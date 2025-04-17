@@ -1,9 +1,30 @@
-import React, { createContext, useState, useContext, ReactNode } from "react";
+import React, {
+  createContext,
+  useState,
+  useContext,
+  ReactNode,
+  useEffect,
+} from "react";
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+import { useNavigate } from "react-router-dom";
+
+// Define the shape of the decoded JWT payload
+interface DecodedToken {
+  userId: string; // Assuming MongoDB ObjectId strings
+  role: "restaurant" | "staff";
+  name: string; // Add name field
+  restaurantId?: string;
+  restaurantName?: string; // Add optional restaurantName
+  // Add other fields your token might contain (e.g., name, email)
+  iat?: number; // Issued at
+  exp?: number; // Expiration time
+}
 
 // Define the shape of the context data
 interface AuthContextType {
   token: string | null;
+  user: DecodedToken | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -26,9 +47,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("authToken")
   );
+  const [user, setUser] = useState<DecodedToken | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // const [userRole, setUserRole] = useState<AuthContextType['userRole']>(null); // Example for user role
+  const navigate = useNavigate();
+
+  // Decode token whenever it changes
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode<DecodedToken>(token);
+        console.log("Decoded Token Payload:", decoded);
+        setUser(decoded);
+      } catch (error) {
+        console.error("Failed to decode token:", error);
+        // Handle invalid token (e.g., logout user)
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem("authToken");
+        navigate("/login");
+      }
+    } else {
+      setUser(null); // Clear user when token is null
+    }
+  }, [token, navigate]); // Dependency array ensures this runs when token changes
 
   // Function to handle login API call and state updates
   const login = async (email: string, password: string) => {
@@ -46,10 +88,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error("Login failed: No token received.");
       }
 
-      setToken(receivedToken);
-      // setUserRole(role); // Set user role if returned by API
+      // Setting the token will trigger the useEffect to decode it and set the user
       localStorage.setItem("authToken", receivedToken);
-      // localStorage.setItem('userRole', role); // Store role if needed
+      setToken(receivedToken);
+
+      // No longer need to set role/user manually here, useEffect handles it
+      // setUserRole(role);
+      // localStorage.setItem('userRole', role);
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message ||
@@ -67,8 +112,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Function to handle logout
   const logout = () => {
     setToken(null);
-    // setUserRole(null);
+    setUser(null); // Clear user state on logout
     localStorage.removeItem("authToken");
+    navigate("/login");
     // localStorage.removeItem('userRole');
     // Optionally redirect to login page
     // window.location.href = '/login'; // Or use navigate if within router context
@@ -77,6 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Value provided by the context
   const contextValue = {
     token,
+    user,
     login,
     logout,
     isLoading,

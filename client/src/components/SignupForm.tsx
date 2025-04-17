@@ -9,8 +9,8 @@ const SignupForm: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"staff" | "restaurant">("staff"); // Default role
-  const [restaurantName, setRestaurantName] = useState("");
-  const [restaurantId, setRestaurantId] = useState(""); // For staff signup
+  const [restaurantName, setRestaurantName] = useState(""); // For restaurant owner signup
+  const [restaurantId, setRestaurantId] = useState(""); // REVERT: For staff signup
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +42,7 @@ const SignupForm: React.FC = () => {
       password,
       role,
       restaurantName: role === "restaurant" ? restaurantName : undefined,
-      restaurantId: role === "staff" ? restaurantId : undefined,
+      restaurantId: role === "staff" ? restaurantId : undefined, // Send ID for staff
     };
 
     try {
@@ -205,7 +205,7 @@ const SignupForm: React.FC = () => {
             Restaurant ID (Provided by Manager):
           </label>
           <input
-            type="text" // Keep as text for now, could be ObjectId
+            type="text"
             id="restaurantId"
             value={restaurantId}
             onChange={(e) => setRestaurantId(e.target.value)}
