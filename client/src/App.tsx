@@ -1,35 +1,57 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from "react";
+import "./App.css";
+import { AuthProvider } from "./context/AuthContext";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
+// Import Page/Component Placeholders
+import LoginForm from "./components/LoginForm";
+import SignupForm from "./components/SignupForm";
+import RestaurantDashboard from "./pages/RestaurantDashboard";
+import StaffDashboard from "./pages/StaffDashboard";
+// TODO: Import other page components as needed
+
+// Placeholder for protected route logic
+// import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  const [count, setCount] = useState(0)
+  // Basic structure - routing logic will likely get more complex
+  // with protected routes and role-based access.
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/signup" element={<SignupForm />} />
+          {/* TODO: Implement Protected Routes Logic */}
+          {/* Example: Redirect to login if not authenticated */}
+          <Route path="/dashboard" element={<RestaurantDashboard />} /> //
+          Placeholder - needs protection & role logic
+          <Route path="/staff-dashboard" element={<StaffDashboard />} /> //
+          Placeholder
+          {/* Redirect root path to login or dashboard based on auth state */}
+          {/* This requires accessing auth context, which is better done in a dedicated component */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* TODO: Add routes for other pages like MenuManagement, QuizManagement etc. */}
+          {/* Example structure for protected route: */}
+          {/* <Route path="/menus" element={ 
+                <ProtectedRoute requiredRole="restaurant"> 
+                  <MenuManagementPage /> 
+                </ProtectedRoute> 
+              } /> 
+          */}
+          {/* Catch-all for 404 Not Found - Optional */}
+          {/* <Route path="*" element={<div>404 Not Found</div>} /> */}
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;
