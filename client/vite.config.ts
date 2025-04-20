@@ -1,9 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+// import postcssConfig from './postcss.config.js'; // No longer importing directly
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // css: { // <-- Remove explicit CSS config block
+  //   postcss: './postcss.config.js'
+  // },
   server: {
     proxy: {
       // Proxy /api requests to our backend server

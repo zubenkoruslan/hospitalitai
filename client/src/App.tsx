@@ -1,5 +1,5 @@
 import React from "react";
-import "./App.css";
+import "./App.css"; // <-- Re-enable this import
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import {
   BrowserRouter as Router,
@@ -14,6 +14,8 @@ import LoginForm from "./components/LoginForm";
 import SignupForm from "./components/SignupForm";
 import RestaurantDashboard from "./pages/RestaurantDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
+import MenusPage from "./pages/MenusPage";
+import MenuItemsPage from "./pages/MenuItemsPage";
 // TODO: Import other page components as needed
 
 // Placeholder for protected route logic
@@ -69,6 +71,22 @@ function App() {
             element={
               <ProtectedRoute requiredRole="staff">
                 <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <MenusPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/:menuId/items"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <MenuItemsPage />
               </ProtectedRoute>
             }
           />
