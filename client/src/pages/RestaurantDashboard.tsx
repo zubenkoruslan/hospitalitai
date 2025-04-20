@@ -225,15 +225,10 @@ const RestaurantDashboard: React.FC = () => {
               <h3 className="text-lg font-medium mb-2 text-gray-900">
                 Quiz Management
               </h3>
-              <div className="flex space-x-2">
-                <Link to="/quizzes" className="flex-1">
-                  <button className="w-full px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50">
-                    View Quizzes
-                  </button>
-                </Link>
-                <Link to="/quizzes/create" className="flex-1">
+              <div>
+                <Link to="/quiz-management" className="w-full">
                   <button className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Create Quiz
+                    Manage/Create Quiz
                   </button>
                 </Link>
               </div>

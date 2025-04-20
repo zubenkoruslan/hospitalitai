@@ -16,6 +16,10 @@ import RestaurantDashboard from "./pages/RestaurantDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
 import MenusPage from "./pages/MenusPage";
 import MenuItemsPage from "./pages/MenuItemsPage";
+// import QuizPage from "./pages/QuizPage"; // Assuming this exists - commented out for now
+import QuizCreation from "./pages/QuizCreation"; // <-- Keep this import
+// import RegistrationPage from "./pages/RegistrationPage"; // Commented out for now
+import MenuManagementPage from "./pages/MenuManagementPage";
 // TODO: Import other page components as needed
 
 // Placeholder for protected route logic
@@ -90,6 +94,24 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* Add new route for Quiz Creation - Protected for restaurant */}
+          <Route
+            path="/quiz-management"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <QuizCreation />
+              </ProtectedRoute>
+            }
+          />
+          {/* Quiz taking page for Staff - Protected for staff - Commented out if QuizPage doesn't exist */}
+          {/* <Route
+            path="/quiz"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <QuizPage />
+              </ProtectedRoute>
+            }
+          /> */}
           {/* Root path handled by RootRedirect component */}
           <Route path="/" element={<RootRedirect />} />
           {/* TODO: Add routes for other pages like MenuManagement, QuizManagement etc. */}

@@ -8,6 +8,7 @@ import React, {
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
+import api from "../services/api"; // Assuming api is your configured axios instance
 
 // Define the shape of the decoded JWT payload
 interface DecodedToken {
@@ -43,58 +44,76 @@ interface AuthProviderProps {
 
 // Create the AuthProvider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  // Initialize token from localStorage
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("authToken")
   );
   const [user, setUser] = useState<DecodedToken | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as true until check is done
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Decode token whenever it changes
   useEffect(() => {
-    if (token) {
-      try {
-        const decoded = jwtDecode<DecodedToken>(token);
-        console.log("Decoded Token Payload:", decoded);
-        setUser(decoded);
-      } catch (error) {
-        console.error("Failed to decode token:", error);
-        // Handle invalid token (e.g., logout user)
+    const initializeAuth = () => {
+      const storedToken = localStorage.getItem("authToken");
+      if (storedToken) {
+        try {
+          const decoded = jwtDecode<DecodedToken>(storedToken);
+          // Optional: Check token expiration
+          if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+            console.log("Token expired");
+            throw new Error("Token expired");
+          }
+          // Token is valid (or doesn't have exp), set state and headers
+          setToken(storedToken);
+          setUser(decoded);
+          // *** Set default auth header for subsequent API calls ***
+          api.defaults.headers.common[
+            "Authorization"
+          ] = `Bearer ${storedToken}`;
+          console.log("Auth initialized with token.");
+        } catch (error) {
+          console.error("Failed to initialize auth from stored token:", error);
+          // Clear invalid/expired token
+          localStorage.removeItem("authToken");
+          setToken(null);
+          setUser(null);
+          // Ensure header is removed if initialization fails
+          delete api.defaults.headers.common["Authorization"];
+        }
+      } else {
+        // No token found, ensure state is clear and header is removed
         setToken(null);
         setUser(null);
-        localStorage.removeItem("authToken");
-        navigate("/login");
+        delete api.defaults.headers.common["Authorization"];
+        console.log("No token found, auth not initialized.");
       }
-    } else {
-      setUser(null); // Clear user when token is null
-    }
-  }, [token, navigate]); // Dependency array ensures this runs when token changes
+      setIsLoading(false); // Finished loading/checking auth state
+    };
 
-  // Function to handle login API call and state updates
+    initializeAuth();
+  }, []); // Empty dependency array means run only once on mount
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      // *** Replace with your actual backend API endpoint ***
-      const response = await axios.post("/api/auth/login", { email, password });
-
-      // --- Adjust based on your actual API response structure ---
-      const { token: receivedToken /*, role */ } = response.data;
-      // ---------------------------------------------------------
+      const response = await api.post("/auth/login", { email, password });
+      const { token: receivedToken } = response.data;
 
       if (!receivedToken) {
         throw new Error("Login failed: No token received.");
       }
 
-      // Setting the token will trigger the useEffect to decode it and set the user
+      // Store token and update state
       localStorage.setItem("authToken", receivedToken);
       setToken(receivedToken);
 
-      // No longer need to set role/user manually here, useEffect handles it
-      // setUserRole(role);
-      // localStorage.setItem('userRole', role);
+      // Decode and set user immediately after getting token
+      const decoded = jwtDecode<DecodedToken>(receivedToken);
+      setUser(decoded);
+
+      // *** Set default auth header on successful login ***
+      api.defaults.headers.common["Authorization"] = `Bearer ${receivedToken}`;
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message ||
@@ -102,25 +121,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         "Login failed. Please check credentials.";
       console.error("Login API error:", err);
       setError(errorMessage);
-      // Re-throw the error so the component can catch it if needed
+      delete api.defaults.headers.common["Authorization"]; // Clear header on login fail
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to handle logout
   const logout = () => {
     setToken(null);
-    setUser(null); // Clear user state on logout
+    setUser(null);
     localStorage.removeItem("authToken");
+    // *** Remove default auth header on logout ***
+    delete api.defaults.headers.common["Authorization"];
+    console.log("User logged out, auth header removed.");
     navigate("/login");
-    // localStorage.removeItem('userRole');
-    // Optionally redirect to login page
-    // window.location.href = '/login'; // Or use navigate if within router context
   };
 
-  // Value provided by the context
   const contextValue = {
     token,
     user,
@@ -128,8 +145,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isLoading,
     error,
-    // userRole,
   };
+
+  // Render children only after initial loading is complete
+  // Or show a loading spinner globally
+  if (isLoading) {
+    // Optional: Return a global loading spinner or null
+    // return <div>Loading Authentication...</div>;
+    return null; // Or render children immediately if you handle loading inside components
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
