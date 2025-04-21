@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 // Interface for storing a single answer given by the user
 interface IUserAnswer {
@@ -9,15 +9,16 @@ interface IUserAnswer {
 
 // Interface for the QuizResult document
 export interface IQuizResult extends Document {
-  quizId: mongoose.Types.ObjectId; // Reference to the Quiz taken
-  userId: mongoose.Types.ObjectId; // Reference to the User (staff) who took the quiz
-  restaurantId: mongoose.Types.ObjectId; // Reference to the Restaurant (for easier querying/filtering)
-  answers: IUserAnswer[];
-  score: number; // Calculated score (e.g., percentage or number correct)
-  totalQuestions: number; // Store the total number of questions at the time of taking
-  startedAt: Date;
+  quizId: Types.ObjectId; // Reference to the Quiz
+  userId: Types.ObjectId; // Reference to the User (Staff) who took the quiz
+  restaurantId: Types.ObjectId; // Reference to the Restaurant for easier querying
+  answers: number[]; // Array of indices representing the user's chosen answers
+  score: number; // Number of correct answers
+  totalQuestions: number; // Total questions in the quiz at time of submission
+  startedAt?: Date;
   completedAt?: Date;
-  status: "notStarted" | "inProgress" | "completed";
+  status: "pending" | "in-progress" | "completed";
+  retakeCount: number;
 }
 
 // Mongoose schema for embedded UserAnswer
@@ -49,55 +50,61 @@ const quizResultSchema = new Schema<IQuizResult>(
     quizId: {
       type: Schema.Types.ObjectId,
       ref: "Quiz",
-      required: true,
+      required: [true, "Quiz ID is required"],
       index: true,
     },
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: [true, "User ID is required"],
       index: true,
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
       ref: "Restaurant",
-      required: true,
+      required: [true, "Restaurant ID is required"],
       index: true,
     },
-    answers: [userAnswerSchema],
+    answers: {
+      type: [Number],
+      required: [true, "Answers are required"],
+      // Optional validation: check if number of answers matches totalQuestions upon save?
+    },
     score: {
       type: Number,
-      required: true,
+      required: [true, "Score is required"],
       min: 0,
-      // Max score could vary, maybe store as percentage?
-      // max: 100, // Example if storing percentage
     },
     totalQuestions: {
       type: Number,
-      required: true,
+      required: [true, "Total questions count is required"],
       min: 0,
     },
     startedAt: {
       type: Date,
-      default: Date.now,
-      required: true,
     },
     completedAt: {
       type: Date,
     },
     status: {
       type: String,
+      enum: ["pending", "in-progress", "completed"],
+      default: "pending",
       required: true,
-      enum: ["notStarted", "inProgress", "completed"],
-      default: "notStarted",
+    },
+    retakeCount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
     },
   },
   {
-    timestamps: true, // Adds createdAt, updatedAt (distinct from started/completed)
+    timestamps: true, // Automatically add createdAt and updatedAt fields
   }
 );
 
-// Index for efficient querying of results by user and quiz
+// Optional: Compound index for faster querying of results by user and quiz
 quizResultSchema.index({ userId: 1, quizId: 1 });
 
 // Ensure only one result entry per user per quiz attempt (conceptually)

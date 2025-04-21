@@ -103,7 +103,7 @@ const RestaurantDashboard: React.FC = () => {
   const navLinks = [
     { name: "Menu", path: "/menu" },
     { name: "Quizzes", path: "/quizzes" },
-    { name: "Staff Results", path: "/results" },
+    { name: "Staff Results", path: "/staff-results" },
   ];
 
   const SidebarContent = () => (
@@ -233,15 +233,19 @@ const RestaurantDashboard: React.FC = () => {
                 </Link>
               </div>
             </div>
-            {/* Results Card */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-2 text-gray-900">
+            {/* Add Staff Results Card */}
+            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">
                 Staff Results
               </h3>
-              <Link to="/results">
-                <button className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                  View Results
-                </button>
+              <p className="text-sm text-gray-600 mb-4">
+                View your staff members' quiz performance and completion status.
+              </p>
+              <Link
+                to="/staff-results"
+                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
+              >
+                View Staff Results
               </Link>
             </div>
           </div>

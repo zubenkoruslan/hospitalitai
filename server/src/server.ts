@@ -3,6 +3,15 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
+// Import route files
+import authRoutes from "./routes/auth";
+import menuRoutes from "./routes/menus";
+import itemRoutes from "./routes/items";
+import quizRoutes from "./routes/quiz";
+import resultsRoutes from "./routes/quizResult";
+import { protect } from "./middleware/authMiddleware";
+// TODO: Import other route files as needed (e.g., quizzes)
+
 dotenv.config();
 
 const app: Express = express();
@@ -24,6 +33,14 @@ const uri: string =
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).send("Server is running");
 });
+
+// Mount API routes
+app.use("/api/auth", authRoutes);
+app.use("/api/menus", menuRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/results", resultsRoutes);
+// TODO: Mount other routes
 
 const PORT: string | number = process.env.PORT || 3000;
 app.listen(PORT, () => {

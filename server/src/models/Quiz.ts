@@ -1,117 +1,60 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
+import { IMenuItem } from "./MenuItem"; // Import for referencing
+import { IUser } from "./User"; // Import for referencing
 
-// Interface for embedded Question options (if multiple choice)
-interface IQuestionOption {
+// Interface for individual question within a quiz
+export interface IQuestion {
   text: string;
-}
-
-// Interface for embedded Question
-interface IQuestion {
-  _id?: mongoose.Types.ObjectId; // Add optional _id field
-  questionText: string;
-  questionType: "multipleChoice" | "trueFalse";
-  options?: IQuestionOption[]; // Only required for multipleChoice
-  correctAnswer: string; // Store the correct option text or 'true'/'false'
+  choices: string[];
+  correctAnswer: number; // Index (0-3)
+  menuItemId: Types.ObjectId; // Link question to the specific menu item it's about
 }
 
 // Interface for the Quiz document
 export interface IQuiz extends Document {
   title: string;
-  description?: string;
-  restaurantId: mongoose.Types.ObjectId; // Reference to the Restaurant
-  createdBy: mongoose.Types.ObjectId; // Reference to the User (Restaurant role) who created it
-  associatedMenus?: mongoose.Types.ObjectId[]; // Optional references to Menus
-  questions: IQuestion[];
+  description?: string; // Add optional description field
+  menuItemIds: Types.ObjectId[]; // References to MenuItems used in the quiz
+  questions: IQuestion[]; // Array of question subdocuments
+  restaurantId: Types.ObjectId; // Reference to the User (Restaurant) who owns the quiz
+  // Timestamps added automatically
+  createdAt?: Date; // Add createdAt
+  updatedAt?: Date; // Add updatedAt
 }
 
-// Mongoose schema for embedded Question Option
-const questionOptionSchema = new Schema<IQuestionOption>(
+// Mongoose schema for the Question subdocument
+const QuestionSchema: Schema<IQuestion> = new Schema(
   {
     text: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-  },
-  { _id: false } // Usually don't need separate IDs for simple options
-);
-
-// Mongoose schema for embedded Question
-const questionSchema = new Schema<IQuestion>(
-  {
-    questionText: {
       type: String,
       required: [true, "Question text is required"],
       trim: true,
     },
-    questionType: {
-      type: String,
-      required: true,
-      enum: ["multipleChoice", "trueFalse"],
-    },
-    options: {
-      type: [questionOptionSchema],
-      // Required only if questionType is multipleChoice
-      required: function (this: IQuestion) {
-        return this.questionType === "multipleChoice";
-      },
+    choices: {
+      type: [String],
+      required: [true, "Question must have choices"],
       validate: [
-        {
-          validator: function (this: IQuestion, val: IQuestionOption[]) {
-            // For multiple choice, must have at least 2 options
-            return (
-              this.questionType !== "multipleChoice" || (val && val.length >= 2)
-            );
-          },
-          message: "Multiple choice questions must have at least 2 options.",
-        },
-        {
-          validator: function (this: IQuestion, val: IQuestionOption[]) {
-            // Should not have options if true/false
-            return (
-              this.questionType !== "trueFalse" ||
-              val === undefined ||
-              val.length === 0
-            );
-          },
-          message: "True/False questions should not have options.",
-        },
+        (val: string[]) => val.length === 4,
+        "Question must have exactly 4 choices",
       ],
     },
     correctAnswer: {
-      type: String,
-      required: [true, "Correct answer is required"],
-      trim: true,
-      validate: {
-        validator: function (this: IQuestion, val: string): boolean {
-          if (this.questionType === "trueFalse") {
-            return val === "true" || val === "false";
-          }
-          if (this.questionType === "multipleChoice") {
-            // Ensure the correct answer is one of the options provided
-            return this.options?.some((option) => option.text === val) ?? false;
-          }
-          return false; // Should not happen with enum validation
-        },
-        message: function (
-          this: IQuestion,
-          props: mongoose.ValidatorProps
-        ): string {
-          // Access questionType directly from the current subdocument context ('this')
-          if (this.questionType === "trueFalse")
-            return `Correct answer must be 'true' or 'false'`;
-          if (this.questionType === "multipleChoice")
-            return `Correct answer for [${props.path}] must match one of the option texts.`;
-          return `Invalid correct answer.`;
-        },
-      },
+      type: Number,
+      required: [true, "Correct answer index is required"],
+      min: [0, "Correct answer index must be between 0 and 3"],
+      max: [3, "Correct answer index must be between 0 and 3"],
+    },
+    menuItemId: {
+      type: Schema.Types.ObjectId,
+      ref: "MenuItem",
+      required: [true, "Question must be linked to a menu item"],
     },
   },
-  { _id: true } // Give questions their own IDs
-);
+  { _id: false }
+); // Subdocuments don't need their own _id by default
 
 // Mongoose schema for Quiz
-const quizSchema = new Schema<IQuiz>(
+const QuizSchema: Schema<IQuiz> = new Schema(
   {
     title: {
       type: String,
@@ -121,40 +64,37 @@ const quizSchema = new Schema<IQuiz>(
     description: {
       type: String,
       trim: true,
+      maxLength: [500, "Description cannot be more than 500 characters"],
+      default: null,
     },
-    restaurantId: {
-      type: Schema.Types.ObjectId,
-      ref: "Restaurant",
-      required: [true, "Quiz must belong to a restaurant"],
-      index: true,
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Quiz must have a creator"],
-    },
-    associatedMenus: [
+    menuItemIds: [
       {
         type: Schema.Types.ObjectId,
-        ref: "Menu",
+        ref: "MenuItem",
+        required: true,
       },
     ],
     questions: {
-      type: [questionSchema],
-      validate: {
-        validator: function (val: IQuestion[]) {
-          return val && val.length > 0;
-        },
-        message: "Quiz must contain at least one question.",
-      },
+      type: [QuestionSchema],
+      required: true,
+      validate: [
+        (val: IQuestion[]) => val.length > 0,
+        "Quiz must contain at least one question",
+      ],
+    },
+    restaurantId: {
+      type: Schema.Types.ObjectId,
+      ref: "User", // Assuming restaurants are linked via the User model
+      required: [true, "Restaurant ID is required"],
+      index: true,
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // Automatically add createdAt and updatedAt fields
   }
 );
 
 // Create and export the Quiz model
-const Quiz: Model<IQuiz> = mongoose.model<IQuiz>("Quiz", quizSchema);
+const Quiz: Model<IQuiz> = mongoose.model<IQuiz>("Quiz", QuizSchema);
 
 export default Quiz;

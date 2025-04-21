@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import User, { IUser } from "../models/User";
 import Restaurant, { IRestaurant } from "../models/Restaurant";
 import mongoose, { Types } from "mongoose";
+import { protect, restrictTo } from "../middleware/authMiddleware";
 
 const router: Router = express.Router();
 
@@ -38,7 +39,9 @@ try {
 interface AuthPayload {
   userId: mongoose.Types.ObjectId;
   role: string; // Or specific 'restaurant' | 'staff'
+  name: string; // Add user name
   restaurantId?: mongoose.Types.ObjectId;
+  restaurantName?: string; // Add restaurantName (optional)
 }
 
 /**
@@ -73,20 +76,16 @@ router.post(
     }
     if (role === "restaurant" && restaurantId) {
       res.status(400).json({
-        message: "Restaurant ID should not be provided for restaurant role",
+        message:
+          "Restaurant ID should not be provided when signing up as restaurant owner",
       });
       return;
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
       // Check if user already exists
-      const existingUser = await User.findOne({ email }).session(session);
+      const existingUser = await User.findOne({ email });
       if (existingUser) {
-        await session.abortTransaction();
-        session.endSession();
         res
           .status(400)
           .json({ message: "User with this email already exists" });
@@ -95,64 +94,93 @@ router.post(
 
       let newRestaurantDoc: IRestaurant | null = null;
       let finalRestaurantId: mongoose.Types.ObjectId | undefined;
+      let newUserDoc: IUser | null = null;
 
-      // If role is restaurant, create the restaurant first
+      // If role is restaurant, create the user first, then the restaurant linked to the user
       if (role === "restaurant") {
-        newRestaurantDoc = new Restaurant({ name: restaurantName });
-        // Owner will be set after user is created
-        await newRestaurantDoc.save({ session });
-        finalRestaurantId = newRestaurantDoc._id as mongoose.Types.ObjectId; // Assert type
+        // 1. Create the User
+        newUserDoc = new User({
+          email,
+          password, // Hashing handled by pre-save hook
+          role,
+          name,
+          // restaurantId will be added after restaurant is created
+        });
+        await newUserDoc.save();
+
+        // 2. Create the Restaurant, assigning the owner
+        newRestaurantDoc = new Restaurant({
+          name: restaurantName,
+          owner: newUserDoc._id as mongoose.Types.ObjectId, // Assign owner immediately
+        });
+        await newRestaurantDoc.save();
+
+        // 3. Update the User with the Restaurant ID
+        finalRestaurantId = newRestaurantDoc._id as mongoose.Types.ObjectId;
+        newUserDoc.restaurantId = finalRestaurantId;
+        await newUserDoc.save(); // Save the user again with the restaurantId
       }
-      // If role is staff, validate the provided restaurantId
+      // If role is staff, validate the provided restaurantId and find the restaurant
       else if (role === "staff") {
-        const targetRestaurant = await Restaurant.findById(
-          restaurantId
-        ).session(session);
+        // Find restaurant by ID
+        const targetRestaurant = await Restaurant.findById(restaurantId);
+
         if (!targetRestaurant) {
-          await session.abortTransaction();
-          session.endSession();
           res
             .status(404)
-            .json({ message: "Restaurant not found for staff assignment" });
+            .json({ message: "Restaurant not found with the provided ID." });
           return;
         }
-        finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId; // Assert type
-      }
+        finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId; // Get ID from found restaurant
 
-      // Create new user
-      const newUserDoc = new User({
-        email,
-        password, // Hashing is handled by the pre-save hook in the model
-        role,
-        name, // Assuming name field exists in User model (add if not)
-        restaurantId: finalRestaurantId,
-      });
-      await newUserDoc.save({ session });
+        // Create staff user linked to the restaurant
+        newUserDoc = new User({
+          email,
+          password,
+          role,
+          name,
+          restaurantId: finalRestaurantId,
+        });
+        await newUserDoc.save();
 
-      // If a new restaurant was created, assign its owner
-      if (newRestaurantDoc) {
-        newRestaurantDoc.owner = newUserDoc._id as mongoose.Types.ObjectId; // Assert type
-        await newRestaurantDoc.save({ session });
-      }
-      // If staff was created, add them to the restaurant's staff list
-      else if (role === "staff" && finalRestaurantId) {
+        // Add staff member to the restaurant's staff list
         await Restaurant.findByIdAndUpdate(
           finalRestaurantId,
-          { $addToSet: { staff: newUserDoc._id } }, // Use $addToSet to avoid duplicates
-          { session, new: true } // `new: true` is optional here
+          { $addToSet: { staff: newUserDoc._id } } // Use $addToSet to avoid duplicates
         );
+      } else {
+        // Handle potential other roles or invalid role value if necessary
+        res.status(400).json({ message: "Invalid user role specified" });
+        return;
       }
 
-      await session.commitTransaction();
+      // Prepare response (exclude password) - newUserDoc should be defined from above branches
+      if (!newUserDoc) {
+        // This case should ideally not happen if validation & role handling is correct
+        console.error(
+          "Signup Error: newUserDoc is null after processing roles."
+        );
+        res
+          .status(500)
+          .json({ message: "Internal server error during signup" });
+        return;
+      }
 
-      // Prepare response (exclude password)
       const { password: _, ...userResponse } = newUserDoc.toObject();
 
       // Generate JWT token
       const payload: AuthPayload = {
         userId: newUserDoc._id as mongoose.Types.ObjectId,
         role: newUserDoc.role,
+        name: newUserDoc.name, // Include user name
         restaurantId: newUserDoc.restaurantId,
+        // Fetch restaurant name if role is staff and ID exists, or use newRestaurantDoc name if owner
+        restaurantName:
+          role === "staff" && newUserDoc.restaurantId
+            ? (await Restaurant.findById(newUserDoc.restaurantId))?.name
+            : role === "restaurant"
+            ? newRestaurantDoc?.name
+            : undefined,
       };
       const options: jwt.SignOptions = { expiresIn: JWT_EXPIRES_IN_SECONDS };
       const token = jwt.sign(payload, JWT_SECRET, options);
@@ -164,7 +192,6 @@ router.post(
         token,
       });
     } catch (error: any) {
-      await session.abortTransaction();
       console.error("Signup Error:", error);
       // Handle Mongoose validation errors or other errors
       if (!res.headersSent) {
@@ -178,8 +205,6 @@ router.post(
       } else {
         next(error); // Pass to error handling middleware if headers sent
       }
-    } finally {
-      session.endSession(); // Ensure session is always closed
     }
   }
 );
@@ -200,8 +225,10 @@ router.post(
     }
 
     try {
-      // Find user by email, explicitly select password for comparison
-      const user = await User.findOne({ email }).select("+password");
+      // Find user by email, explicitly select fields needed for payload + password
+      const user = await User.findOne({ email }).select(
+        "+password name role restaurantId"
+      );
 
       if (!user) {
         res.status(401).json({ message: "Invalid credentials" }); // User not found
@@ -220,8 +247,17 @@ router.post(
       const payload: AuthPayload = {
         userId: user._id as mongoose.Types.ObjectId,
         role: user.role,
+        name: user.name, // Include user name
         restaurantId: user.restaurantId, // Include restaurantId if present
+        // Fetch and include restaurant name if user has a restaurantId (staff or owner)
+        restaurantName: user.restaurantId
+          ? (await Restaurant.findById(user.restaurantId))?.name
+          : undefined,
       };
+
+      console.log("--- Login Route Debug --- ");
+      console.log("User object from DB:", JSON.stringify(user, null, 2)); // Log user object
+      console.log("Payload for JWT:", JSON.stringify(payload, null, 2)); // Log payload
 
       // Sign the token
       const options: jwt.SignOptions = { expiresIn: JWT_EXPIRES_IN_SECONDS };
@@ -235,6 +271,42 @@ router.post(
         res.status(500).json({ message: "Server error during login" });
       } else {
         next(error); // Pass to error handling middleware
+      }
+    }
+  }
+);
+
+/**
+ * @route   GET /api/auth/staff
+ * @desc    Get all staff members for the logged-in restaurant owner
+ * @access  Private (Restaurant Owner only)
+ */
+router.get(
+  "/staff",
+  protect, // Apply authentication middleware
+  restrictTo("restaurant"), // Apply role restriction middleware
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // The protect middleware should have added the user object to req
+    if (!req.user?.restaurantId) {
+      res
+        .status(400)
+        .json({ message: "Restaurant ID not found for this user." });
+      return;
+    }
+
+    try {
+      const staffMembers = await User.find({
+        restaurantId: req.user.restaurantId,
+        role: "staff", // Ensure we only fetch staff
+      }).select("name email createdAt"); // Select specific fields to return
+
+      res.status(200).json({ staff: staffMembers });
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Server error fetching staff" });
+      } else {
+        next(error);
       }
     }
   }

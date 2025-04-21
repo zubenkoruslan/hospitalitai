@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 
 // Define the interface for the User document
 export interface IUser extends Document {
+  name: string;
   email: string;
   password: string;
   role: "restaurant" | "staff";
@@ -13,6 +14,11 @@ export interface IUser extends Document {
 // Define the Mongoose schema
 const userSchema = new Schema<IUser>(
   {
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -44,19 +50,6 @@ const userSchema = new Schema<IUser>(
       required: function (this: IUser) {
         // Only require restaurantId if the role is 'staff'
         return this.role === "staff";
-      },
-      validate: {
-        validator: function (
-          this: IUser,
-          value: mongoose.Types.ObjectId | undefined
-        ) {
-          // Ensure restaurantId is not provided if role is 'restaurant'
-          if (this.role === "restaurant" && value != null) {
-            return false;
-          }
-          return true;
-        },
-        message: "Restaurant ID should not be provided for restaurant roles.",
       },
     },
   },

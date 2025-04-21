@@ -1,22 +1,13 @@
 import express, { Request, Response, Router, NextFunction } from "express";
 import Menu, { IMenu } from "../models/Menu";
-import { authenticateToken, authorizeRole } from "../middleware/authMiddleware"; // Assuming middleware exists
+import { protect, restrictTo } from "../middleware/authMiddleware";
 import mongoose from "mongoose";
 
 const router: Router = express.Router();
 
-// Extend Express Request interface to include user from auth middleware
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    role: string;
-    restaurantId?: string;
-  };
-}
-
 // === Middleware specific to this router ===
-// All menu routes require authentication
-router.use(authenticateToken);
+// Use 'protect' for authentication
+router.use(protect);
 
 // === Routes ===
 
@@ -27,15 +18,12 @@ router.use(authenticateToken);
  */
 router.post(
   "/",
-  authorizeRole(["restaurant"]),
-  async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    const { name, description, items } = req.body;
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { name, description } = req.body;
     const restaurantId = req.user?.restaurantId;
 
+    // Validation
     if (!name) {
       res.status(400).json({ message: "Menu name is required" });
       return;
@@ -44,22 +32,18 @@ router.post(
       res.status(400).json({ message: "Restaurant ID not found for user" });
       return;
     }
-    if (items && !Array.isArray(items)) {
-      res.status(400).json({ message: "Menu items must be an array" });
-      return;
-    }
 
     try {
       const newMenuData: Partial<IMenu> = {
         name,
-        restaurantId: new mongoose.Types.ObjectId(restaurantId),
-        items: items || [],
+        restaurantId: restaurantId,
       };
       if (description) newMenuData.description = description;
 
       const menu = new Menu(newMenuData);
-      await menu.save();
-      res.status(201).json(menu);
+      const savedMenu = await menu.save();
+
+      res.status(201).json({ menu: savedMenu });
     } catch (error: any) {
       if (error.name === "ValidationError") {
         res
@@ -80,11 +64,7 @@ router.post(
  */
 router.get(
   "/",
-  async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const restaurantId = req.user?.restaurantId;
 
     if (!restaurantId) {
@@ -94,7 +74,7 @@ router.get(
 
     try {
       const menus = await Menu.find({ restaurantId });
-      res.json(menus);
+      res.json({ menus: menus });
     } catch (error) {
       console.error("Error fetching menus:", error);
       next(error);
@@ -109,11 +89,7 @@ router.get(
  */
 router.get(
   "/:menuId",
-  async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { menuId } = req.params;
     const restaurantId = req.user?.restaurantId;
 
@@ -133,7 +109,7 @@ router.get(
         res.status(404).json({ message: "Menu not found or access denied" });
         return;
       }
-      res.json(menu);
+      res.json({ menu: menu });
     } catch (error) {
       console.error("Error fetching single menu:", error);
       next(error);
@@ -143,61 +119,55 @@ router.get(
 
 /**
  * @route   PUT /api/menus/:menuId
- * @desc    Update a menu (including items)
+ * @desc    Update a menu
  * @access  Private (Restaurant Role)
  */
 router.put(
   "/:menuId",
-  authorizeRole(["restaurant"]),
-  async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { menuId } = req.params;
-    const { name, description, items } = req.body;
+    const { name, description } = req.body;
     const restaurantId = req.user?.restaurantId;
 
     if (!mongoose.Types.ObjectId.isValid(menuId)) {
-      res.status(400).json({ message: "Invalid Menu ID format" });
-      return;
+      return res.status(400).json({ message: "Invalid Menu ID format" });
     }
     if (!restaurantId) {
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
+      return res
+        .status(400)
+        .json({ message: "Restaurant ID not found for user" });
     }
 
     const updateData: Partial<IMenu> = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
-    if (items !== undefined) {
-      if (!Array.isArray(items)) {
-        res.status(400).json({ message: "Menu items must be an array" });
-        return;
-      }
-      updateData.items = items;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "No update data provided" });
     }
 
     try {
       const updatedMenu = await Menu.findOneAndUpdate(
-        { _id: menuId, restaurantId },
+        { _id: menuId, restaurantId: restaurantId },
         { $set: updateData },
         { new: true, runValidators: true }
       );
 
       if (!updatedMenu) {
-        res.status(404).json({ message: "Menu not found or access denied" });
-        return;
+        return res
+          .status(404)
+          .json({ message: "Menu not found or access denied" });
       }
-      res.json(updatedMenu);
+      res.json({ menu: updatedMenu });
     } catch (error: any) {
       if (error.name === "ValidationError") {
-        res
+        return res
           .status(400)
           .json({ message: "Validation failed", errors: error.errors });
       } else {
         console.error("Error updating menu:", error);
-        next(error);
+        next(error); // Pass error to error-handling middleware
       }
     }
   }
@@ -210,12 +180,8 @@ router.put(
  */
 router.delete(
   "/:menuId",
-  authorizeRole(["restaurant"]),
-  async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { menuId } = req.params;
     const restaurantId = req.user?.restaurantId;
 
@@ -229,7 +195,10 @@ router.delete(
     }
 
     try {
-      const result = await Menu.deleteOne({ _id: menuId, restaurantId });
+      const result = await Menu.deleteOne({
+        _id: menuId,
+        restaurantId: restaurantId,
+      });
 
       if (result.deletedCount === 0) {
         res.status(404).json({ message: "Menu not found or access denied" });
@@ -242,8 +211,5 @@ router.delete(
     }
   }
 );
-
-// Routes for managing individual menu items could go here (e.g., POST /:menuId/items, PUT /:menuId/items/:itemId)
-// For simplicity, the PUT route above replaces the whole items array.
 
 export default router;

@@ -20,6 +20,10 @@ import MenuItemsPage from "./pages/MenuItemsPage";
 import QuizCreation from "./pages/QuizCreation"; // <-- Keep this import
 // import RegistrationPage from "./pages/RegistrationPage"; // Commented out for now
 import MenuManagementPage from "./pages/MenuManagementPage";
+import StaffQuizListPage from "./pages/StaffQuizListPage"; // Import staff quiz list page
+import QuizTakingPage from "./pages/QuizTakingPage"; // Import quiz taking page
+// Add import for the new results page
+import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 // TODO: Import other page components as needed
 
 // Placeholder for protected route logic
@@ -112,6 +116,33 @@ function App() {
               </ProtectedRoute>
             }
           /> */}
+          {/* NEW: Staff Quiz List Page */}
+          <Route
+            path="/staff/quizzes"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <StaffQuizListPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* NEW: Staff Quiz Taking Page */}
+          <Route
+            path="/staff/quiz/:quizId/take"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <QuizTakingPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* NEW: Restaurant Staff Results Page */}
+          <Route
+            path="/staff-results"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <RestaurantStaffResultsPage />
+              </ProtectedRoute>
+            }
+          />
           {/* Root path handled by RootRedirect component */}
           <Route path="/" element={<RootRedirect />} />
           {/* TODO: Add routes for other pages like MenuManagement, QuizManagement etc. */}

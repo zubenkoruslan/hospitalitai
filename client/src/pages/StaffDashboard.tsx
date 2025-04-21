@@ -3,11 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // Mock data for assigned quizzes
-const mockQuizzes = [
-  { id: "quiz1", title: "Basic Food Safety" },
-  { id: "quiz2", title: "Wine Service Fundamentals" },
-  { id: "quiz3", title: "Allergen Awareness" },
-];
+// Remove mock data as we will link to the quiz page
+// const mockQuizzes = [
+//   { id: "quiz1", title: "Basic Food Safety" },
+//   { id: "quiz2", title: "Wine Service Fundamentals" },
+//   { id: "quiz3", title: "Allergen Awareness" },
+// ];
 
 // Simple Loading Spinner Placeholder
 const LoadingSpinner: React.FC = () => (
@@ -76,8 +77,8 @@ const StaffDashboard: React.FC = () => {
   }
 
   const navLinks = [
-    { name: "Quizzes", path: "/quizzes" },
-    { name: "Results", path: "/results" },
+    // Update this link to point to the new staff quiz page
+    { name: "Take a Quiz", path: "/staff/quizzes" },
   ];
 
   const SidebarContent = () => (
@@ -181,52 +182,22 @@ const StaffDashboard: React.FC = () => {
 
           {/* Grid for Content Cards */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Quizzes Card */}
+            {/* Quizzes Card - Modify to link to the quiz list page */}
             <div className="bg-white p-4 rounded-lg shadow">
               <h3 className="text-lg font-medium mb-3 text-gray-900">
-                Assigned Quizzes
+                Available Quizzes
               </h3>
-              {quizzesLoading && <LoadingSpinner />}
-              {quizzesError && <ErrorMessage message={quizzesError} />}
-              {!quizzesLoading && !quizzesError && (
-                <ul className="space-y-2">
-                  {mockQuizzes.length > 0 ? (
-                    mockQuizzes.map((quiz) => (
-                      <li
-                        key={quiz.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                      >
-                        <span className="text-sm text-gray-800">
-                          {quiz.title}
-                        </span>
-                        <Link to={`/quizzes/${quiz.id}/take`}>
-                          <button className="px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                            Take Quiz
-                          </button>
-                        </Link>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="text-sm text-gray-500">
-                      No quizzes assigned.
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-            {/* Results Card */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-3 text-gray-900">
-                Your Results
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Review your past quiz performance.
-              </p>
-              <Link to="/results">
-                <button className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                  View Results
-                </button>
-              </Link>
+              {/* Remove loading/error placeholders and mock data rendering */}
+              {/* {!quizzesLoading && !quizzesError && ( */}
+              <div className="mt-4">
+                <Link
+                  to="/staff/quizzes"
+                  className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                >
+                  View and Take Quizzes
+                </Link>
+              </div>
+              {/* )} */}
             </div>
           </div>
         </main>

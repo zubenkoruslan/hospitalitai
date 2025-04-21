@@ -12,13 +12,16 @@ interface MenuItem {
   description?: string;
   price?: number;
   ingredients?: string[];
-  allergens?: string[];
   itemType: ItemType;
   category: ItemCategory;
   menuId: string; // Foreign key linking to the Menu
   restaurantId: string;
   createdAt?: string;
   updatedAt?: string;
+  isGlutenFree: boolean;
+  isDairyFree: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
 }
 
 // Re-import types from model file if possible, or redefine here
@@ -35,24 +38,34 @@ interface Menu {
   description?: string;
 }
 
+// Update FormData interface to allow empty category string
 interface MenuItemFormData {
   name: string;
   description: string;
   price: string; // Use string for form input, convert later
   ingredients: string; // Comma-separated string
-  allergens: string;
   itemType: ItemType | "";
-  category: ItemCategory | "";
+  category: ItemCategory | ""; // Explicitly allow empty string
+  isGlutenFree: boolean;
+  isDairyFree: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
 }
 
-// Define constants locally for frontend use
-const FOOD_CATEGORIES = ["starter", "main", "dessert"] as const;
+// Define constants locally for frontend use - UPDATE THESE TO MATCH BACKEND MODEL
+const FOOD_CATEGORIES = [
+  "appetizer",
+  "main",
+  "side",
+  "dessert",
+  "other",
+] as const;
 const BEVERAGE_CATEGORIES = [
-  "cold",
   "hot",
-  "wine",
-  "alcohol",
-  "cocktail",
+  "cold",
+  "alcoholic",
+  "non-alcoholic",
+  "other",
 ] as const;
 
 // --- Helper Components (Reusing LoadingSpinner, ErrorMessage, SuccessNotification) ---
@@ -144,9 +157,12 @@ const MenuItemsPage: React.FC = () => {
     description: "",
     price: "",
     ingredients: "",
-    allergens: "",
     itemType: "",
     category: "",
+    isGlutenFree: false,
+    isDairyFree: false,
+    isVegetarian: false,
+    isVegan: false,
   };
   const [formData, setFormData] = useState<MenuItemFormData>(initialFormData);
   const [formError, setFormError] = useState<string | null>(null);
@@ -200,14 +216,31 @@ const MenuItemsPage: React.FC = () => {
 
   const openEditModal = (item: MenuItem) => {
     setCurrentItem(item);
+
+    let categoryToSet: ItemCategory | "" = item.category; // Initialize with the correct type
+    const foodCategories = ["appetizer", "main", "side", "dessert", "other"];
+    if (
+      item.itemType === "food" &&
+      !foodCategories.includes(item.category as any)
+    ) {
+      console.warn(
+        `Item '${item.name}' has outdated category '${item.category}'. Resetting.`
+      );
+      categoryToSet = "" as ItemCategory | ""; // Explicitly cast empty string
+    }
+    // Add similar check for beverage categories if they changed significantly
+
     setFormData({
       name: item.name,
       description: item.description || "",
       price: item.price?.toString() || "",
       ingredients: (item.ingredients || []).join(", "),
-      allergens: (item.allergens || []).join(", "),
       itemType: item.itemType,
-      category: item.category,
+      category: categoryToSet, // Assign the potentially reset value
+      isGlutenFree: item.isGlutenFree ?? false,
+      isDairyFree: item.isDairyFree ?? false,
+      isVegetarian: item.isVegetarian ?? false,
+      isVegan: item.isVegan ?? false,
     });
     setFormError(null);
     setIsAddEditModalOpen(true);
@@ -233,9 +266,26 @@ const MenuItemsPage: React.FC = () => {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
 
-    if (name === "itemType") {
+    // Handle checkboxes differently
+    if (type === "checkbox") {
+      const { checked } = e.target as HTMLInputElement;
+      setFormData((prev) => ({
+        ...prev,
+        [name]: checked, // Use the boolean checked state
+      }));
+      // Enforce consistency: If Vegan is checked, Vegetarian must be checked
+      if (name === "isVegan" && checked) {
+        setFormData((prev) => ({ ...prev, isVegetarian: true }));
+      }
+      // If Vegetarian is unchecked, Vegan must be unchecked
+      if (name === "isVegetarian" && !checked) {
+        setFormData((prev) => ({ ...prev, isVegan: false }));
+      }
+      // Add other consistency checks if needed (e.g., Vegan -> Dairy Free)
+    } else if (name === "itemType") {
+      // --- Keep existing itemType/category reset logic ---
       const newType = value as ItemType | "";
       const currentCategory = formData.category;
       let resetCategory = false;
@@ -250,92 +300,87 @@ const MenuItemsPage: React.FC = () => {
         !BEVERAGE_CATEGORIES.includes(currentCategory as any)
       ) {
         resetCategory = true;
-      } else if (newType === "") {
-        resetCategory = true;
       }
 
       setFormData((prev) => ({
         ...prev,
-        [name]: value as ItemType | "",
-        ...(resetCategory && { category: "" }),
+        itemType: newType,
+        // Reset category only if it becomes invalid for the new type
+        category: resetCategory ? "" : prev.category,
       }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      // Handle regular inputs (text, textarea, select)
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
     }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setFormError("Item name is required.");
+    if (!formData.itemType || !formData.category) {
+      setFormError("Item Type and Category are required.");
       return;
     }
-    if (!formData.itemType) {
-      setFormError("Item type is required.");
-      return;
-    }
-    if (!formData.category) {
-      setFormError("Item category is required.");
-      return;
-    }
-    if (!menuId || !restaurantId) {
-      setFormError("Menu or Restaurant context is missing.");
-      return;
-    }
-
-    const priceValue = parseFloat(formData.price);
-    if (formData.price.trim() && (isNaN(priceValue) || priceValue < 0)) {
-      setFormError("Please enter a valid positive price.");
-      return;
-    }
-
     setIsSubmitting(true);
     setFormError(null);
-    setError(null);
-
-    const payload = {
-      name: formData.name.trim(),
-      description: formData.description.trim() || undefined,
-      price: formData.price.trim() ? priceValue : undefined,
-      ingredients: formData.ingredients
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      allergens: formData.allergens
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      itemType: formData.itemType as ItemType,
-      category: formData.category as ItemCategory,
-      menuId: menuId,
-      restaurantId: restaurantId,
-    };
 
     try {
       let response: AxiosResponse<{ item: MenuItem }>;
+      const priceValue = parseFloat(formData.price);
+      const payload = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: formData.price.trim() ? priceValue : undefined,
+        ingredients: formData.ingredients
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        itemType: formData.itemType,
+        category: formData.category,
+        isGlutenFree: formData.isGlutenFree,
+        isDairyFree: formData.isDairyFree,
+        isVegetarian: formData.isVegetarian,
+        isVegan: formData.isVegan,
+      };
+
+      if (!payload.name) {
+        setFormError("Item name is required.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!payload.itemType) {
+        setFormError("Item type is required.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!payload.category) {
+        setFormError("Item category is required.");
+        setIsSubmitting(false);
+        return;
+      }
 
       if (currentItem) {
         response = await api.put<{ item: MenuItem }>(
           `/items/${currentItem._id}`,
           payload
         );
-        setItems((prev) =>
-          prev.map((item) =>
-            item._id === currentItem._id ? response.data.item : item
-          )
-        );
-        setSuccessMessage("Menu item updated successfully.");
+        setSuccessMessage("Item updated successfully!");
       } else {
-        response = await api.post<{ item: MenuItem }>("/items", payload);
-        setItems((prev) => [...prev, response.data.item]);
-        setSuccessMessage("Menu item added successfully.");
+        response = await api.post<{ item: MenuItem }>("/items", {
+          ...payload,
+          menuId: menuId,
+        });
+        setSuccessMessage("Item created successfully!");
       }
+
+      fetchData();
       closeModal();
     } catch (err: any) {
-      setFormError(
-        err.response?.data?.message ||
-          (currentItem ? "Failed to update item." : "Failed to add item.")
-      );
+      const message = err.response?.data?.message || "Operation failed.";
+      setFormError(message);
+      console.error("Submit error:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -376,6 +421,13 @@ const MenuItemsPage: React.FC = () => {
       return acc;
     }, {} as Record<string, MenuItem[]>);
   }, [items]);
+
+  // Determine available categories based on selected itemType
+  const availableCategories = useMemo(() => {
+    if (formData.itemType === "food") return FOOD_CATEGORIES;
+    if (formData.itemType === "beverage") return BEVERAGE_CATEGORIES;
+    return [];
+  }, [formData.itemType]);
 
   // --- Render Logic ---
   if (isLoading) {
@@ -521,7 +573,7 @@ const MenuItemsPage: React.FC = () => {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          Allergens
+                          Dietary
                         </th>
                         <th
                           scope="col"
@@ -553,10 +605,27 @@ const MenuItemsPage: React.FC = () => {
                               ? item.ingredients.join(", ")
                               : "-"}
                           </td>
-                          <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 max-w-xs break-words">
-                            {item.allergens && item.allergens.length > 0
-                              ? item.allergens.join(", ")
-                              : "-"}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-1">
+                            {item.isGlutenFree && (
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                GF
+                              </span>
+                            )}
+                            {item.isDairyFree && (
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                DF
+                              </span>
+                            )}
+                            {item.isVegetarian && (
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                VG
+                              </span>
+                            )}
+                            {item.isVegan && (
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                V
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                             <button
@@ -624,10 +693,10 @@ const MenuItemsPage: React.FC = () => {
                               : "-"}
                           </p>
                           <p className="whitespace-normal break-words">
-                            <span className="font-medium">Allergens:</span>{" "}
-                            {item.allergens && item.allergens.length > 0
-                              ? item.allergens.join(", ")
-                              : "-"}
+                            <span className="font-medium">Dietary:</span>{" "}
+                            {item.isGlutenFree
+                              ? "Gluten-free"
+                              : "Contains gluten"}
                           </p>
                         </div>
                       </div>
@@ -724,18 +793,11 @@ const MenuItemsPage: React.FC = () => {
                     <option value="" disabled>
                       Select category...
                     </option>
-                    {formData.itemType === "food" &&
-                      FOOD_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat} className="capitalize">
-                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                        </option>
-                      ))}
-                    {formData.itemType === "beverage" &&
-                      BEVERAGE_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat} className="capitalize">
-                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                        </option>
-                      ))}
+                    {availableCategories.map((cat) => (
+                      <option key={cat} value={cat} className="capitalize">
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -796,22 +858,81 @@ const MenuItemsPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Allergens Field */}
+                {/* Dietary Checkboxes */}
                 <div className="mb-4">
-                  <label
-                    htmlFor="allergens"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Allergens (comma-separated)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dietary Information
                   </label>
-                  <textarea
-                    id="allergens"
-                    name="allergens"
-                    value={formData.allergens}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Gluten Free */}
+                    <div className="flex items-center">
+                      <input
+                        id="isGlutenFree"
+                        name="isGlutenFree"
+                        type="checkbox"
+                        checked={formData.isGlutenFree}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="isGlutenFree"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Gluten Free (GF)
+                      </label>
+                    </div>
+                    {/* Dairy Free */}
+                    <div className="flex items-center">
+                      <input
+                        id="isDairyFree"
+                        name="isDairyFree"
+                        type="checkbox"
+                        checked={formData.isDairyFree}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="isDairyFree"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Dairy Free (DF)
+                      </label>
+                    </div>
+                    {/* Vegetarian */}
+                    <div className="flex items-center">
+                      <input
+                        id="isVegetarian"
+                        name="isVegetarian"
+                        type="checkbox"
+                        checked={formData.isVegetarian}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="isVegetarian"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Vegetarian (VG)
+                      </label>
+                    </div>
+                    {/* Vegan */}
+                    <div className="flex items-center">
+                      <input
+                        id="isVegan"
+                        name="isVegan"
+                        type="checkbox"
+                        checked={formData.isVegan}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="isVegan"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Vegan (V)
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
