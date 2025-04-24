@@ -24,6 +24,9 @@ import StaffQuizListPage from "./pages/StaffQuizListPage"; // Import staff quiz 
 import QuizTakingPage from "./pages/QuizTakingPage"; // Import quiz taking page
 // Add import for the new results page
 import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
+// Add imports for new staff management pages
+import StaffManagement from "./pages/StaffManagement";
+import StaffDetails from "./pages/StaffDetails";
 // TODO: Import other page components as needed
 
 // Placeholder for protected route logic
@@ -140,6 +143,23 @@ function App() {
             element={
               <ProtectedRoute requiredRole="restaurant">
                 <RestaurantStaffResultsPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* NEW: Staff Management Pages (for Restaurant) */}
+          <Route
+            path="/staff"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <StaffManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/:id"
+            element={
+              <ProtectedRoute requiredRole="restaurant">
+                <StaffDetails />
               </ProtectedRoute>
             }
           />

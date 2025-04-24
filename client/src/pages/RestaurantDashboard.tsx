@@ -3,12 +3,24 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
-// Staff Member Interface
-interface StaffMember {
+// Updated Interfaces to match the data structure needed
+interface ResultSummary {
+  _id: string;
+  quizId: string;
+  quizTitle: string;
+  score: number;
+  totalQuestions: number;
+  completedAt?: string;
+  status: string;
+  retakeCount: number;
+}
+
+interface StaffMemberWithResults {
   _id: string;
   name: string;
   email: string;
   createdAt: string;
+  results: ResultSummary[];
 }
 
 // Simple Loading Spinner Placeholder
@@ -51,32 +63,47 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 const RestaurantDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading, logout } = useAuth();
   const navigate = useNavigate();
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [staffLoading, setStaffLoading] = useState<boolean>(false);
-  const [staffError, setStaffError] = useState<string | null>(null);
+  // Remove old staff state
+  // const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  // const [staffLoading, setStaffLoading] = useState<boolean>(false);
+  // const [staffError, setStaffError] = useState<string | null>(null);
+  // Add new state for combined data
+  const [staffQuizData, setStaffQuizData] = useState<StaffMemberWithResults[]>(
+    []
+  );
+  const [totalQuizzes, setTotalQuizzes] = useState<number>(0);
+  const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Update useEffect to fetch combined staff/results data
   useEffect(() => {
-    const fetchStaff = async () => {
-      if (user && user.role === "restaurant" && user.restaurantId) {
-        setStaffLoading(true);
-        setStaffError(null);
+    const fetchStaffQuizSummary = async () => {
+      if (user && user.role === "restaurant") {
+        setSummaryLoading(true);
+        setSummaryError(null);
         try {
-          const response = await api.get<{ staff: StaffMember[] }>(
-            "/auth/staff"
+          const response = await api.get<{
+            staff: StaffMemberWithResults[];
+            totalAvailableQuizzes: number;
+          }>(
+            "/results/restaurant-view" // Use the endpoint that provides combined data
           );
-          setStaffList(response.data.staff || []);
+          setStaffQuizData(response.data.staff || []);
+          setTotalQuizzes(response.data.totalAvailableQuizzes || 0);
         } catch (err: any) {
-          setStaffError(
-            err.response?.data?.message || "Failed to load staff list."
+          setSummaryError(
+            err.response?.data?.message || "Failed to load staff quiz summary."
           );
-          setStaffList([]);
+          setStaffQuizData([]);
+          setTotalQuizzes(0);
         } finally {
-          setStaffLoading(false);
+          setSummaryLoading(false);
         }
       }
     };
-    if (!authIsLoading) fetchStaff();
+    if (!authIsLoading) fetchStaffQuizSummary();
   }, [user, authIsLoading]);
 
   const handleLogout = () => {
@@ -104,6 +131,7 @@ const RestaurantDashboard: React.FC = () => {
     { name: "Menu", path: "/menu" },
     { name: "Quizzes", path: "/quizzes" },
     { name: "Staff Results", path: "/staff-results" },
+    { name: "Staff Management", path: "/staff" },
   ];
 
   const SidebarContent = () => (
@@ -248,19 +276,34 @@ const RestaurantDashboard: React.FC = () => {
                 View Staff Results
               </Link>
             </div>
+            {/* Add Staff Management Card */}
+            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">
+                Staff Management
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                View your staff list and their details.
+              </p>
+              <Link
+                to="/staff"
+                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
+              >
+                Manage Staff
+              </Link>
+            </div>
           </div>
 
-          {/* Staff List Table */}
+          {/* Staff List Table - Modified for Quiz Summary */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Staff Members ({staffList.length})
+                Staff Quiz Progress ({staffQuizData.length})
               </h3>
             </div>
             <div className="overflow-x-auto">
-              {staffLoading && <LoadingSpinner />}
-              {staffError && <ErrorMessage message={staffError} />}
-              {!staffLoading && !staffError && (
+              {summaryLoading && <LoadingSpinner />}
+              {summaryError && <ErrorMessage message={summaryError} />}
+              {!summaryLoading && !summaryError && (
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -268,41 +311,57 @@ const RestaurantDashboard: React.FC = () => {
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Name
+                        Staff Name
                       </th>
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Email
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Joined
+                        Quiz Status
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {staffList.length > 0 ? (
-                      staffList.map((staff) => (
-                        <tr key={staff._id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {staff.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {staff.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(staff.createdAt).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))
+                    {staffQuizData.length > 0 ? (
+                      staffQuizData.map((staff) => {
+                        // Calculate number of *unique* completed quizzes
+                        const completedQuizIds = new Set(
+                          staff.results
+                            .filter((r) => r.status === "completed")
+                            .map((r) => r.quizId)
+                        );
+                        const completedCount = completedQuizIds.size;
+                        const statusText =
+                          completedCount >= totalQuizzes
+                            ? "All Complete"
+                            : "Pending";
+                        const statusColor =
+                          completedCount >= totalQuizzes
+                            ? "text-green-600"
+                            : "text-yellow-600";
+
+                        return (
+                          <tr key={staff._id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <Link
+                                to={`/staff/${staff._id}`}
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {staff.name}
+                              </Link>
+                            </td>
+                            <td
+                              className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${statusColor}`}
+                            >
+                              {statusText} ({completedCount}/{totalQuizzes})
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td
-                          colSpan={3}
+                          colSpan={2}
                           className="text-center py-4 text-sm text-gray-500"
                         >
                           No staff members found.

@@ -9,6 +9,7 @@ import menuRoutes from "./routes/menus";
 import itemRoutes from "./routes/items";
 import quizRoutes from "./routes/quiz";
 import resultsRoutes from "./routes/quizResult";
+import staffRoutes from "./routes/staff";
 import { protect } from "./middleware/authMiddleware";
 // TODO: Import other route files as needed (e.g., quizzes)
 
@@ -40,6 +41,7 @@ app.use("/api/menus", menuRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/results", resultsRoutes);
+app.use("/api/staff", staffRoutes);
 // TODO: Mount other routes
 
 const PORT: string | number = process.env.PORT || 3000;
