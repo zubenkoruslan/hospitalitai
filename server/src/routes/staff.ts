@@ -187,4 +187,66 @@ router.get(
   }
 );
 
+/**
+ * @route   DELETE /api/staff/:id
+ * @desc    Delete a specific staff member and their associated quiz results
+ * @access  Private (Restaurant Role)
+ */
+router.delete(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const restaurantId = req.user?.restaurantId || req.user?.userId;
+    const { id: staffId } = req.params;
+
+    if (!restaurantId) {
+      return res
+        .status(400)
+        .json({ message: "Restaurant ID could not be determined for user." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(staffId)) {
+      return res.status(400).json({ message: "Invalid Staff ID format." });
+    }
+
+    const staffObjectId = new mongoose.Types.ObjectId(staffId);
+
+    try {
+      // 1. Find the staff user to ensure they belong to the restaurant before deleting
+      const staffMember = await User.findOne(
+        { _id: staffObjectId, restaurantId: restaurantId, role: "staff" },
+        "_id" // Only need the ID for verification
+      ).lean();
+
+      if (!staffMember) {
+        return res
+          .status(404)
+          .json({
+            message:
+              "Staff member not found or does not belong to this restaurant.",
+          });
+      }
+
+      // 2. Delete the staff user
+      const deleteUserResult = await User.deleteOne({ _id: staffObjectId });
+
+      if (deleteUserResult.deletedCount === 0) {
+        // Should not happen if findOne succeeded, but good practice to check
+        return res
+          .status(404)
+          .json({ message: "Staff member could not be deleted." });
+      }
+
+      // 3. Delete associated quiz results (optional, but good for cleanup)
+      await QuizResult.deleteMany({
+        userId: staffObjectId,
+        restaurantId: restaurantId,
+      });
+
+      res.status(200).json({ message: "Staff member deleted successfully." });
+    } catch (error) {
+      console.error(`Error deleting staff member with ID ${staffId}:`, error);
+      next(error);
+    }
+  }
+);
+
 export default router;

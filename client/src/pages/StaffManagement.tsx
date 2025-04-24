@@ -95,6 +95,37 @@ const StaffManagement: React.FC = () => {
     }
   };
 
+  // --- Delete Handler ---
+  const handleDeleteStaff = async (staffId: string, staffName: string) => {
+    // Confirmation dialog
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${staffName}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    // Set loading state specifically for this row? (Optional, more complex)
+    // For now, rely on the main loading state if needed, or just update UI optimistically/on success.
+
+    try {
+      await api.delete(`/staff/${staffId}`);
+      // Update UI: Remove the deleted staff member from the list
+      setStaffList((prevList) =>
+        prevList.filter((staff) => staff._id !== staffId)
+      );
+      // Optionally show a success message (e.g., using a toast notification library)
+      console.log(`Successfully deleted ${staffName}`);
+    } catch (err: any) {
+      console.error(`Error deleting staff member ${staffName}:`, err);
+      // Display error message to the user
+      setError(err.response?.data?.message || `Failed to delete ${staffName}.`);
+      // Clear error after a few seconds (optional)
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       <Navbar />
@@ -145,7 +176,7 @@ const StaffManagement: React.FC = () => {
                           Joined
                         </th>
                         <th scope="col" className="relative px-6 py-3">
-                          <span className="sr-only">View Details</span>
+                          <span className="sr-only">Actions</span>
                         </th>
                       </tr>
                     </thead>
@@ -168,7 +199,7 @@ const StaffManagement: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(staff.createdAt)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                             <Link
                               to={`/staff/${staff._id}`}
                               className="text-indigo-600 hover:text-indigo-900"
@@ -176,6 +207,15 @@ const StaffManagement: React.FC = () => {
                             >
                               Details
                             </Link>
+                            <button
+                              onClick={() =>
+                                handleDeleteStaff(staff._id, staff.name)
+                              }
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                              aria-label={`Delete ${staff.name}`}
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
