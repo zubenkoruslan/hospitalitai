@@ -8,7 +8,6 @@ const LoginForm: React.FC = () => {
   const [componentError, setComponentError] = useState<string | null>(null); // Separate error state for component-level display
   const navigate = useNavigate();
   const auth = useAuth(); // Get context values
-  console.log("Auth context in LoginForm:", auth); // <-- ADD THIS LINE
 
   // Handle case where context might not be ready or loaded yet
   if (!auth) {

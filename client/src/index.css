@@ -1,7 +1,34 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Remove Tailwind directives */
+@layer base {
+  body {
+    @apply font-sans bg-background text-text;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-/* You can add custom base styles or component styles below if needed */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold text-dark-slate;
+  }
+}
+
+/* Add custom animations directly if not extending via theme */
+/* Keyframes are defined in tailwind.config.js and automatically available */
+
+/* You can add other global styles or component overrides here */
+
+/* Example of custom utility class (if needed) */
+/*
+.custom-gradient-text {
+  @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+}
+*/

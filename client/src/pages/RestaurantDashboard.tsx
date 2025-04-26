@@ -74,8 +74,8 @@ const RestaurantDashboard: React.FC = () => {
   const [totalQuizzes, setTotalQuizzes] = useState<number>(0);
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [copied, setCopied] = useState(false); // State for copy feedback
 
   // Update useEffect to fetch combined staff/results data
   useEffect(() => {
@@ -109,6 +109,22 @@ const RestaurantDashboard: React.FC = () => {
   const handleLogout = () => {
     setIsSidebarOpen(false);
     logout();
+  };
+
+  // --- Copy ID Handler ---
+  const handleCopyId = () => {
+    if (user?.userId) {
+      navigator.clipboard
+        .writeText(user.userId)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+        })
+        .catch((err) => {
+          console.error("Failed to copy ID: ", err);
+          // Optionally show an error message to the user
+        });
+    }
   };
 
   if (authIsLoading) return <LoadingSpinner />;
@@ -229,8 +245,32 @@ const RestaurantDashboard: React.FC = () => {
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">
-              Welcome, {user.name}!
+              Welcome, {user?.name}!
             </h1>
+            {/* Display Restaurant ID and Copy Button */}
+            {user?.userId && (
+              <div className="mt-2 flex items-center space-x-2 bg-gray-50 p-2 rounded-md border border-gray-200 max-w-md">
+                <p className="text-sm text-gray-600">
+                  Your Restaurant ID (for staff registration):
+                  <strong className="ml-1 font-mono text-gray-800">
+                    {user.userId}
+                  </strong>
+                </p>
+                <button
+                  onClick={handleCopyId}
+                  className={`px-2 py-1 text-xs font-medium rounded ${
+                    copied
+                      ? "bg-green-100 text-green-700"
+                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  } transition-colors duration-150 ease-in-out`}
+                  aria-label={
+                    copied ? "Copied Restaurant ID" : "Copy Restaurant ID"
+                  }
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Grid for Management Cards */}

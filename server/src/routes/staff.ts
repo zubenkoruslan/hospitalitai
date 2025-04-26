@@ -217,12 +217,10 @@ router.delete(
       ).lean();
 
       if (!staffMember) {
-        return res
-          .status(404)
-          .json({
-            message:
-              "Staff member not found or does not belong to this restaurant.",
-          });
+        return res.status(404).json({
+          message:
+            "Staff member not found or does not belong to this restaurant.",
+        });
       }
 
       // 2. Delete the staff user

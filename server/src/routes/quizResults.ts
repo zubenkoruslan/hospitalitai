@@ -52,11 +52,9 @@ router.post(
       // Check if the quiz exists and belongs to the user's restaurant
       const quiz = await Quiz.findOne({ _id: quizId, restaurantId });
       if (!quiz) {
-        res
-          .status(404)
-          .json({
-            message: "Quiz not found or not available for this restaurant",
-          });
+        res.status(404).json({
+          message: "Quiz not found or not available for this restaurant",
+        });
         return;
       }
 
@@ -70,12 +68,10 @@ router.post(
 
       if (existingAttempt) {
         // Depending on rules, could return existing attempt or an error
-        res
-          .status(409)
-          .json({
-            message: "Quiz attempt already exists or is in progress",
-            attemptId: existingAttempt._id,
-          });
+        res.status(409).json({
+          message: "Quiz attempt already exists or is in progress",
+          attemptId: existingAttempt._id,
+        });
         return;
       }
 
@@ -154,11 +150,9 @@ router.post(
       });
 
       if (!attempt) {
-        res
-          .status(404)
-          .json({
-            message: "Quiz attempt not found, not yours, or already completed",
-          });
+        res.status(404).json({
+          message: "Quiz attempt not found, not yours, or already completed",
+        });
         return;
       }
 
@@ -328,12 +322,9 @@ router.get(
         (userRole !== "restaurant" ||
           result.restaurantId.toString() !== restaurantId)
       ) {
-        res
-          .status(403)
-          .json({
-            message:
-              "Forbidden: You do not have permission to view this result",
-          });
+        res.status(403).json({
+          message: "Forbidden: You do not have permission to view this result",
+        });
         return;
       }
 
