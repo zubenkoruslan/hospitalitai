@@ -6,6 +6,7 @@ import MenuItem, { IMenuItem } from "../models/MenuItem";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
 import Menu from "../models/Menu"; // Import Menu model if needed for fetching items by menu
 import User from "../models/User"; // Assuming User model exists and stores restaurantId for staff
+import notificationService from "../services/notificationService";
 
 const router: Router = express.Router();
 
@@ -338,6 +339,16 @@ router.post(
       });
 
       const savedQuiz = await newQuiz.save();
+
+      // Notify all staff about the new quiz
+      if (savedQuiz && savedQuiz._id) {
+        await notificationService.notifyStaffAboutNewQuiz(
+          restaurantId.toString(),
+          savedQuiz._id.toString(),
+          title
+        );
+      }
+
       res.status(201).json({ quiz: savedQuiz });
     } catch (error: any) {
       if (error.name === "ValidationError") {
@@ -354,7 +365,7 @@ router.post(
 
 /**
  * @route   DELETE /api/quiz/:quizId
- * @desc    Delete a specific quiz
+ * @desc    Delete a specific quiz and all associated quiz results
  * @access  Private (Restaurant Role)
  */
 router.delete(
@@ -377,6 +388,17 @@ router.delete(
     }
 
     try {
+      // First, delete all associated quiz results
+      const deletedResults = await QuizResult.deleteMany({
+        quizId: new mongoose.Types.ObjectId(quizId),
+        restaurantId: restaurantId,
+      });
+
+      console.log(
+        `Deleted ${deletedResults.deletedCount} quiz results associated with quiz ${quizId}`
+      );
+
+      // Then delete the quiz itself
       const result = await Quiz.deleteOne({
         _id: new mongoose.Types.ObjectId(quizId),
         restaurantId: restaurantId,
@@ -388,9 +410,10 @@ router.delete(
           .json({ message: "Quiz not found or access denied" });
       }
 
-      // await QuizResult.deleteMany({ quizId: new mongoose.Types.ObjectId(quizId), restaurantId: restaurantId });
-
-      res.status(200).json({ message: "Quiz deleted successfully" });
+      res.status(200).json({
+        message: "Quiz deleted successfully",
+        deletedResultsCount: deletedResults.deletedCount,
+      });
     } catch (error) {
       console.error("Error deleting quiz:", error);
       next(error);
@@ -514,6 +537,7 @@ router.post(
     const { quizId } = req.params;
     const { answers } = req.body;
     const userId = req.user?.userId; // No type assertion needed
+    const userName = req.user?.name;
     const userRole = req.user?.role;
     const restaurantId = req.user?.restaurantId; // No type assertion needed
 
@@ -583,6 +607,33 @@ router.post(
           },
           { new: true, upsert: true, runValidators: true }
         );
+
+        // Send notification to restaurant managers about completed quiz
+        try {
+          // Find restaurant managers
+          const managers = await User.find({
+            restaurantId: restaurantId,
+            role: "restaurant",
+          });
+
+          // Create notifications for each manager
+          for (const manager of managers) {
+            await notificationService.createCompletedTrainingNotification(
+              manager._id as mongoose.Types.ObjectId,
+              userId as mongoose.Types.ObjectId,
+              userName || "A staff member",
+              quiz._id as mongoose.Types.ObjectId,
+              quiz.title,
+              savedResult._id as mongoose.Types.ObjectId
+            );
+          }
+        } catch (notificationError) {
+          console.error(
+            "Failed to create completion notification:",
+            notificationError
+          );
+          // Don't reject the submission if notification fails
+        }
       }
 
       res.status(200).json({
@@ -659,6 +710,137 @@ router.get(
       res.status(200).json({ quizzes: combinedView });
     } catch (error) {
       console.error("Error fetching staff quiz view:", error);
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   POST /api/quiz/assign
+ * @desc    Assign quiz to staff member(s)
+ * @access  Private (Restaurant Role)
+ */
+router.post(
+  "/assign",
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { quizId, staffIds } = req.body;
+    const restaurantId = req.user?.restaurantId;
+
+    if (!restaurantId) {
+      res.status(400).json({ message: "Restaurant ID not found for user" });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(quizId)) {
+      res.status(400).json({ message: "Invalid Quiz ID format" });
+      return;
+    }
+
+    if (!staffIds || !Array.isArray(staffIds) || staffIds.length === 0) {
+      res.status(400).json({ message: "Staff IDs array is required" });
+      return;
+    }
+
+    // Validate all staff IDs are valid ObjectIds
+    if (staffIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      res.status(400).json({ message: "One or more invalid Staff IDs" });
+      return;
+    }
+
+    try {
+      // 1. Verify the quiz belongs to this restaurant
+      const quiz = await Quiz.findOne({
+        _id: new mongoose.Types.ObjectId(quizId),
+        restaurantId: restaurantId,
+      });
+
+      if (!quiz) {
+        res.status(404).json({
+          message: "Quiz not found or not accessible for this restaurant",
+        });
+        return;
+      }
+
+      // 2. Verify all staff members belong to this restaurant
+      const validStaffMembers = await User.find({
+        _id: { $in: staffIds },
+        restaurantId: restaurantId,
+        role: "staff",
+      }).select("_id name");
+
+      if (validStaffMembers.length !== staffIds.length) {
+        res.status(400).json({
+          message:
+            "One or more staff members do not exist or do not belong to this restaurant",
+          validStaffCount: validStaffMembers.length,
+          requestedStaffCount: staffIds.length,
+        });
+        return;
+      }
+
+      // 3. Create pending quiz results for each staff member
+      const quizResults = [];
+      const notificationPromises = [];
+
+      for (const staff of validStaffMembers) {
+        // Create or update quiz result to 'pending' status
+        const result = await QuizResult.findOneAndUpdate(
+          {
+            quizId: quiz._id,
+            userId: staff._id,
+            restaurantId: restaurantId,
+            status: { $ne: "completed" }, // Don't update if already completed
+          },
+          {
+            $setOnInsert: {
+              status: "pending",
+              startedAt: null,
+              answers: [],
+              score: 0,
+              totalQuestions: quiz.questions.length,
+              restaurantId: restaurantId,
+              retakeCount: 0,
+            },
+          },
+          { upsert: true, new: true }
+        );
+
+        quizResults.push(result);
+
+        // Create notification for the staff member
+        try {
+          const notification =
+            await notificationService.createAssignmentNotification(
+              staff._id as mongoose.Types.ObjectId,
+              quiz._id as mongoose.Types.ObjectId,
+              quiz.title
+            );
+          notificationPromises.push(notification);
+        } catch (notificationError) {
+          console.error(
+            "Failed to create notification for staff",
+            staff._id,
+            ":",
+            notificationError
+          );
+          // Continue with assignment even if notification fails
+        }
+      }
+
+      // Wait for all notifications to be created
+      await Promise.all(notificationPromises);
+
+      res.status(200).json({
+        message: `Quiz "${quiz.title}" successfully assigned to ${validStaffMembers.length} staff members`,
+        quizResults: quizResults.map((result) => ({
+          _id: result._id,
+          userId: result.userId,
+          status: result.status,
+        })),
+      });
+    } catch (error) {
+      console.error("Error assigning quiz to staff:", error);
       next(error);
     }
   }
