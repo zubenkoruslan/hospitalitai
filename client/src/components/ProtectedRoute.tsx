@@ -32,7 +32,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Or redirect based on the *actual* role?
     // Example: redirect staff trying to access restaurant dash to staff dash
     if (user.role === "staff") {
-      return <Navigate to="/staff-dashboard" replace />;
+      return <Navigate to="/staff/dashboard" replace />;
     } else if (user.role === "restaurant") {
       return <Navigate to="/dashboard" replace />;
     }

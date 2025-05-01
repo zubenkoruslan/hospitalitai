@@ -23,11 +23,28 @@ router.post(
     const { name, description } = req.body;
     const restaurantId = req.user?.restaurantId;
 
-    // Validation
-    if (!name) {
-      res.status(400).json({ message: "Menu name is required" });
+    // Enhanced validation
+    if (!name || typeof name !== "string") {
+      res
+        .status(400)
+        .json({ message: "Menu name is required and must be a string" });
       return;
     }
+
+    if (name.trim().length < 2 || name.trim().length > 50) {
+      res
+        .status(400)
+        .json({ message: "Menu name must be between 2 and 50 characters" });
+      return;
+    }
+
+    if (description && typeof description !== "string") {
+      res
+        .status(400)
+        .json({ message: "Description must be a string if provided" });
+      return;
+    }
+
     if (!restaurantId) {
       res.status(400).json({ message: "Restaurant ID not found for user" });
       return;
@@ -35,10 +52,23 @@ router.post(
 
     try {
       const newMenuData: Partial<IMenu> = {
-        name,
+        name: name.trim(),
         restaurantId: restaurantId,
       };
-      if (description) newMenuData.description = description;
+      if (description) newMenuData.description = description.trim();
+
+      // Check for duplicate menu names for this restaurant
+      const existingMenu = await Menu.findOne({
+        name: name.trim(),
+        restaurantId: restaurantId,
+      });
+
+      if (existingMenu) {
+        res
+          .status(400)
+          .json({ message: "A menu with this name already exists" });
+        return;
+      }
 
       const menu = new Menu(newMenuData);
       const savedMenu = await menu.save();

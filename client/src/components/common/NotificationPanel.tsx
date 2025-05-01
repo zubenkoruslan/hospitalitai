@@ -1,7 +1,9 @@
 import React, { useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useNotifications } from "../../context/NotificationContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
 
 interface NotificationPanelProps {
   onClose: () => void;
@@ -16,14 +18,102 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
     markAsRead,
     deleteNotification,
   } = useNotifications();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Function to handle notification click
-  const handleNotificationClick = async (id: string) => {
-    await markAsRead(id);
+  // Function to handle notification click with role-based redirects
+  const handleNotificationClick = async (notification: any) => {
+    await markAsRead(notification._id);
+    onClose();
+
+    // Debug notification data
+    console.log("Clicked notification:", notification);
+    console.log("Notification type:", notification.type);
+    console.log("Notification metadata:", notification.metadata);
+    console.log("User role:", user?.role);
+
+    // Role-based redirects
+    if (user?.role === "staff") {
+      if (notification.type === "new_quiz") {
+        navigate("/staff/quizzes");
+        return;
+      }
+    } else if (user?.role === "restaurant") {
+      if (
+        notification.type === "completed_training" ||
+        notification.type === "new_staff"
+      ) {
+        console.log(
+          "Should redirect to staff details with ID:",
+          notification.metadata?.staffId
+        );
+
+        let staffId;
+        let resultId;
+
+        // Try getting staffId from metadata first
+        if (notification.metadata?.staffId) {
+          staffId = notification.metadata.staffId;
+
+          // For completed training, also get resultId if available
+          if (notification.type === "completed_training") {
+            resultId = notification.metadata.resultId || notification.relatedId;
+          }
+        }
+        // For new_staff notifications, relatedId IS the staffId
+        else if (notification.type === "new_staff" && notification.relatedId) {
+          staffId = notification.relatedId;
+        }
+        // For completed_training, relatedId is the resultId
+        else if (
+          notification.type === "completed_training" &&
+          notification.relatedId
+        ) {
+          // For older notifications, relatedId is the resultId
+          resultId = notification.relatedId;
+
+          try {
+            // Try to fetch the result to get the staff ID
+            const response = await api.get(`/api/results/${resultId}/detail`);
+            if (response.data && response.data.result) {
+              // Navigate directly to the result
+              navigate(`/quiz-results/${resultId}`);
+              return;
+            }
+          } catch (error) {
+            console.error("Error fetching quiz result:", error);
+          }
+        }
+
+        console.log("Using staffId:", staffId);
+        console.log("Using resultId:", resultId);
+
+        if (staffId) {
+          // For completed training with resultId, include it in the URL
+          if (notification.type === "completed_training" && resultId) {
+            navigate(`/staff/${staffId}?resultId=${resultId}`);
+            return;
+          }
+
+          // Otherwise just go to the staff profile
+          navigate(`/staff/${staffId}`);
+          return;
+        } else if (resultId) {
+          // If we have a resultId but no staffId, go to the result directly
+          navigate(`/quiz-results/${resultId}`);
+          return;
+        } else {
+          console.log("No staffId or resultId found in notification");
+        }
+      }
+    }
+
+    // Default redirect if no specific redirect is configured
+    navigate("/notifications");
   };
 
   // Function to get icon for notification type
@@ -69,6 +159,17 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
             fill="currentColor"
           >
             <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+          </svg>
+        );
+      case "new_quiz":
+        return (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 text-yellow-500"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
           </svg>
         );
       default:
@@ -129,16 +230,12 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
                   {getNotificationIcon(notification.type)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link
-                    to="/notifications"
-                    onClick={() => {
-                      handleNotificationClick(notification._id);
-                      onClose();
-                    }}
-                    className="block text-sm font-medium text-gray-900"
+                  <button
+                    onClick={() => handleNotificationClick(notification)}
+                    className="block w-full text-left text-sm font-medium text-gray-900 hover:text-blue-700"
                   >
                     {notification.content}
-                  </Link>
+                  </button>
                   <p className="text-xs text-gray-500 mt-1">
                     {formatDistanceToNow(new Date(notification.createdAt), {
                       addSuffix: true,

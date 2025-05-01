@@ -336,18 +336,13 @@ router.post(
         menuItemIds,
         questions,
         restaurantId,
+        isAssigned: false, // Default to false (not assigned)
       });
 
       const savedQuiz = await newQuiz.save();
 
-      // Notify all staff about the new quiz
-      if (savedQuiz && savedQuiz._id) {
-        await notificationService.notifyStaffAboutNewQuiz(
-          restaurantId.toString(),
-          savedQuiz._id.toString(),
-          title
-        );
-      }
+      // No longer automatically notify staff members
+      // Quiz assignment is now manual through the /quiz/assign endpoint
 
       res.status(201).json({ quiz: savedQuiz });
     } catch (error: any) {
@@ -357,6 +352,80 @@ router.post(
           .json({ message: "Validation failed", errors: error.errors });
       } else {
         console.error("Error saving quiz:", error);
+        next(error);
+      }
+    }
+  }
+);
+
+/**
+ * @route   PUT /api/quiz/:quizId
+ * @desc    Update an existing quiz
+ * @access  Private (Restaurant Role)
+ */
+router.put(
+  "/:quizId",
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const { quizId } = req.params;
+    const { title, menuItemIds, questions } = req.body;
+    const restaurantId = req.user?.restaurantId;
+
+    if (!restaurantId) {
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      return res
+        .status(400)
+        .json({ message: "Restaurant ID not found for user" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({ message: "Invalid Quiz ID format" });
+    }
+
+    if (
+      !title ||
+      !menuItemIds ||
+      !questions ||
+      !Array.isArray(menuItemIds) ||
+      !Array.isArray(questions) ||
+      questions.length === 0
+    ) {
+      return res.status(400).json({ message: "Invalid quiz data provided" });
+    }
+
+    try {
+      // Find the quiz to update, ensuring it belongs to this restaurant
+      const existingQuiz = await Quiz.findOne({
+        _id: new mongoose.Types.ObjectId(quizId),
+        restaurantId: restaurantId,
+      });
+
+      if (!existingQuiz) {
+        return res
+          .status(404)
+          .json({ message: "Quiz not found or access denied" });
+      }
+
+      // Update the quiz
+      existingQuiz.title = title;
+      existingQuiz.menuItemIds = menuItemIds;
+      existingQuiz.questions = questions;
+
+      const updatedQuiz = await existingQuiz.save();
+
+      res.status(200).json({
+        message: "Quiz updated successfully",
+        quiz: updatedQuiz,
+      });
+    } catch (error: any) {
+      if (error.name === "ValidationError") {
+        return res
+          .status(400)
+          .json({ message: "Validation failed", errors: error.errors });
+      } else {
+        console.error("Error updating quiz:", error);
         next(error);
       }
     }
@@ -831,6 +900,10 @@ router.post(
       // Wait for all notifications to be created
       await Promise.all(notificationPromises);
 
+      // Mark the quiz as assigned
+      quiz.isAssigned = true;
+      await quiz.save();
+
       res.status(200).json({
         message: `Quiz "${quiz.title}" successfully assigned to ${validStaffMembers.length} staff members`,
         quizResults: quizResults.map((result) => ({
@@ -840,10 +913,10 @@ router.post(
         })),
       });
     } catch (error) {
-      console.error("Error assigning quiz to staff:", error);
+      console.error("Error assigning quiz:", error);
       next(error);
     }
   }
 );
 
-export default router;
+export { router };

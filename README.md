@@ -84,14 +84,6 @@ The application uses JWT (JSON Web Tokens) for authentication. Tokens are stored
 - `restaurant`: Restaurant owners/managers with full access
 - `staff`: Staff members with limited access
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## 👏 Acknowledgements
 
 - MongoDB for database

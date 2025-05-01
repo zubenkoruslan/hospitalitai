@@ -3,6 +3,8 @@ import { formatDistanceToNow } from "date-fns";
 import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
 
 const NotificationsPage: React.FC = () => {
   const {
@@ -21,6 +23,8 @@ const NotificationsPage: React.FC = () => {
 
   const [filter, setFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchNotifications();
@@ -153,6 +157,108 @@ const NotificationsPage: React.FC = () => {
 
   const hasUnreadNotifications = notifications.some((n) => !n.isRead);
 
+  // Function to handle notification click with role-based redirects
+  const handleNotificationClick = async (notification: any) => {
+    await markAsRead(notification._id);
+
+    // Debug notification data
+    console.log("Clicked notification in page:", notification);
+    console.log("Notification type:", notification.type);
+    console.log("Notification metadata:", notification.metadata);
+    console.log("User role:", user?.role);
+
+    // Role-based redirects
+    if (user?.role === "staff") {
+      if (notification.type === "new_quiz") {
+        navigate("/staff/quizzes");
+        return;
+      }
+    } else if (user?.role === "restaurant") {
+      if (
+        notification.type === "completed_training" ||
+        notification.type === "new_staff"
+      ) {
+        console.log(
+          "Should redirect to staff details with ID:",
+          notification.metadata?.staffId
+        );
+
+        let staffId;
+        let resultId;
+
+        // Try getting staffId from metadata first
+        if (notification.metadata?.staffId) {
+          staffId = notification.metadata.staffId;
+
+          // For completed training, also get resultId if available
+          if (notification.type === "completed_training") {
+            resultId = notification.metadata.resultId || notification.relatedId;
+          }
+        }
+        // For new_staff notifications, relatedId IS the staffId
+        else if (notification.type === "new_staff" && notification.relatedId) {
+          staffId = notification.relatedId;
+        }
+        // For completed_training, relatedId is the resultId
+        else if (
+          notification.type === "completed_training" &&
+          notification.relatedId
+        ) {
+          // For older notifications, relatedId is the resultId
+          resultId = notification.relatedId;
+
+          try {
+            console.log("Fetching quiz result details for:", resultId);
+            // Try to fetch the result to get the staff ID
+            const response = await api.get(`/api/results/${resultId}/detail`);
+            console.log("API response:", response.data);
+
+            if (response.data && response.data.result) {
+              console.log("Navigating to quiz result:", resultId);
+              // Navigate directly to the result
+              navigate(`/quiz-results/${resultId}`);
+              return;
+            } else {
+              console.log("Quiz result data not found in response");
+            }
+          } catch (error) {
+            console.error("Error fetching quiz result:", error);
+            if (error.response) {
+              console.error("Error response status:", error.response.status);
+              console.error("Error response data:", error.response.data);
+            }
+
+            // Fallback navigation
+            console.log("Using fallback navigation to /staff/results");
+            navigate("/staff/results");
+            return;
+          }
+        }
+
+        console.log("Using staffId:", staffId);
+        console.log("Using resultId:", resultId);
+
+        if (staffId) {
+          // For completed training with resultId, include it in the URL
+          if (notification.type === "completed_training" && resultId) {
+            navigate(`/staff/${staffId}?resultId=${resultId}`);
+            return;
+          }
+
+          // Otherwise just go to the staff profile
+          navigate(`/staff/${staffId}`);
+          return;
+        } else if (resultId) {
+          // If we have a resultId but no staffId, go to the result directly
+          navigate(`/quiz-results/${resultId}`);
+          return;
+        } else {
+          console.log("No staffId or resultId found in notification");
+        }
+      }
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -199,20 +305,6 @@ const NotificationsPage: React.FC = () => {
                     }`}
                   >
                     New Quizzes
-                  </button>
-                )}
-
-                {/* Show Assignments filter only for staff */}
-                {isStaff && (
-                  <button
-                    onClick={() => setFilter("new_assignment")}
-                    className={`px-3 py-1 rounded-md ${
-                      filter === "new_assignment"
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
-                  >
-                    Assignments
                   </button>
                 )}
 
@@ -292,7 +384,8 @@ const NotificationsPage: React.FC = () => {
               {filteredNotifications.map((notification) => (
                 <li
                   key={notification._id}
-                  className={`p-4 hover:bg-gray-50 transition-colors ${
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                     !notification.isRead ? "bg-blue-50" : ""
                   }`}
                 >
@@ -322,30 +415,11 @@ const NotificationsPage: React.FC = () => {
                       </p>
                     </div>
                     <div className="flex flex-shrink-0 ml-2 space-x-2 self-center">
-                      {!notification.isRead && (
-                        <button
-                          onClick={() => markAsRead(notification._id)}
-                          className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
-                          aria-label="Mark as read"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        </button>
-                      )}
                       <button
-                        onClick={() => deleteNotification(notification._id)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the li's onClick
+                          deleteNotification(notification._id);
+                        }}
                         className="p-1 text-red-500 hover:text-red-700 transition-colors"
                         aria-label="Delete notification"
                       >

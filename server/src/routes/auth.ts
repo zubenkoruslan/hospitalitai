@@ -5,6 +5,7 @@ import User, { IUser } from "../models/User";
 import Restaurant, { IRestaurant } from "../models/Restaurant";
 import mongoose, { Types } from "mongoose";
 import { protect, restrictTo } from "../middleware/authMiddleware";
+import notificationService from "../services/notificationService";
 
 const router: Router = express.Router();
 
@@ -52,8 +53,15 @@ interface AuthPayload {
 router.post(
   "/signup",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { email, password, role, name, restaurantName, restaurantId } =
-      req.body;
+    const {
+      email,
+      password,
+      role,
+      name,
+      restaurantName,
+      restaurantId,
+      professionalRole,
+    } = req.body;
 
     // Basic validation
     if (!email || !password || !role || !name) {
@@ -78,6 +86,18 @@ router.post(
       res.status(400).json({
         message:
           "Restaurant ID should not be provided when signing up as restaurant owner",
+      });
+      return;
+    }
+    if (role === "staff" && !professionalRole) {
+      res.status(400).json({
+        message: "Professional role is required for staff role",
+      });
+      return;
+    }
+    if (role === "restaurant" && professionalRole) {
+      res.status(400).json({
+        message: "Professional role should not be provided for restaurant role",
       });
       return;
     }
@@ -133,13 +153,14 @@ router.post(
         }
         finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId; // Get ID from found restaurant
 
-        // Create staff user linked to the restaurant
+        // Create staff user linked to the restaurant, including professionalRole
         newUserDoc = new User({
           email,
           password,
           role,
           name,
           restaurantId: finalRestaurantId,
+          professionalRole, // Add professionalRole here
         });
         await newUserDoc.save();
 
@@ -148,6 +169,23 @@ router.post(
           finalRestaurantId,
           { $addToSet: { staff: newUserDoc._id } } // Use $addToSet to avoid duplicates
         );
+
+        // Create notifications for all restaurant managers about the new staff registration
+        if (restaurantId) {
+          try {
+            await notificationService.notifyManagersAboutNewStaff(
+              restaurantId as unknown as mongoose.Types.ObjectId,
+              newUserDoc._id as mongoose.Types.ObjectId,
+              name
+            );
+          } catch (notificationError) {
+            console.error(
+              "Failed to create notifications for new staff:",
+              notificationError
+            );
+            // Don't reject the signup if notification creation fails
+          }
+        }
       } else {
         // Handle potential other roles or invalid role value if necessary
         res.status(400).json({ message: "Invalid user role specified" });
@@ -166,28 +204,30 @@ router.post(
         return;
       }
 
+      // Exclude password AND professionalRole if not needed in general response
+      // Or keep professionalRole if useful (e.g., for immediate display after signup)
       const { password: _, ...userResponse } = newUserDoc.toObject();
 
-      // Generate JWT token
+      // Generate JWT token (Payload might not need professionalRole unless specifically required)
       const payload: AuthPayload = {
         userId: newUserDoc._id as mongoose.Types.ObjectId,
         role: newUserDoc.role,
-        name: newUserDoc.name, // Include user name
+        name: newUserDoc.name,
         restaurantId: newUserDoc.restaurantId,
-        // Fetch restaurant name if role is staff and ID exists, or use newRestaurantDoc name if owner
         restaurantName:
           role === "staff" && newUserDoc.restaurantId
             ? (await Restaurant.findById(newUserDoc.restaurantId))?.name
             : role === "restaurant"
             ? newRestaurantDoc?.name
             : undefined,
+        // professionalRole: newUserDoc.professionalRole // Optional: Add to JWT if needed frequently
       };
       const options: jwt.SignOptions = { expiresIn: JWT_EXPIRES_IN_SECONDS };
       const token = jwt.sign(payload, JWT_SECRET, options);
 
       res.status(201).json({
         message: "User registered successfully",
-        user: userResponse,
+        user: userResponse, // Includes professionalRole if not excluded above
         restaurant: newRestaurantDoc ? newRestaurantDoc.toObject() : undefined,
         token,
       });

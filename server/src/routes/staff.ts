@@ -46,7 +46,7 @@ router.get(
       // 1. Fetch all staff members for the restaurant
       const staffList = await User.find(
         { restaurantId: restaurantId, role: "staff" },
-        "_id name email createdAt"
+        "_id name email createdAt professionalRole"
       ).lean();
 
       // 2. Fetch all relevant results for this restaurant to aggregate
@@ -61,13 +61,20 @@ router.get(
       const resultsByUser = new Map<string, any[]>();
       allResults.forEach((result) => {
         const userIdStr = result.userId.toString();
+
+        // Skip results where the quiz is deleted (quizId doesn't resolve to a document)
+        if (!result.quizId) {
+          console.log(`Skipping result ${result._id} with deleted quiz`);
+          return;
+        }
+
         if (!resultsByUser.has(userIdStr)) {
           resultsByUser.set(userIdStr, []);
         }
         resultsByUser.get(userIdStr)?.push({
           _id: result._id,
           quizId: (result.quizId as any)?._id,
-          quizTitle: (result.quizId as any)?.title || "Quiz Not Found",
+          quizTitle: (result.quizId as any)?.title,
           score: result.score,
           totalQuestions: result.totalQuestions,
           completedAt: result.completedAt,
@@ -121,7 +128,7 @@ router.get(
           restaurantId: restaurantId,
           role: "staff",
         },
-        "name email createdAt"
+        "name email createdAt professionalRole"
       ).lean();
 
       if (!staffMember) {
@@ -143,37 +150,40 @@ router.get(
         .sort({ completedAt: -1 })
         .lean();
 
-      const processedResults = quizResults.map((result) => {
-        const incorrectQuestions: any[] = [];
-        const quizData = result.quizId as any;
+      // Filter out results with deleted quizzes and then process the remaining results
+      const processedResults = quizResults
+        .filter((result) => result.quizId) // Skip results where the quiz was deleted
+        .map((result) => {
+          const incorrectQuestions: any[] = [];
+          const quizData = result.quizId as any;
 
-        if (quizData && quizData.questions && Array.isArray(result.answers)) {
-          quizData.questions.forEach((question: any, index: number) => {
-            const userAnswerIndex = result.answers[index];
-            if (userAnswerIndex !== question.correctAnswer) {
-              incorrectQuestions.push({
-                questionText: question.text,
-                userAnswer: getChoiceText(question.choices, userAnswerIndex),
-                correctAnswer: getChoiceText(
-                  question.choices,
-                  question.correctAnswer
-                ),
-              });
-            }
-          });
-        }
+          if (quizData && quizData.questions && Array.isArray(result.answers)) {
+            quizData.questions.forEach((question: any, index: number) => {
+              const userAnswerIndex = result.answers[index];
+              if (userAnswerIndex !== question.correctAnswer) {
+                incorrectQuestions.push({
+                  questionText: question.text,
+                  userAnswer: getChoiceText(question.choices, userAnswerIndex),
+                  correctAnswer: getChoiceText(
+                    question.choices,
+                    question.correctAnswer
+                  ),
+                });
+              }
+            });
+          }
 
-        return {
-          _id: result._id,
-          quizId: quizData?._id,
-          quizTitle: quizData?.title || "Quiz Not Found",
-          completedAt: result.completedAt,
-          score: result.score,
-          totalQuestions: result.totalQuestions,
-          retakeCount: result.retakeCount,
-          incorrectQuestions: incorrectQuestions,
-        };
-      });
+          return {
+            _id: result._id,
+            quizId: quizData?._id,
+            quizTitle: quizData?.title,
+            completedAt: result.completedAt,
+            score: result.score,
+            totalQuestions: result.totalQuestions,
+            retakeCount: result.retakeCount,
+            incorrectQuestions: incorrectQuestions,
+          };
+        });
 
       const responseData = {
         ...staffMember,
@@ -182,6 +192,78 @@ router.get(
       res.status(200).json({ staff: responseData });
     } catch (error) {
       console.error(`Error fetching staff details for ID ${staffId}:`, error);
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   PATCH /api/staff/:id
+ * @desc    Update details for a specific staff member (e.g., professionalRole)
+ * @access  Private (Restaurant Role)
+ */
+router.patch(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const restaurantId = req.user?.restaurantId || req.user?.userId;
+    const { id: staffId } = req.params;
+    const { professionalRole } = req.body; // Get updated role from body
+
+    if (!restaurantId) {
+      return res
+        .status(400)
+        .json({ message: "Restaurant ID could not be determined for user." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(staffId)) {
+      return res.status(400).json({ message: "Invalid Staff ID format." });
+    }
+    if (!professionalRole) {
+      // Add validation if professionalRole is expected
+      return res
+        .status(400)
+        .json({ message: "Professional role is required for update." });
+    }
+
+    const staffObjectId = new mongoose.Types.ObjectId(staffId);
+
+    try {
+      // Find the staff member, ensure they belong to the requesting restaurant
+      const staffMember = await User.findOne({
+        _id: staffObjectId,
+        restaurantId: restaurantId, // Authorization check
+        role: "staff",
+      });
+
+      if (!staffMember) {
+        return res.status(404).json({
+          message:
+            "Staff member not found or you do not have permission to edit.",
+        });
+      }
+
+      // Update the professional role
+      staffMember.professionalRole = professionalRole;
+
+      // Validate before saving (optional, but good practice)
+      await staffMember.validate();
+
+      // Save the updated document
+      const updatedStaff = await staffMember.save();
+
+      // Exclude password if necessary (shouldn't be selected anyway)
+      const { password: _, ...staffResponse } = updatedStaff.toObject();
+
+      res.status(200).json({
+        message: "Staff details updated successfully.",
+        staff: staffResponse,
+      });
+    } catch (error: any) {
+      console.error(`Error updating staff details for ID ${staffId}:`, error);
+      if (error.name === "ValidationError") {
+        return res
+          .status(400)
+          .json({ message: "Validation failed", errors: error.errors });
+      }
       next(error);
     }
   }

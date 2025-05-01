@@ -1,28 +1,62 @@
-import React, { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import NotificationIcon from "./common/NotificationIcon";
 
 const Navbar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownMenuRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isDropdownOpen &&
+        dropdownButtonRef.current &&
+        dropdownMenuRef.current &&
+        !dropdownButtonRef.current.contains(event.target as Node) &&
+        !dropdownMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location]);
 
   // Base link common to both roles
   const baseLinks = [
     {
       name: "Dashboard",
-      path: user?.role === "staff" ? "/staff-dashboard" : "/dashboard",
+      path: user?.role === "staff" ? "/staff/dashboard" : "/dashboard",
     },
   ];
 
   // Links specific to restaurant role
   const restaurantLinks = [
+    { name: "Menu Management", path: "/menu" },
     { name: "Quiz Management", path: "/quiz-management" },
     { name: "Staff Management", path: "/staff" },
-    { name: "Staff Results", path: "/staff-results" },
+    { name: "Quiz Results", path: "/staff-results" },
   ];
 
   // Links specific to staff role
-  const staffLinks = [{ name: "Take Quiz", path: "/staff/quizzes" }];
+  const staffLinks = [
+    { name: "Take Quiz", path: "/staff/quizzes" },
+    { name: "My Results", path: "/staff/my-results" },
+  ];
 
   // Combine links based on role
   const navLinks = [
@@ -43,7 +77,7 @@ const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Left side: Logo/Brand */}
-          <div className="flex items-center">
+          <div className="flex-none flex items-center">
             <Link
               to={baseLinks[0].path}
               className="text-xl font-bold text-blue-600 hover:opacity-80 transition-opacity"
@@ -52,32 +86,71 @@ const Navbar: React.FC = () => {
             </Link>
           </div>
 
-          {/* Center: Desktop Navigation Links */}
-          <div className="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
-            {navLinks.map((link) => (
-              <NavLink
-                key={link.name}
-                to={link.path}
-                className={({ isActive }) =>
-                  `${baseStyle} ${isActive ? activeStyle : inactiveStyle}`
-                }
-                aria-label={`Navigate to ${link.name}`}
-              >
-                {link.name}
-              </NavLink>
-            ))}
+          {/* Center: Desktop Navigation Links - Centered using flex-1 and justify-center */}
+          <div className="hidden sm:flex flex-1 justify-center items-center">
+            <div className="flex space-x-8">
+              {navLinks.map((link) => (
+                <NavLink
+                  key={link.name}
+                  to={link.path}
+                  className={({ isActive }) =>
+                    `${baseStyle} ${isActive ? activeStyle : inactiveStyle}`
+                  }
+                  aria-label={`Navigate to ${link.name}`}
+                >
+                  {link.name}
+                </NavLink>
+              ))}
+            </div>
           </div>
 
-          {/* Right side: Logout and Mobile Menu Button */}
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            <button
-              onClick={logout}
-              className="ml-4 px-3 py-1.5 rounded-md text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              aria-label="Logout"
-            >
-              Logout
-            </button>
+          {/* Right side: Profile, notifications, etc. */}
+          <div className="flex-none flex items-center space-x-4">
+            {/* Notification icon - visible when authenticated */}
+            {token && <NotificationIcon />}
+
+            {/* User profile/menu */}
+            <div className="relative">
+              <button
+                ref={dropdownButtonRef}
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center focus:outline-none"
+              >
+                {/* User profile icon */}
+                <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                  {user?.name?.charAt(0) || "U"}
+                </div>
+              </button>
+
+              {/* Dropdown menu */}
+              {isDropdownOpen && (
+                <div
+                  ref={dropdownMenuRef}
+                  className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-2xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
+                >
+                  <div className="py-1">
+                    <NavLink
+                      to={baseLinks[0].path}
+                      className="text-sm text-gray-700 hover:bg-gray-100 block px-4 py-2"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      Dashboard
+                    </NavLink>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setIsDropdownOpen(false);
+                      }}
+                      className="text-sm text-gray-700 hover:bg-gray-100 block w-full text-left px-4 py-2"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
           {/* Mobile menu button */}
           <div className="-mr-2 flex items-center sm:hidden">
             <button

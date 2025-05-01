@@ -8,18 +8,17 @@ import React, {
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api"; // Assuming api is your configured axios instance
+import api from "../services/api";
 
 // Define the shape of the decoded JWT payload
 interface DecodedToken {
-  userId: string; // Assuming MongoDB ObjectId strings
+  userId: string;
   role: "restaurant" | "staff";
-  name: string; // Add name field
+  name: string;
   restaurantId?: string;
-  restaurantName?: string; // Add optional restaurantName
-  // Add other fields your token might contain (e.g., name, email)
-  iat?: number; // Issued at
-  exp?: number; // Expiration time
+  restaurantName?: string;
+  iat?: number;
+  exp?: number;
 }
 
 // Define the shape of the context data
@@ -30,25 +29,20 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   error: string | null;
-  // Add user role or other user info if needed
-  // userRole: 'Restaurant' | 'Staff' | null;
 }
 
-// Create the context with a default value of null
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Define the props for the provider component
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Create the AuthProvider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("authToken")
   );
   const [user, setUser] = useState<DecodedToken | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as true until check is done
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -58,15 +52,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (storedToken) {
         try {
           const decoded = jwtDecode<DecodedToken>(storedToken);
-          // Optional: Check token expiration
+          // Check token expiration
           if (decoded.exp && decoded.exp * 1000 < Date.now()) {
             console.log("Token expired");
             throw new Error("Token expired");
           }
-          // Token is valid (or doesn't have exp), set state and headers
+          // Token is valid, set state and headers
           setToken(storedToken);
           setUser(decoded);
-          // *** Set default auth header for subsequent API calls ***
           api.defaults.headers.common[
             "Authorization"
           ] = `Bearer ${storedToken}`;
@@ -77,21 +70,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem("authToken");
           setToken(null);
           setUser(null);
-          // Ensure header is removed if initialization fails
           delete api.defaults.headers.common["Authorization"];
         }
       } else {
-        // No token found, ensure state is clear and header is removed
+        // No token found, ensure state is clear
         setToken(null);
         setUser(null);
         delete api.defaults.headers.common["Authorization"];
         console.log("No token found, auth not initialized.");
       }
-      setIsLoading(false); // Finished loading/checking auth state
+      setIsLoading(false);
     };
 
     initializeAuth();
-  }, []); // Empty dependency array means run only once on mount
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -108,11 +100,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem("authToken", receivedToken);
       setToken(receivedToken);
 
-      // Decode and set user immediately after getting token
+      // Decode and set user
       const decoded = jwtDecode<DecodedToken>(receivedToken);
       setUser(decoded);
 
-      // *** Set default auth header on successful login ***
+      // Set auth header
       api.defaults.headers.common["Authorization"] = `Bearer ${receivedToken}`;
     } catch (err: any) {
       const errorMessage =
@@ -121,7 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         "Login failed. Please check credentials.";
       console.error("Login API error:", err);
       setError(errorMessage);
-      delete api.defaults.headers.common["Authorization"]; // Clear header on login fail
+      delete api.defaults.headers.common["Authorization"];
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -132,7 +124,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem("authToken");
-    // *** Remove default auth header on logout ***
     delete api.defaults.headers.common["Authorization"];
     console.log("User logged out, auth header removed.");
     navigate("/login");
@@ -147,12 +138,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
   };
 
-  // Render children only after initial loading is complete
-  // Or show a loading spinner globally
+  // Don't render until auth check is complete
   if (isLoading) {
-    // Optional: Return a global loading spinner or null
-    // return <div>Loading Authentication...</div>;
-    return null; // Or render children immediately if you handle loading inside components
+    return null;
   }
 
   return (
@@ -164,9 +152,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === null) {
-    // This error means you are trying to use the context
-    // outside of where it is provided. Ensure your component
-    // is wrapped by AuthProvider in the component tree.
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

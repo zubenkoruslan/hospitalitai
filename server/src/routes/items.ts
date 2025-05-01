@@ -65,6 +65,25 @@ router.post(
         message: "Item name, menu ID, type, and category are required",
       });
     }
+
+    // Name validation
+    if (
+      typeof name !== "string" ||
+      name.trim().length < 2 ||
+      name.trim().length > 50
+    ) {
+      return res.status(400).json({
+        message: "Item name must be between 2 and 50 characters",
+      });
+    }
+
+    // Description validation if provided
+    if (description !== undefined && typeof description !== "string") {
+      return res.status(400).json({
+        message: "Description must be a string if provided",
+      });
+    }
+
     if (!restaurantId) {
       return res
         .status(400)
@@ -87,13 +106,52 @@ router.post(
         message: `Invalid category '${category}' for type '${itemType}'. Allowed: ${allowed}`,
       });
     }
-    if (price !== undefined && (isNaN(Number(price)) || Number(price) < 0)) {
-      return res.status(400).json({ message: "Invalid price format" });
+
+    // Enhanced price validation
+    if (price !== undefined) {
+      const numPrice = Number(price);
+      if (isNaN(numPrice)) {
+        return res.status(400).json({
+          message: "Price must be a valid number",
+        });
+      }
+
+      if (numPrice < 0) {
+        return res.status(400).json({
+          message: "Price cannot be negative",
+        });
+      }
+
+      if (numPrice > 1000) {
+        // Set a reasonable upper limit
+        return res.status(400).json({
+          message: "Price exceeds maximum allowed value (1000)",
+        });
+      }
     }
-    if (ingredients !== undefined && !Array.isArray(ingredients)) {
-      return res
-        .status(400)
-        .json({ message: "Ingredients must be an array of strings" });
+
+    // Enhanced ingredients validation
+    if (ingredients !== undefined) {
+      if (!Array.isArray(ingredients)) {
+        return res.status(400).json({
+          message: "Ingredients must be provided as an array",
+        });
+      }
+
+      // Check each ingredient
+      for (const ingredient of ingredients) {
+        if (typeof ingredient !== "string" || ingredient.trim().length === 0) {
+          return res.status(400).json({
+            message: "Each ingredient must be a non-empty string",
+          });
+        }
+
+        if (ingredient.trim().length > 50) {
+          return res.status(400).json({
+            message: "Ingredient names cannot exceed 50 characters",
+          });
+        }
+      }
     }
 
     try {
@@ -301,11 +359,9 @@ router.put(
             finalItemType === "food"
               ? FOOD_CATEGORIES.join(", ")
               : BEVERAGE_CATEGORIES.join(", ");
-          return res
-            .status(400)
-            .json({
-              message: `Invalid category '${finalCategory}' for type '${finalItemType}'. Allowed: ${allowed}`,
-            });
+          return res.status(400).json({
+            message: `Invalid category '${finalCategory}' for type '${finalItemType}'. Allowed: ${allowed}`,
+          });
         }
       }
 

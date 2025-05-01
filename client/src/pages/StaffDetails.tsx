@@ -27,6 +27,7 @@ interface StaffDetailsData {
   name: string;
   email: string;
   createdAt: string;
+  professionalRole?: string;
   quizResults: QuizResultDetails[];
 }
 
@@ -206,7 +207,7 @@ const StaffDetails: React.FC = () => {
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { id: staffId } = useParams<{ id: string }>(); // Get staff ID from URL
+  const { id: staffId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -214,6 +215,12 @@ const StaffDetails: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedQuizResult, setSelectedQuizResult] =
     useState<QuizResultDetails | null>(null);
+
+  // State for editing professional role
+  const [isEditingRole, setIsEditingRole] = useState(false);
+  const [editedRole, setEditedRole] = useState<string>("");
+  const [isSavingRole, setIsSavingRole] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStaffDetails = async () => {
@@ -229,6 +236,7 @@ const StaffDetails: React.FC = () => {
           `/staff/${staffId}`
         );
         setStaffDetails(response.data.staff);
+        setEditedRole(response.data.staff?.professionalRole || "");
       } catch (err: any) {
         console.error("Error fetching staff details:", err);
         setError(
@@ -277,146 +285,231 @@ const StaffDetails: React.FC = () => {
     setSelectedQuizResult(null);
   };
 
+  // --- Role Edit Handlers ---
+  const handleEditRoleClick = () => {
+    setEditedRole(staffDetails?.professionalRole || "");
+    setIsEditingRole(true);
+    setRoleError(null);
+  };
+
+  const handleCancelEditRole = () => {
+    setIsEditingRole(false);
+    setRoleError(null);
+  };
+
+  const handleSaveRole = async () => {
+    if (!staffId || !editedRole.trim()) {
+      setRoleError("Role cannot be empty.");
+      return;
+    }
+    setIsSavingRole(true);
+    setRoleError(null);
+
+    try {
+      const response = await api.patch<{ staff: StaffDetailsData }>(
+        `/staff/${staffId}`,
+        {
+          professionalRole: editedRole.trim(),
+        }
+      );
+      setStaffDetails(response.data.staff);
+      setIsEditingRole(false);
+    } catch (err: any) {
+      console.error("Error updating role:", err);
+      setRoleError(err.response?.data?.message || "Failed to update role.");
+    } finally {
+      setIsSavingRole(false);
+    }
+  };
+
   // --- Render Logic ---
   if (loading) return <LoadingSpinner />;
-  // Keep Navbar consistent even on error/no data
+  if (error) return <ErrorMessage message={error} />;
+  if (!staffDetails) {
+    return <ErrorMessage message="Staff details could not be loaded." />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
-      {/* Use the Navbar component */}
       <Navbar />
-
-      {/* Main Content */}
       <main className="flex-1 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <div className="mb-6">
-            <button
-              onClick={() => navigate(-1)}
-              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+          {/* Back Link */}
+          <Link
+            to="/staff"
+            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mb-4 group"
+          >
+            <svg
+              /* Back arrow SVG */ className="mr-1 h-4 w-4 transition-transform duration-150 ease-in-out group-hover:-translate-x-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <svg
-                className="h-4 w-4 mr-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M15 19l-7-7 7-7"
-                ></path>
-              </svg>
-              Back
-            </button>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              ></path>
+            </svg>
+            Back to Staff List
+          </Link>
+
+          {/* Staff Header */}
+          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+              {staffDetails.name}
+            </h1>
+            <p className="text-sm text-gray-500 mb-1">
+              Email: {staffDetails.email}
+            </p>
+            {/* Professional Role Display/Edit */}
+            <div className="flex items-center text-sm text-gray-500 mb-1">
+              <span className="mr-2">Role:</span>
+              {isEditingRole ? (
+                <div className="flex items-center space-x-2 flex-grow">
+                  <input
+                    type="text"
+                    value={editedRole}
+                    onChange={(e) => setEditedRole(e.target.value)}
+                    className="block w-full pl-3 pr-1 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter professional role"
+                    disabled={isSavingRole}
+                  />
+                  <button
+                    onClick={handleSaveRole}
+                    disabled={isSavingRole}
+                    className="px-3 py-1 bg-green-500 text-white text-xs font-medium rounded hover:bg-green-600 disabled:opacity-50 flex-shrink-0"
+                  >
+                    {isSavingRole ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={handleCancelEditRole}
+                    disabled={isSavingRole}
+                    className="px-3 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 disabled:opacity-50 flex-shrink-0"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <span className="font-medium text-gray-700 mr-2">
+                  {staffDetails.professionalRole || "Not Set"}
+                </span>
+              )}
+              {!isEditingRole && (
+                <button
+                  onClick={handleEditRoleClick}
+                  className="text-blue-600 hover:text-blue-800 text-xs ml-1 p-1 rounded hover:bg-blue-50 flex-shrink-0"
+                  title="Edit Role"
+                >
+                  {/* Simple Edit Icon SVG */}
+                  <svg
+                    className="h-3.5 w-3.5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {roleError && (
+              <p className="text-xs text-red-500 mt-1">{roleError}</p>
+            )}
+            <p className="text-sm text-gray-500">
+              Joined: {formatDate(staffDetails.createdAt)}
+            </p>
           </div>
 
-          {error && <ErrorMessage message={error} />}
-
-          {!loading && !error && staffDetails && (
-            <div className="space-y-8">
-              {/* Staff Info Header */}
-              <div className="bg-white shadow-md rounded-lg p-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                  {staffDetails.name}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Email: {staffDetails.email}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Joined: {formatDate(staffDetails.createdAt)}
-                </p>
+          {/* Quiz Results Section */}
+          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <h3 className="text-lg font-semibold text-gray-800 p-4 border-b">
+              Tests Taken
+            </h3>
+            {staffDetails.quizResults && staffDetails.quizResults.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-4 py-2 text-left font-medium tracking-wider"
+                      >
+                        Quiz Title
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-2 text-left font-medium tracking-wider"
+                      >
+                        Completed
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-2 text-left font-medium tracking-wider"
+                      >
+                        Score
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-2 text-left font-medium tracking-wider"
+                      >
+                        Retakes
+                      </th>
+                      <th scope="col" className="relative px-4 py-2">
+                        <span className="sr-only">View Incorrect</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200 text-sm">
+                    {staffDetails.quizResults.map((result) => (
+                      <tr key={result._id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {result.quizTitle}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {formatDate(result.completedAt, true)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {result.score}/{result.totalQuestions}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {result.retakeCount > 0 ? result.retakeCount - 1 : 0}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleOpenModal(result)}
+                            className="text-indigo-600 hover:text-indigo-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={result.incorrectQuestions.length === 0}
+                            aria-label={`View incorrect answers for ${result.quizTitle}`}
+                          >
+                            {result.incorrectQuestions.length > 0
+                              ? "View Incorrect"
+                              : "All Correct"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {/* Quiz Results Section */}
-              <section className="bg-white shadow-md rounded-lg overflow-hidden">
-                <h3 className="text-lg font-semibold text-gray-800 p-4 border-b">
-                  Tests Taken
-                </h3>
-                {staffDetails.quizResults.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                        <tr>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-left font-medium tracking-wider"
-                          >
-                            Quiz Title
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-left font-medium tracking-wider"
-                          >
-                            Completed
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-left font-medium tracking-wider"
-                          >
-                            Score
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-left font-medium tracking-wider"
-                          >
-                            Retakes
-                          </th>
-                          <th scope="col" className="relative px-4 py-2">
-                            <span className="sr-only">View Incorrect</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200 text-sm">
-                        {staffDetails.quizResults.map((result) => (
-                          <tr key={result._id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium text-gray-900">
-                              {result.quizTitle}
-                            </td>
-                            <td className="px-4 py-3 text-gray-500">
-                              {formatDate(result.completedAt, true)}
-                            </td>
-                            <td className="px-4 py-3 text-gray-700">
-                              {result.score}/{result.totalQuestions}
-                            </td>
-                            <td className="px-4 py-3 text-gray-500">
-                              {result.retakeCount > 0
-                                ? result.retakeCount - 1
-                                : 0}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleOpenModal(result)}
-                                className="text-indigo-600 hover:text-indigo-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={
-                                  result.incorrectQuestions.length === 0
-                                }
-                                aria-label={`View incorrect answers for ${result.quizTitle}`}
-                              >
-                                {result.incorrectQuestions.length > 0
-                                  ? "View Incorrect"
-                                  : "All Correct"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 p-6">
-                    No quizzes have been completed by this staff member.
-                  </p>
-                )}
-              </section>
-            </div>
-          )}
+            ) : (
+              <p className="text-center text-gray-500 p-6">
+                No quizzes have been completed by this staff member.
+              </p>
+            )}
+          </div>
         </div>
       </main>
 
-      {/* Modal Render */}
+      {/* Modal for Incorrect Answers */}
       <IncorrectAnswersModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}

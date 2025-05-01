@@ -10,6 +10,7 @@ interface StaffMemberSummary {
   name: string;
   email: string;
   createdAt: string;
+  professionalRole?: string;
 }
 
 // --- Helper Components ---
@@ -137,14 +138,14 @@ const StaffManagement: React.FC = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
               Staff Management
             </h1>
-            {/* Placeholder Button */}
-            <button
+            {/* Add New Staff Button Removed */}
+            {/* <button
               className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:opacity-50"
               disabled
               aria-label="Add New Staff (disabled)"
             >
               + Add New Staff
-            </button>
+            </button> */}
           </div>
 
           {loading && <LoadingSpinner />}
@@ -173,6 +174,12 @@ const StaffManagement: React.FC = () => {
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
+                          Role
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Joined
                         </th>
                         <th scope="col" className="relative px-6 py-3">
@@ -184,7 +191,6 @@ const StaffManagement: React.FC = () => {
                       {staffList.map((staff) => (
                         <tr key={staff._id} className="hover:bg-gray-50 group">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {/* Clickable Name */}
                             <Link
                               to={`/staff/${staff._id}`}
                               className="text-blue-600 hover:text-blue-800 group-hover:underline"
@@ -195,6 +201,9 @@ const StaffManagement: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {staff.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {staff.professionalRole || "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(staff.createdAt)}

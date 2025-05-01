@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api"; // Assuming api.ts is configured
+import Navbar from "../components/Navbar"; // Import Navbar
+import QuizAssignment from "../components/QuizAssignment"; // Import the QuizAssignment component
 
 // --- Interfaces (matching backend models) ---
 
@@ -33,6 +35,7 @@ interface QuizData {
   menuItemIds: string[] | { _id: string; name: string }[]; // Keep this as backend returns menuItemIds
   questions: Question[];
   restaurantId: string;
+  isAssigned?: boolean; // Flag to indicate if the quiz has been assigned
   createdAt?: string;
   updatedAt?: string;
 }
@@ -112,7 +115,7 @@ const SuccessNotification: React.FC<{
 
 // --- Main Component ---
 const QuizCreation: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // --- State ---
   const [quizzes, setQuizzes] = useState<QuizData[]>([]);
@@ -146,6 +149,23 @@ const QuizCreation: React.FC = () => {
   // Delete Confirmation
   const [quizToDelete, setQuizToDelete] = useState<QuizData | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Add state for editing mode
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+  // Assignment Modal State
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  const [quizToAssign, setQuizToAssign] = useState<QuizData | null>(null);
+
+  // Add state for new question modal
+  const [isAddQuestionModalOpen, setIsAddQuestionModalOpen] =
+    useState<boolean>(false);
+  const [newQuestion, setNewQuestion] = useState<Question>({
+    text: "New Question",
+    choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
+    correctAnswer: 0,
+    menuItemId: "",
+  });
 
   // --- Data Fetching ---
   const fetchQuizzes = useCallback(async () => {
@@ -193,7 +213,10 @@ const QuizCreation: React.FC = () => {
     setQuizForPreview(null);
   };
 
-  const openPreviewModal = (quiz: QuizData) => {
+  const openPreviewModal = (
+    quiz: QuizData,
+    startInEditMode: boolean = false
+  ) => {
     setQuizForPreview(quiz);
     setCurrentQuestionIndex(0);
     setUserAnswers(new Array(quiz.questions.length).fill(undefined));
@@ -201,6 +224,16 @@ const QuizCreation: React.FC = () => {
     setIsPreviewModalOpen(true);
     setIsResultsModalOpen(false);
     setIsCreateModalOpen(false);
+
+    // Don't allow edit mode for assigned quizzes
+    if (quiz.isAssigned) {
+      setIsEditMode(false);
+      setSuccessMessage(
+        "This quiz has been assigned to staff and cannot be edited."
+      );
+    } else if (startInEditMode) {
+      setIsEditMode(true);
+    }
   };
 
   const closePreviewModal = () => {
@@ -223,16 +256,56 @@ const QuizCreation: React.FC = () => {
   };
 
   const openDeleteConfirm = (quiz: QuizData) => {
-    setQuizToDelete(quiz);
     if (
       window.confirm(
-        `Are you sure you want to delete the quiz "${quiz.title}"?`
+        `Are you sure you want to delete the quiz "${quiz.title}"?\n\nWARNING: This will permanently delete the quiz and ALL associated staff quiz results.`
       )
     ) {
-      handleDeleteQuiz();
-    } else {
+      deleteQuiz(quiz);
+    }
+  };
+
+  // Function to delete a quiz without relying on state
+  const deleteQuiz = async (quiz: QuizData) => {
+    if (!quiz || !quiz._id) return; // Need _id to delete
+
+    setQuizToDelete(quiz); // For UI feedback
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      await api.delete(`/quiz/${quiz._id}`);
+      setSuccessMessage(
+        `Quiz "${quiz.title}" and all associated results deleted.`
+      );
+      setQuizzes((prev) => prev.filter((q) => q._id !== quiz._id)); // Optimistic UI update
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to delete quiz.");
+    } finally {
+      setIsDeleting(false);
       setQuizToDelete(null);
     }
+  };
+
+  // Add function to open assignment modal
+  const openAssignModal = (quiz: QuizData) => {
+    setQuizToAssign(quiz);
+    setIsAssignModalOpen(true);
+  };
+
+  // Add function to close assignment modal
+  const closeAssignModal = () => {
+    setIsAssignModalOpen(false);
+    setQuizToAssign(null);
+  };
+
+  // Add function to handle assignment success
+  const handleAssignmentSuccess = () => {
+    setSuccessMessage(
+      `Quiz "${quizToAssign?.title}" successfully assigned to staff.`
+    );
+    setIsAssignModalOpen(false);
+    setQuizToAssign(null);
   };
 
   // --- Create/Generate Quiz Logic ---
@@ -277,10 +350,10 @@ const QuizCreation: React.FC = () => {
   };
 
   // --- Preview Quiz Logic ---
-  const handleAnswerSelect = (choiceIndex: number) => {
+  const handleAnswerSelect = (questionIndex: number, choiceIndex: number) => {
     setUserAnswers((prev) => {
       const newAnswers = [...prev];
-      newAnswers[currentQuestionIndex] = choiceIndex;
+      newAnswers[questionIndex] = choiceIndex;
       return newAnswers;
     });
   };
@@ -324,54 +397,97 @@ const QuizCreation: React.FC = () => {
 
   // --- Save Quiz Logic ---
   const handleSaveQuiz = async () => {
-    if (!quizResults || !quizResults.quizData) {
+    // Decide which quiz data to save based on context (preview or edit)
+    let quizToSave: QuizData;
+
+    if (isEditMode && quizForPreview) {
+      // We're in edit mode with the preview modal
+      quizToSave = { ...quizForPreview };
+
+      // Basic validation for edit mode
+      if (!quizToSave.title.trim()) {
+        setError("Quiz title cannot be empty");
+        return;
+      }
+
+      if (quizToSave.questions.length === 0) {
+        setError("Quiz must have at least one question");
+        return;
+      }
+
+      for (const q of quizToSave.questions) {
+        if (!q.text.trim()) {
+          setError("Question text cannot be empty");
+          return;
+        }
+
+        if (q.choices.some((c) => !c.trim())) {
+          setError("Answer choices cannot be empty");
+          return;
+        }
+      }
+    } else if (quizResults && quizResults.quizData) {
+      // We're in the results modal
+      quizToSave = { ...quizResults.quizData };
+    } else {
       setError("No quiz data available to save.");
       return;
+    }
+
+    // Make sure menuItemIds is in the correct format (array of strings)
+    if (
+      Array.isArray(quizToSave.menuItemIds) &&
+      quizToSave.menuItemIds.length > 0 &&
+      typeof quizToSave.menuItemIds[0] === "object"
+    ) {
+      quizToSave = {
+        ...quizToSave,
+        menuItemIds: (quizToSave.menuItemIds as { _id: string }[]).map(
+          (item) => item._id
+        ),
+      };
     }
 
     setIsSaving(true);
     setError(null);
 
     try {
-      // Send the quiz data that was generated and previewed
-      const response = await api.post<{ quiz: QuizData }>(
-        "/quiz",
-        quizResults.quizData
-      );
-      setSuccessMessage(
-        `Quiz "${response.data.quiz.title}" saved successfully!`
-      );
-      fetchQuizzes(); // Refresh the list of quizzes
-      closeResultsModal(); // Close results modal after saving
+      // Determine if this is an update or create operation
+      const isUpdate = !!quizToSave._id;
+      const message = isUpdate
+        ? "Save changes to this quiz?"
+        : "Save this quiz?";
+
+      if (window.confirm(message)) {
+        // If quiz has an ID, use PUT to update it, otherwise create new with POST
+        const apiCall = isUpdate
+          ? api.put<{ quiz: QuizData }>(`/quiz/${quizToSave._id}`, quizToSave)
+          : api.post<{ quiz: QuizData }>("/quiz", quizToSave);
+
+        const response = await apiCall;
+        setSuccessMessage(
+          `Quiz "${response.data.quiz.title}" ${
+            isUpdate ? "updated" : "saved"
+          } successfully!`
+        );
+        fetchQuizzes(); // Refresh the list of quizzes
+
+        // Close the appropriate modal
+        if (isResultsModalOpen) {
+          closeResultsModal();
+        } else if (isPreviewModalOpen) {
+          closePreviewModal();
+        }
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to save quiz.");
-      // Keep results modal open on error?
+      console.error("Save error:", err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- Delete Quiz Logic ---
-  const handleDeleteQuiz = async () => {
-    if (!quizToDelete || !quizToDelete._id) return; // Need _id to delete
-
-    setIsDeleting(true); // Maybe add loading state to the row/card?
-    setError(null);
-
-    try {
-      await api.delete(`/quiz/${quizToDelete._id}`);
-      setSuccessMessage(`Quiz "${quizToDelete.title}" deleted.`);
-      setQuizzes((prev) => prev.filter((q) => q._id !== quizToDelete._id)); // Optimistic UI update
-      setQuizToDelete(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete quiz.");
-      setQuizToDelete(null);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // --- Render Logic ---
+  // --- Render Functions ---
   const renderMenusList = () => (
     <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md p-2 space-y-1">
       {isLoadingMenus ? (
@@ -402,7 +518,6 @@ const QuizCreation: React.FC = () => {
     </div>
   );
 
-  // Helper to get menu item names for display
   const getMenuItemNames = (quiz: QuizData): string => {
     if (!quiz.menuItemIds) return "N/A";
     // If populated (from GET /quiz)
@@ -421,446 +536,690 @@ const QuizCreation: React.FC = () => {
     return `${quiz.menuItemIds.length} items`;
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link
-                to="/dashboard"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                &larr; Back to Dashboard
-              </Link>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={logout}
-                className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition duration-150 ease-in-out"
-              >
-                Logout
-              </button>
-            </div>
+  // Modify the renderQuestion function to pass the question index to handleAnswerSelect
+  const renderQuestion = (
+    question: Question,
+    index: number,
+    isEditing: boolean = false
+  ) => {
+    const currentAnswer = userAnswers[index];
+    return (
+      <div
+        key={`q-${index}`}
+        className="bg-white p-4 rounded-lg shadow-sm mb-4"
+      >
+        {isEditing ? (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Question Text
+            </label>
+            <input
+              type="text"
+              value={question.text}
+              onChange={(e) => {
+                const updatedQuestions = [...quizForPreview!.questions];
+                updatedQuestions[index] = {
+                  ...updatedQuestions[index],
+                  text: e.target.value,
+                };
+                setQuizForPreview({
+                  ...quizForPreview!,
+                  questions: updatedQuestions,
+                });
+              }}
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
           </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
-            Quiz Management
-          </h1>
-          <button
-            onClick={openCreateModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-md hover:shadow-lg transition duration-150 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Create New Quiz
-          </button>
-        </div>
-
-        {/* Notifications */}
-        {error && <ErrorMessage message={error} />}
-        {successMessage && (
-          <SuccessNotification
-            message={successMessage}
-            onDismiss={() => setSuccessMessage(null)}
-          />
+        ) : (
+          <p className="text-lg font-medium text-gray-900 mb-4">
+            {index + 1}. {question.text}
+          </p>
         )}
 
-        {/* Quiz List */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          {isLoadingQuizzes ? (
-            <LoadingSpinner />
-          ) : quizzes.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">
-              No quizzes found. Create one to get started!
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* Table View */}
-              <table className="min-w-full divide-y divide-gray-200 hidden md:table">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Title
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Menu Items
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Questions
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Created
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {quizzes.map((quiz) => (
-                    <tr key={quiz._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {quiz.title}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {getMenuItemNames(quiz)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {quiz.questions.length}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {quiz.createdAt
-                          ? new Date(quiz.createdAt).toLocaleDateString()
-                          : "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                        {/* Preview button might be less relevant if quizzes can't be retaken by owner? */}
-                        {/* <button onClick={() => openPreviewModal(quiz)} className="text-green-600 hover:text-green-900" aria-label={`Preview ${quiz.title}`}>Preview</button> */}
-                        {/* Add View Results button later? */}
-                        {/* <button onClick={() => { }} className="text-blue-600 hover:text-blue-900" aria-label={`Edit ${quiz.title}`}>Edit</button> */}
-                        <button
-                          onClick={() => openDeleteConfirm(quiz)}
-                          className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded"
-                          aria-label={`Delete ${quiz.title}`}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {/* Card View */}
-              <div className="divide-y divide-gray-200 md:hidden">
+        <div className="space-y-3">
+          {question.choices.map((choice, choiceIndex) => (
+            <div key={choiceIndex} className="flex items-center">
+              {isEditing ? (
+                <>
+                  <input
+                    type="radio"
+                    name={`correct-answer-${index}`}
+                    checked={question.correctAnswer === choiceIndex}
+                    onChange={() => {
+                      const updatedQuestions = [...quizForPreview!.questions];
+                      updatedQuestions[index] = {
+                        ...updatedQuestions[index],
+                        correctAnswer: choiceIndex,
+                      };
+                      setQuizForPreview({
+                        ...quizForPreview!,
+                        questions: updatedQuestions,
+                      });
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 mr-2"
+                  />
+                  <input
+                    type="text"
+                    value={choice}
+                    onChange={(e) => {
+                      const updatedQuestions = [...quizForPreview!.questions];
+                      updatedQuestions[index].choices[choiceIndex] =
+                        e.target.value;
+                      setQuizForPreview({
+                        ...quizForPreview!,
+                        questions: updatedQuestions,
+                      });
+                    }}
+                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                  />
+                </>
+              ) : (
+                <label
+                  className={`flex items-center w-full p-3 border rounded-md hover:bg-gray-50 cursor-pointer transition-colors duration-150 ease-in-out ${
+                    currentAnswer === choiceIndex
+                      ? "bg-blue-50 border-blue-300 ring-1 ring-blue-300"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`question-${index}`}
+                    value={choiceIndex}
+                    checked={currentAnswer === choiceIndex}
+                    onChange={() => handleAnswerSelect(index, choiceIndex)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="ml-3 text-sm text-gray-700">{choice}</span>
+                  {isEditing && question.correctAnswer === choiceIndex && (
+                    <span className="ml-2 text-sm text-green-600">
+                      (Correct Answer)
+                    </span>
+                  )}
+                </label>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {isEditing && (
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => {
+                const updatedQuestions = [...quizForPreview!.questions];
+                updatedQuestions.splice(index, 1);
+                setQuizForPreview({
+                  ...quizForPreview!,
+                  questions: updatedQuestions,
+                });
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded-md text-sm"
+            >
+              Delete Question
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Update function to show modal instead of immediately adding question
+  const addNewQuestion = () => {
+    if (!quizForPreview) return;
+
+    console.log("Opening add question modal");
+
+    // Get a valid menuItemId - either from existing questions or from menuItemIds
+    let menuItemId = "";
+
+    // Try to get from first question
+    if (quizForPreview.questions && quizForPreview.questions.length > 0) {
+      menuItemId = quizForPreview.questions[0].menuItemId;
+    }
+    // If not available, try to get from menuItemIds
+    else if (
+      quizForPreview.menuItemIds &&
+      quizForPreview.menuItemIds.length > 0
+    ) {
+      // Check if menuItemIds is an array of strings or objects
+      const firstItem = quizForPreview.menuItemIds[0];
+      if (typeof firstItem === "string") {
+        menuItemId = firstItem;
+      } else if (
+        firstItem &&
+        typeof firstItem === "object" &&
+        "_id" in firstItem
+      ) {
+        menuItemId = firstItem._id;
+      }
+    }
+
+    console.log("Using menuItemId:", menuItemId);
+
+    // Set up the new question with the menuItemId
+    setNewQuestion({
+      text: "New Question",
+      choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
+      correctAnswer: 0,
+      menuItemId: menuItemId,
+    });
+
+    // Open the modal
+    setIsAddQuestionModalOpen(true);
+  };
+
+  // Function to handle adding the edited question to the quiz
+  const handleAddQuestionSubmit = () => {
+    if (!quizForPreview) return;
+
+    // Add the new question to the quiz
+    setQuizForPreview({
+      ...quizForPreview,
+      questions: [...quizForPreview.questions, newQuestion],
+    });
+
+    // Close the modal
+    setIsAddQuestionModalOpen(false);
+
+    // Add console log to confirm question was added
+    console.log(
+      "Question added, new count:",
+      quizForPreview.questions.length + 1
+    );
+  };
+
+  // --- Return JSX ---
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+
+      {/* Main content wrapper */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0">
+          {/* Page Header */}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Quiz Management
+            </h1>
+            <button
+              onClick={openCreateModal}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
+            >
+              Create New Quiz
+            </button>
+          </div>
+
+          {/* Notifications */}
+          {error && <ErrorMessage message={error} />}
+          {successMessage && (
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={() => setSuccessMessage(null)}
+            />
+          )}
+
+          {/* Quiz List */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <h2 className="sr-only" id="quiz-list-title">
+              Available Quizzes
+            </h2>
+            {isLoadingQuizzes ? (
+              <LoadingSpinner />
+            ) : quizzes.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">
+                No quizzes found. Create one to get started!
+              </p>
+            ) : (
+              <ul
+                className="divide-y divide-gray-200"
+                aria-labelledby="quiz-list-title"
+              >
                 {quizzes.map((quiz) => (
-                  <div key={quiz._id} className="px-4 py-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {quiz.title}
-                      </p>
-                      <div className="ml-2 flex-shrink-0 flex space-x-2">
-                        {/* <button onClick={() => { }} className="text-blue-600 hover:text-blue-900 text-xs" aria-label={`Edit ${quiz.title}`}>Edit</button> */}
+                  <li key={quiz._id} className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div className="truncate">
+                        <p className="text-lg font-medium text-blue-600 truncate">
+                          {quiz.title}
+                          {quiz.isAssigned && (
+                            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                              Assigned
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Covers: {getMenuItemNames(quiz)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Created:{" "}
+                          {quiz.createdAt
+                            ? new Date(quiz.createdAt).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <div className="ml-4 flex-shrink-0 flex space-x-2">
+                        <button
+                          onClick={() => openPreviewModal(quiz, false)}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        >
+                          Preview
+                        </button>
+                        {!quiz.isAssigned && (
+                          <>
+                            <button
+                              onClick={() => openPreviewModal(quiz, true)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => openAssignModal(quiz)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                            >
+                              Assign
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => openDeleteConfirm(quiz)}
-                          className="text-red-600 hover:text-red-900 text-xs focus:outline-none focus:ring-1 focus:ring-red-500 rounded p-0.5"
-                          aria-label={`Delete ${quiz.title}`}
+                          disabled={
+                            isDeleting && quizToDelete?._id === quiz._id
+                          }
+                          className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
+                            isDeleting && quizToDelete?._id === quiz._id
+                              ? "bg-gray-400"
+                              : "bg-red-600 hover:bg-red-700"
+                          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50`}
                         >
-                          Delete
+                          {isDeleting && quizToDelete?._id === quiz._id
+                            ? "Deleting..."
+                            : "Delete"}
                         </button>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>Items: {getMenuItemNames(quiz)}</p>
-                      <p>Questions: {quiz.questions.length}</p>
-                      <p>
-                        Created:{" "}
-                        {quiz.createdAt
-                          ? new Date(quiz.createdAt).toLocaleDateString()
-                          : "N/A"}
-                      </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* --- Modals --- */}
+
+          {/* Create/Generate Quiz Modal */}
+          {isCreateModalOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 my-8">
+                <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                  Create New Quiz
+                </h2>
+                {createError && <ErrorMessage message={createError} />}
+                <div className="mb-4">
+                  <label
+                    htmlFor="quizTitle"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Quiz Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="quizTitle"
+                    value={quizTitle}
+                    onChange={(e) => {
+                      setQuizTitle(e.target.value);
+                      if (createError && e.target.value.trim()) {
+                        setCreateError(null);
+                      }
+                    }}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="E.g., Appetizers Knowledge Check"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Menus to Generate Questions From{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  {isLoadingMenus ? (
+                    <LoadingSpinner />
+                  ) : menus.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
+                      {menus.map((menu) => (
+                        <div key={menu._id} className="flex items-center">
+                          <input
+                            id={`menu-${menu._id}`}
+                            name="menus"
+                            type="checkbox"
+                            value={menu._id}
+                            checked={selectedMenuIds.includes(menu._id)}
+                            onChange={() => handleMenuSelection(menu._id)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <label
+                            htmlFor={`menu-${menu._id}`}
+                            className="ml-3 text-sm text-gray-700"
+                          >
+                            {menu.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      No menus found. Please create menus first.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={closeCreateModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateQuiz}
+                    disabled={
+                      isGenerating ||
+                      selectedMenuIds.length === 0 ||
+                      !quizTitle.trim()
+                    }
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? "Generating..." : "Generate Quiz"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preview Quiz Modal */}
+          {isPreviewModalOpen && quizForPreview && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
+              <div className="max-w-6xl mx-auto px-4 py-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">
+                    {isEditMode ? "Edit Quiz: " : "Preview Quiz: "}{" "}
+                    {quizForPreview.title}
+                  </h2>
+                  <div className="flex space-x-3">
+                    {!quizForPreview.isAssigned ? (
+                      <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium ${
+                          isEditMode
+                            ? "bg-blue-100 text-blue-600"
+                            : "bg-blue-600 text-white"
+                        }`}
+                      >
+                        {isEditMode ? "Exit Edit Mode" : "Edit Questions"}
+                      </button>
+                    ) : (
+                      <div className="text-yellow-700 text-sm bg-yellow-50 px-3 py-2 rounded-md">
+                        Quiz has been assigned. Editing disabled.
+                      </div>
+                    )}
+                    {isEditMode && (
+                      <button
+                        onClick={addNewQuestion}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium"
+                      >
+                        Add Question
+                      </button>
+                    )}
+                    <button
+                      onClick={closePreviewModal}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                {isEditMode ? (
+                  // Editing view - all questions visible with edit controls
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium mb-4">
+                      Edit Quiz Questions
+                    </h3>
+                    <div className="space-y-6">
+                      {quizForPreview.questions.map((question, idx) =>
+                        renderQuestion(question, idx, true)
+                      )}
+                    </div>
+
+                    <div className="mt-6 flex justify-between">
+                      <input
+                        type="text"
+                        value={quizForPreview.title}
+                        onChange={(e) =>
+                          setQuizForPreview({
+                            ...quizForPreview,
+                            title: e.target.value,
+                          })
+                        }
+                        className="px-4 py-2 border border-gray-300 rounded-md"
+                        placeholder="Quiz Title"
+                      />
+                      <button
+                        onClick={handleSaveQuiz}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium"
+                      >
+                        {isSaving ? "Saving..." : "Save Quiz"}
+                      </button>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  // Preview view - all questions visible with navigation
+                  <div className="mb-6">
+                    <div className="space-y-8">
+                      {quizForPreview.questions.map((question, idx) =>
+                        renderQuestion(question, idx, false)
+                      )}
+                    </div>
+
+                    <div className="mt-8 flex justify-end">
+                      <button
+                        onClick={handlePreviewSubmit}
+                        disabled={userAnswers.some((a) => a === undefined)}
+                        className="px-6 py-2 bg-green-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                      >
+                        Finish & View Results
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Results Modal */}
+          {isResultsModalOpen && quizResults && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-4 my-8">
+                <h2 className="text-xl font-semibold mb-2 text-gray-800">
+                  Preview Results: {quizResults.quizData.title}
+                </h2>
+                <p className="text-lg font-medium mb-4 text-gray-700">
+                  Score: {quizResults.score} / {quizResults.totalQuestions} (
+                  {quizResults.totalQuestions > 0
+                    ? (
+                        (quizResults.score / quizResults.totalQuestions) *
+                        100
+                      ).toFixed(0)
+                    : 0}
+                  %)
+                </p>
+
+                <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
+                  {quizResults.quizData.questions.map((q, index) => (
+                    <div
+                      key={`result-${index}`}
+                      className="p-4 border rounded-md bg-gray-50"
+                    >
+                      <p className="font-medium mb-2">
+                        {index + 1}. {q.text}
+                      </p>
+                      <ul className="space-y-1 list-disc list-inside mb-2">
+                        {q.choices.map((choice, choiceIndex) => {
+                          const isCorrect = choiceIndex === q.correctAnswer;
+                          const isSelected =
+                            choiceIndex === quizResults.userAnswers[index];
+                          let choiceStyle = "text-gray-700";
+                          if (isCorrect)
+                            choiceStyle = "text-green-600 font-semibold";
+                          if (isSelected && !isCorrect)
+                            choiceStyle = "text-red-600";
+
+                          return (
+                            <li key={choiceIndex} className={`${choiceStyle}`}>
+                              {choice}
+                              {isSelected && !isCorrect && (
+                                <span className="text-red-500 ml-2">
+                                  (Your Answer)
+                                </span>
+                              )}
+                              {isCorrect && !isSelected && (
+                                <span className="text-green-500 ml-2">
+                                  (Correct Answer)
+                                </span>
+                              )}
+                              {isCorrect && isSelected && (
+                                <span className="text-green-500 ml-2">
+                                  (Correct)
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={closeResultsModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Close Preview
+                  </button>
+                  {/* Show Save button for all quizzes */}
+                  <button
+                    type="button"
+                    onClick={handleSaveQuiz}
+                    disabled={isSaving}
+                    className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving..." : "Save Quiz"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Assignment Modal */}
+          {isAssignModalOpen && quizToAssign && (
+            <QuizAssignment
+              quizId={quizToAssign._id || ""}
+              quizTitle={quizToAssign.title}
+              onClose={closeAssignModal}
+              onSuccess={handleAssignmentSuccess}
+            />
+          )}
+
+          {/* Add Question Modal */}
+          {isAddQuestionModalOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4 my-8">
+                <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                  Add New Question
+                </h2>
+
+                <div className="mb-4">
+                  <label
+                    htmlFor="questionText"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Question Text
+                  </label>
+                  <input
+                    type="text"
+                    id="questionText"
+                    value={newQuestion.text}
+                    onChange={(e) =>
+                      setNewQuestion({ ...newQuestion, text: e.target.value })
+                    }
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Enter question text"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Answer Choices
+                  </label>
+                  {newQuestion.choices.map((choice, index) => (
+                    <div key={index} className="flex items-center mb-2">
+                      <input
+                        type="radio"
+                        id={`correct-${index}`}
+                        name="correctAnswer"
+                        checked={newQuestion.correctAnswer === index}
+                        onChange={() =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            correctAnswer: index,
+                          })
+                        }
+                        className="h-4 w-4 text-blue-600 border-gray-300 mr-2"
+                      />
+                      <input
+                        type="text"
+                        value={choice}
+                        onChange={(e) => {
+                          const newChoices = [...newQuestion.choices];
+                          newChoices[index] = e.target.value;
+                          setNewQuestion({
+                            ...newQuestion,
+                            choices: newChoices,
+                          });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        placeholder={`Option ${index + 1}`}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the radio button next to the correct answer
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddQuestionModalOpen(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddQuestionSubmit}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Add Question
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       </main>
-
-      {/* --- Modals --- */}
-
-      {/* Create Quiz Modal */}
-      {isCreateModalOpen && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-quiz-title"
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-auto overflow-hidden">
-            <div className="px-6 py-4">
-              <h2
-                id="create-quiz-title"
-                className="text-xl font-semibold text-gray-800 mb-4"
-              >
-                Create New Quiz
-              </h2>
-              {createError && <ErrorMessage message={createError} />}
-              <div className="mb-4">
-                <label
-                  htmlFor="quizTitle"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Quiz Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="quizTitle"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Menus <span className="text-red-500">*</span>
-                </label>
-                {renderMenusList()}
-              </div>
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                disabled={isGenerating}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerateQuiz}
-                disabled={
-                  isGenerating || isLoadingMenus || selectedMenuIds.length === 0
-                }
-                className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
-              >
-                {isGenerating ? <LoadingSpinner /> : "Generate & Preview Quiz"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preview Quiz Modal */}
-      {isPreviewModalOpen && quizForPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="preview-quiz-title"
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-auto overflow-hidden flex flex-col"
-            style={{ maxHeight: "90vh" }}
-          >
-            <div className="px-6 py-4 border-b">
-              <h2
-                id="preview-quiz-title"
-                className="text-xl font-semibold text-gray-800"
-              >
-                Preview: {quizForPreview.title}
-              </h2>
-              <p className="text-sm text-gray-600">
-                Question {currentQuestionIndex + 1} of{" "}
-                {quizForPreview.questions.length}
-              </p>
-            </div>
-            <div className="px-6 py-4 flex-1 overflow-y-auto">
-              {/* Display current question */}
-              {quizForPreview.questions.length > 0 && (
-                <div>
-                  <p className="text-lg font-medium text-gray-900 mb-4">
-                    {quizForPreview.questions[currentQuestionIndex].text}
-                  </p>
-                  <div className="space-y-3">
-                    {quizForPreview.questions[currentQuestionIndex].choices.map(
-                      (choice, index) => (
-                        <label
-                          key={index}
-                          className="flex items-center p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="radio"
-                            name={`question-${currentQuestionIndex}`}
-                            value={index}
-                            checked={
-                              userAnswers[currentQuestionIndex] === index
-                            }
-                            onChange={() => handleAnswerSelect(index)}
-                            className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">
-                            {choice}
-                          </span>
-                        </label>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-between items-center">
-              <div>
-                <button
-                  type="button"
-                  onClick={goToPreviousQuestion}
-                  disabled={currentQuestionIndex === 0}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={goToNextQuestion}
-                  disabled={
-                    !quizForPreview ||
-                    currentQuestionIndex >= quizForPreview.questions.length - 1
-                  }
-                  className="ml-3 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={closePreviewModal}
-                  className="mr-3 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel Preview
-                </button>
-                {/* Enable submit only if all questions answered? */}
-                {userAnswers.every((ans) => ans !== undefined) && (
-                  <button
-                    type="button"
-                    onClick={handlePreviewSubmit}
-                    className="px-4 py-2 bg-green-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Submit Answers
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Results Modal */}
-      {isResultsModalOpen && quizResults && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="results-quiz-title"
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-auto overflow-hidden flex flex-col"
-            style={{ maxHeight: "90vh" }}
-          >
-            <div className="px-6 py-4 border-b">
-              <h2
-                id="results-quiz-title"
-                className="text-xl font-semibold text-gray-800"
-              >
-                Results: {quizResults.quizData.title}
-              </h2>
-              <p className="text-lg font-medium text-gray-700">
-                Score: {quizResults.score} / {quizResults.totalQuestions} (
-                {(
-                  (quizResults.score / quizResults.totalQuestions) *
-                  100
-                ).toFixed(0)}
-                %)
-              </p>
-            </div>
-            <div className="px-6 py-4 flex-1 overflow-y-auto space-y-4">
-              {quizResults.quizData.questions.map((q, index) => {
-                const userAnswerIndex = quizResults.userAnswers[index];
-                const correctAnswerIndex = quizResults.correctAnswers[index];
-                const isCorrect = userAnswerIndex === correctAnswerIndex;
-                return (
-                  <div
-                    key={index}
-                    className={`p-4 border rounded-md ${
-                      isCorrect
-                        ? "border-green-300 bg-green-50"
-                        : "border-red-300 bg-red-50"
-                    }`}
-                  >
-                    <p className="font-medium text-gray-800 mb-2">
-                      {index + 1}. {q.text}
-                    </p>
-                    <div className="space-y-1 text-sm">
-                      {q.choices.map((choice, choiceIndex) => (
-                        <p
-                          key={choiceIndex}
-                          className={`${
-                            choiceIndex === correctAnswerIndex
-                              ? "text-green-700 font-semibold"
-                              : ""
-                          }
-                            ${
-                              choiceIndex === userAnswerIndex && !isCorrect
-                                ? "text-red-700 line-through"
-                                : ""
-                            }
-                            ${
-                              choiceIndex !== userAnswerIndex &&
-                              choiceIndex !== correctAnswerIndex
-                                ? "text-gray-600"
-                                : ""
-                            }`}
-                        >
-                          {choiceIndex === userAnswerIndex ? "➔" : ""}{" "}
-                          {String.fromCharCode(65 + choiceIndex)}. {choice}
-                          {choiceIndex === correctAnswerIndex
-                            ? " (Correct)"
-                            : ""}
-                          {choiceIndex === userAnswerIndex && !isCorrect
-                            ? " (Your Answer)"
-                            : ""}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={closeResultsModal}
-                disabled={isSaving}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Close
-              </button>
-              {!quizResults.quizData._id && (
-                <button
-                  type="button"
-                  onClick={handleSaveQuiz}
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
-                >
-                  {isSaving ? <LoadingSpinner /> : "Save Quiz for Staff"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

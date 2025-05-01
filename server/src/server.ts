@@ -7,11 +7,12 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/auth";
 import menuRoutes from "./routes/menus";
 import itemRoutes from "./routes/items";
-import quizRoutes from "./routes/quiz";
+import { router as quizRoutes } from "./routes/quiz";
 import resultsRoutes from "./routes/quizResult";
 import staffRoutes from "./routes/staff";
+import notificationRoutes from "./routes/notifications";
 import { protect } from "./middleware/authMiddleware";
-// TODO: Import other route files as needed (e.g., quizzes)
+import { errorHandler } from "./middleware/errorHandler";
 
 dotenv.config();
 
@@ -42,7 +43,10 @@ app.use("/api/items", itemRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/results", resultsRoutes);
 app.use("/api/staff", staffRoutes);
-// TODO: Mount other routes
+app.use("/api/notifications", notificationRoutes);
+
+// Global error handler - must be after all routes
+app.use(errorHandler);
 
 const PORT: string | number = process.env.PORT || 3000;
 app.listen(PORT, () => {

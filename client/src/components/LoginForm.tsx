@@ -28,15 +28,24 @@ const LoginForm: React.FC = () => {
 
     try {
       await login(email, password);
-      // Redirect on successful login (AuthContext might handle token setting)
-      // Choose appropriate redirect path based on user role if needed
-      navigate("/dashboard"); // Or navigate based on role after context update
+      // Get the updated user after login
+      const { user } = auth;
+
+      // Redirect based on user role
+      if (user?.role === "staff") {
+        navigate("/staff/dashboard");
+      } else if (user?.role === "restaurant") {
+        navigate("/dashboard");
+      } else {
+        // Default redirect if role is unknown
+        navigate("/");
+      }
     } catch (err) {
       // Error is already set in AuthContext, but we can use componentError for form-specific feedback
       // authError will contain the error message from the context
       console.error("Login failed:", err);
       // Optionally set componentError if authError isn't displayed elsewhere
-      // setComponentError(authError || 'Login failed.');
+      setComponentError(authError || "Login failed.");
     }
   };
 

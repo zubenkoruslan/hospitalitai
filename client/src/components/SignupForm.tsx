@@ -9,6 +9,7 @@ const SignupForm: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"staff" | "restaurant">("staff"); // Default role
+  const [professionalRole, setProfessionalRole] = useState<string>("");
   const [restaurantName, setRestaurantName] = useState(""); // For restaurant owner signup
   const [restaurantId, setRestaurantId] = useState(""); // REVERT: For staff signup
 
@@ -33,6 +34,10 @@ const SignupForm: React.FC = () => {
       setError("Restaurant ID is required for staff members.");
       return;
     }
+    if (role === "staff" && !professionalRole.trim()) {
+      setError("Please enter your professional role.");
+      return;
+    }
 
     setIsLoading(true);
 
@@ -42,7 +47,8 @@ const SignupForm: React.FC = () => {
       password,
       role,
       restaurantName: role === "restaurant" ? restaurantName : undefined,
-      restaurantId: role === "staff" ? restaurantId : undefined, // Send ID for staff
+      restaurantId: role === "staff" ? restaurantId : undefined,
+      professionalRole: role === "staff" ? professionalRole.trim() : undefined,
     };
 
     try {
@@ -199,21 +205,38 @@ const SignupForm: React.FC = () => {
         </div>
       )}
       {role === "staff" && (
-        <div style={styles.inputGroup}>
-          {/* This might be better as an invite code lookup later */}
-          <label htmlFor="restaurantId" style={styles.label}>
-            Restaurant ID (Provided by Manager):
-          </label>
-          <input
-            type="text"
-            id="restaurantId"
-            value={restaurantId}
-            onChange={(e) => setRestaurantId(e.target.value)}
-            required={role === "staff"}
-            style={styles.input}
-            disabled={isLoading}
-          />
-        </div>
+        <>
+          <div style={styles.inputGroup}>
+            {/* This might be better as an invite code lookup later */}
+            <label htmlFor="restaurantId" style={styles.label}>
+              Restaurant ID (Provided by Manager):
+            </label>
+            <input
+              type="text"
+              id="restaurantId"
+              value={restaurantId}
+              onChange={(e) => setRestaurantId(e.target.value)}
+              required={role === "staff"}
+              style={styles.input}
+              disabled={isLoading}
+            />
+          </div>
+          <div style={styles.inputGroup}>
+            <label htmlFor="professionalRole" style={styles.label}>
+              Your Professional Role:
+            </label>
+            <input
+              type="text"
+              id="professionalRole"
+              value={professionalRole}
+              onChange={(e) => setProfessionalRole(e.target.value)}
+              required={role === "staff"}
+              placeholder="E.g., Waiter, Chef, Supervisor"
+              style={styles.input}
+              disabled={isLoading}
+            />
+          </div>
+        </>
       )}
 
       <button type="submit" disabled={isLoading} style={styles.button}>

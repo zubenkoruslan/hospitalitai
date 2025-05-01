@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: "restaurant" | "staff";
+  professionalRole?: string; // Added professional role
   restaurantId?: mongoose.Types.ObjectId; // Optional here, but conditionally required by schema
   comparePassword(candidatePassword: string): Promise<boolean>; // Method signature
 }
@@ -42,6 +43,14 @@ const userSchema = new Schema<IUser>(
       enum: {
         values: ["restaurant", "staff"],
         message: "{VALUE} is not a supported role",
+      },
+    },
+    professionalRole: {
+      type: String,
+      trim: true,
+      required: function (this: IUser) {
+        // Only require professionalRole if the role is 'staff'
+        return this.role === "staff";
       },
     },
     restaurantId: {

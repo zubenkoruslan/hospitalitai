@@ -17,6 +17,7 @@ export interface IQuiz extends Document {
   menuItemIds: Types.ObjectId[]; // References to MenuItems used in the quiz
   questions: IQuestion[]; // Array of question subdocuments
   restaurantId: Types.ObjectId; // Reference to the User (Restaurant) who owns the quiz
+  isAssigned: boolean; // Flag to indicate if the quiz has been assigned to any staff
   // Timestamps added automatically
   createdAt?: Date; // Add createdAt
   updatedAt?: Date; // Add updatedAt
@@ -87,6 +88,10 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       ref: "User", // Assuming restaurants are linked via the User model
       required: [true, "Restaurant ID is required"],
       index: true,
+    },
+    isAssigned: {
+      type: Boolean,
+      required: [true, "isAssigned field is required"],
     },
   },
   {

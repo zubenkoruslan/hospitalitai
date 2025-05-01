@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AxiosResponse } from "axios";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import Navbar from "../components/Navbar";
 
 // --- Interfaces ---
 interface Menu {
@@ -87,7 +88,7 @@ const SuccessNotification: React.FC<{
 
 // --- Main Component ---
 const MenusPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // State variables
   const [menus, setMenus] = useState<Menu[]>([]);
@@ -174,10 +175,27 @@ const MenusPage: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
+
+    // Enhanced validation
+    const trimmedName = formData.name.trim();
+    const trimmedDescription = formData.description.trim();
+
+    // Check name validity
+    if (!trimmedName) {
       setFormError("Menu name is required.");
       return;
     }
+
+    if (trimmedName.length < 2) {
+      setFormError("Menu name must be at least 2 characters.");
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setFormError("Menu name cannot exceed 50 characters.");
+      return;
+    }
+
     if (!restaurantId) {
       setFormError("Restaurant context is missing.");
       return;
@@ -188,8 +206,8 @@ const MenusPage: React.FC = () => {
     setError(null);
 
     const payload = {
-      name: formData.name.trim(),
-      description: formData.description.trim() || undefined,
+      name: trimmedName,
+      description: trimmedDescription || undefined,
       restaurantId: restaurantId!,
     };
 
@@ -216,10 +234,22 @@ const MenusPage: React.FC = () => {
       }
       closeModal();
     } catch (err: any) {
-      setFormError(
-        err.response?.data?.message ||
-          (currentMenu ? "Failed to update menu." : "Failed to add menu.")
-      );
+      // Enhanced error handling
+      if (err.response?.data?.message) {
+        setFormError(err.response.data.message);
+      } else if (err.response?.data?.errors) {
+        // Handle validation errors from the server
+        const errorMessages = Object.values(err.response.data.errors).join(
+          ", "
+        );
+        setFormError(errorMessages || "Validation failed.");
+      } else if (err.message) {
+        setFormError(err.message);
+      } else {
+        setFormError(
+          currentMenu ? "Failed to update menu." : "Failed to add menu."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -246,282 +276,166 @@ const MenusPage: React.FC = () => {
   };
 
   // --- Render Logic ---
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  // Handle case where user is not a restaurant owner (should be caught by ProtectedRoute ideally)
-  if (user?.role !== "restaurant") {
-    return (
-      <ErrorMessage message="Access Denied. Only restaurant owners can manage menus." />
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link
-                to="/dashboard"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                &larr; Back to Dashboard
-              </Link>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={logout}
-                className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition duration-150 ease-in-out"
-              >
-                Logout
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0">
+          {/* Page Header */}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Menu Management
+            </h1>
+            <button
+              onClick={openAddModal}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
+            >
+              Add New Menu
+            </button>
           </div>
-        </div>
-      </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
-            Menus
-          </h1>
-          <button
-            onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-md hover:shadow-lg transition duration-150 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Add Menu
-          </button>
-        </div>
-        {/* Notifications */}
-        {error && <ErrorMessage message={error} />} {/* Main error display */}
-        {successMessage && (
-          <SuccessNotification
-            message={successMessage}
-            onDismiss={() => setSuccessMessage(null)}
-          />
-        )}
-        {/* Menus List/Table */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          {menus.length === 0 && !isLoading ? (
-            <p className="text-center text-gray-500 py-8">
-              No menus found. Add one to get started!
-            </p>
+          {/* Notifications */}
+          {error && <ErrorMessage message={error} />}
+          {successMessage && (
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={() => setSuccessMessage(null)}
+            />
+          )}
+
+          {/* Content Area */}
+          {isLoading ? (
+            <LoadingSpinner />
           ) : (
-            <div className="overflow-x-auto">
-              {/* Table for larger screens */}
-              <table className="min-w-full divide-y divide-gray-200 hidden md:table">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Name
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Description
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              {menus.length > 0 ? (
+                <ul
+                  className="divide-y divide-gray-200"
+                  aria-labelledby="menu-list-title"
+                >
                   {menus.map((menu) => (
-                    <tr key={menu._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {/* Optional: Make name clickable */}
-                        {/* <Link to={`/menu/${menu._id}/items`} className="hover:underline">{menu.name}</Link> */}
-                        {menu.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 max-w-md break-words">
-                        {menu.description || "-"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                        {" "}
-                        {/* Increased space slightly */}
-                        <Link
-                          to={`/menu/${menu._id}/items`}
-                          className="text-green-600 hover:text-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded"
-                          aria-label={`View items in ${menu.name}`}
-                        >
-                          Items
-                        </Link>
-                        <button
-                          onClick={() => openEditModal(menu)}
-                          className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
-                          aria-label={`Edit ${menu.name}`}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(menu)}
-                          className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded"
-                          aria-label={`Delete ${menu.name}`}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Cards for smaller screens */}
-              <div className="divide-y divide-gray-200 md:hidden">
-                {menus.map((menu) => (
-                  <div key={menu._id} className="px-4 py-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {/* Optional: Make name clickable */}
-                        {/* <Link to={`/menu/${menu._id}/items`} className="hover:underline">{menu.name}</Link> */}
-                        {menu.name}
-                      </p>
-                      <div className="ml-2 flex-shrink-0 flex space-x-3">
-                        {" "}
-                        {/* Increased space slightly */}
-                        <Link
-                          to={`/menu/${menu._id}/items`}
-                          className="text-green-600 hover:text-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded px-1 py-0.5 text-xs"
-                          aria-label={`View items in ${menu.name}`}
-                        >
-                          Items
-                        </Link>
-                        <button
-                          onClick={() => openEditModal(menu)}
-                          className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 py-0.5 text-xs"
-                          aria-label={`Edit ${menu.name}`}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(menu)}
-                          className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded px-1 py-0.5 text-xs"
-                          aria-label={`Delete ${menu.name}`}
-                        >
-                          Delete
-                        </button>
+                    <li
+                      key={menu._id}
+                      className="px-4 py-4 sm:px-6 hover:bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          {/* Link to view items within this menu */}
+                          <Link
+                            to={`/menu/${menu._id}/items`} // Navigate to items page
+                            className="text-lg font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                            aria-label={`View items for ${menu.name}`}
+                          >
+                            {menu.name}
+                          </Link>
+                          {menu.description && (
+                            <p className="text-sm text-gray-500 mt-1 truncate">
+                              {menu.description}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1">
+                            Created:{" "}
+                            {menu.createdAt
+                              ? new Date(menu.createdAt).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div className="ml-4 flex-shrink-0 flex space-x-2">
+                          <button
+                            onClick={() => openEditModal(menu)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            aria-label={`Edit menu ${menu.name}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(menu)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            aria-label={`Delete menu ${menu.name}`}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-sm text-gray-500 space-y-1">
-                      <p className="whitespace-normal break-words">
-                        <span className="font-medium">Desc:</span>{" "}
-                        {menu.description || "-"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-gray-500 py-8">
+                  No menus found. Add one to get started!
+                </p>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      {/* Add/Edit Modal */}
+      {/* --- Modals --- */}
+
+      {/* Add/Edit Menu Modal */}
       {isAddEditModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="menu-modal-title"
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 my-8">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">
+              {currentMenu ? "Edit Menu" : "Add New Menu"}
+            </h2>
             <form onSubmit={handleFormSubmit}>
-              <div className="px-6 py-4">
-                <h2
-                  id="menu-modal-title"
-                  className="text-xl font-semibold text-gray-800 mb-4"
+              {formError && <ErrorMessage message={formError} />}
+              <div className="mb-4">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  {currentMenu ? "Edit Menu" : "Add New Menu"}
-                </h2>
-
-                {formError && <ErrorMessage message={formError} />}
-
-                <div className="mb-4">
-                  <label
-                    htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    aria-describedby={formError ? "form-error" : undefined}
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label
-                    htmlFor="description"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
+                  Menu Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  disabled={isSubmitting}
+                />
               </div>
-
-              {/* Modal Footer */}
-              <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
+              <div className="mb-4">
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Description (Optional)
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  rows={3}
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
-                  {isSubmitting ? (
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  ) : null}
-                  {currentMenu ? "Save Changes" : "Add Menu"}
+                  {isSubmitting
+                    ? "Saving..."
+                    : currentMenu
+                    ? "Save Changes"
+                    : "Add Menu"}
                 </button>
               </div>
             </form>
@@ -531,34 +445,27 @@ const MenusPage: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && currentMenu && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-modal-title"
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden">
-            <div className="px-6 py-4">
-              <h2
-                id="delete-modal-title"
-                className="text-xl font-semibold text-gray-800 mb-2"
-              >
-                Confirm Deletion
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to delete the menu "
-                <span className="font-medium">{currentMenu.name}</span>"? This
-                action cannot be undone.
-              </p>
-              {/* Show error within the delete modal if delete fails */}
-              {error && <ErrorMessage message={error} />}
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 my-8">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">
+              Confirm Deletion
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete the menu "
+              <strong>{currentMenu.name}</strong>"? This action cannot be
+              undone.
+              <br />
+              <span className="text-red-600 font-medium">
+                Note: Deleting a menu will NOT delete its associated items.
+              </span>
+              {/* TODO: Decide if items should be deleted or unlinked when menu is deleted */}
+            </p>
+            <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel
               </button>
@@ -566,31 +473,9 @@ const MenusPage: React.FC = () => {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-red-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 flex items-center justify-center"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
               >
-                {isSubmitting ? (
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                ) : null}
-                Delete Menu
+                {isSubmitting ? "Deleting..." : "Delete Menu"}
               </button>
             </div>
           </div>

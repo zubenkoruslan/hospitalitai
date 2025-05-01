@@ -43,6 +43,11 @@ class NotificationService {
       type: NotificationType.COMPLETED_TRAINING,
       content,
       relatedId: resultId,
+      metadata: {
+        staffId: staffId.toString(),
+        quizId: quizId.toString(),
+        resultId: resultId.toString(),
+      },
     });
   }
 
@@ -60,6 +65,9 @@ class NotificationService {
       type: NotificationType.NEW_STAFF,
       content,
       relatedId: newStaffId,
+      metadata: {
+        staffId: newStaffId.toString(),
+      },
     });
   }
 

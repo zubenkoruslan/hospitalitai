@@ -34,7 +34,7 @@ router.get(
       // 1. Fetch all staff members for the restaurant
       const staffMembers = await User.find(
         { restaurantId: restaurantId, role: "staff" },
-        "_id name email createdAt" // Select necessary staff fields
+        "_id name email createdAt professionalRole" // Added professionalRole
       ).lean();
 
       // 2. Fetch all results for this restaurant
@@ -55,6 +55,12 @@ router.get(
       const resultsByUser = new Map<string, any[]>();
       results.forEach((result) => {
         const userIdStr = result.userId.toString();
+        // Skip results where the quiz is deleted (quizId doesn't resolve to a document)
+        if (!result.quizId) {
+          console.log(`Skipping result ${result._id} with deleted quiz`);
+          return;
+        }
+
         if (!resultsByUser.has(userIdStr)) {
           resultsByUser.set(userIdStr, []);
         }
@@ -62,11 +68,13 @@ router.get(
         resultsByUser.get(userIdStr)?.push({
           _id: result._id,
           quizId: (result.quizId as any)?._id,
-          quizTitle: (result.quizId as any)?.title || "Quiz Not Found",
+          quizTitle: (result.quizId as any)?.title,
           score: result.score,
           totalQuestions: result.totalQuestions,
           completedAt: result.completedAt,
-          status: result.status,
+          // Capitalize the status to match frontend expectations
+          status:
+            result.status.charAt(0).toUpperCase() + result.status.slice(1),
           retakeCount: result.retakeCount,
         });
       });
@@ -88,6 +96,155 @@ router.get(
     } catch (error) {
       console.error("Error fetching staff quiz results for restaurant:", error);
       next(error); // Pass error to the global error handler
+    }
+  }
+);
+
+/**
+ * @route   GET /api/results/my-results
+ * @desc    Get all quiz results for the logged-in staff member
+ * @access  Private (Staff Role)
+ */
+router.get(
+  "/my-results",
+  restrictTo("staff"),
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    // Use req.user.userId from the AuthPayload interface
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      // If user exists but userId doesn't (shouldn't happen with valid token)
+      return res
+        .status(400)
+        .json({ message: "User ID not found in token payload" });
+    }
+
+    try {
+      const results = await QuizResult.find({ userId: userId })
+        .populate({
+          path: "quizId",
+          select: "title settings.allowRetake", // Select title and retake setting
+        })
+        .sort({ completedAt: -1 }); // Sort by most recent first
+
+      // Map results to include the canRetake flag based on quiz settings
+      // Filter out results where the quiz no longer exists
+      const formattedResults = results
+        .filter((result) => result.quizId) // Skip results where quiz doesn't exist
+        .map((result) => {
+          const quiz = result.quizId as any; // Cast for easier access
+          const canRetakeSetting = quiz?.settings?.allowRetake ?? false; // Default to false if setting missing
+
+          // Ensure consistent status comparison (assuming DB uses lowercase)
+          const isCompleted = result.status === "completed";
+
+          return {
+            _id: result._id,
+            quizId: quiz?._id, // Use populated quiz ID
+            quizTitle: quiz?.title,
+            score: result.score,
+            totalQuestions: result.totalQuestions,
+            completedAt: result.completedAt,
+            // Ensure the status sent back matches frontend expectations (e.g., capitalized)
+            status:
+              result.status.charAt(0).toUpperCase() + result.status.slice(1),
+            retakeCount: result.retakeCount,
+            // Only allow retake if quiz setting allows AND result is completed
+            canRetake: canRetakeSetting && isCompleted,
+          };
+        });
+
+      res.status(200).json({ results: formattedResults });
+    } catch (error) {
+      console.error("Error fetching quiz results for staff:", error);
+      next(error); // Pass error to the global error handler
+    }
+  }
+);
+
+/**
+ * @route   GET /api/results/:resultId/detail
+ * @desc    Get detailed quiz result with user answers and correct answers
+ * @access  Private (Staff or Restaurant Role)
+ */
+router.get(
+  "/:resultId/detail",
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const { resultId } = req.params;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    try {
+      // Validate resultId
+      if (!mongoose.Types.ObjectId.isValid(resultId)) {
+        return res.status(400).json({ message: "Invalid result ID format" });
+      }
+
+      // Find the quiz result
+      const result = await QuizResult.findById(resultId).populate({
+        path: "quizId",
+        select: "title questions", // We need questions to compare with user answers
+      });
+
+      if (!result) {
+        return res.status(404).json({ message: "Quiz result not found" });
+      }
+
+      // Security check: Staff can only view their own results
+      // Restaurant owners can view results for their restaurant
+      if (
+        userRole === "staff" &&
+        result.userId.toString() !== userId.toString()
+      ) {
+        return res.status(403).json({
+          message: "You are not authorized to view this result",
+        });
+      }
+
+      // Get the quiz from the populated result
+      const quiz = result.quizId as any;
+
+      if (!quiz) {
+        return res.status(404).json({
+          message: "The quiz associated with this result no longer exists",
+        });
+      }
+
+      // Process the result to include question text, user answers, and correct answers
+      const detailedResult = {
+        _id: result._id,
+        quizId: quiz._id,
+        quizTitle: quiz.title,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+        completedAt: result.completedAt,
+        status: result.status.charAt(0).toUpperCase() + result.status.slice(1),
+        retakeCount: result.retakeCount,
+        questions: quiz.questions.map((question: any, index: number) => {
+          const userAnswer = result.answers[index];
+          return {
+            text: question.text,
+            choices: question.choices,
+            userAnswerIndex: userAnswer,
+            userAnswer: question.choices[userAnswer],
+            correctAnswerIndex: question.correctAnswer,
+            correctAnswer: question.choices[question.correctAnswer],
+            isCorrect: userAnswer === question.correctAnswer,
+          };
+        }),
+      };
+
+      res.status(200).json({ result: detailedResult });
+    } catch (error) {
+      console.error("Error fetching detailed quiz result:", error);
+      next(error);
     }
   }
 );

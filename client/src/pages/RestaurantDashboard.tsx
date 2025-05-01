@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import Navbar from "../components/Navbar";
 
 // Updated Interfaces to match the data structure needed
 interface ResultSummary {
@@ -20,7 +21,13 @@ interface StaffMemberWithResults {
   name: string;
   email: string;
   createdAt: string;
+  professionalRole?: string;
   results: ResultSummary[];
+}
+
+// Interface for minimal Menu data needed for count
+interface MenuSummary {
+  _id: string;
 }
 
 // Simple Loading Spinner Placeholder
@@ -60,72 +67,102 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
+// Helper function to check if a quiz is completed regardless of capitalization
+const isCompletedQuiz = (result: ResultSummary): boolean => {
+  const status = result.status.toLowerCase();
+  return status === "completed";
+};
+
 const RestaurantDashboard: React.FC = () => {
-  const { user, isLoading: authIsLoading, logout } = useAuth();
+  const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  // Remove old staff state
-  // const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  // const [staffLoading, setStaffLoading] = useState<boolean>(false);
-  // const [staffError, setStaffError] = useState<string | null>(null);
-  // Add new state for combined data
   const [staffQuizData, setStaffQuizData] = useState<StaffMemberWithResults[]>(
     []
   );
   const [totalQuizzes, setTotalQuizzes] = useState<number>(0);
-  const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
+  const [menuCount, setMenuCount] = useState<number | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState<boolean>(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [copied, setCopied] = useState(false); // State for copy feedback
+  const [copied, setCopied] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Update useEffect to fetch combined staff/results data
+  // Calculate the average performance percentage across all staff
+  const calculateAveragePerformance = (
+    staffData: StaffMemberWithResults[]
+  ): string => {
+    let totalScore = 0;
+    let totalPossibleScore = 0;
+
+    staffData.forEach((staff) => {
+      const completedQuizzes = staff.results.filter(isCompletedQuiz);
+
+      completedQuizzes.forEach((quiz) => {
+        totalScore += quiz.score;
+        totalPossibleScore += quiz.totalQuestions;
+      });
+    });
+
+    if (totalPossibleScore === 0) return "0";
+
+    const averagePercentage = (totalScore / totalPossibleScore) * 100;
+    return averagePercentage.toFixed(0);
+  };
+
   useEffect(() => {
-    const fetchStaffQuizSummary = async () => {
+    const fetchDashboardData = async () => {
       if (user && user.role === "restaurant") {
         setSummaryLoading(true);
         setSummaryError(null);
         try {
-          const response = await api.get<{
-            staff: StaffMemberWithResults[];
-            totalAvailableQuizzes: number;
-          }>(
-            "/results/restaurant-view" // Use the endpoint that provides combined data
-          );
-          setStaffQuizData(response.data.staff || []);
-          setTotalQuizzes(response.data.totalAvailableQuizzes || 0);
+          const [resultsResponse, menusResponse] = await Promise.all([
+            api.get<{
+              staff: StaffMemberWithResults[];
+              totalAvailableQuizzes: number;
+            }>("/results/restaurant-view"),
+            api.get<{ menus: MenuSummary[] }>("/menus"),
+          ]);
+
+          setStaffQuizData(resultsResponse.data.staff || []);
+          setTotalQuizzes(resultsResponse.data.totalAvailableQuizzes || 0);
+          setMenuCount(menusResponse.data.menus?.length ?? 0);
         } catch (err: any) {
+          console.error("Dashboard fetch error:", err);
           setSummaryError(
-            err.response?.data?.message || "Failed to load staff quiz summary."
+            err.response?.data?.message || "Failed to load dashboard data."
           );
           setStaffQuizData([]);
           setTotalQuizzes(0);
+          setMenuCount(null);
         } finally {
           setSummaryLoading(false);
         }
+      } else if (!authIsLoading) {
+        setSummaryLoading(false);
       }
     };
-    if (!authIsLoading) fetchStaffQuizSummary();
+    fetchDashboardData();
   }, [user, authIsLoading]);
 
-  const handleLogout = () => {
-    setIsSidebarOpen(false);
-    logout();
-  };
-
-  // --- Copy ID Handler ---
   const handleCopyId = () => {
     if (user?.userId) {
       navigator.clipboard
         .writeText(user.userId)
         .then(() => {
           setCopied(true);
-          setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+          setTimeout(() => setCopied(false), 2000);
         })
         .catch((err) => {
           console.error("Failed to copy ID: ", err);
-          // Optionally show an error message to the user
         });
     }
   };
+
+  const filteredStaffData =
+    searchTerm.length >= 3
+      ? staffQuizData.filter((staff) =>
+          staff.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : staffQuizData;
 
   if (authIsLoading) return <LoadingSpinner />;
 
@@ -143,284 +180,238 @@ const RestaurantDashboard: React.FC = () => {
     );
   }
 
-  const navLinks = [
-    { name: "Menu", path: "/menu" },
-    { name: "Quizzes", path: "/quizzes" },
-    { name: "Staff Results", path: "/staff-results" },
-    { name: "Staff Management", path: "/staff" },
-  ];
-
-  const SidebarContent = () => (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200 w-64">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800 truncate">
-          {user.restaurantName || "Dashboard"}
-        </h2>
-      </div>
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            to={link.path}
-            onClick={() => setIsSidebarOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-          >
-            {link.name}
-          </Link>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={handleLogout}
-          className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800"
-        >
-          Logout
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block flex-shrink-0">
-        <SidebarContent />
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
 
-      {/* Mobile Sidebar (Drawer) - Basic Implementation */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden ${
-          isSidebarOpen ? "block" : "hidden"
-        }`}
-      >
-        {/* Overlay */}
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-        {/* Sidebar Content */}
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button
-              type="button"
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white text-white"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              {/* Basic Close Icon */}X
-            </button>
-          </div>
-          <SidebarContent />
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 px-4 sm:px-0">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Welcome, {user?.name}!
+          </h1>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 md:hidden"
-                  aria-label="Open sidebar"
-                >
-                  {/* Basic Hamburger Icon */}☰
-                </button>
-              </div>
-              <div className="flex items-center">
-                <h1 className="text-lg font-semibold text-gray-800 truncate">
-                  {user.restaurantName || "Dashboard"}
-                </h1>
-              </div>
-              <div className="flex items-center">
-                {" "}
-                {/* Add dummy div for spacing if needed */}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Welcome, {user?.name}!
-            </h1>
-            {/* Display Restaurant ID and Copy Button */}
-            {user?.userId && (
-              <div className="mt-2 flex items-center space-x-2 bg-gray-50 p-2 rounded-md border border-gray-200 max-w-md">
-                <p className="text-sm text-gray-600">
-                  Your Restaurant ID (for staff registration):
-                  <strong className="ml-1 font-mono text-gray-800">
-                    {user.userId}
-                  </strong>
+        <div className="px-4 sm:px-0">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Dashboard Summary
+          </h2>
+          {summaryLoading && <LoadingSpinner />}
+          {summaryError && <ErrorMessage message={summaryError} />}
+          {!summaryLoading && !summaryError && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-700">
+                  Total Staff
+                </h3>
+                <p className="text-3xl font-semibold text-blue-600">
+                  {staffQuizData.length}
                 </p>
-                <button
-                  onClick={handleCopyId}
-                  className={`px-2 py-1 text-xs font-medium rounded ${
-                    copied
-                      ? "bg-green-100 text-green-700"
-                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                  } transition-colors duration-150 ease-in-out`}
-                  aria-label={
-                    copied ? "Copied Restaurant ID" : "Copy Restaurant ID"
-                  }
+                <Link
+                  to="/staff"
+                  className="text-sm text-blue-500 hover:underline mt-2 inline-block"
                 >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Grid for Management Cards */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-            {/* Menu Card */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-2 text-gray-900">
-                Menu Management
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Create, view, and organize your restaurant's menus and items.
-              </p>
-              <div className="flex space-x-2">
-                <Link to="/menu" className="w-full">
-                  <button className="w-full px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50">
-                    View Menus
-                  </button>
+                  Manage Staff
                 </Link>
               </div>
-            </div>
-            {/* Quiz Card */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-2 text-gray-900">
-                Quiz Management
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Generate, manage, and review quizzes for staff training.
-              </p>
-              <div>
-                <Link to="/quiz-management" className="w-full">
-                  <button className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Manage/Create Quiz
-                  </button>
+
+              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-700">
+                  Menu Management
+                </h3>
+                <p className="text-3xl font-semibold text-green-600">
+                  {menuCount !== null ? menuCount : "-"}
+                </p>
+                <Link
+                  to="/menu"
+                  className="text-sm text-green-500 hover:underline mt-2 inline-block"
+                >
+                  Manage Menus
                 </Link>
               </div>
-            </div>
-            {/* Add Staff Results Card */}
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
-              <h3 className="text-xl font-semibold mb-3 text-gray-800">
-                Staff Results
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                View your staff members' quiz performance and completion status.
-              </p>
-              <Link
-                to="/staff-results"
-                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
-              >
-                View Staff Results
-              </Link>
-            </div>
-            {/* Add Staff Management Card */}
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
-              <h3 className="text-xl font-semibold mb-3 text-gray-800">
-                Staff Management
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                View your staff list and their details.
-              </p>
-              <Link
-                to="/staff"
-                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
-              >
-                Manage Staff
-              </Link>
-            </div>
-          </div>
 
-          {/* Staff List Table - Modified for Quiz Summary */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Staff Quiz Progress ({staffQuizData.length})
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              {summaryLoading && <LoadingSpinner />}
-              {summaryError && <ErrorMessage message={summaryError} />}
-              {!summaryLoading && !summaryError && (
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Staff Name
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Quiz Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {staffQuizData.length > 0 ? (
-                      staffQuizData.map((staff) => {
-                        // Calculate number of *unique* completed quizzes
-                        const completedQuizIds = new Set(
-                          staff.results
-                            .filter((r) => r.status === "completed")
-                            .map((r) => r.quizId)
-                        );
-                        const completedCount = completedQuizIds.size;
-                        const statusText =
-                          completedCount >= totalQuizzes
-                            ? "All Complete"
-                            : "Pending";
-                        const statusColor =
-                          completedCount >= totalQuizzes
-                            ? "text-green-600"
-                            : "text-yellow-600";
+              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-700">
+                  Available Quizzes
+                </h3>
+                <p className="text-3xl font-semibold text-purple-600">
+                  {totalQuizzes}
+                </p>
+                <Link
+                  to="/quiz-management"
+                  className="text-sm text-purple-500 hover:underline mt-2 inline-block"
+                >
+                  Manage Quizzes
+                </Link>
+              </div>
 
-                        return (
-                          <tr key={staff._id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              <Link
-                                to={`/staff/${staff._id}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
-                              >
-                                {staff.name}
-                              </Link>
-                            </td>
-                            <td
-                              className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${statusColor}`}
-                            >
-                              {statusText} ({completedCount}/{totalQuizzes})
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={2}
-                          className="text-center py-4 text-sm text-gray-500"
-                        >
-                          No staff members found.
+              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-700">
+                  Staff Performance
+                </h3>
+                <p className="text-3xl font-semibold text-amber-600">
+                  {staffQuizData.length > 0
+                    ? `${calculateAveragePerformance(staffQuizData)}%`
+                    : "N/A"}
+                </p>
+                <Link
+                  to="/staff-results"
+                  className="text-sm text-amber-500 hover:underline mt-2 inline-block"
+                >
+                  View Quiz Results
+                </Link>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg shadow border border-gray-200 flex flex-col justify-between xl:col-span-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">
+                    Quick Actions
+                  </h3>
+                  <div className="mb-3 text-sm text-gray-600">
+                    <span className="font-medium">Your Restaurant ID:</span>
+                    <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
+                      <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
+                        {user?.userId}
+                      </code>
+                      <button
+                        onClick={handleCopyId}
+                        className={`px-3 py-1 text-xs font-medium rounded transition-colors duration-150 ${
+                          copied
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        }`}
+                        aria-label="Copy restaurant ID"
+                      >
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Staff use this ID to register.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 space-y-2">
+                  <Link
+                    to="/quiz-management/create"
+                    className="block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center text-sm"
+                  >
+                    Create New Quiz
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white p-4 rounded-lg shadow border border-gray-200 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+              <h2 className="text-xl font-semibold text-gray-800">Overview</h2>
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  placeholder="Search staff by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Search staff"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {summaryLoading && !filteredStaffData.length ? (
+              <LoadingSpinner />
+            ) : summaryError && !filteredStaffData.length ? (
+              <ErrorMessage message={summaryError} />
+            ) : !summaryLoading && filteredStaffData.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">
+                {searchTerm.length >= 3
+                  ? `No staff found matching "${searchTerm}".`
+                  : "No staff members found or no results available yet."}
+              </p>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Staff Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Quizzes Completed
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Average Score
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredStaffData.map((staff) => {
+                    const completedQuizzes =
+                      staff.results.filter(isCompletedQuiz);
+                    const totalScore = completedQuizzes.reduce(
+                      (sum, r) => sum + (r.score / r.totalQuestions) * 100,
+                      0
+                    );
+                    const averageScore =
+                      completedQuizzes.length > 0
+                        ? (totalScore / completedQuizzes.length).toFixed(1)
+                        : "N/A";
+
+                    return (
+                      <tr key={staff._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <Link
+                            to={`/staff/${staff._id}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            aria-label={`View details for ${staff.name}`}
+                          >
+                            {staff.name}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {staff.professionalRole || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {completedQuizzes.length} / {totalQuizzes}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {averageScore === "N/A" ? "N/A" : `${averageScore}%`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <Link
+                            to="/staff-results"
+                            className="text-indigo-600 hover:text-indigo-900 font-medium"
+                          >
+                            View Results
+                          </Link>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { AxiosResponse } from "axios";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import Navbar from "../components/Navbar";
 
 // --- Interfaces ---
 // Reintroduce MenuItem, specific to items within a menu
@@ -134,7 +135,7 @@ const SuccessNotification: React.FC<{
 // --- Main Component ---
 const MenuItemsPage: React.FC = () => {
   const { menuId } = useParams<{ menuId: string }>(); // Get menuId from URL
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // State for menu details (optional)
@@ -319,24 +320,90 @@ const MenuItemsPage: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.itemType || !formData.category) {
-      setFormError("Item Type and Category are required.");
+
+    // Reset error state
+    setFormError(null);
+
+    // Extensive validation
+    const trimmedName = formData.name.trim();
+    const trimmedDescription = formData.description.trim();
+    const trimmedIngredients = formData.ingredients.trim();
+    const trimmedPrice = formData.price.trim();
+
+    // Required fields validation
+    if (!trimmedName) {
+      setFormError("Item name is required.");
       return;
     }
+
+    if (trimmedName.length < 2) {
+      setFormError("Item name must be at least 2 characters.");
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setFormError("Item name cannot exceed 50 characters.");
+      return;
+    }
+
+    if (!formData.itemType) {
+      setFormError("Item type is required.");
+      return;
+    }
+
+    if (!formData.category) {
+      setFormError("Category is required.");
+      return;
+    }
+
+    // Price validation
+    let priceValue: number | undefined = undefined;
+
+    if (trimmedPrice) {
+      priceValue = parseFloat(trimmedPrice);
+
+      if (isNaN(priceValue)) {
+        setFormError("Price must be a valid number.");
+        return;
+      }
+
+      if (priceValue < 0) {
+        setFormError("Price cannot be negative.");
+        return;
+      }
+
+      if (priceValue > 1000) {
+        setFormError("Price exceeds maximum allowed value (1000).");
+        return;
+      }
+    }
+
+    // Prepare ingredients
+    const ingredientsArray = trimmedIngredients
+      ? trimmedIngredients
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
+    // Check individual ingredients
+    for (const ingredient of ingredientsArray) {
+      if (ingredient.length > 50) {
+        setFormError("Ingredient names cannot exceed 50 characters.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
-    setFormError(null);
 
     try {
       let response: AxiosResponse<{ item: MenuItem }>;
-      const priceValue = parseFloat(formData.price);
+
       const payload = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        price: formData.price.trim() ? priceValue : undefined,
-        ingredients: formData.ingredients
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        name: trimmedName,
+        description: trimmedDescription || undefined,
+        price: priceValue,
+        ingredients: ingredientsArray,
         itemType: formData.itemType,
         category: formData.category,
         isGlutenFree: formData.isGlutenFree,
@@ -344,22 +411,6 @@ const MenuItemsPage: React.FC = () => {
         isVegetarian: formData.isVegetarian,
         isVegan: formData.isVegan,
       };
-
-      if (!payload.name) {
-        setFormError("Item name is required.");
-        setIsSubmitting(false);
-        return;
-      }
-      if (!payload.itemType) {
-        setFormError("Item type is required.");
-        setIsSubmitting(false);
-        return;
-      }
-      if (!payload.category) {
-        setFormError("Item category is required.");
-        setIsSubmitting(false);
-        return;
-      }
 
       if (currentItem) {
         response = await api.put<{ item: MenuItem }>(
@@ -378,8 +429,21 @@ const MenuItemsPage: React.FC = () => {
       fetchData();
       closeModal();
     } catch (err: any) {
-      const message = err.response?.data?.message || "Operation failed.";
-      setFormError(message);
+      // Enhanced error handling
+      if (err.response?.data?.message) {
+        setFormError(err.response.data.message);
+      } else if (err.response?.data?.errors) {
+        // Handle validation errors from the server
+        const errorMessages = Object.values(err.response.data.errors).join(
+          ", "
+        );
+        setFormError(errorMessages || "Validation failed.");
+      } else if (err.message) {
+        setFormError(err.message);
+      } else {
+        setFormError("Operation failed. Please try again.");
+      }
+
       console.error("Submit error:", err);
     } finally {
       setIsSubmitting(false);
@@ -430,548 +494,360 @@ const MenuItemsPage: React.FC = () => {
   }, [formData.itemType]);
 
   // --- Render Logic ---
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  if (user?.role !== "restaurant") {
-    return <ErrorMessage message="Access Denied." />;
-  }
-
   if (!menuId) {
-    return <ErrorMessage message="Menu ID not found in URL." />;
-  }
-
-  if (error && !menuDetails && !items.length) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-        <Link
-          to="/menu"
-          className="text-blue-600 hover:underline mb-4 inline-block"
-        >
-          &larr; Back to Menus
-        </Link>
-        <ErrorMessage message={error} />
-      </div>
-    );
+    return <ErrorMessage message="Menu ID is missing from the URL." />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Navbar - Consider making a reusable Navbar component */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/dashboard"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                &larr; Dashboard
-              </Link>
-              <Link
-                to="/menu"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                &larr; Menus
-              </Link>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={logout}
-                className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition duration-150 ease-in-out"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
-              {menuDetails ? menuDetails.name : "Menu Items"}
-            </h1>
-            {menuDetails?.description && (
-              <p className="text-sm text-gray-600 mt-1">
-                {menuDetails.description}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-md hover:shadow-lg transition duration-150 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Add Menu Item
-          </button>
-        </div>
-        {/* Notifications */}
-        {error && <ErrorMessage message={error} />}{" "}
-        {/* Show non-fatal errors here */}
-        {successMessage && (
-          <SuccessNotification
-            message={successMessage}
-            onDismiss={() => setSuccessMessage(null)}
-          />
-        )}
-        {/* Menu Items Display - Grouped */}
-        {items.length === 0 && !isLoading ? (
-          <div className="bg-white shadow rounded-lg p-8 text-center text-gray-500">
-            No items found in this menu. Add one to get started!
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Iterate over grouped types (e.g., 'food', 'beverage') */}
-            {Object.entries(groupedItems).map(([type, itemsOfType]) => (
-              <div
-                key={type}
-                className="bg-white shadow rounded-lg overflow-hidden"
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 pb-4 border-b border-gray-200 gap-4 sm:gap-0">
+            <div>
+              <Link
+                to={`/menu`}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 mb-1 inline-block"
               >
-                <h2 className="px-4 py-3 border-b border-gray-200 text-lg leading-6 font-medium text-gray-900 capitalize">
-                  {type}s {/* Simple pluralization */}
-                </h2>
-                <div className="overflow-x-auto">
-                  {/* Table for larger screens */}
-                  <table className="min-w-full divide-y divide-gray-200 hidden md:table">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {/* Update Table Headers */}
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Name
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Category
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Price
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Ingredients
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Dietary
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {itemsOfType.map((item) => (
-                        <tr key={item._id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                            {item.category}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.price !== undefined
-                              ? `$${item.price.toFixed(2)}`
-                              : "-"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 max-w-xs break-words">
-                            {item.description || "-"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 max-w-xs break-words">
-                            {item.ingredients && item.ingredients.length > 0
-                              ? item.ingredients.join(", ")
-                              : "-"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-1">
+                &larr; Back to Menus
+              </Link>
+              <h1 className="text-2xl font-semibold text-gray-900 flex items-center">
+                {menuDetails ? (
+                  <>
+                    Items for:{" "}
+                    <span className="ml-2 font-bold text-blue-700">
+                      {menuDetails.name}
+                    </span>
+                  </>
+                ) : (
+                  "Menu Items"
+                )}
+                {isLoading && !menuDetails && (
+                  <span className="ml-3 h-5 w-5 border-t-2 border-blue-200 border-solid rounded-full animate-spin"></span>
+                )}
+              </h1>
+            </div>
+            <button
+              onClick={openAddModal}
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
+            >
+              Add New Item
+            </button>
+          </div>
+
+          {error && <ErrorMessage message={error} />}
+          {successMessage && (
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={() => setSuccessMessage(null)}
+            />
+          )}
+
+          {isLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              {items.length > 0 ? (
+                <ul
+                  className="divide-y divide-gray-200"
+                  aria-labelledby="menu-item-list-title"
+                >
+                  {items.map((item) => (
+                    <li
+                      key={item._id}
+                      className="px-4 py-4 sm:px-6 hover:bg-gray-50"
+                    >
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                        <div className="flex-1 min-w-0 mb-2 sm:mb-0">
+                          <div className="flex items-baseline mb-1">
+                            <p className="text-lg font-medium text-gray-900 truncate mr-3">
+                              {item.name}
+                            </p>
+                            {item.price !== undefined && (
+                              <p className="text-sm font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                                ${item.price.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                          {/* Conditionally render description only if it exists AND is different from the name */}
+                          {item.description &&
+                            item.description !== item.name && (
+                              <p className="text-sm text-gray-500 mt-1 truncate">
+                                {item.description}
+                              </p>
+                            )}
+                          {/* Ingredients */}
+                          {item.ingredients && item.ingredients.length > 0 && (
+                            <p className="text-sm text-gray-600 mt-1.5">
+                              <span className="font-medium">Ingredients:</span>{" "}
+                              {item.ingredients.join(", ")}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-600 mt-1.5 capitalize">
+                            Type: {item.itemType} | Category: {item.category}
+                          </p>
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5">
                             {item.isGlutenFree && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                 GF
                               </span>
                             )}
                             {item.isDairyFree && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                                 DF
                               </span>
                             )}
                             {item.isVegetarian && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                VG
-                              </span>
-                            )}
-                            {item.isVegan && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                                 V
                               </span>
                             )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <button
-                              onClick={() => openEditModal(item)}
-                              className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
-                              aria-label={`Edit ${item.name}`}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => openDeleteModal(item)}
-                              className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded"
-                              aria-label={`Delete ${item.name}`}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* Cards for smaller screens */}
-                  <div className="divide-y divide-gray-200 md:hidden">
-                    {itemsOfType.map((item) => (
-                      <div key={item._id} className="px-4 py-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {item.name}
-                            </p>
-                            <p className="text-xs text-gray-500 capitalize">
-                              {item.category} -{" "}
-                              {item.price !== undefined
-                                ? `$${item.price.toFixed(2)}`
-                                : "N/A"}
-                            </p>
-                          </div>
-                          <div className="ml-2 flex-shrink-0 flex space-x-2">
-                            <button
-                              onClick={() => openEditModal(item)}
-                              className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 py-0.5 text-xs"
-                              aria-label={`Edit ${item.name}`}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => openDeleteModal(item)}
-                              className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded px-1 py-0.5 text-xs"
-                              aria-label={`Delete ${item.name}`}
-                            >
-                              Delete
-                            </button>
+                            {item.isVegan && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                VG
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="text-sm text-gray-500 space-y-1 mt-2">
-                          <p className="whitespace-normal break-words">
-                            <span className="font-medium">Desc:</span>{" "}
-                            {item.description || "-"}
-                          </p>
-                          <p className="whitespace-normal break-words">
-                            <span className="font-medium">Ingredients:</span>{" "}
-                            {item.ingredients && item.ingredients.length > 0
-                              ? item.ingredients.join(", ")
-                              : "-"}
-                          </p>
-                          <p className="whitespace-normal break-words">
-                            <span className="font-medium">Dietary:</span>{" "}
-                            {item.isGlutenFree
-                              ? "Gluten-free"
-                              : "Contains gluten"}
-                          </p>
+                        <div className="flex-shrink-0 flex space-x-2 self-start sm:self-center">
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                            aria-label={`Edit item ${item.name}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(item)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            aria-label={`Delete item ${item.name}`}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-gray-500 py-8">
+                  No items found for this menu. Add one to get started!
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
-      {/* Add/Edit Item Modal - Update Form Structure */}
       {isAddEditModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="menu-item-modal-title"
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4 my-8">
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">
+              {currentItem ? "Edit Menu Item" : "Add New Menu Item"}
+            </h2>
             <form onSubmit={handleFormSubmit}>
-              <div className="px-6 py-4">
-                <h2
-                  id="menu-item-modal-title"
-                  className="text-xl font-semibold text-gray-800 mb-4"
-                >
-                  {currentItem ? "Edit Menu Item" : "Add New Menu Item"}
-                </h2>
-                {formError && <ErrorMessage message={formError} />}
+              {formError && <ErrorMessage message={formError} />}
 
-                {/* Name Field */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                {/* Type Selection */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="itemType"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Item Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="itemType"
-                    name="itemType"
-                    value={formData.itemType}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  >
-                    <option value="" disabled>
-                      Select type...
-                    </option>
-                    <option value="food">Food</option>
-                    <option value="beverage">Beverage</option>
-                  </select>
-                </div>
-
-                {/* Category Selection (Conditional) */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="category"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    disabled={!formData.itemType}
-                    className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                      !formData.itemType ? "bg-gray-100 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    <option value="" disabled>
-                      Select category...
-                    </option>
-                    {availableCategories.map((cat) => (
-                      <option key={cat} value={cat} className="capitalize">
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="name"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Item Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="price"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Price ($) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="price"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      required
+                      step="0.01"
+                      min="0"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="itemType"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Item Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="itemType"
+                      name="itemType"
+                      value={formData.itemType}
+                      onChange={handleInputChange}
+                      required
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm capitalize"
+                      disabled={isSubmitting}
+                    >
+                      <option value="" disabled>
+                        Select type...
                       </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Price Field */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="price"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Price
-                  </label>
-                  <input
-                    type="number"
-                    id="price"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    step="0.01"
-                    min="0"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., 12.99"
-                  />
-                </div>
-
-                {/* Description Field */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="description"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                {/* Ingredients Field */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="ingredients"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Ingredients (comma-separated)
-                  </label>
-                  <textarea
-                    id="ingredients"
-                    name="ingredients"
-                    value={formData.ingredients}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                {/* Dietary Checkboxes */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dietary Information
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Gluten Free */}
-                    <div className="flex items-center">
-                      <input
-                        id="isGlutenFree"
-                        name="isGlutenFree"
-                        type="checkbox"
-                        checked={formData.isGlutenFree}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label
-                        htmlFor="isGlutenFree"
-                        className="ml-2 block text-sm text-gray-900"
-                      >
-                        Gluten Free (GF)
-                      </label>
-                    </div>
-                    {/* Dairy Free */}
-                    <div className="flex items-center">
-                      <input
-                        id="isDairyFree"
-                        name="isDairyFree"
-                        type="checkbox"
-                        checked={formData.isDairyFree}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label
-                        htmlFor="isDairyFree"
-                        className="ml-2 block text-sm text-gray-900"
-                      >
-                        Dairy Free (DF)
-                      </label>
-                    </div>
-                    {/* Vegetarian */}
-                    <div className="flex items-center">
-                      <input
-                        id="isVegetarian"
-                        name="isVegetarian"
-                        type="checkbox"
-                        checked={formData.isVegetarian}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label
-                        htmlFor="isVegetarian"
-                        className="ml-2 block text-sm text-gray-900"
-                      >
-                        Vegetarian (VG)
-                      </label>
-                    </div>
-                    {/* Vegan */}
-                    <div className="flex items-center">
-                      <input
-                        id="isVegan"
-                        name="isVegan"
-                        type="checkbox"
-                        checked={formData.isVegan}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label
-                        htmlFor="isVegan"
-                        className="ml-2 block text-sm text-gray-900"
-                      >
-                        Vegan (V)
-                      </label>
-                    </div>
+                      <option value="food">Food</option>
+                      <option value="beverage">Beverage</option>
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="category"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="category"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      required
+                      disabled={!formData.itemType || isSubmitting}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm capitalize disabled:bg-gray-100"
+                    >
+                      <option value="" disabled>
+                        {formData.itemType
+                          ? "Select category..."
+                          : "Select type first..."}
+                      </option>
+                      {formData.itemType === "food" &&
+                        FOOD_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      {formData.itemType === "beverage" &&
+                        BEVERAGE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </div>
+
+                <div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="description"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows={3}
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label
+                      htmlFor="ingredients"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Ingredients (Optional, comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      id="ingredients"
+                      name="ingredients"
+                      value={formData.ingredients}
+                      onChange={handleInputChange}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <fieldset className="mt-2">
+                    <legend className="block text-sm font-medium text-gray-700 mb-1">
+                      Dietary Information
+                    </legend>
+                    <div className="space-y-2">
+                      {[
+                        "isGlutenFree",
+                        "isDairyFree",
+                        "isVegetarian",
+                        "isVegan",
+                      ].map((flag) => (
+                        <div key={flag} className="relative flex items-start">
+                          <div className="flex items-center h-5">
+                            <input
+                              id={flag}
+                              name={flag}
+                              type="checkbox"
+                              checked={
+                                formData[
+                                  flag as keyof MenuItemFormData
+                                ] as boolean
+                              }
+                              onChange={handleInputChange}
+                              disabled={isSubmitting}
+                              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                            />
+                          </div>
+                          <div className="ml-3 text-sm">
+                            <label
+                              htmlFor={flag}
+                              className="font-medium text-gray-700 capitalize"
+                            >
+                              {flag
+                                .substring(2)
+                                .replace(/([A-Z])/g, " $1")
+                                .trim()}
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
+
+              <div className="flex justify-end space-x-3 mt-8 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
-                  {isSubmitting ? (
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  ) : null}
-                  {currentItem ? "Save Changes" : "Add Item"}
+                  {isSubmitting
+                    ? "Saving..."
+                    : currentItem
+                    ? "Save Changes"
+                    : "Add Item"}
                 </button>
               </div>
             </form>
@@ -979,36 +855,23 @@ const MenuItemsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && currentItem && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-800 bg-opacity-75"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-item-modal-title"
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden">
-            <div className="px-6 py-4">
-              <h2
-                id="delete-item-modal-title"
-                className="text-xl font-semibold text-gray-800 mb-2"
-              >
-                Confirm Deletion
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to delete the menu item "
-                <span className="font-medium">{currentItem.name}</span>"? This
-                action cannot be undone.
-              </p>
-              {error && <ErrorMessage message={error} />}{" "}
-              {/* Modal-specific error for delete failure */}
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 my-8">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">
+              Confirm Deletion
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete the item "
+              <strong>{currentItem.name}</strong>"? This action cannot be
+              undone.
+            </p>
+            <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel
               </button>
@@ -1016,31 +879,9 @@ const MenuItemsPage: React.FC = () => {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-red-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 flex items-center justify-center"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
               >
-                {isSubmitting ? (
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                ) : null}
-                Delete Item
+                {isSubmitting ? "Deleting..." : "Delete Item"}
               </button>
             </div>
           </div>

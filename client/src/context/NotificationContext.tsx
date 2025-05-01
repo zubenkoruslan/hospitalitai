@@ -13,10 +13,15 @@ import api from "../services/api";
 // Interface for notification objects
 interface Notification {
   _id: string;
-  type: "new_assignment" | "completed_training" | "new_staff";
+  type: "new_assignment" | "completed_training" | "new_staff" | "new_quiz";
   content: string;
   isRead: boolean;
   relatedId?: string;
+  metadata?: {
+    staffId?: string;
+    quizId?: string;
+    [key: string]: any;
+  };
   createdAt: string;
 }
 

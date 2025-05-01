@@ -13,6 +13,11 @@ export interface INotification extends Document {
   content: string;
   isRead: boolean;
   relatedId?: mongoose.Types.ObjectId; // Reference to quiz, result, or user
+  metadata?: {
+    staffId?: string;
+    quizId?: string;
+    [key: string]: any;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +44,10 @@ const notificationSchema = new Schema<INotification>(
     },
     relatedId: {
       type: Schema.Types.ObjectId,
+      required: false,
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
       required: false,
     },
   },

@@ -36,6 +36,20 @@ module.exports = {
           800: "#B34747",
           900: "#993B3B",
         },
+        accent: {
+          // Vibrant Indigo
+          DEFAULT: "#6366F1", // indigo-500
+          50: "#EEF2FF", // indigo-50
+          100: "#E0E7FF", // indigo-100
+          200: "#C7D2FE", // indigo-200
+          300: "#A5B4FC", // indigo-300
+          400: "#818CF8", // indigo-400
+          500: "#6366F1", // indigo-500 (Base)
+          600: "#4F46E5", // indigo-600
+          700: "#4338CA", // indigo-700
+          800: "#3730A3", // indigo-800
+          900: "#312E81", // indigo-900
+        },
         background: {
           // Off-white
           DEFAULT: "#F8FAFC", // slate-50
@@ -50,6 +64,8 @@ module.exports = {
         "off-white": "#F8FAFC",
         "dark-slate": "#1E293B",
         "muted-gray": "#64748B",
+        // Add alias for accent
+        indigo: "#6366F1",
       },
       fontFamily: {
         sans: ["Inter", ...defaultTheme.fontFamily.sans],

@@ -1,14 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-// Mock data for assigned quizzes
-// Remove mock data as we will link to the quiz page
-// const mockQuizzes = [
-//   { id: "quiz1", title: "Basic Food Safety" },
-//   { id: "quiz2", title: "Wine Service Fundamentals" },
-//   { id: "quiz3", title: "Allergen Awareness" },
-// ];
+import Navbar from "../components/Navbar";
 
 // Simple Loading Spinner Placeholder
 const LoadingSpinner: React.FC = () => (
@@ -48,17 +41,8 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 );
 
 const StaffDashboard: React.FC = () => {
-  const { user, isLoading: authIsLoading, logout } = useAuth();
+  const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  // Add state for actual quiz data later
-  const quizzesLoading = false; // Placeholder
-  const quizzesError = null; // Placeholder
-
-  const handleLogout = () => {
-    setIsSidebarOpen(false);
-    logout();
-  };
 
   if (authIsLoading) return <LoadingSpinner />;
 
@@ -76,101 +60,12 @@ const StaffDashboard: React.FC = () => {
     );
   }
 
-  const navLinks = [
-    // Update this link to point to the new staff quiz page
-    { name: "Take a Quiz", path: "/staff/quizzes" },
-  ];
-
-  const SidebarContent = () => (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200 w-64">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Staff Portal</h2>
-        {user.restaurantName && (
-          <p className="text-sm text-gray-500 truncate">
-            {user.restaurantName}
-          </p>
-        )}
-      </div>
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            to={link.path}
-            onClick={() => setIsSidebarOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-          >
-            {link.name}
-          </Link>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={handleLogout}
-          className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800"
-        >
-          Logout
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block flex-shrink-0">
-        <SidebarContent />
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
 
-      {/* Mobile Sidebar (Drawer) */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden ${
-          isSidebarOpen ? "block" : "hidden"
-        }`}
-      >
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button
-              type="button"
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none text-white"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              X
-            </button>
-          </div>
-          <SidebarContent />
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none md:hidden"
-                >
-                  ☰
-                </button>
-              </div>
-              <div className="flex items-center">
-                <h1 className="text-lg font-semibold text-gray-800">
-                  Staff Portal
-                </h1>
-              </div>
-              <div className="flex items-center"></div>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0">
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">
               Welcome, {user.name}!
@@ -180,28 +75,39 @@ const StaffDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Grid for Content Cards */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Quizzes Card - Modify to link to the quiz list page */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-3 text-gray-900">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">
                 Available Quizzes
               </h3>
-              {/* Remove loading/error placeholders and mock data rendering */}
-              {/* {!quizzesLoading && !quizzesError && ( */}
-              <div className="mt-4">
-                <Link
-                  to="/staff/quizzes"
-                  className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
-                >
-                  View and Take Quizzes
-                </Link>
-              </div>
-              {/* )} */}
+              <p className="text-sm text-gray-600 mb-4">
+                View and take quizzes assigned by your manager.
+              </p>
+              <Link
+                to="/staff/quizzes"
+                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
+              >
+                View Quizzes
+              </Link>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">
+                My Results
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Review your past quiz attempts and scores.
+              </p>
+              <Link
+                to="/staff/my-results"
+                className="inline-block px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 transition duration-150 ease-in-out"
+              >
+                View My Results
+              </Link>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
