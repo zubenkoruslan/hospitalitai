@@ -10,8 +10,8 @@ import React, {
 import { useAuth } from "./AuthContext";
 import api from "../services/api";
 
-// Interface for notification objects
-interface Notification {
+// Interface for notification objects - Exported now
+export interface Notification {
   _id: string;
   type: "new_assignment" | "completed_training" | "new_staff" | "new_quiz";
   content: string;
@@ -81,7 +81,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     func: T,
     delay: number
   ) => {
-    let timeoutId: number;
+    let timeoutId: NodeJS.Timeout | number;
     return (...args: Parameters<T>): void => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => func(...args), delay);

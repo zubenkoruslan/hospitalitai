@@ -2,11 +2,23 @@ import express, { Request, Response, Router, NextFunction } from "express";
 import mongoose, { Types } from "mongoose";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import Quiz, { IQuiz, IQuestion } from "../models/Quiz";
-import MenuItem, { IMenuItem } from "../models/MenuItem";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
+import MenuItem, { IMenuItem } from "../models/MenuItem";
 import Menu from "../models/Menu"; // Import Menu model if needed for fetching items by menu
 import User from "../models/User"; // Assuming User model exists and stores restaurantId for staff
 import notificationService from "../services/notificationService";
+import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware";
+import {
+  handleValidationErrors,
+  validateQuizIdParam,
+  validateAutoGenerateQuiz,
+  validateQuizBody,
+  validateSubmitAnswers,
+  validateAssignQuiz,
+} from "../middleware/validationMiddleware"; // Import quiz validators
+import { AppError } from "../utils/errorHandler";
+import QuizService from "../services/quizService"; // Import the new service
+import QuizResultService from "../services/quizResultService"; // Import QuizResultService
 
 const router: Router = express.Router();
 
@@ -83,6 +95,7 @@ async function generateDistractors(
 
 // === Middleware ===
 router.use(protect); // All quiz routes require login
+router.use(ensureRestaurantAssociation); // Ensure user is linked to a restaurant for most routes
 
 // === Routes ===
 
@@ -94,26 +107,16 @@ router.use(protect); // All quiz routes require login
 router.get(
   "/",
   restrictTo("restaurant"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId;
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
-    }
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // Fetch quizzes and populate menuItem names for display
-      const quizzes = await Quiz.find({ restaurantId }).populate(
-        "menuItemIds",
-        "name"
-      ); // Populate names only
+      const quizzes = await QuizService.getAllQuizzesForRestaurant(
+        restaurantId
+      );
       res.status(200).json({ quizzes });
     } catch (error) {
-      console.error("Error fetching quizzes:", error);
+      console.error("Error in GET /api/quiz route:", error);
       next(error);
     }
   }
@@ -127,173 +130,21 @@ router.get(
 router.post(
   "/auto",
   restrictTo("restaurant"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const { menuIds, title } = req.body; // Expect menuIds now
-    const restaurantId = req.user?.restaurantId;
-
-    // --- Validation ---
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
-    }
-    if (!title || typeof title !== "string" || title.trim() === "") {
-      return res.status(400).json({ message: "Quiz title is required" });
-    }
-    if (!menuIds || !Array.isArray(menuIds) || menuIds.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Please select at least one menu" }); // Updated message
-    }
-    if (!menuIds.every((id) => mongoose.Types.ObjectId.isValid(id))) {
-      return res
-        .status(400)
-        .json({ message: "Invalid menu ID format provided" }); // Updated message
-    }
+  validateAutoGenerateQuiz,
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { menuIds, title } = req.body;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // --- Fetch All Menu Items from Selected Menus ---
-      const objectIdMenuIds = menuIds.map(
-        (id) => new mongoose.Types.ObjectId(id)
+      const generatedQuizData = await QuizService.generateQuizQuestions(
+        title,
+        menuIds,
+        restaurantId
       );
-      const items = await MenuItem.find({
-        menuId: { $in: objectIdMenuIds }, // Find items in any of the selected menus
-        restaurantId: restaurantId,
-      });
-
-      if (items.length === 0) {
-        return res.status(404).json({
-          message:
-            "No menu items found in the selected menus for this restaurant.",
-        });
-      }
-
-      // --- Generate Questions ---
-      const questions: IQuestion[] = [];
-
-      for (const item of items) {
-        const currentIngredients = item.ingredients || [];
-
-        // Define potential question types
-        const potentialTypes: string[] = [];
-        if (currentIngredients.length > 0) potentialTypes.push("ingredients");
-        potentialTypes.push("dietary_boolean");
-        if (potentialTypes.length === 0)
-          potentialTypes.push("generic_fallback");
-
-        const randomType =
-          potentialTypes[Math.floor(Math.random() * potentialTypes.length)];
-
-        let questionText = "";
-        let choices: string[] = [];
-        let correctAnswerIndex = -1;
-        let questionGenerated = false;
-
-        if (randomType === "ingredients" && currentIngredients.length > 0) {
-          questionText = `What are the main ingredients in ${item.name}?`;
-          const correctChoice = currentIngredients.join(", ");
-          const distractors = await generateDistractors(
-            currentIngredients,
-            restaurantId,
-            "ingredients",
-            item._id as Types.ObjectId
-          );
-          choices = shuffleArray([correctChoice, ...distractors]);
-          correctAnswerIndex = choices.indexOf(correctChoice);
-          if (correctAnswerIndex !== -1 && choices.length === 4)
-            questionGenerated = true;
-        } else if (randomType === "dietary_boolean") {
-          const dietaryCategories = {
-            "Gluten Free": "isGlutenFree",
-            "Dairy Free": "isDairyFree",
-            Vegetarian: "isVegetarian",
-            Vegan: "isVegan",
-          } as const;
-          type CategoryKey = keyof typeof dietaryCategories;
-
-          const availableCategories = Object.keys(
-            dietaryCategories
-          ) as CategoryKey[];
-          const chosenCategory =
-            availableCategories[
-              Math.floor(Math.random() * availableCategories.length)
-            ];
-          const modelField = dietaryCategories[chosenCategory];
-
-          const isDietaryPropertyTrue = Boolean((item as any)[modelField]);
-
-          questionText = `Is ${item.name} ${chosenCategory}?`;
-          choices = ["True", "False"];
-          correctAnswerIndex = isDietaryPropertyTrue ? 0 : 1;
-          questionGenerated = true;
-        }
-
-        // --- Fallback Question Logic ---
-        if (!questionGenerated || randomType === "generic_fallback") {
-          questionText = `Is the description for ${item.name} accurate?`;
-          choices = ["True", "False", "N/A", "Partially"];
-          correctAnswerIndex = 0;
-        }
-
-        // --- Padding and Pushing Question ---
-        const finalChoices = choices.slice();
-        if (randomType === "dietary_boolean" && choices.length === 2) {
-          const dummyOptions = [
-            "Contains some related ingredients",
-            "Information not available",
-            "Ask kitchen staff",
-            "True only on Tuesdays",
-          ];
-          shuffleArray(dummyOptions);
-          finalChoices.push(dummyOptions[0], dummyOptions[1]);
-        }
-        while (finalChoices.length < 4 && finalChoices.length > 0) {
-          finalChoices.push("Option not available");
-        }
-        if (finalChoices.length === 0) {
-          finalChoices.push("Yes", "No", "Maybe", "Always");
-          correctAnswerIndex = 0;
-        }
-
-        if (
-          correctAnswerIndex < 0 ||
-          correctAnswerIndex >= finalChoices.length
-        ) {
-          console.warn(
-            `Correct answer index ${correctAnswerIndex} out of bounds for choices: ${finalChoices}. Resetting to 0.`
-          );
-          correctAnswerIndex = 0;
-        }
-
-        questions.push({
-          text: questionText,
-          choices: finalChoices.slice(0, 4),
-          correctAnswer: correctAnswerIndex,
-          menuItemId: item._id as Types.ObjectId,
-        });
-      } // End of loop through items
-
-      if (questions.length === 0) {
-        return res.status(400).json({
-          message:
-            "Could not generate questions for the selected menus. Ensure items exist and have ingredients/allergens.",
-        });
-      }
-
-      // --- Return Generated Quiz Data (Unsaved) ---
-      const generatedQuizData = {
-        title: title.trim(),
-        menuItemIds: items.map((item) => item._id),
-        questions: questions,
-        restaurantId: restaurantId,
-      };
-
       res.status(200).json({ quiz: generatedQuizData });
     } catch (error) {
-      console.error("Error generating quiz:", error);
+      console.error("Error in POST /api/quiz/auto route:", error);
       next(error);
     }
   }
@@ -301,59 +152,31 @@ router.post(
 
 /**
  * @route   POST /api/quiz
- * @desc    Save a generated quiz
+ * @desc    Save a quiz
  * @access  Private (Restaurant Role)
  */
 router.post(
   "/",
   restrictTo("restaurant"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  validateQuizBody,
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { title, menuItemIds, questions } = req.body;
-    const restaurantId = req.user?.restaurantId;
-
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
-    }
-    if (
-      !title ||
-      !menuItemIds ||
-      !questions ||
-      !Array.isArray(menuItemIds) ||
-      !Array.isArray(questions) ||
-      questions.length === 0
-    ) {
-      return res.status(400).json({ message: "Invalid quiz data provided" });
-    }
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const newQuiz = new Quiz({
+      // Construct the data payload for the service
+      const quizData = {
         title,
-        menuItemIds,
-        questions,
+        menuItemIds: menuItemIds.map((id: string) => new Types.ObjectId(id)), // Ensure ObjectIds
+        questions, // Assuming questions structure matches IQuestion
         restaurantId,
-        isAssigned: false, // Default to false (not assigned)
-      });
-
-      const savedQuiz = await newQuiz.save();
-
-      // No longer automatically notify staff members
-      // Quiz assignment is now manual through the /quiz/assign endpoint
-
+      };
+      const savedQuiz = await QuizService.createQuiz(quizData);
       res.status(201).json({ quiz: savedQuiz });
-    } catch (error: any) {
-      if (error.name === "ValidationError") {
-        return res
-          .status(400)
-          .json({ message: "Validation failed", errors: error.errors });
-      } else {
-        console.error("Error saving quiz:", error);
-        next(error);
-      }
+    } catch (error) {
+      console.error("Error in POST /api/quiz route:", error);
+      next(error);
     }
   }
 );
@@ -366,125 +189,62 @@ router.post(
 router.put(
   "/:quizId",
   restrictTo("restaurant"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  validateQuizIdParam,
+  validateQuizBody, // Use same validation as create for updatable fields
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
+    // Extract only the fields allowed for update from the body
     const { title, menuItemIds, questions } = req.body;
-    const restaurantId = req.user?.restaurantId;
+    const updateData: Partial<IQuiz> = {};
+    if (title !== undefined) updateData.title = title;
+    if (menuItemIds !== undefined) updateData.menuItemIds = menuItemIds;
+    if (questions !== undefined) updateData.questions = questions;
 
-    if (!restaurantId) {
-      if (!req.user) {
-        return res.status(401).json({ message: "User not authenticated" });
-      }
-      return res
-        .status(400)
-        .json({ message: "Restaurant ID not found for user" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(quizId)) {
-      return res.status(400).json({ message: "Invalid Quiz ID format" });
-    }
-
-    if (
-      !title ||
-      !menuItemIds ||
-      !questions ||
-      !Array.isArray(menuItemIds) ||
-      !Array.isArray(questions) ||
-      questions.length === 0
-    ) {
-      return res.status(400).json({ message: "Invalid quiz data provided" });
-    }
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // Find the quiz to update, ensuring it belongs to this restaurant
-      const existingQuiz = await Quiz.findOne({
-        _id: new mongoose.Types.ObjectId(quizId),
-        restaurantId: restaurantId,
-      });
-
-      if (!existingQuiz) {
-        return res
-          .status(404)
-          .json({ message: "Quiz not found or access denied" });
-      }
-
-      // Update the quiz
-      existingQuiz.title = title;
-      existingQuiz.menuItemIds = menuItemIds;
-      existingQuiz.questions = questions;
-
-      const updatedQuiz = await existingQuiz.save();
-
+      const updatedQuiz = await QuizService.updateQuiz(
+        new Types.ObjectId(quizId),
+        restaurantId,
+        updateData // Pass only the allowed update fields
+      );
       res.status(200).json({
         message: "Quiz updated successfully",
         quiz: updatedQuiz,
       });
-    } catch (error: any) {
-      if (error.name === "ValidationError") {
-        return res
-          .status(400)
-          .json({ message: "Validation failed", errors: error.errors });
-      } else {
-        console.error("Error updating quiz:", error);
-        next(error);
-      }
+    } catch (error) {
+      console.error("Error in PUT /api/quiz/:quizId route:", error);
+      next(error);
     }
   }
 );
 
 /**
  * @route   DELETE /api/quiz/:quizId
- * @desc    Delete a specific quiz and all associated quiz results
+ * @desc    Delete a specific quiz and results
  * @access  Private (Restaurant Role)
  */
 router.delete(
   "/:quizId",
   restrictTo("restaurant"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  validateQuizIdParam,
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
-    const restaurantId = req.user?.restaurantId;
-
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
-    }
-    if (!mongoose.Types.ObjectId.isValid(quizId)) {
-      return res.status(400).json({ message: "Invalid Quiz ID format" });
-    }
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // First, delete all associated quiz results
-      const deletedResults = await QuizResult.deleteMany({
-        quizId: new mongoose.Types.ObjectId(quizId),
-        restaurantId: restaurantId,
-      });
-
-      console.log(
-        `Deleted ${deletedResults.deletedCount} quiz results associated with quiz ${quizId}`
+      const result = await QuizService.deleteQuiz(
+        new Types.ObjectId(quizId),
+        restaurantId
       );
-
-      // Then delete the quiz itself
-      const result = await Quiz.deleteOne({
-        _id: new mongoose.Types.ObjectId(quizId),
-        restaurantId: restaurantId,
-      });
-
-      if (result.deletedCount === 0) {
-        return res
-          .status(404)
-          .json({ message: "Quiz not found or access denied" });
-      }
-
       res.status(200).json({
         message: "Quiz deleted successfully",
-        deletedResultsCount: deletedResults.deletedCount,
+        deletedResultsCount: result.deletedResultsCount,
       });
     } catch (error) {
-      console.error("Error deleting quiz:", error);
+      console.error("Error in DELETE /api/quiz/:quizId route:", error);
       next(error);
     }
   }
@@ -500,38 +260,16 @@ router.delete(
 router.get(
   "/available",
   restrictTo("staff"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId;
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({
-        message: "Restaurant association not found for staff member.",
-      });
-      return;
-    }
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // Find quizzes for the restaurant, selecting only necessary fields for listing
-      const availableQuizzes = await Quiz.find(
-        { restaurantId },
-        "_id title description createdAt questions" // Select ID, title, description, createdAt, and questions
-      ).sort({ createdAt: -1 }); // Sort by newest first
-
-      // Optionally add number of questions if needed
-      const quizzesWithCounts = availableQuizzes.map((q) => ({
-        _id: q._id,
-        title: q.title,
-        description: q.description, // Description now exists
-        createdAt: q.createdAt, // createdAt exists due to timestamps
-        numQuestions: q.questions.length, // Calculate question count from projected questions
-      }));
-
-      res.status(200).json({ quizzes: quizzesWithCounts });
+      const quizzes = await QuizService.getAvailableQuizzesForStaff(
+        restaurantId
+      );
+      res.status(200).json({ quizzes });
     } catch (error) {
-      console.error("Error fetching available quizzes for staff:", error);
+      console.error("Error in GET /api/quiz/available route:", error);
       next(error);
     }
   }
@@ -539,180 +277,59 @@ router.get(
 
 /**
  * @route   GET /api/quiz/:quizId/take
- * @desc    Get details of a specific quiz for a staff member to take (EXCLUDES ANSWERS)
+ * @desc    Get quiz details for taking (no answers)
  * @access  Private (Staff Role)
  */
 router.get(
   "/:quizId/take",
   restrictTo("staff"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  validateQuizIdParam,
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
-    const restaurantId = req.user?.restaurantId;
-
-    if (!restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({
-        message: "Restaurant association not found for staff member.",
-      });
-      return;
-    }
-    if (!mongoose.Types.ObjectId.isValid(quizId)) {
-      res.status(400).json({ message: "Invalid Quiz ID format" });
-      return;
-    }
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // Find the quiz, ensuring it belongs to the staff's restaurant
-      // CRITICAL: Exclude the correctAnswer field from the questions array
-      const quiz = await Quiz.findOne(
-        {
-          _id: new mongoose.Types.ObjectId(quizId),
-          restaurantId: restaurantId,
-        },
-        { "questions.correctAnswer": 0 } // Projection to EXCLUDE correctAnswer
+      const quiz = await QuizService.getQuizForTaking(
+        new Types.ObjectId(quizId),
+        restaurantId
       );
-
-      if (!quiz) {
-        res.status(404).json({
-          message: "Quiz not found or not accessible for this restaurant.",
-        });
-        return;
-      }
-
-      // Return the quiz data (without correct answers)
       res.status(200).json({ quiz });
     } catch (error) {
-      console.error("Error fetching quiz for taking:", error);
+      console.error("Error in GET /api/quiz/:quizId/take route:", error);
       next(error);
     }
   }
 );
 
-// --- Shared Routes (Submit) ---
-
 /**
  * @route   POST /api/quiz/:quizId/submit
- * @desc    Submit quiz answers and get results
- * @access  Private (Staff Role primarily - saves result, Restaurant can maybe use for checking?)
+ * @desc    Submit quiz answers
+ * @access  Private (Staff Role)
  */
 router.post(
   "/:quizId/submit",
-  restrictTo("staff"), // Changed to staff only
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    // Changed return type
+  restrictTo("staff"),
+  validateSubmitAnswers,
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
     const { answers } = req.body;
-    const userId = req.user?.userId; // No type assertion needed
-    const userName = req.user?.name;
-    const userRole = req.user?.role;
-    const restaurantId = req.user?.restaurantId; // No type assertion needed
-
-    if (!userId || !userRole || !restaurantId) {
-      if (!req.user) {
-        res.status(401).json({ message: "User not authenticated" });
-        return;
-      }
-      res.status(400).json({ message: "User information missing" });
-      return;
-    }
-    if (!mongoose.Types.ObjectId.isValid(quizId)) {
-      return res.status(400).json({ message: "Invalid Quiz ID format" });
-    }
-    if (
-      !answers ||
-      !Array.isArray(answers) ||
-      answers.some((ans) => typeof ans !== "number" || ans < 0 || ans > 3)
-    ) {
-      return res.status(400).json({
-        message: "Invalid answers format. Must be an array of numbers (0-3).",
-      });
-    }
+    const userId = req.user?.userId as mongoose.Types.ObjectId;
+    const userName = req.user?.name as string;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const quiz = await Quiz.findOne({
-        _id: new Types.ObjectId(quizId),
-        restaurantId: restaurantId,
-      });
-
-      if (!quiz) {
-        return res
-          .status(404)
-          .json({ message: "Quiz not found or not accessible" });
-      }
-
-      if (answers.length !== quiz.questions.length) {
-        return res.status(400).json({
-          message: `Number of answers (${answers.length}) does not match number of questions (${quiz.questions.length})`,
-        });
-      }
-
-      let score = 0;
-      const correctAnswers: (number | undefined)[] = [];
-      quiz.questions.forEach((question, index) => {
-        correctAnswers.push(question.correctAnswer);
-        if (answers[index] === question.correctAnswer) {
-          score++;
-        }
-      });
-
-      let savedResult = null;
-      if (userRole === "staff") {
-        savedResult = await QuizResult.findOneAndUpdate(
-          { quizId: quiz._id, userId: userId, restaurantId: restaurantId },
-          {
-            $set: {
-              // Use $set for fields that should be overwritten
-              answers: answers,
-              score: score,
-              totalQuestions: quiz.questions.length,
-              status: "completed", // Mark as completed on submission
-              completedAt: new Date(),
-              // Consider adding/updating startedAt if tracking attempts
-            },
-            $inc: { retakeCount: 1 }, // Increment retake count on every submission
-          },
-          { new: true, upsert: true, runValidators: true }
-        );
-
-        // Send notification to restaurant managers about completed quiz
-        try {
-          // Find restaurant managers
-          const managers = await User.find({
-            restaurantId: restaurantId,
-            role: "restaurant",
-          });
-
-          // Create notifications for each manager
-          for (const manager of managers) {
-            await notificationService.createCompletedTrainingNotification(
-              manager._id as mongoose.Types.ObjectId,
-              userId as mongoose.Types.ObjectId,
-              userName || "A staff member",
-              quiz._id as mongoose.Types.ObjectId,
-              quiz.title,
-              savedResult._id as mongoose.Types.ObjectId
-            );
-          }
-        } catch (notificationError) {
-          console.error(
-            "Failed to create completion notification:",
-            notificationError
-          );
-          // Don't reject the submission if notification fails
-        }
-      }
-
-      res.status(200).json({
-        message: "Quiz submitted successfully",
-        score: score,
-        totalQuestions: quiz.questions.length,
-        correctAnswers: correctAnswers,
-      });
+      const result = await QuizResultService.submitAnswers(
+        quizId, // Pass quizId directly (service handles string/ObjectId)
+        userId,
+        userName,
+        restaurantId,
+        answers
+      );
+      res.status(200).json(result);
     } catch (error) {
-      console.error("Error submitting quiz:", error);
+      console.error("Error in POST /api/quiz/:quizId/submit route:", error);
       next(error);
     }
   }
@@ -720,65 +337,28 @@ router.post(
 
 /**
  * @route   GET /api/quiz/staff-view
- * @desc    Get combined list of quizzes and results for logged-in staff
+ * @desc    Get combined quizzes and results for logged-in staff
  * @access  Private (Staff Role)
  */
 router.get(
   "/staff-view",
   restrictTo("staff"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const userId = req.user?.userId;
-    const restaurantId = req.user?.restaurantId;
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user?.userId as mongoose.Types.ObjectId;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     if (!userId || !restaurantId) {
-      return res.status(400).json({ message: "User or Restaurant ID missing" });
+      return next(new AppError("User or Restaurant ID missing in token", 403));
     }
 
     try {
-      // 1. Fetch all quizzes for the restaurant
-      const availableQuizzes = await Quiz.find(
-        { restaurantId },
-        "_id title description questions" // Include questions to get count
-      ).lean(); // Use lean for performance, we only need plain objects
-
-      // 2. Fetch all results for the user
-      const userResults = await QuizResult.find(
-        { userId: userId },
-        "quizId score totalQuestions completedAt retakeCount status"
-      ).lean(); // Use lean
-
-      // 3. Create a map of results for easy lookup
-      const resultsMap = new Map<string, Partial<IQuizResult>>();
-      userResults.forEach((result) => {
-        // Store the most recent result if multiple exist (optional, based on sort)
-        // For now, assume find retrieves all, and we only care if *any* result exists.
-        // If specific logic like 'latest' is needed, sort results by completedAt desc.
-        if (result.quizId) {
-          // Ensure quizId exists
-          resultsMap.set(result.quizId.toString(), result);
-        }
-      });
-
-      // 4. Merge the data
-      const combinedView = availableQuizzes.map((quiz) => {
-        const result = resultsMap.get(quiz._id.toString());
-        return {
-          _id: quiz._id,
-          title: quiz.title,
-          description: quiz.description,
-          numQuestions: quiz.questions?.length || 0,
-          // Add result fields if found, otherwise null/undefined
-          score: result?.score,
-          totalQuestions: result?.totalQuestions,
-          completedAt: result?.completedAt,
-          retakeCount: result?.retakeCount,
-          status: result?.status,
-        };
-      });
-
-      res.status(200).json({ quizzes: combinedView });
+      const quizzes = await QuizResultService.getStaffQuizView(
+        userId,
+        restaurantId
+      );
+      res.status(200).json({ quizzes });
     } catch (error) {
-      console.error("Error fetching staff quiz view:", error);
+      console.error("Error in GET /api/quiz/staff-view route:", error);
       next(error);
     }
   }
@@ -792,128 +372,24 @@ router.get(
 router.post(
   "/assign",
   restrictTo("restaurant"),
+  validateAssignQuiz,
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId, staffIds } = req.body;
-    const restaurantId = req.user?.restaurantId;
-
-    if (!restaurantId) {
-      res.status(400).json({ message: "Restaurant ID not found for user" });
-      return;
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(quizId)) {
-      res.status(400).json({ message: "Invalid Quiz ID format" });
-      return;
-    }
-
-    if (!staffIds || !Array.isArray(staffIds) || staffIds.length === 0) {
-      res.status(400).json({ message: "Staff IDs array is required" });
-      return;
-    }
-
-    // Validate all staff IDs are valid ObjectIds
-    if (staffIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
-      res.status(400).json({ message: "One or more invalid Staff IDs" });
-      return;
-    }
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      // 1. Verify the quiz belongs to this restaurant
-      const quiz = await Quiz.findOne({
-        _id: new mongoose.Types.ObjectId(quizId),
-        restaurantId: restaurantId,
-      });
-
-      if (!quiz) {
-        res.status(404).json({
-          message: "Quiz not found or not accessible for this restaurant",
-        });
-        return;
-      }
-
-      // 2. Verify all staff members belong to this restaurant
-      const validStaffMembers = await User.find({
-        _id: { $in: staffIds },
-        restaurantId: restaurantId,
-        role: "staff",
-      }).select("_id name");
-
-      if (validStaffMembers.length !== staffIds.length) {
-        res.status(400).json({
-          message:
-            "One or more staff members do not exist or do not belong to this restaurant",
-          validStaffCount: validStaffMembers.length,
-          requestedStaffCount: staffIds.length,
-        });
-        return;
-      }
-
-      // 3. Create pending quiz results for each staff member
-      const quizResults = [];
-      const notificationPromises = [];
-
-      for (const staff of validStaffMembers) {
-        // Create or update quiz result to 'pending' status
-        const result = await QuizResult.findOneAndUpdate(
-          {
-            quizId: quiz._id,
-            userId: staff._id,
-            restaurantId: restaurantId,
-            status: { $ne: "completed" }, // Don't update if already completed
-          },
-          {
-            $setOnInsert: {
-              status: "pending",
-              startedAt: null,
-              answers: [],
-              score: 0,
-              totalQuestions: quiz.questions.length,
-              restaurantId: restaurantId,
-              retakeCount: 0,
-            },
-          },
-          { upsert: true, new: true }
-        );
-
-        quizResults.push(result);
-
-        // Create notification for the staff member
-        try {
-          const notification =
-            await notificationService.createAssignmentNotification(
-              staff._id as mongoose.Types.ObjectId,
-              quiz._id as mongoose.Types.ObjectId,
-              quiz.title
-            );
-          notificationPromises.push(notification);
-        } catch (notificationError) {
-          console.error(
-            "Failed to create notification for staff",
-            staff._id,
-            ":",
-            notificationError
-          );
-          // Continue with assignment even if notification fails
-        }
-      }
-
-      // Wait for all notifications to be created
-      await Promise.all(notificationPromises);
-
-      // Mark the quiz as assigned
-      quiz.isAssigned = true;
-      await quiz.save();
-
+      const result = await QuizService.assignQuizToStaff(
+        new Types.ObjectId(quizId),
+        staffIds,
+        restaurantId
+      );
       res.status(200).json({
-        message: `Quiz "${quiz.title}" successfully assigned to ${validStaffMembers.length} staff members`,
-        quizResults: quizResults.map((result) => ({
-          _id: result._id,
-          userId: result.userId,
-          status: result.status,
-        })),
+        message: `Quiz successfully assigned to ${result.assignedCount} staff members`,
+        quizResults: result.results,
       });
     } catch (error) {
-      console.error("Error assigning quiz:", error);
+      console.error("Error in POST /api/quiz/assign route:", error);
       next(error);
     }
   }

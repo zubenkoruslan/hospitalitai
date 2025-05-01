@@ -12,6 +12,7 @@ export interface IQuestion {
 
 // Interface for the Quiz document
 export interface IQuiz extends Document {
+  _id: Types.ObjectId; // Explicitly add _id type
   title: string;
   description?: string; // Add optional description field
   menuItemIds: Types.ObjectId[]; // References to MenuItems used in the quiz

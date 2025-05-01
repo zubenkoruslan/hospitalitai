@@ -1,0 +1,54 @@
+# HospitalityAI Project Rules (.cursorrules)
+
+## General AI Instructions
+
+- **Stack:** Strictly adhere to the MERN stack architecture (MongoDB, Express.js, React, Node.js).
+- **Validation:** When making assumptions, validate them against MERN best practices. Provide reasoning, evidence, or counterexamples for decisions.
+- **Optimization:** Proactively suggest optimizations for performance (e.g., MongoDB indexing, React memoization), scalability, and security (e.g., Express middleware, environment variables).
+- **Consistency:** If unsure about project-specific conventions (e.g., folder structure, naming), infer patterns from existing code and confirm understanding if ambiguity remains.
+- **Language:** Use TypeScript for all new code unless explicitly instructed otherwise. Prioritize strict type safety.
+- **Testing Assumptions:** For assumptions, consider edge cases and propose unit tests using Jest (frontend) or Mocha/Chai (backend) for validation.
+
+## React Frontend Rules (_.jsx, _.tsx)
+
+- **Components:** Use functional components with TypeScript interfaces for props and state. No class components.
+- **Structure:** Follow the component structure: `client/src/components/` for reusable components, `client/src/pages/` for route-based components.
+- **Hooks:** Utilize hooks (useState, useEffect, etc.). Optimize expensive computations or frequent re-renders with useMemo/useCallback.
+- **State Management:** Use Context API for simpler state management needs. Consider Redux for more complex scenarios if the app scales significantly.
+- **Accessibility:** Ensure components are accessible (use ARIA attributes, semantic HTML).
+- **Validation:** Validate UI assumptions against React best practices (e.g., minimize re-renders, proper key usage).
+- **Testing:** Generate Jest/React Testing Library tests for components, covering rendering, state changes, and user interactions. Colocate tests (e.g., `Button.test.tsx` next to `Button.tsx`).
+- **Naming:** Example: `Button.tsx`, `HomePage.tsx`.
+
+## Node.js/Express Backend Rules (_.js, _.ts in server/)
+
+- **Structure:** Maintain the backend structure in `server/src/` with subfolders: `routes/`, `controllers/`, `models/`, `middleware/`, `services/`.
+- **API Design:** Design RESTful APIs with clear, standard endpoints (e.g., GET /api/users, POST /api/users/:id).
+- **Async:** Use async/await for all asynchronous operations. Implement robust error handling with try-catch blocks and a global error handling middleware (`middleware/errorHandler.ts`).
+- **Validation:** Validate incoming request data using libraries like `express-validator` or `Joi`.
+- **Security:** Secure APIs using JWT for authentication (`middleware/authMiddleware.ts`). Use environment variables (`.env`) for all sensitive data (API keys, JWT secrets, DB URIs). Never hardcode secrets.
+- **Validation:** Check backend assumptions for scalability (e.g., database query efficiency) and security (e.g., input sanitization, rate limiting, XSS/CSRF prevention).
+- **Testing:** Generate Mocha/Chai/Supertest tests for API endpoints, covering success paths, error handling, and authentication/authorization.
+- **Naming:** Example: `userController.ts`, `authMiddleware.ts`, `notificationService.ts`.
+
+## MongoDB Rules (_.js, _.ts in server/src/models/)
+
+- **Schemas:** Define MongoDB schemas in `server/src/models/` using Mongoose with TypeScript interfaces (`IUser`, `IQuiz`, etc.).
+- **Naming:** Use clear, descriptive field names in schemas (e.g., `createdAt` instead of `crtdAt`).
+- **Optimization:** Define Mongoose indexes within schemas for frequently queried fields (e.g., `restaurantId`, `userId`, `email`).
+- **Relationships:** Prefer references (`ref: 'ModelName'`) over deep embedding for related data to maintain normalization and scalability.
+- **Validation:** Validate schema design choices against MongoDB best practices for performance and data integrity.
+- **Testing:** Generate tests (using Mocha/Chai) to verify model validation, CRUD operations, and handling of edge cases (e.g., duplicate unique fields).
+- **Naming:** Example: `UserModel.ts`, `QuizModel.ts`.
+
+## Testing and Debugging Rules
+
+- **Coverage:** Aim for comprehensive unit and integration test coverage for critical paths in both frontend (Jest/RTL) and backend (Mocha/Chai/Supertest).
+- **Edge Cases:** Ensure tests cover edge cases like invalid inputs, empty data, network errors, and concurrent operations if applicable.
+- **Debugging:** Suggest appropriate logging strategies: `console.log` for frontend debugging during development, a structured logger like Winston for backend production logs.
+- **Validation:** Validate assumptions by proposing specific test cases that simulate potential real-world usage and failure scenarios.
+- **Colocation:** Keep test files close to their corresponding source files.
+
+## Rule Updates
+
+- After significant changes or feature implementations, review these rules and suggest updates if codebase patterns diverge or new conventions emerge.

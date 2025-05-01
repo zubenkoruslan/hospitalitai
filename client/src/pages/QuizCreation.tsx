@@ -52,7 +52,10 @@ interface QuizResultDisplay {
 // --- Helper Components --- (Assume LoadingSpinner, ErrorMessage, SuccessNotification exist)
 // Simple Loading Spinner
 const LoadingSpinner: React.FC = () => (
-  <div className="flex justify-center items-center p-4">
+  <div
+    className="flex justify-center items-center p-4"
+    data-testid="loading-spinner"
+  >
     <svg
       className="animate-spin h-8 w-8 text-blue-600"
       xmlns="http://www.w3.org/2000/svg"

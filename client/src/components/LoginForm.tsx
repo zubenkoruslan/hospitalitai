@@ -1,4 +1,4 @@
-import React, { useState, FormEvent, useContext } from "react";
+import React, { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext"; // Fixed import path
 
@@ -15,11 +15,32 @@ const LoginForm: React.FC = () => {
     return <div>Loading auth context...</div>;
   }
 
-  const { login, isLoading, error: authError } = auth;
+  const { login, isLoading, error: authError, user, token } = auth;
+
+  // --- Navigation Effect --- >>
+  // Navigate user after successful login when user/token context changes
+  useEffect(() => {
+    // Only navigate if we have a user and token, and not during initial load
+    if (user && token && !isLoading) {
+      console.log("User logged in, navigating based on role:", user.role);
+      if (user.role === "staff") {
+        navigate("/staff/dashboard");
+      } else if (user.role === "restaurant") {
+        navigate("/dashboard");
+      } else {
+        // Default redirect if role is unexpected (shouldn't happen ideally)
+        navigate("/");
+      }
+    }
+    // Dependency array includes user and token to trigger on login/logout
+    // Also include navigate and isLoading to satisfy lint rules
+  }, [user, token, navigate, isLoading]);
+  // --- Navigation Effect --- <<
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setComponentError(null); // Clear previous component error
+    setComponentError(null);
+    // Clear previous auth errors? Maybe not, context handles its error state.
 
     if (!email || !password) {
       setComponentError("Please enter both email and password.");
@@ -28,34 +49,24 @@ const LoginForm: React.FC = () => {
 
     try {
       await login(email, password);
-      // Get the updated user after login
-      const { user } = auth;
-
-      // Redirect based on user role
-      if (user?.role === "staff") {
-        navigate("/staff/dashboard");
-      } else if (user?.role === "restaurant") {
-        navigate("/dashboard");
-      } else {
-        // Default redirect if role is unknown
-        navigate("/");
-      }
+      // *** Removed navigation logic from here ***
+      // Navigation will now be handled by the useEffect hook when the context updates
     } catch (err) {
-      // Error is already set in AuthContext, but we can use componentError for form-specific feedback
-      // authError will contain the error message from the context
-      console.error("Login failed:", err);
-      // Optionally set componentError if authError isn't displayed elsewhere
-      setComponentError(authError || "Login failed.");
+      console.error("Login submission failed:", err);
+      // Only set component error if the context hasn't already set one.
+      if (!authError) {
+        setComponentError("Login failed unexpectedly.");
+      }
+      // The authError from the context will be displayed automatically
     }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <h2>Login</h2>
-      {componentError && <p style={styles.errorText}>{componentError}</p>}
-      {/* Display auth error if needed */}
-      {authError && !componentError && (
-        <p style={styles.errorText}>{authError}</p>
+      {/* Display component error OR auth error */}
+      {(componentError || authError) && (
+        <p style={styles.errorText}>{componentError || authError}</p>
       )}
       <div style={styles.inputGroup}>
         <label htmlFor="email" style={styles.label}>

@@ -23,14 +23,18 @@ app.use(express.urlencoded({ extended: true }));
 
 const uri: string =
   process.env.MONGODB_URI || "mongodb://localhost:27017/hospitality-training";
-(async () => {
-  try {
-    await mongoose.connect(uri);
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    console.error("MongoDB connection error:", error);
-  }
-})();
+
+// Only connect if not in a test environment (vitest sets process.env.VITEST)
+if (!process.env.VITEST) {
+  (async () => {
+    try {
+      await mongoose.connect(uri);
+      console.log("Connected to MongoDB");
+    } catch (error) {
+      console.error("MongoDB connection error:", error);
+    }
+  })();
+}
 
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).send("Server is running");
@@ -49,6 +53,13 @@ app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
 const PORT: string | number = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+// Only listen when not in test environment (vitest or general test)
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export the app instance for testing
+export default app;

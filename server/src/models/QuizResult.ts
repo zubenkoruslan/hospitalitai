@@ -9,6 +9,7 @@ interface IUserAnswer {
 
 // Interface for the QuizResult document
 export interface IQuizResult extends Document {
+  _id: Types.ObjectId; // Explicitly add _id type
   quizId: Types.ObjectId; // Reference to the Quiz
   userId: Types.ObjectId; // Reference to the User (Staff) who took the quiz
   restaurantId: Types.ObjectId; // Reference to the Restaurant for easier querying
