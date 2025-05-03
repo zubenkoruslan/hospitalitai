@@ -48,28 +48,49 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       type: String,
       required: [true, "Menu item name is required"],
       trim: true,
+      maxlength: [100, "Item name cannot exceed 100 characters"],
     },
     description: {
       type: String,
       trim: true,
+      maxlength: [500, "Description cannot exceed 500 characters"],
     },
     price: {
       type: Number,
       min: [0, "Price cannot be negative"],
     },
     ingredients: {
-      type: [String],
+      type: [{ type: String, trim: true }],
       default: [],
     },
     itemType: {
       type: String,
       enum: ITEM_TYPES,
       required: [true, "Item type (food/beverage) is required"],
+      index: true,
     },
     category: {
       type: String,
       required: [true, "Item category is required"],
       trim: true,
+      index: true,
+      validate: {
+        validator: function (this: IMenuItem, value: string): boolean {
+          if (this.itemType === "food") {
+            return (FOOD_CATEGORIES as ReadonlyArray<string>).includes(value);
+          }
+          if (this.itemType === "beverage") {
+            return (BEVERAGE_CATEGORIES as ReadonlyArray<string>).includes(
+              value
+            );
+          }
+          return false; // Should not happen if itemType is validated
+        },
+        message: (props: any) =>
+          `Category \`${props.value}\` is not valid for item type \`${
+            (props.ownerDocument as IMenuItem)?.itemType
+          }\`.`,
+      },
     },
     menuId: {
       type: Schema.Types.ObjectId,
@@ -87,18 +108,22 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
     isGlutenFree: {
       type: Boolean,
       default: false,
+      index: true,
     },
     isDairyFree: {
       type: Boolean,
       default: false,
+      index: true,
     },
     isVegetarian: {
       type: Boolean,
       default: false,
+      index: true,
     },
     isVegan: {
       type: Boolean,
       default: false,
+      index: true,
     },
   },
   {

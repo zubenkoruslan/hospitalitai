@@ -4,6 +4,9 @@ import { protect, restrictTo } from "../middleware/authMiddleware";
 import User from "../models/User"; // Staff and Restaurant are Users
 import QuizResult from "../models/QuizResult";
 import Quiz from "../models/Quiz";
+import QuizResultService from "../services/quizResultService"; // Import the service
+import StaffService from "../services/staffService"; // Import the new service
+import { AppError } from "../utils/errorHandler"; // Import AppError for consistency
 
 const router: Router = express.Router();
 
@@ -11,90 +14,29 @@ const router: Router = express.Router();
 router.use(protect); // Ensure user is logged in
 router.use(restrictTo("restaurant")); // Ensure user is a restaurant owner
 
-// --- Helper Functions ---
-
-// Helper to safely get choice text from index
-const getChoiceText = (
-  choices: string[] | undefined,
-  index: number
-): string => {
-  return choices && index >= 0 && index < choices.length
-    ? choices[index]
-    : "Invalid Choice Index";
-};
-
 // --- Routes ---
 
 /**
  * @route   GET /api/staff
- * @desc    Get all staff members for the logged-in restaurant owner WITH quiz result summaries
+ * @desc    Get all staff members with average scores
  * @access  Private (Restaurant Role)
  */
 router.get(
   "/",
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    // Determine restaurantId (owner might have it directly or use their own userId)
-    const restaurantId = req.user?.restaurantId || req.user?.userId;
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const restaurantId = req.user?.restaurantId;
 
     if (!restaurantId) {
-      return res
-        .status(400)
-        .json({ message: "Restaurant ID could not be determined for user." });
+      return next(new AppError("Restaurant ID not found for user.", 400));
     }
 
     try {
-      // 1. Fetch all staff members for the restaurant
-      const staffList = await User.find(
-        { restaurantId: restaurantId, role: "staff" },
-        "_id name email createdAt professionalRole"
-      ).lean();
-
-      // 2. Fetch all relevant results for this restaurant to aggregate
-      const allResults = await QuizResult.find({ restaurantId: restaurantId })
-        .populate({ path: "quizId", select: "title" }) // Populate quiz title for summary
-        .select(
-          "userId quizId score totalQuestions completedAt retakeCount status"
-        ) // Select necessary fields
-        .lean();
-
-      // 3. Group results by userId for efficient mapping
-      const resultsByUser = new Map<string, any[]>();
-      allResults.forEach((result) => {
-        const userIdStr = result.userId.toString();
-
-        // Skip results where the quiz is deleted (quizId doesn't resolve to a document)
-        if (!result.quizId) {
-          console.log(`Skipping result ${result._id} with deleted quiz`);
-          return;
-        }
-
-        if (!resultsByUser.has(userIdStr)) {
-          resultsByUser.set(userIdStr, []);
-        }
-        resultsByUser.get(userIdStr)?.push({
-          _id: result._id,
-          quizId: (result.quizId as any)?._id,
-          quizTitle: (result.quizId as any)?.title,
-          score: result.score,
-          totalQuestions: result.totalQuestions,
-          completedAt: result.completedAt,
-          retakeCount: result.retakeCount,
-          status: result.status,
-        });
-      });
-
-      // 4. Combine staff with their results array
-      const staffWithResults = staffList.map((staff) => {
-        const staffIdStr = staff._id.toString();
-        return {
-          ...staff,
-          results: resultsByUser.get(staffIdStr) || [], // Attach the array of result summaries
-        };
-      });
-
-      res.status(200).json({ staff: staffWithResults });
+      // Delegate fetching and processing to the service
+      const staffWithData = await StaffService.getStaffListWithAverages(
+        restaurantId
+      );
+      res.status(200).json({ staff: staffWithData });
     } catch (error) {
-      console.error("Error fetching staff list with results:", error);
       next(error);
     }
   }
@@ -102,96 +44,31 @@ router.get(
 
 /**
  * @route   GET /api/staff/:id
- * @desc    Get details for a specific staff member, including quiz results and analysis
+ * @desc    Get details for a specific staff member
  * @access  Private (Restaurant Role)
  */
 router.get(
   "/:id",
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId || req.user?.userId;
+    const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
 
+    // Basic validation
     if (!restaurantId) {
-      return res
-        .status(400)
-        .json({ message: "Restaurant ID could not be determined for user." });
+      return next(new AppError("Restaurant ID not found for user.", 400));
     }
-
     if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return res.status(400).json({ message: "Invalid Staff ID format." });
+      return next(new AppError("Invalid Staff ID format.", 400));
     }
 
     try {
-      const staffMember = await User.findOne(
-        {
-          _id: new mongoose.Types.ObjectId(staffId),
-          restaurantId: restaurantId,
-          role: "staff",
-        },
-        "name email createdAt professionalRole"
-      ).lean();
-
-      if (!staffMember) {
-        return res.status(404).json({
-          message:
-            "Staff member not found or does not belong to this restaurant.",
-        });
-      }
-
-      const quizResults = await QuizResult.find({
-        userId: staffMember._id,
-        restaurantId: restaurantId,
-      })
-        .populate({
-          path: "quizId",
-          select: "title questions", // Need questions for incorrect answer analysis
-          model: Quiz,
-        })
-        .sort({ completedAt: -1 })
-        .lean();
-
-      // Filter out results with deleted quizzes and then process the remaining results
-      const processedResults = quizResults
-        .filter((result) => result.quizId) // Skip results where the quiz was deleted
-        .map((result) => {
-          const incorrectQuestions: any[] = [];
-          const quizData = result.quizId as any;
-
-          if (quizData && quizData.questions && Array.isArray(result.answers)) {
-            quizData.questions.forEach((question: any, index: number) => {
-              const userAnswerIndex = result.answers[index];
-              if (userAnswerIndex !== question.correctAnswer) {
-                incorrectQuestions.push({
-                  questionText: question.text,
-                  userAnswer: getChoiceText(question.choices, userAnswerIndex),
-                  correctAnswer: getChoiceText(
-                    question.choices,
-                    question.correctAnswer
-                  ),
-                });
-              }
-            });
-          }
-
-          return {
-            _id: result._id,
-            quizId: quizData?._id,
-            quizTitle: quizData?.title,
-            completedAt: result.completedAt,
-            score: result.score,
-            totalQuestions: result.totalQuestions,
-            retakeCount: result.retakeCount,
-            incorrectQuestions: incorrectQuestions,
-          };
-        });
-
-      const responseData = {
-        ...staffMember,
-        quizResults: processedResults,
-      };
+      // Delegate fetching and processing to the service
+      const responseData = await StaffService.getStaffMemberDetails(
+        staffId,
+        restaurantId
+      );
       res.status(200).json({ staff: responseData });
     } catch (error) {
-      console.error(`Error fetching staff details for ID ${staffId}:`, error);
       next(error);
     }
   }
@@ -199,71 +76,40 @@ router.get(
 
 /**
  * @route   PATCH /api/staff/:id
- * @desc    Update details for a specific staff member (e.g., professionalRole)
+ * @desc    Update professional role for a specific staff member
  * @access  Private (Restaurant Role)
  */
 router.patch(
   "/:id",
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId || req.user?.userId;
+    const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
-    const { professionalRole } = req.body; // Get updated role from body
+    const { professionalRole } = req.body;
 
+    // Basic validation
     if (!restaurantId) {
-      return res
-        .status(400)
-        .json({ message: "Restaurant ID could not be determined for user." });
+      return next(new AppError("Restaurant ID not found for user.", 400));
     }
     if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return res.status(400).json({ message: "Invalid Staff ID format." });
+      return next(new AppError("Invalid Staff ID format.", 400));
     }
-    if (!professionalRole) {
-      // Add validation if professionalRole is expected
-      return res
-        .status(400)
-        .json({ message: "Professional role is required for update." });
+    // Basic check for presence, service handles more detail
+    if (professionalRole === undefined) {
+      return next(new AppError("Professional role is required.", 400));
     }
-
-    const staffObjectId = new mongoose.Types.ObjectId(staffId);
 
     try {
-      // Find the staff member, ensure they belong to the requesting restaurant
-      const staffMember = await User.findOne({
-        _id: staffObjectId,
-        restaurantId: restaurantId, // Authorization check
-        role: "staff",
-      });
-
-      if (!staffMember) {
-        return res.status(404).json({
-          message:
-            "Staff member not found or you do not have permission to edit.",
-        });
-      }
-
-      // Update the professional role
-      staffMember.professionalRole = professionalRole;
-
-      // Validate before saving (optional, but good practice)
-      await staffMember.validate();
-
-      // Save the updated document
-      const updatedStaff = await staffMember.save();
-
-      // Exclude password if necessary (shouldn't be selected anyway)
-      const { password: _, ...staffResponse } = updatedStaff.toObject();
-
+      // Delegate update logic to the service
+      const staffResponse = await StaffService.updateStaffMemberRole(
+        staffId,
+        professionalRole,
+        restaurantId
+      );
       res.status(200).json({
         message: "Staff details updated successfully.",
         staff: staffResponse,
       });
     } catch (error: any) {
-      console.error(`Error updating staff details for ID ${staffId}:`, error);
-      if (error.name === "ValidationError") {
-        return res
-          .status(400)
-          .json({ message: "Validation failed", errors: error.errors });
-      }
       next(error);
     }
   }
@@ -277,53 +123,22 @@ router.patch(
 router.delete(
   "/:id",
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId || req.user?.userId;
+    const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
 
+    // Basic validation
     if (!restaurantId) {
-      return res
-        .status(400)
-        .json({ message: "Restaurant ID could not be determined for user." });
+      return next(new AppError("Restaurant ID not found for user.", 400));
     }
     if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return res.status(400).json({ message: "Invalid Staff ID format." });
+      return next(new AppError("Invalid Staff ID format.", 400));
     }
 
-    const staffObjectId = new mongoose.Types.ObjectId(staffId);
-
     try {
-      // 1. Find the staff user to ensure they belong to the restaurant before deleting
-      const staffMember = await User.findOne(
-        { _id: staffObjectId, restaurantId: restaurantId, role: "staff" },
-        "_id" // Only need the ID for verification
-      ).lean();
-
-      if (!staffMember) {
-        return res.status(404).json({
-          message:
-            "Staff member not found or does not belong to this restaurant.",
-        });
-      }
-
-      // 2. Delete the staff user
-      const deleteUserResult = await User.deleteOne({ _id: staffObjectId });
-
-      if (deleteUserResult.deletedCount === 0) {
-        // Should not happen if findOne succeeded, but good practice to check
-        return res
-          .status(404)
-          .json({ message: "Staff member could not be deleted." });
-      }
-
-      // 3. Delete associated quiz results (optional, but good for cleanup)
-      await QuizResult.deleteMany({
-        userId: staffObjectId,
-        restaurantId: restaurantId,
-      });
-
+      // Delegate deletion logic to the service
+      await StaffService.deleteStaffMember(staffId, restaurantId);
       res.status(200).json({ message: "Staff member deleted successfully." });
     } catch (error) {
-      console.error(`Error deleting staff member with ID ${staffId}:`, error);
       next(error);
     }
   }

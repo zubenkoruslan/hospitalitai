@@ -1,7 +1,11 @@
-import express, { Express, Request, Response } from "express";
+import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import morgan from "morgan";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { globalErrorHandler, AppError } from "./utils/errorHandler";
 
 // Import route files
 import authRoutes from "./routes/auth";
@@ -10,15 +14,42 @@ import itemRoutes from "./routes/items";
 import { router as quizRoutes } from "./routes/quiz";
 import resultsRoutes from "./routes/quizResult";
 import staffRoutes from "./routes/staff";
-import notificationRoutes from "./routes/notifications";
 import { protect } from "./middleware/authMiddleware";
 import { errorHandler } from "./middleware/errorHandler";
 
 dotenv.config();
 
 const app: Express = express();
-app.use(cors());
-app.use(express.json());
+
+// === Middleware ===
+
+// CORS Configuration (Adjust origin in production!)
+app.use(
+  cors({
+    // Use environment variable for production, but specific origin for dev
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL
+        : "http://localhost:5173", // Allow Vite dev server
+    credentials: true,
+  })
+);
+
+// Helmet for security headers
+app.use(helmet());
+
+// Rate Limiting (Apply before routes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `windowMs`
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: "Too many requests from this IP, please try again after 15 minutes", // Custom message
+});
+app.use(limiter); // Apply the rate limiting middleware to all requests
+
+// Body Parsing
+app.use(express.json()); // For parsing application/json
 app.use(express.urlencoded({ extended: true }));
 
 const uri: string =
@@ -47,7 +78,6 @@ app.use("/api/items", itemRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/results", resultsRoutes);
 app.use("/api/staff", staffRoutes);
-app.use("/api/notifications", notificationRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

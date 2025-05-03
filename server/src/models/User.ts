@@ -11,6 +11,10 @@ export interface IUser extends Document {
   professionalRole?: string; // Added professional role
   restaurantId?: mongoose.Types.ObjectId; // Optional here, but conditionally required by schema
   comparePassword(candidatePassword: string): Promise<boolean>; // Method signature
+
+  // Add optional timestamp fields managed by Mongoose
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Define the Mongoose schema
@@ -45,6 +49,7 @@ const userSchema = new Schema<IUser>(
         values: ["restaurant", "staff"],
         message: "{VALUE} is not a supported role",
       },
+      index: true, // Added index for role filtering
     },
     professionalRole: {
       type: String,
@@ -61,12 +66,16 @@ const userSchema = new Schema<IUser>(
         // Only require restaurantId if the role is 'staff'
         return this.role === "staff";
       },
+      index: true, // Added index for restaurant lookups
     },
   },
   {
     timestamps: true, // Add createdAt and updatedAt timestamps
   }
 );
+
+// Add compound index for common staff lookups
+userSchema.index({ restaurantId: 1, role: 1 });
 
 // Pre-save hook to hash password
 userSchema.pre<IUser>("save", async function (next) {

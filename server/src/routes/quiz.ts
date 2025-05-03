@@ -6,8 +6,7 @@ import QuizResult, { IQuizResult } from "../models/QuizResult";
 import MenuItem, { IMenuItem } from "../models/MenuItem";
 import Menu from "../models/Menu"; // Import Menu model if needed for fetching items by menu
 import User from "../models/User"; // Assuming User model exists and stores restaurantId for staff
-import notificationService from "../services/notificationService";
-import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware";
+import QuizService from "../services/quizService";
 import {
   handleValidationErrors,
   validateQuizIdParam,
@@ -17,81 +16,10 @@ import {
   validateAssignQuiz,
 } from "../middleware/validationMiddleware"; // Import quiz validators
 import { AppError } from "../utils/errorHandler";
-import QuizService from "../services/quizService"; // Import the new service
 import QuizResultService from "../services/quizResultService"; // Import QuizResultService
+import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware"; // Re-added this import
 
 const router: Router = express.Router();
-
-// --- Helper Functions ---
-
-// Shuffle array in place (Fisher-Yates algorithm)
-function shuffleArray<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]]; // Swap elements
-  }
-  return array;
-}
-
-// Generate incorrect choices (distractor strings) for ingredient/allergen list questions
-async function generateDistractors(
-  correctItems: string[],
-  restaurantId: Types.ObjectId,
-  fieldType: "ingredients", // Explicitly only support ingredients now
-  excludeItemId: Types.ObjectId
-): Promise<string[]> {
-  const correctItemsString = correctItems.sort().join(", ");
-
-  const sampleSize = 7;
-  const otherItems = await MenuItem.find(
-    {
-      restaurantId: restaurantId,
-      _id: { $ne: excludeItemId },
-    },
-    { [fieldType]: 1, name: 1 } // Select only ingredients
-  ).limit(sampleSize);
-
-  let potentialDistractorStrings: string[] = [];
-  otherItems.forEach((item) => {
-    // Only process ingredients
-    const list = item.ingredients as string[] | undefined;
-    if (list && list.length > 0) {
-      const listString = list.sort().join(", ");
-      if (listString !== correctItemsString) {
-        potentialDistractorStrings.push(list.join(", ") || "None");
-      }
-    }
-  });
-
-  potentialDistractorStrings = Array.from(new Set(potentialDistractorStrings));
-  shuffleArray(potentialDistractorStrings);
-  const distractors = potentialDistractorStrings.slice(0, 3);
-
-  // Padding logic remains mostly the same
-  if (distractors.length < 3) {
-    const placeholders = [
-      "None of the other listed options",
-      "Salt and Pepper only",
-      "All of the above (Incorrect)",
-      `Only items from ${otherItems[0]?.name || "another dish"}`,
-    ];
-    let placeholderIndex = 0;
-    while (distractors.length < 3 && placeholderIndex < placeholders.length) {
-      const currentPlaceholder = placeholders[placeholderIndex++];
-      if (
-        currentPlaceholder !== correctItems.join(", ") &&
-        !distractors.includes(currentPlaceholder)
-      ) {
-        distractors.push(currentPlaceholder);
-      }
-    }
-    while (distractors.length < 3) {
-      distractors.push(`Placeholder ${distractors.length + 1}`);
-    }
-  }
-
-  return distractors.slice(0, 3);
-}
 
 // === Middleware ===
 router.use(protect); // All quiz routes require login
@@ -116,7 +44,34 @@ router.get(
       );
       res.status(200).json({ quizzes });
     } catch (error) {
-      console.error("Error in GET /api/quiz route:", error);
+      // Service handles errors
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   GET /api/quiz/count
+ * @desc    Get the total number of quizzes for the associated restaurant
+ * @access  Private (Authenticated users associated with a restaurant)
+ */
+router.get(
+  "/count",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+
+    if (!restaurantId) {
+      return next(
+        new AppError("Restaurant association not found for user.", 400)
+      );
+    }
+
+    try {
+      // Delegate counting to the service
+      const count = await QuizService.countQuizzes(restaurantId);
+      res.status(200).json({ count });
+    } catch (error) {
+      // Service handles errors
       next(error);
     }
   }
@@ -144,7 +99,7 @@ router.post(
       );
       res.status(200).json({ quiz: generatedQuizData });
     } catch (error) {
-      console.error("Error in POST /api/quiz/auto route:", error);
+      // Service handles errors
       next(error);
     }
   }

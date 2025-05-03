@@ -1,49 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-// Interface for individual Menu Item (embedded)
-interface IMenuItem {
-  name: string;
-  description?: string;
-  price: number;
-  ingredients?: string[];
-  allergens?: string[];
-  imageUrl?: string;
-}
-
 // Interface for the Menu document
 export interface IMenu extends Document {
   name: string;
   description?: string;
   restaurantId: mongoose.Types.ObjectId; // Reference to the Restaurant
-  items: IMenuItem[];
 }
-
-// Mongoose schema for embedded MenuItem
-const menuItemSchema = new Schema<IMenuItem>(
-  {
-    name: {
-      type: String,
-      required: [true, "Menu item name is required"],
-      trim: true,
-    },
-    description: {
-      type: String,
-      trim: true,
-    },
-    price: {
-      type: Number,
-      required: [true, "Menu item price is required"],
-      min: [0, "Price cannot be negative"],
-    },
-    ingredients: [{ type: String, trim: true }],
-    allergens: [{ type: String, trim: true }],
-    imageUrl: {
-      type: String,
-      trim: true,
-    },
-  },
-  { _id: true } // Assign IDs to subdocuments if needed for direct manipulation
-);
 
 // Mongoose schema for Menu
 const menuSchema = new Schema<IMenu>(
@@ -52,10 +14,12 @@ const menuSchema = new Schema<IMenu>(
       type: String,
       required: [true, "Menu name is required"],
       trim: true,
+      maxlength: [100, "Menu name cannot exceed 100 characters"],
     },
     description: {
       type: String,
       trim: true,
+      maxlength: [500, "Description cannot exceed 500 characters"],
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
@@ -63,7 +27,6 @@ const menuSchema = new Schema<IMenu>(
       required: [true, "Menu must belong to a restaurant"],
       index: true,
     },
-    items: [menuItemSchema], // Array of embedded menu items
   },
   {
     timestamps: true, // Add createdAt and updatedAt timestamps

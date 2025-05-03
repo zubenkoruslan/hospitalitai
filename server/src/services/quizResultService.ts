@@ -2,7 +2,6 @@ import mongoose, { Types } from "mongoose";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
 import Quiz, { IQuiz } from "../models/Quiz";
 import User, { IUser } from "../models/User";
-import notificationService from "./notificationService"; // Assuming it's in the same directory
 import { AppError } from "../utils/errorHandler";
 
 // Interface for the data returned by submitAnswers
@@ -30,8 +29,17 @@ interface StaffQuizViewItem {
 
 class QuizResultService {
   /**
-   * Handles the submission of quiz answers by a staff member.
-   * TODO: Consider wrapping in a transaction.
+   * Submits answers for a quiz attempt, calculates the score, saves the result,
+   * and notifies relevant managers.
+   *
+   * @param quizId - The ID of the quiz being submitted.
+   * @param userId - The ID of the staff member submitting the answers.
+   * @param userName - The name of the staff member (for notifications).
+   * @param restaurantId - The ID of the restaurant.
+   * @param answers - An array of numbers representing the chosen answer indices.
+   * @returns A promise resolving to an object containing the submission message, score, total questions, correct answer indices, and the saved result ID.
+   * @throws {AppError} If the quiz is not found (404), if the answer count mismatch (400),
+   *                    if saving the result fails (500), or for other unexpected errors (500).
    */
   static async submitAnswers(
     quizId: string | Types.ObjectId,
@@ -95,44 +103,6 @@ class QuizResultService {
         throw new AppError("Failed to save quiz result", 500);
       }
 
-      // 5. Trigger notifications
-      try {
-        const managers: IUser[] = await User.find({
-          restaurantId: restaurantId,
-          role: "restaurant",
-        }).select("_id");
-
-        const notificationPromises = managers.map((manager) => {
-          if (!savedResult?._id) {
-            console.error("Saved result ID is missing unexpectedly.");
-            return Promise.resolve();
-          }
-          return notificationService.createCompletedTrainingNotification(
-            manager._id,
-            userId,
-            userName,
-            quiz._id,
-            quiz.title,
-            savedResult._id
-          );
-        });
-        Promise.allSettled(notificationPromises).then((results) => {
-          results.forEach((result, index) => {
-            if (result.status === "rejected") {
-              console.error(
-                `Failed to create completion notification for manager ${managers[index]._id}:`,
-                result.reason
-              );
-            }
-          });
-        });
-      } catch (notificationError) {
-        console.error(
-          "Failed to query managers for completion notification:",
-          notificationError
-        );
-      }
-
       // 6. Return result details
       if (!savedResult?._id) {
         throw new AppError("Saved result ID missing after processing.", 500);
@@ -152,7 +122,13 @@ class QuizResultService {
   }
 
   /**
-   * Fetches the combined view of quizzes and their results for a specific staff member.
+   * Fetches a combined view of all quizzes available to a restaurant
+   * merged with the specific staff member's results for those quizzes.
+   *
+   * @param userId - The ID of the staff user whose results are needed.
+   * @param restaurantId - The ID of the restaurant.
+   * @returns A promise resolving to an array of StaffQuizViewItem objects, sorted by status (pending first) and then by newest quiz.
+   * @throws {AppError} If any database error occurs during lookup (500).
    */
   static async getStaffQuizView(
     userId: Types.ObjectId,
@@ -215,6 +191,236 @@ class QuizResultService {
     } catch (error) {
       console.error("Error fetching staff quiz view in service:", error);
       throw new AppError("Failed to fetch staff quiz view.", 500);
+    }
+  }
+
+  /**
+   * Calculates the overall average quiz score (as a percentage) for a staff user.
+   * The average is calculated based on the average percentage score achieved for each unique quiz taken.
+   * Formula: Sum of (Score on Quiz / Total Questions on Quiz) / Number of Unique Quizzes Completed
+   *
+   * @param userId - The ID of the staff user.
+   * @param restaurantId - The ID of the restaurant to scope the results.
+   * @returns A promise resolving to an object containing the average score (percentage, 0-100) and the count of unique quizzes taken.
+   *          Returns null for averageScore if no completed quizzes are found.
+   * @throws {AppError} If any database error occurs during lookup (500).
+   */
+  static async calculateAverageScoreForUser(
+    userId: Types.ObjectId,
+    restaurantId: Types.ObjectId
+  ): Promise<{ averageScore: number | null; quizzesTaken: number }> {
+    try {
+      // 1. Fetch all completed quiz results for the user/restaurant
+      const results = await QuizResult.find({
+        userId: userId,
+        restaurantId: restaurantId,
+        status: "completed",
+      })
+        .select("quizId score totalQuestions")
+        .lean();
+
+      if (results.length === 0) {
+        return { averageScore: null, quizzesTaken: 0 };
+      }
+
+      // 2. Group results by quizId
+      const scoresByQuiz: {
+        [quizId: string]: { scoreSum: number; totalPossibleScore: number };
+      } = {};
+      results.forEach((result) => {
+        const quizIdStr = result.quizId.toString();
+        if (!scoresByQuiz[quizIdStr]) {
+          scoresByQuiz[quizIdStr] = { scoreSum: 0, totalPossibleScore: 0 };
+        }
+        scoresByQuiz[quizIdStr].scoreSum += result.score ?? 0;
+        scoresByQuiz[quizIdStr].totalPossibleScore +=
+          result.totalQuestions ?? 0;
+      });
+
+      // 3. Calculate average percentage for each quiz and sum them
+      let sumOfQuizPercentages = 0;
+      const uniqueQuizzesTaken = Object.keys(scoresByQuiz).length;
+
+      for (const quizIdStr in scoresByQuiz) {
+        const quizData = scoresByQuiz[quizIdStr];
+        if (quizData.totalPossibleScore > 0) {
+          const percentageForQuiz =
+            (quizData.scoreSum / quizData.totalPossibleScore) * 100;
+          sumOfQuizPercentages += percentageForQuiz;
+        } else {
+          console.warn(
+            `Quiz ${quizIdStr} has results but zero total possible score. Treating as 0% for average calculation.`
+          );
+        }
+      }
+
+      // 4. Calculate final average
+      const finalAveragePercentage =
+        uniqueQuizzesTaken > 0 ? sumOfQuizPercentages / uniqueQuizzesTaken : 0;
+
+      return {
+        averageScore: finalAveragePercentage,
+        quizzesTaken: uniqueQuizzesTaken,
+      };
+    } catch (error: any) {
+      console.error(
+        `Error calculating average score for user ${userId}:`,
+        error
+      );
+      throw new AppError("Failed to calculate average score.", 500);
+    }
+  }
+
+  /**
+   * Fetches quiz results for a specific staff member, formatted for display.
+   *
+   * @param userId - The ID of the staff user.
+   * @returns A promise resolving to an array of the user's quiz results, formatted for display.
+   *          Includes quiz title. Results are sorted by most recent completion.
+   * @throws {AppError} If any database error occurs during lookup (500).
+   */
+  static async getMyResults(userId: Types.ObjectId): Promise<any[]> {
+    try {
+      const results = await QuizResult.find({ userId: userId })
+        .populate<{ quizId: Pick<IQuiz, "_id" | "title"> | null }>({
+          path: "quizId",
+          select: "title",
+        })
+        .sort({ completedAt: -1 }); // Sort by most recent first
+
+      // Map results and filter out those with deleted quizzes
+      const formattedResults = results
+        .filter((result) => result.quizId) // Skip results where quiz doesn't exist
+        .map((result) => {
+          const quiz = result.quizId; // Already populated and typed
+
+          return {
+            _id: result._id,
+            quizId: quiz?._id,
+            quizTitle: quiz?.title,
+            score: result.score,
+            totalQuestions: result.totalQuestions,
+            completedAt: result.completedAt,
+            status:
+              result.status.charAt(0).toUpperCase() + result.status.slice(1),
+            retakeCount: result.retakeCount,
+          };
+        });
+
+      return formattedResults;
+    } catch (error: any) {
+      console.error("Error fetching my results in service:", error);
+      throw new AppError("Failed to fetch quiz results.", 500);
+    }
+  }
+
+  /**
+   * Fetches detailed information for a single quiz result, including question text, choices, user answer, and correct answer.
+   *
+   * @param resultId - The ID of the QuizResult to fetch.
+   * @param requestingUserId - The ID of the user requesting the details.
+   * @param requestingUserRole - The role ('staff' or 'restaurant') of the requesting user.
+   * @param restaurantId - The restaurant ID of the requesting user (used for manager authorization).
+   * @returns A promise resolving to an object containing detailed quiz result information.
+   * @throws {AppError} If the result is not found (404),
+   *                    if the requesting user is not authorized to view the result (403),
+   *                    if the associated quiz no longer exists (404),
+   *                    if the resultId format is invalid (400),
+   *                    or if any unexpected database error occurs (500).
+   */
+  static async getResultDetails(
+    resultId: string | Types.ObjectId,
+    requestingUserId: Types.ObjectId,
+    requestingUserRole: string,
+    restaurantId: Types.ObjectId
+  ): Promise<any> {
+    // Define a specific return type later
+    const resultObjectId =
+      typeof resultId === "string" ? new Types.ObjectId(resultId) : resultId;
+
+    try {
+      const result = await QuizResult.findById(resultObjectId).populate<{
+        quizId: Pick<IQuiz, "_id" | "title" | "questions"> | null;
+      }>({
+        path: "quizId",
+        select: "title questions", // Need questions and title
+      });
+
+      if (!result) {
+        throw new AppError("Quiz result not found", 404);
+      }
+
+      // Authorization Check
+      if (requestingUserRole === "staff") {
+        if (result.userId.toString() !== requestingUserId.toString()) {
+          throw new AppError("You are not authorized to view this result", 403);
+        }
+      } else if (requestingUserRole === "restaurant") {
+        // Ensure the result belongs to the requesting owner's restaurant
+        if (result.restaurantId.toString() !== restaurantId.toString()) {
+          throw new AppError(
+            "You are not authorized to view this result (wrong restaurant)",
+            403
+          );
+        }
+      } else {
+        // Should not happen if roles are properly managed
+        throw new AppError("Unauthorized role for accessing results", 403);
+      }
+
+      const quiz = result.quizId;
+      if (!quiz) {
+        throw new AppError(
+          "The quiz associated with this result no longer exists",
+          404
+        );
+      }
+
+      // Helper to safely get choice text
+      const getChoiceText = (
+        choices: string[] | undefined,
+        index: number
+      ): string => {
+        return choices && index >= 0 && index < choices.length
+          ? choices[index]
+          : "N/A";
+      };
+
+      // Process details
+      const detailedResult = {
+        _id: result._id,
+        quizId: quiz._id,
+        quizTitle: quiz.title,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+        completedAt: result.completedAt,
+        status: result.status.charAt(0).toUpperCase() + result.status.slice(1),
+        retakeCount: result.retakeCount,
+        questions: quiz.questions.map((question, index) => {
+          const userAnswerIndex = result.answers[index];
+          return {
+            text: question.text,
+            choices: question.choices,
+            userAnswerIndex: userAnswerIndex,
+            userAnswer: getChoiceText(question.choices, userAnswerIndex),
+            correctAnswerIndex: question.correctAnswer,
+            correctAnswer: getChoiceText(
+              question.choices,
+              question.correctAnswer
+            ),
+            isCorrect: userAnswerIndex === question.correctAnswer,
+          };
+        }),
+      };
+
+      return detailedResult;
+    } catch (error: any) {
+      console.error("Error fetching detailed quiz result in service:", error);
+      if (error instanceof AppError) throw error;
+      if (error.name === "CastError") {
+        throw new AppError("Invalid Result ID format.", 400);
+      }
+      throw new AppError("Failed to fetch detailed quiz result.", 500);
     }
   }
 

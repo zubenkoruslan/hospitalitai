@@ -86,12 +86,14 @@ const quizResultSchema = new Schema<IQuizResult>(
     },
     completedAt: {
       type: Date,
+      index: true,
     },
     status: {
       type: String,
       enum: ["pending", "in-progress", "completed"],
       default: "pending",
       required: true,
+      index: true,
     },
     retakeCount: {
       type: Number,
@@ -107,6 +109,9 @@ const quizResultSchema = new Schema<IQuizResult>(
 
 // Optional: Compound index for faster querying of results by user and quiz
 quizResultSchema.index({ userId: 1, quizId: 1 });
+
+// Compound index for restaurant-level aggregation/filtering by user
+quizResultSchema.index({ restaurantId: 1, userId: 1 });
 
 // Ensure only one result entry per user per quiz attempt (conceptually)
 // Mongoose unique index on {userId, quizId} might be too strict if re-takes are allowed.

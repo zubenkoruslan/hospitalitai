@@ -31,9 +31,10 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       type: String,
       required: [true, "Question text is required"],
       trim: true,
+      maxlength: [500, "Question text cannot exceed 500 characters"],
     },
     choices: {
-      type: [String],
+      type: [{ type: String, trim: true }],
       required: [true, "Question must have choices"],
       validate: [
         (val: string[]) => val.length === 4,
@@ -62,6 +63,7 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       type: String,
       required: [true, "Quiz title is required"],
       trim: true,
+      maxlength: [150, "Quiz title cannot exceed 150 characters"],
     },
     description: {
       type: String,
@@ -93,12 +95,19 @@ const QuizSchema: Schema<IQuiz> = new Schema(
     isAssigned: {
       type: Boolean,
       required: [true, "isAssigned field is required"],
+      index: true, // Added index for filtering by assigned status
     },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt fields
   }
 );
+
+// Add compound index for fetching quizzes by restaurant
+QuizSchema.index({ restaurantId: 1, _id: 1 });
+
+// Add multikey index for searching quizzes by menu item IDs
+QuizSchema.index({ menuItemIds: 1 });
 
 // Create and export the Quiz model
 const Quiz: Model<IQuiz> = mongoose.model<IQuiz>("Quiz", QuizSchema);

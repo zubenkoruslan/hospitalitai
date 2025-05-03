@@ -10,6 +10,7 @@ import {
 } from "../middleware/validationMiddleware";
 import mongoose from "mongoose";
 import { AppError } from "../utils/errorHandler";
+import MenuService from "../services/menuService";
 
 const router: Router = express.Router();
 
@@ -34,24 +35,10 @@ router.post(
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const existingMenu = await Menu.findOne({
-        name: name.trim(),
-        restaurantId: restaurantId,
-      });
-
-      if (existingMenu) {
-        return next(new AppError("A menu with this name already exists", 400));
-      }
-
-      const newMenuData: Partial<IMenu> = {
-        name: name.trim(),
-        restaurantId: restaurantId,
-      };
-      if (description) newMenuData.description = description.trim();
-
-      const menu = new Menu(newMenuData);
-      const savedMenu = await menu.save();
-
+      const savedMenu = await MenuService.createMenu(
+        { name, description },
+        restaurantId
+      );
       res.status(201).json({ menu: savedMenu });
     } catch (error) {
       next(error);
@@ -70,8 +57,8 @@ router.get(
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const menus = await Menu.find({ restaurantId }).lean();
-      res.json({ menus: menus });
+      const menus = await MenuService.getAllMenus(restaurantId);
+      res.json({ menus });
     } catch (error) {
       console.error("Error fetching menus:", error);
       next(error);
@@ -93,12 +80,8 @@ router.get(
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const menu = await Menu.findOne({ _id: menuId, restaurantId }).lean();
-
-      if (!menu) {
-        return next(new AppError("Menu not found or access denied", 404));
-      }
-      res.json({ menu: menu });
+      const menu = await MenuService.getMenuById(menuId, restaurantId);
+      res.json({ menu });
     } catch (error) {
       console.error("Error fetching single menu:", error);
       next(error);
@@ -122,36 +105,14 @@ router.put(
     const { name, description } = req.body;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
-    const updateData: { [key: string]: any } = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined) updateData.description = description.trim();
+    const updateData = { name, description };
 
     try {
-      if (updateData.name) {
-        const existingMenu = await Menu.findOne({
-          _id: { $ne: menuId },
-          name: updateData.name,
-          restaurantId: restaurantId,
-        });
-        if (existingMenu) {
-          return next(
-            new AppError(
-              `A menu with the name '${updateData.name}' already exists`,
-              400
-            )
-          );
-        }
-      }
-
-      const updatedMenu = await Menu.findOneAndUpdate(
-        { _id: menuId, restaurantId: restaurantId },
-        { $set: updateData },
-        { new: true, runValidators: true }
+      const updatedMenu = await MenuService.updateMenu(
+        menuId,
+        updateData,
+        restaurantId
       );
-
-      if (!updatedMenu) {
-        return next(new AppError("Menu not found or access denied", 404));
-      }
       res.json({ menu: updatedMenu });
     } catch (error) {
       next(error);
@@ -174,14 +135,7 @@ router.delete(
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
     try {
-      const result = await Menu.deleteOne({
-        _id: menuId,
-        restaurantId: restaurantId,
-      });
-
-      if (result.deletedCount === 0) {
-        return next(new AppError("Menu not found or access denied", 404));
-      }
+      await MenuService.deleteMenu(menuId, restaurantId);
       res.status(200).json({ message: "Menu deleted successfully" });
     } catch (error) {
       console.error("Error deleting menu:", error);

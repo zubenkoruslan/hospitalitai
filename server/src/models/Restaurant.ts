@@ -14,6 +14,8 @@ const restaurantSchema = new Schema<IRestaurant>(
       type: String,
       required: [true, "Restaurant name is required"],
       trim: true,
+      index: true, // Added index for potential lookups by name
+      maxlength: [100, "Restaurant name cannot exceed 100 characters"], // Added maxlength
     },
     owner: {
       type: Schema.Types.ObjectId,
