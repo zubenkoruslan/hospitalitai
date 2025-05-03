@@ -209,13 +209,6 @@ const StaffManagement: React.FC = () => {
                             {formatDate(staff.createdAt)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <Link
-                              to={`/staff/${staff._id}`}
-                              className="text-indigo-600 hover:text-indigo-900"
-                              aria-label={`View details for ${staff.name}`}
-                            >
-                              Details
-                            </Link>
                             <button
                               onClick={() =>
                                 handleDeleteStaff(staff._id, staff.name)

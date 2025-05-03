@@ -46,7 +46,7 @@ const limiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   message: "Too many requests from this IP, please try again after 15 minutes", // Custom message
 });
-app.use(limiter); // Apply the rate limiting middleware to all requests
+// app.use(limiter); // Temporarily disabled rate limiting
 
 // Body Parsing
 app.use(express.json()); // For parsing application/json

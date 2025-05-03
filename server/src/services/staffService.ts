@@ -14,7 +14,7 @@ interface StaffMemberWithAverage {
   professionalRole?: string;
   averageScore: number | null;
   quizzesTaken: number;
-  resultsSummary?: any[]; // Optional: Include if needed by frontend
+  resultsSummary: any[]; // Make resultsSummary required
 }
 
 interface IncorrectQuestionDetail {
@@ -86,25 +86,36 @@ class StaffService {
         "_id name email createdAt professionalRole"
       ).lean<IUser[]>();
 
-      // 2. Calculate average score for each staff member
+      // 2. Calculate average score and fetch summary for each staff member
       const staffWithData = await Promise.all(
         staffList.map(async (staff) => {
+          const staffObjectId = staff._id as Types.ObjectId;
+
           // Call the QuizResultService to calculate the average score
           const { averageScore, quizzesTaken } =
             await QuizResultService.calculateAverageScoreForUser(
-              staff._id as Types.ObjectId,
+              staffObjectId,
               restaurantId
             );
 
+          // Fetch the results summary
+          const resultsSummary = await QuizResult.find(
+            { userId: staffObjectId, restaurantId: restaurantId },
+            "_id quizId quizTitle score totalQuestions completedAt status retakeCount" // Select fields matching ResultSummary
+          )
+            .sort({ completedAt: -1 }) // Optional: sort if needed
+            .lean();
+
           // Construct the return object explicitly matching the interface
           return {
-            _id: staff._id as Types.ObjectId,
+            _id: staffObjectId,
             name: staff.name,
             email: staff.email,
             createdAt: staff.createdAt,
             professionalRole: staff.professionalRole,
             averageScore: averageScore,
             quizzesTaken: quizzesTaken,
+            resultsSummary: resultsSummary, // Include the summary
           } as StaffMemberWithAverage;
         })
       );

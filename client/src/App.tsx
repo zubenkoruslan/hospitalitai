@@ -1,13 +1,12 @@
 import React from "react";
 // import "./App.css"; // <-- Re-enable this import
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { NotificationProvider } from "./context/NotificationContext";
+// import { NotificationProvider } from "./context/NotificationContext"; // Removed
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
-  useNavigate,
 } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ValidationProvider } from "./context/ValidationContext";
@@ -26,7 +25,7 @@ import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
 import MyResultsPage from "./pages/MyResultsPage";
-import NotificationsPage from "./pages/NotificationsPage";
+// import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
 // Component to handle root path redirection based on auth state
 const RootRedirect: React.FC = () => {
@@ -57,13 +56,15 @@ function App() {
     <Router>
       <AuthProvider>
         <ValidationProvider>
-          <NotificationProvider>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/signup" element={<SignupForm />} />
+          {/* <NotificationProvider> */}
+          {/* Removed */}
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/signup" element={<SignupForm />} />
 
-              {/* Shared Protected Routes */}
+            {/* Shared Protected Routes (Removed Notifications) */}
+            {/*
               <Route
                 path="/notifications"
                 element={
@@ -72,106 +73,108 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              */}
 
-              {/* Restaurant Protected Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <RestaurantDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/menu"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <MenusPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/menu/:menuId/items"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <MenuItemsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/quiz-management"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <QuizCreation />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff-results"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <RestaurantStaffResultsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <StaffManagement />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff/:id"
-                element={
-                  <ProtectedRoute requiredRole="restaurant">
-                    <StaffDetails />
-                  </ProtectedRoute>
-                }
-              />
+            {/* Restaurant Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <RestaurantDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/menu"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <MenusPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/menu/:menuId/items"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <MenuItemsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/quiz-management"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <QuizCreation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff-results"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <RestaurantStaffResultsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <StaffManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/:id"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <StaffDetails />
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Staff Protected Routes */}
-              <Route
-                path="/staff/dashboard"
-                element={
-                  <ProtectedRoute requiredRole="staff">
-                    <StaffDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff/quizzes"
-                element={
-                  <ProtectedRoute requiredRole="staff">
-                    <StaffQuizListPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff/quiz/:quizId/take"
-                element={
-                  <ProtectedRoute requiredRole="staff">
-                    <QuizTakingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/staff/my-results"
-                element={
-                  <ProtectedRoute requiredRole="staff">
-                    <MyResultsPage />
-                  </ProtectedRoute>
-                }
-              />
+            {/* Staff Protected Routes */}
+            <Route
+              path="/staff/dashboard"
+              element={
+                <ProtectedRoute requiredRole="staff">
+                  <StaffDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/quizzes"
+              element={
+                <ProtectedRoute requiredRole="staff">
+                  <StaffQuizListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/quiz/:quizId/take"
+              element={
+                <ProtectedRoute requiredRole="staff">
+                  <QuizTakingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/my-results"
+              element={
+                <ProtectedRoute requiredRole="staff">
+                  <MyResultsPage />
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Root path handled by RootRedirect component */}
-              <Route path="/" element={<RootRedirect />} />
+            {/* Root path handled by RootRedirect component */}
+            <Route path="/" element={<RootRedirect />} />
 
-              {/* Catch-all for 404 Not Found */}
-              <Route path="*" element={<div>404 Not Found</div>} />
-            </Routes>
-          </NotificationProvider>
+            {/* Catch-all for 404 Not Found */}
+            <Route path="*" element={<div>404 Not Found</div>} />
+          </Routes>
+          {/* </NotificationProvider> */}
+          {/* Removed */}
         </ValidationProvider>
       </AuthProvider>
     </Router>

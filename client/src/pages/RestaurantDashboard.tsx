@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
+import { useStaffSummary } from "../hooks/useStaffSummary";
+import { useQuizCount } from "../hooks/useQuizCount";
+import { useMenus } from "../hooks/useMenus";
 
-// Updated Interfaces to match the data structure needed
+// Updated Interfaces to match API response from GET /api/staff
 interface ResultSummary {
+  // Assuming this remains the same if still needed
   _id: string;
   quizId: string;
   quizTitle: string;
@@ -16,18 +20,15 @@ interface ResultSummary {
   retakeCount: number;
 }
 
-interface StaffMemberWithResults {
+interface StaffMemberWithData {
   _id: string;
   name: string;
   email: string;
   createdAt: string;
   professionalRole?: string;
-  results: ResultSummary[];
-}
-
-// Interface for minimal Menu data needed for count
-interface MenuSummary {
-  _id: string;
+  resultsSummary: ResultSummary[]; // Keep summary if needed
+  averageScore: number | null; // Add the average score from backend
+  quizzesTaken: number; // Add the count from backend
 }
 
 // Simple Loading Spinner Placeholder
@@ -76,77 +77,54 @@ const isCompletedQuiz = (result: ResultSummary): boolean => {
 const RestaurantDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  const [staffQuizData, setStaffQuizData] = useState<StaffMemberWithResults[]>(
-    []
-  );
-  const [totalQuizzes, setTotalQuizzes] = useState<number>(0);
-  const [menuCount, setMenuCount] = useState<number | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState<boolean>(true);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // Use custom hooks for data fetching
+  const {
+    staffData,
+    loading: staffLoading,
+    error: staffError,
+  } = useStaffSummary();
+  const {
+    quizCount: totalQuizzes,
+    loading: quizCountLoading,
+    error: quizCountError,
+  } = useQuizCount();
+  const { menus, loading: menuLoading, error: menuError } = useMenus();
+
+  // Keep other state
   const [copied, setCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Calculate the average performance percentage across all staff
-  const calculateAveragePerformance = (
-    staffData: StaffMemberWithResults[]
-  ): string => {
-    let totalScore = 0;
-    let totalPossibleScore = 0;
+  // Memoize calculations based on staffData from the hook
+  const overallAveragePerformance = useMemo(() => {
+    const staffWithScores = staffData.filter(
+      (staff) => staff.averageScore !== null
+    );
+    if (staffWithScores.length === 0) return "0";
 
-    staffData.forEach((staff) => {
-      const completedQuizzes = staff.results.filter(isCompletedQuiz);
+    const sumOfAverages = staffWithScores.reduce(
+      (sum, staff) => sum + (staff.averageScore as number), // Assert non-null
+      0
+    );
+    const overallAverage = sumOfAverages / staffWithScores.length;
+    return overallAverage.toFixed(1); // Display raw average score
+  }, [staffData]);
 
-      completedQuizzes.forEach((quiz) => {
-        totalScore += quiz.score;
-        totalPossibleScore += quiz.totalQuestions;
-      });
-    });
+  const filteredStaffData = useMemo(
+    () =>
+      searchTerm.length >= 3
+        ? staffData.filter((staff) =>
+            staff.name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        : staffData,
+    [staffData, searchTerm]
+  );
 
-    if (totalPossibleScore === 0) return "0";
-
-    const averagePercentage = (totalScore / totalPossibleScore) * 100;
-    return averagePercentage.toFixed(0);
-  };
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (user && user.role === "restaurant") {
-        setSummaryLoading(true);
-        setSummaryError(null);
-        try {
-          const [resultsResponse, menusResponse] = await Promise.all([
-            api.get<{
-              staff: StaffMemberWithResults[];
-              totalAvailableQuizzes: number;
-            }>("/results/restaurant-view"),
-            api.get<{ menus: MenuSummary[] }>("/menus"),
-          ]);
-
-          setStaffQuizData(resultsResponse.data.staff || []);
-          setTotalQuizzes(resultsResponse.data.totalAvailableQuizzes || 0);
-          setMenuCount(menusResponse.data.menus?.length ?? 0);
-        } catch (err: any) {
-          console.error("Dashboard fetch error:", err);
-          setSummaryError(
-            err.response?.data?.message || "Failed to load dashboard data."
-          );
-          setStaffQuizData([]);
-          setTotalQuizzes(0);
-          setMenuCount(null);
-        } finally {
-          setSummaryLoading(false);
-        }
-      } else if (!authIsLoading) {
-        setSummaryLoading(false);
-      }
-    };
-    fetchDashboardData();
-  }, [user, authIsLoading]);
-
-  const handleCopyId = () => {
-    if (user?.userId) {
+  // useCallback for copy handler
+  const handleCopyId = useCallback(() => {
+    if (user?.restaurantId) {
       navigator.clipboard
-        .writeText(user.userId)
+        .writeText(user.restaurantId)
         .then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -155,21 +133,28 @@ const RestaurantDashboard: React.FC = () => {
           console.error("Failed to copy ID: ", err);
         });
     }
-  };
+  }, [user?.restaurantId]); // Dependency: user.restaurantId
 
-  const filteredStaffData =
-    searchTerm.length >= 3
-      ? staffQuizData.filter((staff) =>
-          staff.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : staffQuizData;
+  // useCallback for search handler
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+    },
+    []
+  ); // No dependency needed
 
-  if (authIsLoading) return <LoadingSpinner />;
+  // Combine loading and error states for overall display
+  const isLoading =
+    authIsLoading || staffLoading || quizCountLoading || menuLoading;
+  const displayError = staffError || quizCountError || menuError;
 
-  if (!user || user.role !== "restaurant") {
+  if (isLoading) return <LoadingSpinner />;
+
+  // Handle access denied specifically if it came from the hook
+  if (!isLoading && staffError?.startsWith("Access denied")) {
     return (
       <div className="p-8 flex flex-col items-center">
-        <ErrorMessage message="Access Denied. Please log in as Restaurant Owner." />
+        <ErrorMessage message={staffError} />
         <button
           onClick={() => navigate("/login")}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -180,10 +165,21 @@ const RestaurantDashboard: React.FC = () => {
     );
   }
 
+  // Handle general errors
+  if (displayError) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Navbar />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <ErrorMessage message={displayError} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
-
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6 px-4 sm:px-0">
           <h1 className="text-2xl font-semibold text-gray-900">
@@ -195,111 +191,103 @@ const RestaurantDashboard: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Dashboard Summary
           </h2>
-          {summaryLoading && <LoadingSpinner />}
-          {summaryError && <ErrorMessage message={summaryError} />}
-          {!summaryLoading && !summaryError && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Total Staff
-                </h3>
-                <p className="text-3xl font-semibold text-blue-600">
-                  {staffQuizData.length}
-                </p>
-                <Link
-                  to="/staff"
-                  className="text-sm text-blue-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Staff
-                </Link>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700">Total Staff</h3>
+              <p className="text-3xl font-semibold text-blue-600">
+                {staffData.length}
+              </p>
+              <Link
+                to="/staff"
+                className="text-sm text-blue-500 hover:underline mt-2 inline-block"
+              >
+                Manage Staff
+              </Link>
+            </div>
 
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Menu Management
-                </h3>
-                <p className="text-3xl font-semibold text-green-600">
-                  {menuCount !== null ? menuCount : "-"}
-                </p>
-                <Link
-                  to="/menu"
-                  className="text-sm text-green-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Menus
-                </Link>
-              </div>
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700">
+                Menu Management
+              </h3>
+              <p className="text-3xl font-semibold text-green-600">
+                {menus.length}
+              </p>
+              <Link
+                to="/menu"
+                className="text-sm text-green-500 hover:underline mt-2 inline-block"
+              >
+                Manage Menus
+              </Link>
+            </div>
 
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Available Quizzes
-                </h3>
-                <p className="text-3xl font-semibold text-purple-600">
-                  {totalQuizzes}
-                </p>
-                <Link
-                  to="/quiz-management"
-                  className="text-sm text-purple-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Quizzes
-                </Link>
-              </div>
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700">
+                Available Quizzes
+              </h3>
+              <p className="text-3xl font-semibold text-purple-600">
+                {totalQuizzes}
+              </p>
+              <Link
+                to="/quiz-management"
+                className="text-sm text-purple-500 hover:underline mt-2 inline-block"
+              >
+                Manage Quizzes
+              </Link>
+            </div>
 
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Staff Performance
-                </h3>
-                <p className="text-3xl font-semibold text-amber-600">
-                  {staffQuizData.length > 0
-                    ? `${calculateAveragePerformance(staffQuizData)}%`
-                    : "N/A"}
-                </p>
-                <Link
-                  to="/staff-results"
-                  className="text-sm text-amber-500 hover:underline mt-2 inline-block"
-                >
-                  View Quiz Results
-                </Link>
-              </div>
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700">
+                Staff Performance (Avg. Score)
+              </h3>
+              <p className="text-3xl font-semibold text-amber-600">
+                {staffData.length > 0 ? `${overallAveragePerformance}%` : "N/A"}
+              </p>
+              <Link
+                to="/staff-results"
+                className="text-sm text-amber-500 hover:underline mt-2 inline-block"
+              >
+                View Quiz Results
+              </Link>
+            </div>
 
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200 flex flex-col justify-between xl:col-span-4">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">
-                    Quick Actions
-                  </h3>
-                  <div className="mb-3 text-sm text-gray-600">
-                    <span className="font-medium">Your Restaurant ID:</span>
-                    <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
-                        {user?.userId}
-                      </code>
-                      <button
-                        onClick={handleCopyId}
-                        className={`px-3 py-1 text-xs font-medium rounded transition-colors duration-150 ${
-                          copied
-                            ? "bg-green-100 text-green-700"
-                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                        }`}
-                        aria-label="Copy restaurant ID"
-                      >
-                        {copied ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Staff use this ID to register.
-                    </p>
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200 flex flex-col justify-between xl:col-span-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  Quick Actions
+                </h3>
+                <div className="mb-3 text-sm text-gray-600">
+                  <span className="font-medium">Your Restaurant ID:</span>
+                  <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
+                      {user?.restaurantId}
+                    </code>
+                    <button
+                      onClick={handleCopyId}
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors duration-150 ${
+                        copied
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      }`}
+                      aria-label="Copy restaurant ID"
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
                   </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Staff use this ID to register.
+                  </p>
                 </div>
-                <div className="mt-2 space-y-2">
-                  <Link
-                    to="/quiz-management/create"
-                    className="block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center text-sm"
-                  >
-                    Create New Quiz
-                  </Link>
-                </div>
+              </div>
+              <div className="mt-2 space-y-2">
+                <Link
+                  to="/quiz-management/create"
+                  className="block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center text-sm"
+                >
+                  Create New Quiz
+                </Link>
               </div>
             </div>
-          )}
+          </div>
 
           <div className="bg-white p-4 rounded-lg shadow border border-gray-200 overflow-x-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
@@ -309,7 +297,7 @@ const RestaurantDashboard: React.FC = () => {
                   type="text"
                   placeholder="Search staff by name..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                   className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   aria-label="Search staff"
                 />
@@ -331,11 +319,7 @@ const RestaurantDashboard: React.FC = () => {
               </div>
             </div>
 
-            {summaryLoading && !filteredStaffData.length ? (
-              <LoadingSpinner />
-            ) : summaryError && !filteredStaffData.length ? (
-              <ErrorMessage message={summaryError} />
-            ) : !summaryLoading && filteredStaffData.length === 0 ? (
+            {filteredStaffData.length === 0 ? (
               <p className="text-gray-500 text-center py-4">
                 {searchTerm.length >= 3
                   ? `No staff found matching "${searchTerm}".`
@@ -352,29 +336,15 @@ const RestaurantDashboard: React.FC = () => {
                       Role
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quizzes Completed
+                      Quizzes Taken
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Average Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStaffData.map((staff) => {
-                    const completedQuizzes =
-                      staff.results.filter(isCompletedQuiz);
-                    const totalScore = completedQuizzes.reduce(
-                      (sum, r) => sum + (r.score / r.totalQuestions) * 100,
-                      0
-                    );
-                    const averageScore =
-                      completedQuizzes.length > 0
-                        ? (totalScore / completedQuizzes.length).toFixed(1)
-                        : "N/A";
-
                     return (
                       <tr key={staff._id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -390,18 +360,12 @@ const RestaurantDashboard: React.FC = () => {
                           {staff.professionalRole || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {completedQuizzes.length} / {totalQuizzes}
+                          {staff.quizzesTaken ?? 0} / {totalQuizzes}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {averageScore === "N/A" ? "N/A" : `${averageScore}%`}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <Link
-                            to="/staff-results"
-                            className="text-indigo-600 hover:text-indigo-900 font-medium"
-                          >
-                            View Results
-                          </Link>
+                          {staff.averageScore !== null
+                            ? `${staff.averageScore.toFixed(1)}%`
+                            : "N/A"}
                         </td>
                       </tr>
                     );

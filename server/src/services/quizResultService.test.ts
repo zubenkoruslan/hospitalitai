@@ -224,31 +224,48 @@ describe("QuizResultService", () => {
   // --- Test Suite for getMyResults ---
   describe("getMyResults", () => {
     const mockUserIdString = new Types.ObjectId().toString();
+    const mockUserId = new Types.ObjectId(mockUserIdString);
+    const mockResults = [
+      {
+        _id: new Types.ObjectId(),
+        quizId: { _id: new Types.ObjectId(), title: "Quiz 2" },
+        userId: mockUserId,
+        score: 15,
+        totalQuestions: 20,
+        completedAt: new Date("2023-01-15T10:00:00Z"),
+        status: "completed",
+        retakeCount: 0,
+      },
+      {
+        _id: new Types.ObjectId(),
+        quizId: { _id: new Types.ObjectId(), title: "Quiz 1" },
+        userId: mockUserId,
+        score: 8,
+        totalQuestions: 10,
+        completedAt: new Date("2023-01-10T10:00:00Z"),
+        status: "completed",
+        retakeCount: 1,
+      },
+    ];
 
     it("should return sorted and populated results for a valid user", async () => {
       // Arrange
-      const mockQuizId1String = new Types.ObjectId().toString();
-      const mockQuizId2String = new Types.ObjectId().toString();
-      const mockResultId1String = new Types.ObjectId().toString();
-      const mockResultId2String = new Types.ObjectId().toString();
-
-      // This is the data the RAW DB query mock should return
+      // Define mock raw data that lean() would return
       const rawMockDbData = [
         {
-          _id: mockResultId1String,
-          // Simulate populate returning the nested object initially
-          quizId: { _id: mockQuizId1String, title: "Quiz 1" },
-          userId: mockUserIdString,
+          _id: new Types.ObjectId(),
+          quizId: { _id: new Types.ObjectId(), title: "Quiz 1" }, // Populated object
+          userId: mockUserId,
           score: 8,
           totalQuestions: 10,
           completedAt: new Date("2023-01-15T10:00:00Z"),
           status: "completed",
-          retakeCount: 1, // Example value from DB
+          retakeCount: 1,
         },
         {
-          _id: mockResultId2String,
-          quizId: { _id: mockQuizId2String, title: "Quiz 2" },
-          userId: mockUserIdString,
+          _id: new Types.ObjectId(),
+          quizId: { _id: new Types.ObjectId(), title: "Quiz 2" }, // Populated object
+          userId: mockUserId,
           score: 5,
           totalQuestions: 5,
           completedAt: new Date("2023-01-10T12:00:00Z"),
@@ -257,102 +274,96 @@ describe("QuizResultService", () => {
         },
       ];
 
-      // This is the data STRUCTURE the SERVICE should return after transformation
-      const expectedServiceResultData = [
-        {
-          _id: mockResultId1String,
-          quizId: mockQuizId1String, // Flattened ID
-          quizTitle: "Quiz 1", // Added title
-          score: 8,
-          totalQuestions: 10,
-          completedAt: new Date("2023-01-15T10:00:00Z"),
-          status: "Completed", // Adjusted casing
-          retakeCount: 1, // Included count
-        },
-        {
-          _id: mockResultId2String,
-          quizId: mockQuizId2String,
-          quizTitle: "Quiz 2",
-          score: 5,
-          totalQuestions: 5,
-          completedAt: new Date("2023-01-10T12:00:00Z"),
-          status: "Completed",
-          retakeCount: 0,
-        },
-      ];
+      // Define the expected output format after the service maps the data
+      const expectedFormattedResults = rawMockDbData.map((raw) => ({
+        _id: raw._id,
+        quizId: raw.quizId._id, // Extract the ID
+        quizTitle: raw.quizId.title, // Extract the title
+        score: raw.score,
+        totalQuestions: raw.totalQuestions,
+        completedAt: raw.completedAt,
+        status: raw.status.charAt(0).toUpperCase() + raw.status.slice(1), // Match formatting
+        retakeCount: raw.retakeCount,
+      }));
 
-      const mockQuery = {
-        populate: vi.fn().mockReturnThis(),
-        sort: vi.fn().mockReturnThis(),
-        // Mock the query resolution to return the RAW data
-        then: vi.fn((resolve) => resolve(rawMockDbData)),
-        catch: vi.fn(),
-      };
-      vi.mocked(QuizResult.find).mockReturnValue(mockQuery as any);
+      // Correct mock setup for the chain
+      const leanMock = vi.fn().mockResolvedValue(rawMockDbData);
+      const populateMock = vi.fn().mockReturnThis();
+      const sortMock = vi.fn().mockReturnThis();
+      const findMock = vi.fn().mockReturnValue({
+        sort: sortMock,
+        populate: populateMock,
+        lean: leanMock,
+      });
+      QuizResult.find = findMock; // Assign the start of the chain
 
       // Act
-      const results = await QuizResultService.getMyResults(
-        new Types.ObjectId(mockUserIdString) // Convert to ObjectId
-      );
+      const results = await QuizResultService.getMyResults(mockUserId);
 
       // Assert
-      expect(QuizResult.find).toHaveBeenCalledWith({
-        userId: mockUserIdString,
-      } as any);
-      expect(mockQuery.populate).toHaveBeenCalledWith({
+      expect(QuizResult.find).toHaveBeenCalledWith({ userId: mockUserId });
+      expect(sortMock).toHaveBeenCalledWith({ completedAt: -1 });
+      // Use the object syntax for populate assertion
+      expect(populateMock).toHaveBeenCalledWith({
         path: "quizId",
         select: "title",
       });
-      expect(mockQuery.sort).toHaveBeenCalledWith({ completedAt: -1 });
-      // Assert that the service returns the TRANSFORMED data structure
-      expect(results).toEqual(expectedServiceResultData);
-      expect(results.length).toBe(2);
-      // Check a property from the transformed data
-      expect(results[0].quizTitle).toBe("Quiz 1");
+      expect(leanMock).toHaveBeenCalled();
+      // Assert against the formatted data expected from the service
+      expect(results).toEqual(expectedFormattedResults);
     });
 
     it("should return an empty array if user has no results", async () => {
       // Arrange
-      const mockQuery = {
-        populate: vi.fn().mockReturnThis(),
-        sort: vi.fn().mockReturnThis(),
-        then: vi.fn((resolve) => resolve([])),
-        catch: vi.fn(),
-      };
-      vi.mocked(QuizResult.find).mockReturnValue(mockQuery as any);
+      const leanMock = vi.fn().mockResolvedValue([]);
+      const populateMock = vi.fn().mockReturnThis();
+      const sortMock = vi.fn().mockReturnThis();
+      const findMock = vi.fn().mockReturnValue({
+        sort: sortMock,
+        populate: populateMock,
+        lean: leanMock,
+      });
+      QuizResult.find = findMock;
 
       // Act
-      const results = await QuizResultService.getMyResults(
-        new Types.ObjectId(mockUserIdString) // Convert to ObjectId
-      );
+      const results = await QuizResultService.getMyResults(mockUserId);
 
       // Assert
-      expect(QuizResult.find).toHaveBeenCalledWith({
-        userId: mockUserIdString, // Expect string ID
-      } as any);
-      expect(mockQuery.populate).toHaveBeenCalled();
-      expect(mockQuery.sort).toHaveBeenCalled();
+      expect(QuizResult.find).toHaveBeenCalledWith({ userId: mockUserId });
+      expect(sortMock).toHaveBeenCalledWith({ completedAt: -1 });
+      // Use the object syntax for populate assertion
+      expect(populateMock).toHaveBeenCalledWith({
+        path: "quizId",
+        select: "title",
+      });
+      expect(leanMock).toHaveBeenCalled();
       expect(results).toEqual([]);
     });
 
     it("should throw AppError if database query fails", async () => {
       // Arrange
       const dbError = new Error("Database connection lost");
-      const mockQuery = {
-        populate: vi.fn().mockReturnThis(),
-        sort: vi.fn().mockReturnThis(),
-        then: vi.fn((resolve, reject) => reject(dbError)),
-        catch: vi.fn((callback) => callback(dbError)),
-      };
-      vi.mocked(QuizResult.find).mockReturnValue(mockQuery as any);
+      const leanMock = vi.fn().mockRejectedValue(dbError);
+      const populateMock = vi.fn().mockReturnThis();
+      const sortMock = vi.fn().mockReturnThis();
+      const findMock = vi.fn().mockReturnValue({
+        sort: sortMock,
+        populate: populateMock,
+        lean: leanMock,
+      });
+      QuizResult.find = findMock;
 
       // Act & Assert
-      await expect(
-        QuizResultService.getMyResults(new Types.ObjectId(mockUserIdString)) // Convert to ObjectId
-      ).rejects.toThrow(new AppError("Failed to fetch quiz results.", 500));
-      expect(QuizResult.find).toHaveBeenCalledWith({
-        userId: mockUserIdString,
-      } as any);
+      await expect(QuizResultService.getMyResults(mockUserId)).rejects.toThrow(
+        new AppError("Failed to fetch quiz results.", 500)
+      );
+      expect(QuizResult.find).toHaveBeenCalledWith({ userId: mockUserId });
+      expect(sortMock).toHaveBeenCalledWith({ completedAt: -1 });
+      expect(populateMock).toHaveBeenCalledWith({
+        path: "quizId",
+        select: "title",
+      });
+      // expect(leanMock).toHaveBeenCalled(); // Lean might not be called if promise rejects earlier
     });
   });
 

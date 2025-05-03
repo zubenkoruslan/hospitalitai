@@ -286,7 +286,8 @@ class QuizResultService {
           path: "quizId",
           select: "title",
         })
-        .sort({ completedAt: -1 }); // Sort by most recent first
+        .sort({ completedAt: -1 })
+        .lean(); // Add .lean() to get plain JS objects
 
       // Map results and filter out those with deleted quizzes
       const formattedResults = results

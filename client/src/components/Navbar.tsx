@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import NotificationIcon from "./common/NotificationIcon";
 
 const Navbar: React.FC = () => {
   const { user, token, logout } = useAuth();
@@ -106,9 +105,6 @@ const Navbar: React.FC = () => {
 
           {/* Right side: Profile, notifications, etc. */}
           <div className="flex-none flex items-center space-x-4">
-            {/* Notification icon - visible when authenticated */}
-            {token && <NotificationIcon />}
-
             {/* User profile/menu */}
             <div className="relative">
               <button
