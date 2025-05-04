@@ -19,6 +19,7 @@ interface SignupData {
 interface LoginResponse {
   user: Omit<IUser, "password">;
   restaurantName?: string;
+  professionalRole?: string;
 }
 
 class AuthService {
@@ -163,7 +164,7 @@ class AuthService {
    *
    * @param email - The user's email address.
    * @param passwordInput - The plain text password provided by the user.
-   * @returns A promise resolving to an object containing the authenticated user's details (excluding password) and their restaurant's name (if applicable).
+   * @returns A promise resolving to an object containing the authenticated user's details (excluding password), their restaurant's name (if applicable), and their professional role (if applicable).
    * @throws {AppError} If authentication fails (invalid email/password) (401), or if an unexpected database error occurs (500).
    */
   static async loginUser(
@@ -171,7 +172,7 @@ class AuthService {
     passwordInput: string
   ): Promise<LoginResponse> {
     try {
-      // Find user by email
+      // Find user by email, ensure professionalRole is selected
       const user = await User.findOne({ email }).select(
         "+password name role restaurantId email createdAt updatedAt professionalRole"
       );
@@ -201,9 +202,11 @@ class AuthService {
 
       const { password, ...userObject } = user.toObject();
 
+      // Return all necessary fields
       return {
         user: userObject as unknown as Omit<IUser, "password">,
         restaurantName,
+        professionalRole: user.professionalRole,
       };
     } catch (error: any) {
       console.error("Error during login:", error);

@@ -41,54 +41,85 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     isVegetarian: false,
     isVegan: false,
   };
+
+  // Restore useState for form data
   const [formData, setFormData] = useState<MenuItemFormData>(initialFormData);
   const [formError, setFormError] = useState<string | null>(null);
 
   const isEditMode = currentItem !== null;
+  // Use formData for available categories
   const availableCategories =
     formData.itemType === "food" ? FOOD_CATEGORIES : BEVERAGE_CATEGORIES;
 
-  // Populate form when currentItem changes (for editing)
+  // Restore useEffect using useState
   useEffect(() => {
-    if (isEditMode && currentItem) {
-      // Add validation/reset for category if needed (copied from MenuItemsPage)
-      let categoryToSet: ItemCategory | "" = currentItem.category;
-      if (
-        currentItem.itemType === "food" &&
-        !(FOOD_CATEGORIES as ReadonlyArray<string>).includes(
-          currentItem.category
-        )
-      ) {
-        categoryToSet = "";
-      } else if (
-        currentItem.itemType === "beverage" &&
-        !(BEVERAGE_CATEGORIES as ReadonlyArray<string>).includes(
-          currentItem.category
-        )
-      ) {
-        categoryToSet = "";
+    // Added isOpen check to prevent updates when closed
+    console.log(
+      "[Modal useEffect] Running. isEditMode:",
+      isEditMode,
+      "currentItem:",
+      !!currentItem,
+      "isOpen:",
+      isOpen
+    );
+    if (isOpen) {
+      // Only run logic when modal is open
+      if (isEditMode && currentItem) {
+        try {
+          console.log("[Modal useEffect] Populating form for edit.");
+          // Validate category based on item type
+          let categoryToSet: ItemCategory | "" = currentItem.category;
+          const currentTypeCategories =
+            currentItem.itemType === "food"
+              ? FOOD_CATEGORIES
+              : BEVERAGE_CATEGORIES;
+          if (
+            !(currentTypeCategories as ReadonlyArray<string>).includes(
+              currentItem.category
+            )
+          ) {
+            console.warn(
+              `[Modal useEffect] Category '${currentItem.category}' invalid for type '${currentItem.itemType}'. Resetting.`
+            );
+            categoryToSet = "";
+          }
+
+          // Map MenuItem to MenuItemFormData, handle potential missing fields
+          const newData: MenuItemFormData = {
+            name: currentItem.name,
+            description: currentItem.description || "",
+            price: currentItem.price != null ? String(currentItem.price) : "", // Convert price to string
+            ingredients: (currentItem.ingredients || []).join(", "), // Join array to string
+            itemType: currentItem.itemType,
+            category: categoryToSet,
+            // Assuming dietary flags are directly on MenuItem based on previous context
+            // If they were nested under dietaryInfo, this needs adjustment
+            isGlutenFree: currentItem.isGlutenFree ?? false,
+            isDairyFree: currentItem.isDairyFree ?? false,
+            isVegetarian: currentItem.isVegetarian ?? false,
+            isVegan: currentItem.isVegan ?? false,
+          };
+          console.log("[Modal useEffect] Setting form data:", newData);
+          setFormData(newData);
+          setFormError(null); // Clear error when repopulating
+          console.log("[Modal useEffect] Form data set for edit.");
+        } catch (error) {
+          console.error(
+            "[Modal useEffect] Error during edit mode population:",
+            error
+          );
+          setFormError("Failed to load item data for editing.");
+        }
+      } else if (!isEditMode) {
+        console.log("[Modal useEffect] Resetting form for add mode.");
+        setFormData(initialFormData); // Reset form for Add mode
+        setFormError(null); // Clear error when resetting
       }
-
-      setFormData({
-        name: currentItem.name,
-        description: currentItem.description || "",
-        price: currentItem.price?.toString() || "",
-        ingredients: (currentItem.ingredients || []).join(", "),
-        itemType: currentItem.itemType,
-        category: categoryToSet,
-        isGlutenFree: currentItem.isGlutenFree ?? false,
-        isDairyFree: currentItem.isDairyFree ?? false,
-        isVegetarian: currentItem.isVegetarian ?? false,
-        isVegan: currentItem.isVegan ?? false,
-      });
-      setFormError(null);
-    } else if (!isEditMode) {
-      // Reset form for Add mode
-      setFormData(initialFormData);
-      setFormError(null);
     }
-  }, [currentItem, isEditMode, isOpen]); // Rerun effect when modal opens too
+    // Rerun when modal opens/closes, mode changes, or item changes
+  }, [currentItem, isEditMode, isOpen, initialFormData]); // Added initialFormData dependency
 
+  // Restore handleInputChange using useState
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -106,13 +137,16 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
       // Reset category if itemType changes
       if (name === "itemType" && prev.itemType !== newValue) {
-        updatedData.category = "";
+        console.log(
+          `[Modal InputChange] Item type changed from ${prev.itemType} to ${newValue}. Resetting category.`
+        );
+        updatedData.category = ""; // Reset category selection
       }
       // Auto-check vegetarian if vegan is checked
       if (name === "isVegan" && newValue === true) {
         updatedData.isVegetarian = true;
       }
-      // Uncheck vegan if vegetarian is unchecked
+      // Uncheck vegan if vegetarian is unchecked (and the change was to vegetarian)
       if (name === "isVegetarian" && newValue === false) {
         updatedData.isVegan = false;
       }
@@ -126,33 +160,61 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     }
   };
 
+  // Restore handleSubmit using useState
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("[Modal] handleSubmit triggered with formData:", formData);
     setFormError(null); // Clear previous errors
 
     // Basic Validation
+    console.log("[Modal] Running validation. Name:", formData.name);
     if (!formData.name.trim()) {
+      console.log("[Modal] Validation failed: Name required");
       setFormError("Item name is required.");
       return;
     }
+    console.log("[Modal] Running validation. Type:", formData.itemType);
     if (!formData.itemType) {
+      console.log("[Modal] Validation failed: Type required");
       setFormError("Item type is required.");
       return;
     }
+    console.log("[Modal] Running validation. Category:", formData.category);
     if (!formData.category) {
+      console.log("[Modal] Validation failed: Category required");
       setFormError("Category is required.");
       return;
     }
-    if (formData.price && isNaN(parseFloat(formData.price))) {
-      setFormError("Price must be a valid number.");
+    console.log("[Modal] Running validation. Price:", formData.price);
+    // Price is optional, but if provided, must be valid non-negative number
+    if (
+      formData.price &&
+      (isNaN(parseFloat(formData.price)) || parseFloat(formData.price) < 0)
+    ) {
+      console.log("[Modal] Validation failed: Invalid Price", formData.price);
+      setFormError("Price must be a valid non-negative number.");
       return;
     }
 
-    onSubmit(formData, currentItem?._id || null);
+    // Prepare data for submission (e.g., convert price string back to number if needed)
+    // NOTE: The parent onSubmit expects MenuItemFormData, which currently has price as string.
+    // If the API expects a number, conversion should happen here or in the parent.
+    const dataToSubmit: MenuItemFormData = {
+      ...formData,
+      // Example conversion if API needed number:
+      // price: formData.price ? parseFloat(formData.price) : undefined,
+    };
+
+    console.log(
+      "[Modal] Validation passed. Calling onSubmit with:",
+      dataToSubmit
+    );
+    onSubmit(dataToSubmit, currentItem?._id || null);
   };
 
   if (!isOpen) return null;
 
+  // Restore input fields to use formData and handleInputChange
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -162,6 +224,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
         {formError && <ErrorMessage message={formError} />}
 
+        {/* Restore form onSubmit */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
@@ -175,8 +238,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               type="text"
               name="name"
               id="name"
-              value={formData.name}
-              onChange={handleInputChange}
+              value={formData.name} // Use value prop
+              onChange={handleInputChange} // Use onChange
               required
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
@@ -193,8 +256,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             <textarea
               name="description"
               id="description"
-              value={formData.description}
-              onChange={handleInputChange}
+              value={formData.description} // Use value prop
+              onChange={handleInputChange} // Use onChange
               rows={3}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             ></textarea>
@@ -209,12 +272,13 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               Price ($)
             </label>
             <input
-              type="number"
+              type="number" // Keep type number for browser validation/keyboard
               name="price"
               id="price"
-              value={formData.price}
-              onChange={handleInputChange}
+              value={formData.price} // Use value prop (string)
+              onChange={handleInputChange} // Use onChange
               step="0.01"
+              min="0" // Add min attribute for better validation
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="e.g., 12.99"
             />
@@ -232,8 +296,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               type="text"
               name="ingredients"
               id="ingredients"
-              value={formData.ingredients}
-              onChange={handleInputChange}
+              value={formData.ingredients} // Use value prop
+              onChange={handleInputChange} // Use onChange
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="e.g., Flour, Sugar, Eggs"
             />
@@ -252,8 +316,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               <select
                 name="itemType"
                 id="itemType"
-                value={formData.itemType}
-                onChange={handleInputChange}
+                value={formData.itemType} // Use value prop
+                onChange={handleInputChange} // Use onChange
                 required
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               >
@@ -274,80 +338,90 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               <select
                 name="category"
                 id="category"
-                value={formData.category}
-                onChange={handleInputChange}
+                value={formData.category} // Use value prop
+                onChange={handleInputChange} // Use onChange
                 required
-                disabled={!formData.itemType}
+                disabled={!formData.itemType} // Disable if no itemType selected
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
               >
                 <option value="" disabled>
-                  Select Category...
+                  {formData.itemType
+                    ? "Select Category..."
+                    : "Select Item Type First"}
                 </option>
-                {formData.itemType &&
-                  (availableCategories as ReadonlyArray<string>).map((cat) => (
-                    <option key={cat} value={cat} className="capitalize">
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
-                  ))}
+                {availableCategories.map((cat) => (
+                  <option key={cat} value={cat} className="capitalize">
+                    {cat}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Dietary Flags */}
+          {/* Dietary Information */}
           <fieldset>
             <legend className="block text-sm font-medium text-gray-700 mb-2">
               Dietary Information
             </legend>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {["isGlutenFree", "isDairyFree", "isVegetarian", "isVegan"].map(
-                (flag) => (
+              {(
+                [
+                  "isGlutenFree",
+                  "isDairyFree",
+                  "isVegetarian",
+                  "isVegan",
+                ] as const
+              ).map((flag) => {
+                const label = flag
+                  .substring(2)
+                  .replace(/([A-Z])/g, " $1")
+                  .trim(); // e.g., "Gluten Free"
+                // Disable 'Vegetarian' if 'Vegan' is checked
+                const isVegetarianDisabled =
+                  flag === "isVegetarian" && formData.isVegan;
+                return (
                   <div key={flag} className="relative flex items-start">
                     <div className="flex items-center h-5">
                       <input
                         id={flag}
                         name={flag}
                         type="checkbox"
-                        checked={
-                          formData[flag as keyof MenuItemFormData] as boolean
-                        }
-                        onChange={handleInputChange}
-                        disabled={flag === "isVegetarian" && formData.isVegan} // Disable Vegetarian if Vegan is checked
-                        className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50"
+                        checked={formData[flag]} // Use checked prop
+                        onChange={handleInputChange} // Use onChange
+                        disabled={isVegetarianDisabled}
+                        className={`focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50`}
                       />
                     </div>
                     <div className="ml-3 text-sm">
+                      {/* Apply disabled styling to label as well */}
                       <label
                         htmlFor={flag}
                         className={`font-medium text-gray-700 capitalize ${
-                          flag === "isVegetarian" && formData.isVegan
-                            ? "text-gray-400"
-                            : ""
+                          isVegetarianDisabled ? "text-gray-400" : ""
                         }`}
                       >
-                        {flag
-                          .replace("is", "")
-                          .replace(/([A-Z])/g, " $1")
-                          .trim()}
+                        {label}
                       </label>
                     </div>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           </fieldset>
 
-          {/* Actions */}
+          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
             <button
-              type="button"
+              type="button" // Ensure it doesn't submit form
               onClick={onClose}
+              disabled={isSubmitting}
               className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!formError} // Disable if submitting or if there's a validation error shown
               className="inline-flex justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {isSubmitting ? (

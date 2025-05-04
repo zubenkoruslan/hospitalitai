@@ -7,11 +7,8 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
 import { formatDate } from "../utils/helpers";
-import {
-  useStaffDetails,
-  StaffDetailsData,
-  QuizResultDetails,
-} from "../hooks/useStaffDetails";
+import { useStaffDetails } from "../hooks/useStaffDetails";
+import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
 
 // --- Main Component ---
 const StaffDetails: React.FC = () => {
@@ -147,47 +144,64 @@ const StaffDetails: React.FC = () => {
               </p>
             </div>
             <div className="mt-4 sm:mt-0 sm:ml-4">
-              {isEditingRole ? (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={editedRole}
-                    onChange={handleRoleChange}
-                    disabled={isSavingRole}
-                    className="block w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
-                    aria-label="Professional Role"
-                  />
-                  <button
-                    onClick={handleSaveRole}
-                    disabled={isSavingRole}
-                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {isSavingRole ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    onClick={handleEditRoleToggle}
-                    disabled={isSavingRole}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
-                    Role: {staffDetails.professionalRole || "Not Set"}
+              {/* Container for Role and Average Score */}
+              <div className="flex flex-col items-start sm:items-end space-y-2">
+                {/* Role Editing/Display */}
+                {isEditingRole ? (
+                  <div className="flex items-center space-x-2">
+                    {/* Role Input, Save, Cancel Buttons */}
+                    <input
+                      type="text"
+                      value={editedRole}
+                      onChange={handleRoleChange}
+                      disabled={isSavingRole}
+                      className="block w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
+                      aria-label="Professional Role"
+                    />
+                    <button
+                      onClick={handleSaveRole}
+                      disabled={isSavingRole}
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {isSavingRole ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={handleEditRoleToggle}
+                      disabled={isSavingRole}
+                      className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+                      Role: {staffDetails.professionalRole || "Not Set"}
+                    </span>
+                    <button
+                      onClick={handleEditRoleToggle}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap"
+                    >
+                      Edit Role
+                    </button>
+                  </div>
+                )}
+                {roleError && (
+                  <p className="text-xs text-red-600 mt-1 text-right">
+                    {roleError}
+                  </p>
+                )}
+
+                {/* Average Score Display */}
+                <div className="text-sm text-gray-600">
+                  Average Score:{" "}
+                  <span className="font-semibold text-gray-800">
+                    {staffDetails.averageScore != null
+                      ? `${staffDetails.averageScore.toFixed(1)}%`
+                      : "N/A"}
                   </span>
-                  <button
-                    onClick={handleEditRoleToggle}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                  >
-                    Edit Role
-                  </button>
                 </div>
-              )}
-              {roleError && (
-                <p className="text-xs text-red-600 mt-1">{roleError}</p>
-              )}
+              </div>
             </div>
           </div>
         </div>

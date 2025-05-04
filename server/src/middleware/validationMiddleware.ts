@@ -177,12 +177,20 @@ export const validateQuizBody: ValidationChain[] = [
 
 export const validateSubmitAnswers: ValidationChain[] = [
   param("quizId", "Invalid Quiz ID format").isMongoId(),
-  body("answers", "Answers must be an array of numbers between 0 and 3")
-    .isArray({ min: 1 }) // Must have at least one answer
+  body("answers", "Answers must be an array")
+    .isArray({ min: 1 })
     .withMessage("Answers array cannot be empty."),
-  body("answers.*", "Each answer must be an integer between 0 and 3")
+  body(
+    "answers.*",
+    "Each answer must be an integer between 0 and 3 or undefined/null"
+  )
+    .optional({ nullable: true })
     .isInt({ min: 0, max: 3 })
     .toInt(),
+  body("cancelled", "Cancelled flag must be a boolean")
+    .optional()
+    .isBoolean()
+    .toBoolean(),
 ];
 
 export const validateAssignQuiz: ValidationChain[] = [
@@ -192,3 +200,15 @@ export const validateAssignQuiz: ValidationChain[] = [
     .withMessage("At least one staff ID must be provided."),
   body("staffIds.*", "Invalid Staff ID format provided").isMongoId(),
 ];
+
+// --- New Validator for Status Updates ---
+export const validateQuizStatusUpdate = [
+  body("isAvailable")
+    .optional()
+    .isBoolean()
+    .withMessage("isAvailable must be a boolean"),
+  // Add validation for other status fields if needed in the future
+];
+
+// === Staff Validation ===
+// ... existing code ...

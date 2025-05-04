@@ -17,6 +17,7 @@ interface DecodedToken {
   name: string;
   restaurantId?: string;
   restaurantName?: string;
+  professionalRole?: string;
   iat?: number;
   exp?: number;
 }

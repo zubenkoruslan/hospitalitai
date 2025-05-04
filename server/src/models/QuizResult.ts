@@ -20,6 +20,7 @@ export interface IQuizResult extends Document {
   completedAt?: Date;
   status: "pending" | "in-progress" | "completed";
   retakeCount: number;
+  wasCancelled?: boolean; // Add optional wasCancelled field
 }
 
 // Mongoose schema for embedded UserAnswer
@@ -100,6 +101,10 @@ const quizResultSchema = new Schema<IQuizResult>(
       required: true,
       default: 0,
       min: 0,
+    },
+    wasCancelled: {
+      type: Boolean,
+      default: false, // Default to false if not explicitly set
     },
   },
   {

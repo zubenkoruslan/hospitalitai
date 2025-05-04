@@ -19,6 +19,7 @@ export interface IQuiz extends Document {
   questions: IQuestion[]; // Array of question subdocuments
   restaurantId: Types.ObjectId; // Reference to the User (Restaurant) who owns the quiz
   isAssigned: boolean; // Flag to indicate if the quiz has been assigned to any staff
+  isAvailable: boolean; // Flag to control if staff can see/take this quiz
   // Timestamps added automatically
   createdAt?: Date; // Add createdAt
   updatedAt?: Date; // Add updatedAt
@@ -96,6 +97,12 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       type: Boolean,
       required: [true, "isAssigned field is required"],
       index: true, // Added index for filtering by assigned status
+    },
+    isAvailable: {
+      type: Boolean,
+      required: true,
+      default: false, // Default to not available
+      index: true, // Index for efficient querying by staff
     },
   },
   {

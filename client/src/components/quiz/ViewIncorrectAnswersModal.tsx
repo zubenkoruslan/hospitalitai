@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from "react";
 // Import the type for the quiz result details
 // TODO: Move QuizResultDetails to a shared types file (e.g., types/quizTypes.ts)
-import { QuizResultDetails } from "../../hooks/useStaffDetails";
+import {
+  QuizResultDetails,
+  IncorrectQuestionDetail,
+} from "../../types/staffTypes";
 
 interface ViewIncorrectAnswersModalProps {
   isOpen: boolean;
@@ -91,21 +94,23 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
 
         {incorrectQuestions.length > 0 ? (
           <ul className="list-disc pl-5 space-y-4 text-sm">
-            {incorrectQuestions.map((q, index) => (
-              <li key={index} className="text-gray-700">
-                <p className="font-medium text-gray-800 mb-1">
-                  {q.questionText}
-                </p>
-                <p className="text-red-600">
-                  <span className="font-semibold">Your Answer:</span>{" "}
-                  {q.userAnswer}
-                </p>
-                <p className="text-green-600">
-                  <span className="font-semibold">Correct Answer:</span>{" "}
-                  {q.correctAnswer}
-                </p>
-              </li>
-            ))}
+            {incorrectQuestions.map(
+              (q: IncorrectQuestionDetail, index: number) => (
+                <li key={index} className="text-gray-700">
+                  <p className="font-medium text-gray-800 mb-1">
+                    {q.questionText}
+                  </p>
+                  <p className="text-red-600">
+                    <span className="font-semibold">Your Answer:</span>{" "}
+                    {q.userAnswer}
+                  </p>
+                  <p className="text-green-600">
+                    <span className="font-semibold">Correct Answer:</span>{" "}
+                    {q.correctAnswer}
+                  </p>
+                </li>
+              )
+            )}
           </ul>
         ) : (
           <p className="text-center text-gray-500 italic py-4">

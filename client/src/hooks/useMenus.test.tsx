@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { useMenus } from "./useMenus";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +44,7 @@ describe("useMenus Hook", () => {
   it("should fetch menus successfully for authorized user", async () => {
     const { result } = renderHook(() => useMenus());
 
+    // Wait for the fetch to complete
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -60,6 +61,7 @@ describe("useMenus Hook", () => {
 
     const { result } = renderHook(() => useMenus());
 
+    // Wait for the fetch to complete and error to be set
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -74,6 +76,7 @@ describe("useMenus Hook", () => {
 
     const { result } = renderHook(() => useMenus());
 
+    // Wait for the fetch to complete
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -90,6 +93,7 @@ describe("useMenus Hook", () => {
 
     const { result } = renderHook(() => useMenus());
 
+    // Wait for the fetch to complete
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });

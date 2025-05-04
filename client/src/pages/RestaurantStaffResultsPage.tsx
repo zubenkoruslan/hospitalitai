@@ -223,9 +223,8 @@ const RestaurantStaffResultsPage: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
             Staff Quiz Results
           </h1>
-          {loading && <LoadingSpinner />} // Use combined loading state
-          {error && <ErrorMessage message={error} />} // Use combined error
-          state
+          {loading && <LoadingSpinner />}
+          {error && <ErrorMessage message={error} />}
           {!loading && !error && (
             <>
               {/* Chart Toggle */}

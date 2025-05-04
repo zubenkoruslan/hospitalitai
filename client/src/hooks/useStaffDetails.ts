@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 // Import types from shared file
 import {
   StaffDetailsData,
-  // QuizResultDetails, // These are implicitly used via StaffDetailsData
+  QuizResultDetails,
   // IncorrectQuestionDetail,
 } from "../types/staffTypes";
 

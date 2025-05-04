@@ -14,6 +14,7 @@ import {
   validateQuizBody,
   validateSubmitAnswers,
   validateAssignQuiz,
+  validateQuizStatusUpdate,
 } from "../middleware/validationMiddleware"; // Import quiz validators
 import { AppError } from "../utils/errorHandler";
 import QuizResultService from "../services/quizResultService"; // Import QuizResultService
@@ -150,11 +151,12 @@ router.put(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
     // Extract only the fields allowed for update from the body
-    const { title, menuItemIds, questions } = req.body;
+    const { title, menuItemIds, questions, isAvailable } = req.body;
     const updateData: Partial<IQuiz> = {};
     if (title !== undefined) updateData.title = title;
     if (menuItemIds !== undefined) updateData.menuItemIds = menuItemIds;
     if (questions !== undefined) updateData.questions = questions;
+    if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
 
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
@@ -170,6 +172,51 @@ router.put(
       });
     } catch (error) {
       console.error("Error in PUT /api/quiz/:quizId route:", error);
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   PATCH /api/quiz/:quizId
+ * @desc    Partially update a quiz (e.g., activate/deactivate)
+ * @access  Private (Restaurant Role)
+ */
+router.patch(
+  "/:quizId",
+  restrictTo("restaurant"),
+  validateQuizIdParam,
+  validateQuizStatusUpdate, // Use the new minimal validator
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { quizId } = req.params;
+    const { isAvailable } = req.body;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+
+    // Prepare only the fields being patched
+    const updateData: Partial<IQuiz> = {};
+    if (isAvailable !== undefined) {
+      updateData.isAvailable = isAvailable;
+    }
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return next(new AppError("No valid fields provided for update", 400));
+    }
+
+    try {
+      // Use the same update service method
+      const updatedQuiz = await QuizService.updateQuiz(
+        new Types.ObjectId(quizId),
+        restaurantId,
+        updateData // Pass only the validated patch data
+      );
+      res.status(200).json({
+        message: "Quiz status updated successfully",
+        quiz: updatedQuiz,
+      });
+    } catch (error) {
+      console.error("Error in PATCH /api/quiz/:quizId route:", error);
       next(error);
     }
   }
@@ -273,6 +320,8 @@ router.post(
     const userId = req.user?.userId as mongoose.Types.ObjectId;
     const userName = req.user?.name as string;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+    // Extract the optional cancelled flag (defaults to false if not provided)
+    const cancelled = req.body.cancelled === true;
 
     try {
       const result = await QuizResultService.submitAnswers(
@@ -280,7 +329,8 @@ router.post(
         userId,
         userName,
         restaurantId,
-        answers
+        answers,
+        cancelled // Pass the cancelled flag to the service
       );
       res.status(200).json(result);
     } catch (error) {
@@ -314,37 +364,6 @@ router.get(
       res.status(200).json({ quizzes });
     } catch (error) {
       console.error("Error in GET /api/quiz/staff-view route:", error);
-      next(error);
-    }
-  }
-);
-
-/**
- * @route   POST /api/quiz/assign
- * @desc    Assign quiz to staff member(s)
- * @access  Private (Restaurant Role)
- */
-router.post(
-  "/assign",
-  restrictTo("restaurant"),
-  validateAssignQuiz,
-  handleValidationErrors,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { quizId, staffIds } = req.body;
-    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
-
-    try {
-      const result = await QuizService.assignQuizToStaff(
-        new Types.ObjectId(quizId),
-        staffIds,
-        restaurantId
-      );
-      res.status(200).json({
-        message: `Quiz successfully assigned to ${result.assignedCount} staff members`,
-        quizResults: result.results,
-      });
-    } catch (error) {
-      console.error("Error in POST /api/quiz/assign route:", error);
       next(error);
     }
   }

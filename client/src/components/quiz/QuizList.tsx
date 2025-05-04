@@ -21,17 +21,18 @@ interface QuizData {
   isAssigned?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  isAvailable: boolean;
 }
 
 // --- Component Props ---
 interface QuizListProps {
   quizzes: QuizData[];
   isLoading: boolean;
-  onPreview: (quiz: QuizData, startInEditMode: boolean) => void;
-  onAssign: (quiz: QuizData) => void;
-  onDelete: (quiz: QuizData) => void; // Renamed from openDeleteConfirm for clarity
-  isDeletingQuizId: string | null; // ID of the quiz currently being deleted
-  getMenuItemNames: (quiz: QuizData) => string; // Pass utility function
+  onPreview: (quiz: QuizData) => void;
+  onActivate: (quizId: string) => void;
+  onDelete: (quiz: QuizData) => void;
+  isDeletingQuizId: string | null;
+  getMenuItemNames: (quiz: QuizData) => string;
 }
 
 // --- Component ---
@@ -39,7 +40,7 @@ const QuizList: React.FC<QuizListProps> = ({
   quizzes,
   isLoading,
   onPreview,
-  onAssign,
+  onActivate,
   onDelete,
   isDeletingQuizId,
   getMenuItemNames,
@@ -60,18 +61,10 @@ const QuizList: React.FC<QuizListProps> = ({
     <ul className="divide-y divide-gray-200" aria-labelledby="quiz-list-title">
       {quizzes.map((quiz) => (
         <li key={quiz._id} className="px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="truncate">
+          <div className="flex items-center justify-between space-x-4">
+            <div className="min-w-0 flex-1">
               <p className="text-lg font-medium text-blue-600 truncate">
                 {quiz.title}
-                {quiz.isAssigned && (
-                  <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    Assigned
-                  </span>
-                )}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Covers: {getMenuItemNames(quiz)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 Created:{" "}
@@ -80,40 +73,48 @@ const QuizList: React.FC<QuizListProps> = ({
                   : "N/A"}
               </p>
             </div>
-            <div className="ml-4 flex-shrink-0 flex space-x-2">
-              <button
-                onClick={() => onPreview(quiz, false)}
-                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+            <div className="flex flex-shrink-0 items-center space-x-3">
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${
+                  quiz.isAvailable
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
               >
-                Preview
-              </button>
-              {!quiz.isAssigned && (
-                <>
+                {quiz.isAvailable ? "Active" : "Draft"}
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => onPreview(quiz)}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                  disabled={isDeletingQuizId === quiz._id}
+                  aria-label={`Edit quiz ${quiz.title}`}
+                >
+                  Edit
+                </button>
+                {!quiz.isAvailable && (
                   <button
-                    onClick={() => onPreview(quiz, true)} // Call onPreview for edit
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    onClick={() => onActivate(quiz._id!)}
+                    className="text-sm font-medium text-green-600 hover:text-green-800 disabled:opacity-50"
+                    disabled={isDeletingQuizId === quiz._id}
+                    aria-label={`Activate quiz ${quiz.title}`}
                   >
-                    Edit
+                    Activate
                   </button>
-                  <button
-                    onClick={() => onAssign(quiz)}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Assign
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => onDelete(quiz)}
-                disabled={isDeletingQuizId === quiz._id}
-                className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
-                  isDeletingQuizId === quiz._id
-                    ? "bg-gray-400"
-                    : "bg-red-600 hover:bg-red-700"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50`}
-              >
-                {isDeletingQuizId === quiz._id ? "Deleting..." : "Delete"}
-              </button>
+                )}
+                <button
+                  onClick={() => onDelete(quiz)}
+                  disabled={isDeletingQuizId === quiz._id}
+                  className={`text-sm font-medium ${
+                    isDeletingQuizId === quiz._id
+                      ? "text-gray-500"
+                      : "text-red-600 hover:text-red-800"
+                  } disabled:opacity-50`}
+                  aria-label={`Delete quiz ${quiz.title}`}
+                >
+                  {isDeletingQuizId === quiz._id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
             </div>
           </div>
         </li>

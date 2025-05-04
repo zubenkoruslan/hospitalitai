@@ -113,6 +113,79 @@ interface AvailableQuizInfo {
   numQuestions: number;
 }
 
+// --- Private Helper Function for Mass Assignment ---
+async function _assignQuizToAllRestaurantStaff(
+  quizId: Types.ObjectId,
+  restaurantId: Types.ObjectId,
+  quizTitle: string, // Pass title for logging/potential future use
+  numQuestions: number // Pass question count
+): Promise<{ assignedCount: number }> {
+  try {
+    // 1. Find all staff for the restaurant
+    const staffMembers = await User.find({
+      restaurantId: restaurantId,
+      role: "staff",
+    })
+      .select("_id")
+      .lean();
+
+    if (staffMembers.length === 0) {
+      console.log(
+        `No staff members found for restaurant ${restaurantId} to assign quiz ${quizId}.`
+      );
+      return { assignedCount: 0 };
+    }
+
+    const staffObjectIds = staffMembers.map((s) => s._id);
+    console.log(`Found ${staffObjectIds.length} staff members.`);
+
+    // 2. Prepare bulk operations for upserting QuizResults
+    const bulkOps = staffObjectIds.map((staffId) => ({
+      updateOne: {
+        filter: {
+          quizId: quizId,
+          userId: staffId,
+          restaurantId: restaurantId,
+          status: { $ne: "completed" }, // Don't overwrite completed quizzes
+        },
+        update: {
+          $setOnInsert: {
+            status: "pending",
+            startedAt: null,
+            answers: [],
+            score: 0,
+            totalQuestions: numQuestions, // Use passed count
+            restaurantId: restaurantId,
+            retakeCount: 0,
+            quizTitle: quizTitle, // Store title denormalized
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    // 3. Execute bulk write
+    console.log(`Bulk upserting QuizResults for quiz ${quizId}...`);
+    const bulkResult = await QuizResult.bulkWrite(bulkOps);
+    console.log(
+      `Bulk write result: Matched=${bulkResult.matchedCount}, Upserted=${bulkResult.upsertedCount}, Modified=${bulkResult.modifiedCount}`
+    );
+
+    // Count how many were actually upserted (newly assigned)
+    const assignedCount = bulkResult.upsertedCount;
+
+    return { assignedCount };
+  } catch (error: any) {
+    console.error(
+      `Error in _assignQuizToAllRestaurantStaff for quiz ${quizId}, restaurant ${restaurantId}:`,
+      error
+    );
+    // Don't throw AppError here, maybe just log? Or rethrow generic?
+    // Let the calling function (updateQuiz) handle the main error flow.
+    throw new AppError("Failed during mass assignment process.", 500);
+  }
+}
+
 class QuizService {
   /**
    * Generates quiz questions based on menu items from selected menus.
@@ -296,6 +369,7 @@ class QuizService {
     const newQuiz = new Quiz({
       ...quizData, // Spread the generated data
       isAssigned: false, // Default value
+      isAvailable: false, // Explicitly set default value
     });
     try {
       return await newQuiz.save();
@@ -334,29 +408,63 @@ class QuizService {
     updateData: Partial<IQuiz>
   ): Promise<IQuiz> {
     try {
-      // Use findOne + save() to ensure hooks and full validation run
       const quiz = await Quiz.findOne({
         _id: quizId,
         restaurantId: restaurantId,
-      });
+      }).select("+isAvailable"); // Ensure isAvailable is fetched
 
       if (!quiz) {
         throw new AppError("Quiz not found or access denied", 404);
       }
 
-      // Apply updates - check which fields are allowed to be updated
+      // --- Mass Assignment Logic ---
+      let assignmentResult: { assignedCount: number } | null = null;
+      const isBecomingAvailable =
+        updateData.isAvailable === true && quiz.isAvailable === false;
+
+      if (isBecomingAvailable) {
+        console.log(
+          `Quiz ${quizId} is becoming available. Triggering mass assignment.`
+        );
+        // Call the helper function BEFORE saving the quiz document changes
+        assignmentResult = await _assignQuizToAllRestaurantStaff(
+          quiz._id,
+          restaurantId,
+          quiz.title, // Pass current title
+          quiz.questions.length // Pass current question count
+        );
+        console.log(
+          `Mass assignment completed for quiz ${quizId}: Assigned to ${assignmentResult.assignedCount} new staff.`
+        );
+        // Mark as assigned if any staff were newly assigned
+        if (assignmentResult.assignedCount > 0) {
+          updateData.isAssigned = true;
+        }
+      }
+      // --- End Mass Assignment Logic ---
+
+      // Apply updates provided in updateData
       if (updateData.title !== undefined) quiz.title = updateData.title;
       if (updateData.menuItemIds !== undefined)
         quiz.menuItemIds = updateData.menuItemIds as Types.ObjectId[];
       if (updateData.questions !== undefined)
         quiz.questions = updateData.questions;
-      // Do not allow updating restaurantId or isAssigned directly here
+      if (updateData.isAvailable !== undefined)
+        // Update isAvailable status
+        quiz.isAvailable = updateData.isAvailable;
+      if (updateData.isAssigned !== undefined)
+        // Update isAssigned status (from mass assign logic)
+        quiz.isAssigned = updateData.isAssigned;
+      // Do not allow updating restaurantId directly here
 
       const updatedQuiz = await quiz.save();
+
+      // Optionally add assignment count to response?
+      // For now, just return the updated quiz
       return updatedQuiz;
     } catch (error: any) {
       console.error("Error updating quiz in service:", error);
-      if (error instanceof AppError) throw error; // Re-throw 404
+      if (error instanceof AppError) throw error; // Re-throw 404 or assignment error
       if (error instanceof mongoose.Error.ValidationError) {
         throw new AppError(`Validation failed: ${error.message}`, 400);
       }
@@ -414,152 +522,6 @@ class QuizService {
       console.error("Error deleting quiz in service:", error);
       if (error instanceof AppError) throw error; // Re-throw 404
       throw new AppError("Failed to delete quiz and associated results.", 500);
-    }
-  }
-
-  /**
-   * Assigns a quiz to specified staff members by creating pending QuizResult entries.
-   *
-   * @param quizId - The ID of the quiz to assign.
-   * @param staffIds - An array of staff user IDs (as strings) to assign the quiz to.
-   * @param restaurantId - The ID of the restaurant performing the assignment.
-   * @returns A promise resolving to an object containing the count of successful assignments and details of the created/pending results.
-   * @throws {AppError} If the quiz is not found (404), if any staff ID is invalid or staff doesn't belong to restaurant (400),
-   *                    if Mongoose validation fails (400), or for other unexpected database errors (500).
-   */
-  static async assignQuizToStaff(
-    quizId: Types.ObjectId,
-    staffIds: string[],
-    restaurantId: Types.ObjectId
-  ): Promise<{ assignedCount: number; results: Partial<IQuizResult>[] }> {
-    try {
-      // 1. Verify the quiz exists and belongs to this restaurant
-      const quiz = await Quiz.findOne({
-        _id: quizId,
-        restaurantId: restaurantId,
-      });
-
-      if (!quiz) {
-        throw new AppError(
-          "Quiz not found or not accessible for this restaurant",
-          404
-        );
-      }
-
-      // Convert staffIds strings to ObjectIds for DB query
-      const staffObjectIds = staffIds.map(
-        (id) => new mongoose.Types.ObjectId(id)
-      );
-
-      // 2. Verify all staff members belong to this restaurant
-      const validStaffMembers = await User.find({
-        _id: { $in: staffObjectIds },
-        restaurantId: restaurantId,
-        role: "staff",
-      })
-        .select("_id name")
-        .lean();
-
-      if (validStaffMembers.length !== staffIds.length) {
-        const requestedSet = new Set(staffIds);
-        const validSet = new Set(
-          validStaffMembers.map((s) => s._id.toString())
-        );
-        const invalidIds = staffIds.filter((id: string) => !validSet.has(id));
-        throw new AppError(
-          `One or more staff members do not exist or do not belong to this restaurant. Invalid IDs: ${invalidIds.join(
-            ", "
-          )}`,
-          400
-        );
-      }
-
-      // 3. Create pending quiz results (Notifications Removed)
-      const quizResults = [];
-      // const notificationPromises = []; // Removed
-
-      for (const staff of validStaffMembers) {
-        // Upsert: Create result if not exists and status isn't completed
-        const result = await QuizResult.findOneAndUpdate(
-          {
-            quizId: quiz._id,
-            userId: staff._id,
-            restaurantId: restaurantId,
-            status: { $ne: "completed" },
-          },
-          {
-            $setOnInsert: {
-              // Only set these fields on insert
-              status: "pending",
-              startedAt: null,
-              answers: [],
-              score: 0,
-              totalQuestions: quiz.questions.length,
-              restaurantId: restaurantId, // Redundant but ensures consistency
-              retakeCount: 0,
-            },
-          },
-          { upsert: true, new: true, runValidators: true }
-        );
-
-        if (result) {
-          quizResults.push(result);
-          // Create notification (REMOVED)
-          /*
-          try {
-            const notification =
-              notificationService.createAssignmentNotification(
-                staff._id as mongoose.Types.ObjectId,
-                quiz._id as mongoose.Types.ObjectId,
-                quiz.title
-              );
-            notificationPromises.push(notification);
-          } catch (notificationError) {
-            console.error(
-              "Failed to create assignment notification for staff",
-              staff._id,
-              ":",
-              notificationError
-            );
-          }
-          */
-        } else {
-          console.warn(
-            `QuizResult skipped for user ${staff._id} (quiz ${quiz._id}) - likely already completed.`
-          );
-        }
-      }
-
-      // Wait for notifications (REMOVED)
-      // await Promise.allSettled(notificationPromises);
-
-      // 4. Mark the quiz as assigned (only if successfully assigned to at least one person)
-      if (quizResults.length > 0 && !quiz.isAssigned) {
-        quiz.isAssigned = true;
-        await quiz.save();
-      }
-
-      return {
-        assignedCount: validStaffMembers.length,
-        results: quizResults.map((r) => ({
-          _id: r._id,
-          userId: r.userId,
-          status: r.status,
-        })),
-      };
-    } catch (error: any) {
-      console.error("Error assigning quiz in service:", error);
-      if (error instanceof AppError) throw error;
-      if (error.name === "CastError") {
-        throw new AppError("One or more staff IDs are invalid.", 400);
-      }
-      if (error instanceof mongoose.Error.ValidationError) {
-        throw new AppError(
-          `Validation failed during result creation: ${error.message}`,
-          400
-        );
-      }
-      throw new AppError("Failed to assign quiz.", 500);
     }
   }
 
@@ -627,9 +589,10 @@ class QuizService {
     restaurantId: Types.ObjectId
   ): Promise<AvailableQuizInfo[]> {
     try {
+      // Find quizzes specifically marked as available for the restaurant
       const availableQuizzes = await Quiz.find(
-        { restaurantId },
-        "_id title description createdAt questions"
+        { restaurantId: restaurantId, isAvailable: true }, // Correctly query by isAvailable
+        "_id title description createdAt questions" // Select necessary fields
       )
         .sort({ createdAt: -1 })
         .lean(); // .lean() causes _id to be a plain object/string

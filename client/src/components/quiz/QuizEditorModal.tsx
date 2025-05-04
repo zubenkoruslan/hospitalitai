@@ -22,17 +22,13 @@ interface QuizData {
   questions: Question[];
   restaurantId: string;
   isAssigned?: boolean;
+  isAvailable: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
 
-interface QuizResultDisplay {
-  score: number;
-  totalQuestions: number;
-  correctAnswers: (number | undefined)[];
-  userAnswers: (number | undefined)[];
-  quizData: QuizData;
-}
+// Remove QuizResultDisplay as preview is removed
+// interface QuizResultDisplay { ... }
 
 // --- Component Props ---
 interface QuizEditorModalProps {
@@ -41,7 +37,7 @@ interface QuizEditorModalProps {
   initialQuizData: QuizData | null;
   onSave: (quizData: QuizData) => void;
   isSaving: boolean;
-  onShowResults?: (results: QuizResultDisplay) => void; // Optional: To show results after preview
+  // Remove startInEditMode and onShowResults
 }
 
 // --- Component ---
@@ -51,15 +47,12 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
   initialQuizData,
   onSave,
   isSaving,
-  onShowResults, // Added prop
 }) => {
   const [quizData, setQuizData] = useState<QuizData | null>(null);
-  const [isEditMode, setIsEditMode] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null); // Local error for validation
+  // Remove isEditMode state
+  const [error, setError] = useState<string | null>(null);
 
-  // State for previewing/answering
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
-  const [userAnswers, setUserAnswers] = useState<(number | undefined)[]>([]);
+  // Remove preview state (userAnswers, currentQuestionIndex)
 
   // State for Add Question Modal
   const [isAddQuestionModalOpen, setIsAddQuestionModalOpen] =
@@ -69,28 +62,19 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
   useEffect(() => {
     if (isOpen && initialQuizData) {
       setQuizData({ ...initialQuizData }); // Create a local copy to edit
-      setUserAnswers(
-        new Array(initialQuizData.questions.length).fill(undefined)
-      );
-      setCurrentQuestionIndex(0);
-      setIsEditMode(false); // Default to preview mode
+      // Remove userAnswers initialization
+      // Remove currentQuestionIndex initialization
       setError(null);
-      setIsAddQuestionModalOpen(false); // Ensure add question modal is closed initially
-
-      // Prevent editing if already assigned
-      if (initialQuizData.isAssigned) {
-        setIsEditMode(false);
-        // Maybe show a notification here?
-      }
+      setIsAddQuestionModalOpen(false);
     } else if (!isOpen) {
       // Reset when closed
       setQuizData(null);
-      setUserAnswers([]);
-      setCurrentQuestionIndex(0);
-      setIsEditMode(false);
+      // Remove userAnswers reset
+      // Remove currentQuestionIndex reset
       setError(null);
       setIsAddQuestionModalOpen(false);
     }
+    // Remove startInEditMode from dependencies
   }, [isOpen, initialQuizData]);
 
   const handleSaveClick = () => {
@@ -105,22 +89,12 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
       setError("Quiz must have at least one question");
       return;
     }
-    // Add more validation as needed...
 
     setError(null);
     onSave(quizData);
   };
 
-  const handleAnswerSelect = useCallback(
-    (questionIndex: number, choiceIndex: number) => {
-      setUserAnswers((prev) => {
-        const newAnswers = [...prev];
-        newAnswers[questionIndex] = choiceIndex;
-        return newAnswers;
-      });
-    },
-    []
-  );
+  // Remove handleAnswerSelect handler
 
   const handleQuestionChange = useCallback(
     (index: number, updatedQuestion: Question) => {
@@ -142,31 +116,7 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
     });
   }, []);
 
-  // Submit Preview Answers (Local Calculation)
-  const handlePreviewSubmit = () => {
-    if (!quizData) return;
-
-    const results: QuizResultDisplay = {
-      score: 0,
-      totalQuestions: quizData.questions.length,
-      correctAnswers: [],
-      userAnswers: userAnswers,
-      quizData: quizData, // Pass the current state of quizData
-    };
-
-    quizData.questions.forEach((q, index) => {
-      results.correctAnswers.push(q.correctAnswer);
-      if (userAnswers[index] === q.correctAnswer) {
-        results.score++;
-      }
-    });
-
-    // Instead of opening a results modal here, call the callback
-    if (onShowResults) {
-      onShowResults(results);
-    }
-    onClose(); // Close the editor modal
-  };
+  // Remove handlePreviewSubmit handler
 
   // --- Add Question Logic ---
   const openAddQuestionModal = () => {
@@ -178,22 +128,20 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
       if (!prevData) return null;
       return { ...prevData, questions: [...prevData.questions, newQuestion] };
     });
-    setIsAddQuestionModalOpen(false); // Close modal handled by AddQuestionModal itself via onClose
+    setIsAddQuestionModalOpen(false);
   };
 
   // Determine initial menu item ID for new questions
   const getInitialMenuItemIdForNewQuestion = (): string => {
     if (!quizData) return "";
-    // Try to get from first question
     if (quizData.questions.length > 0) {
       return quizData.questions[0].menuItemId;
     }
-    // Try to get from menuItemIds array
     if (quizData.menuItemIds.length > 0) {
       const firstItem = quizData.menuItemIds[0];
       return typeof firstItem === "string" ? firstItem : firstItem._id;
     }
-    return ""; // Fallback
+    return "";
   };
 
   if (!isOpen || !quizData) {
@@ -201,41 +149,28 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
   }
 
   const isAssigned = quizData.isAssigned ?? false;
+  // Remove the canEdit derivation, editing is always allowed for the owner
+  // const canEdit = !isAssigned;
 
   return (
+    // Use a full-screen modal style or adjust as needed
     <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header: Title and Buttons */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-gray-800">
-            {isEditMode ? "Edit Quiz: " : "Preview Quiz: "} {quizData.title}
+            Edit Quiz: {quizData.title} {/* Always Edit Title */}
           </h2>
           <div className="flex space-x-3">
-            {!isAssigned ? (
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  isEditMode
-                    ? "bg-blue-100 text-blue-600"
-                    : "bg-blue-600 text-white"
-                }`}
-              >
-                {isEditMode ? "Exit Edit Mode" : "Edit Questions"}
-              </button>
-            ) : (
-              <div className="text-yellow-700 text-sm bg-yellow-50 px-3 py-2 rounded-md">
-                Quiz has been assigned. Editing disabled.
-              </div>
-            )}
-            {isEditMode && (
-              <button
-                onClick={openAddQuestionModal} // Use handler
-                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium"
-              >
-                Add Question
-              </button>
-            )}
+            {/* Show 'Add Question' button always (owner is editing) */}
             <button
-              onClick={onClose} // Use onClose prop
+              onClick={openAddQuestionModal}
+              className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium"
+            >
+              Add Question
+            </button>
+            <button
+              onClick={onClose}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium"
             >
               Close
@@ -243,102 +178,64 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
           </div>
         </div>
 
-        {/* TODO: Implement Content Area (Preview/Edit) */}
-        {isEditMode ? (
-          // Editing view
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-4">Edit Quiz Questions</h3>
-            <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
-              {quizData.questions.map((question, idx) => (
-                <QuestionDisplay
-                  key={question._id || `new-${idx}`} // Handle potential new questions without _id yet
-                  question={question}
-                  index={idx}
-                  userAnswer={undefined} // Not used in edit mode
-                  isEditing={true}
-                  onAnswerSelect={() => {}} // Not used in edit mode
-                  onQuestionChange={handleQuestionChange}
-                  onQuestionDelete={handleQuestionDelete}
-                />
-              ))}
-              {quizData.questions.length === 0 && (
-                <p className="text-center text-gray-500 py-4">
-                  No questions yet. Add one!
-                </p>
-              )}
-            </div>
-
-            {error && <ErrorMessage message={error} />}
-
-            {/* Edit Footer (Title edit + Save) */}
-            <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
-              <div>
-                <label htmlFor="quizEditTitle" className="sr-only">
-                  Quiz Title
-                </label>
-                <input
-                  id="quizEditTitle"
-                  type="text"
-                  value={quizData.title}
-                  onChange={(e) =>
-                    setQuizData((prev) =>
-                      prev ? { ...prev, title: e.target.value } : null
-                    )
-                  }
-                  className="px-4 py-2 border border-gray-300 rounded-md"
-                  placeholder="Quiz Title"
-                />
-              </div>
-              <button
-                onClick={handleSaveClick}
-                disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Quiz Changes"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          // Preview view
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-4">Preview Questions</h3>
-            <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
-              {quizData.questions.map((question, idx) => (
-                <QuestionDisplay
-                  key={question._id || `preview-${idx}`}
-                  question={question}
-                  index={idx}
-                  userAnswer={userAnswers[idx]}
-                  isEditing={false}
-                  onAnswerSelect={handleAnswerSelect}
-                  onQuestionChange={() => {}} // Not used in preview
-                  onQuestionDelete={() => {}} // Not used in preview
-                />
-              ))}
-              {quizData.questions.length === 0 && (
-                <p className="text-center text-gray-500 py-4">
-                  This quiz has no questions.
-                </p>
-              )}
-            </div>
-
-            {/* Preview Footer (Finish Button) */}
-            {quizData.questions.length > 0 && (
-              <div className="mt-8 flex justify-end">
-                <button
-                  onClick={handlePreviewSubmit}
-                  disabled={userAnswers.some((a) => a === undefined)}
-                  className="px-6 py-2 bg-green-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
-                >
-                  Finish & View Results
-                </button>
-              </div>
+        {/* Editing View Content - Rendered Unconditionally */}
+        <div className="mb-6">
+          {/* Removed outer conditional rendering based on isEditMode */}
+          <h3 className="text-lg font-medium mb-4">Edit Quiz Questions</h3>
+          <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
+            {quizData.questions.map((question, idx) => (
+              <QuestionDisplay
+                key={question._id || `new-${idx}`}
+                question={question}
+                index={idx}
+                userAnswer={undefined} // Not applicable
+                isEditing={true} // Always true for editing fields
+                onAnswerSelect={() => {}} // Not applicable
+                onQuestionChange={handleQuestionChange} // Always allow change
+                onQuestionDelete={handleQuestionDelete} // Always allow delete
+              />
+            ))}
+            {quizData.questions.length === 0 && (
+              <p className="text-center text-gray-500 py-4">
+                No questions yet. Add one!
+              </p>
             )}
           </div>
-        )}
+
+          {error && <ErrorMessage message={error} />}
+
+          {/* Edit Footer (Title edit + Save) - Always show */}
+          <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+            <div>
+              <label htmlFor="quizEditTitle" className="sr-only">
+                Quiz Title
+              </label>
+              <input
+                id="quizEditTitle"
+                type="text"
+                value={quizData.title}
+                onChange={(e) =>
+                  setQuizData((prev) =>
+                    prev ? { ...prev, title: e.target.value } : null
+                  )
+                }
+                className="px-4 py-2 border border-gray-300 rounded-md"
+                placeholder="Quiz Title"
+              />
+            </div>
+            <button
+              onClick={handleSaveClick}
+              disabled={isSaving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : "Save Quiz Changes"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Add Question Modal (Rendered within Editor Modal) */}
+      {/* Always render Add Question Modal */}
       <AddQuestionModal
         isOpen={isAddQuestionModalOpen}
         onClose={() => setIsAddQuestionModalOpen(false)}

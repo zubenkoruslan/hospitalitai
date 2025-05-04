@@ -1,54 +1,80 @@
-# React + TypeScript + Vite
+# Savvy Frontend (Client)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This folder contains the frontend application for Savvy, built with React, Vite, TypeScript, and Tailwind CSS.
 
-Currently, two official plugins are available:
+## Getting Started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Prerequisites
 
-## Expanding the ESLint configuration
+- Node.js (v18 or later recommended)
+- npm (v8 or later recommended)
+- A running instance of the Savvy backend API (see `/server/README.md`)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Installation
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+1.  **Navigate to the `client` directory:**
+    ```bash
+    cd path/to/project/client
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Configuration
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1.  **Environment Variables:**
+    Create a `.env` file in the `client` directory.
+    The primary variable needed is the backend API URL:
+    ```dotenv
+    VITE_API_BASE_URL=http://localhost:3000/api
+    ```
+    Replace `http://localhost:3000` with the actual URL where your backend server is running if it's different.
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+### Running the Development Server
+
+1.  **Start the Vite dev server:**
+    ```bash
+    npm run dev
+    ```
+2.  Open your browser and navigate to the URL provided (usually `http://localhost:5173`).
+
+## Building for Production
+
+1.  **Create a production build:**
+    ```bash
+    npm run build
+    ```
+    This will create a `dist` folder with optimized static assets ready for deployment.
+
+## Available Scripts
+
+- `npm run dev`: Starts the development server.
+- `npm run build`: Creates a production build.
+- `npm run lint`: Runs the linter (ESLint).
+- `npm run preview`: Serves the production build locally for testing.
+- `npm test`: Runs Jest tests.
+
+## Project Structure
+
+- `public/`: Static assets.
+- `src/`: Source code.
+  - `components/`: Reusable React components.
+  - `context/`: React Context providers (Auth, Notifications).
+  - `hooks/`: Custom React hooks.
+  - `pages/`: Page-level components.
+  - `services/`: API communication logic (Axios instance).
+  - `types/`: TypeScript type definitions.
+  - `utils/`: Utility functions.
+  - `main.tsx`: Application entry point.
+  - `App.tsx`: Main application component with routing.
+
+## Key Libraries
+
+- **React & React DOM**: Core UI library.
+- **Vite**: Build tool and dev server.
+- **TypeScript**: Static typing.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **React Router DOM**: Client-side routing.
+- **Axios**: HTTP client for API calls.
+- **Jest & React Testing Library**: Unit and integration testing.

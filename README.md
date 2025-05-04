@@ -1,92 +1,55 @@
-# HospitalityAI
+# Savvy
 
-HospitalityAI is a comprehensive training and knowledge management platform designed specifically for restaurants and food service businesses. It empowers restaurant owners and managers to create custom quizzes and training materials for their staff, ensuring consistent product knowledge and service standards.
+Savvy is a comprehensive MERN stack application designed for restaurant staff training and management.
+It features automated quiz generation based on menu items, staff management, quiz assignments, and performance tracking.
 
-## 🍽️ Overview
+## Project Structure
 
-The application serves two distinct user groups:
+This repository contains two main folders:
 
-- **Restaurant Owners/Managers**: Create and manage menus, items, quizzes, and track staff performance
-- **Staff Members**: Complete assigned training, take quizzes, and demonstrate their menu knowledge
+- `/client`: Contains the React (Vite + TypeScript) frontend application.
+- `/server`: Contains the Node.js/Express backend API and MongoDB models/services.
 
-## 🚀 Key Features
+Each folder has its own `README.md` with specific instructions for setup and running.
 
-- **Menu & Item Management**: Add, edit, and organize menu items with ingredients, allergens, and dietary information
-- **Automated Quiz Generation**: Create quizzes from your menu items with AI-assisted question generation
-- **Staff Management**: Add and manage staff members, assign quizzes, and track progress
-- **Real-time Notifications**: System alerts for new quizzes, completed training, and other important events
-- **Performance Analytics**: Track quiz results and identify knowledge gaps
-- **Mobile Responsive**: Works seamlessly on desktop and mobile devices
+## Key Features
 
-## 💻 Tech Stack
+- **Role-Based Access:** Separate interfaces for Restaurant Managers and Staff.
+- **Menu Management:** Add, edit, and delete menus and menu items.
+- **Automated Quiz Generation:** Create quizzes automatically based on selected menus.
+- **Manual Quiz Creation/Editing:** Fine-tune generated quizzes or build them from scratch.
+- **Staff Management:** Add and manage staff accounts.
+- **Quiz Assignment:** (Now handled by Activation) Activate quizzes to make them available to all staff.
+- **Quiz Taking:** Staff can take available quizzes.
+- **Results Tracking:** View individual staff quiz results and overall performance metrics.
+- **Authentication:** Secure login using JWT.
 
-### Frontend
+## Getting Started
 
-- **React**: UI library for building the single-page application
-- **TypeScript**: Type-safe JavaScript
-- **Tailwind CSS**: Utility-first CSS framework
-- **Context API**: State management
-- **React Router**: Navigation
-- **Axios**: API client
+1.  **Prerequisites:**
 
-### Backend
+    - Node.js (v18 or later recommended)
+    - npm (usually comes with Node.js)
+    - MongoDB (running locally or connection string for Atlas/other provider)
 
-- **Node.js**: JavaScript runtime
-- **Express**: Web framework
-- **TypeScript**: Type-safe JavaScript
-- **MongoDB**: NoSQL database
-- **Mongoose**: MongoDB object modeling
-- **JWT**: Authentication
-- **bcrypt**: Password hashing
+2.  **Setup Backend:**
 
-## 🔑 Usage
+    - Navigate to the `/server` directory.
+    - Follow the instructions in `server/README.md` (install dependencies, set up `.env`).
+    - Start the backend server.
 
-- **Restaurant Owner**:
+3.  **Setup Frontend:**
 
-  1. Register as a restaurant owner
-  2. Add your menu and menu items
-  3. Create quizzes or have them auto-generated
-  4. Add staff members
-  5. Assign quizzes and monitor results
+    - Navigate to the `/client` directory.
+    - Follow the instructions in `client/README.md` (install dependencies, set up `.env` if needed).
+    - Start the frontend development server.
 
-- **Staff Member**:
-  1. Register as staff and connect to your restaurant
-  2. Take assigned quizzes
-  3. View your performance metrics
-  4. Receive notifications about new training materials
+4.  **Access Application:** Open your browser and navigate to the frontend URL (typically `http://localhost:5173`).
 
-## 📂 Project Structure
+## Contributing
 
-```
-hospitalityai/
-├── client/                   # React frontend
-│   ├── public/               # Static assets
-│   └── src/
-│       ├── components/       # Reusable UI components
-│       ├── context/          # React context providers
-│       ├── pages/            # Application pages
-│       └── services/         # API services
-│
-└── server/                   # Node.js backend
-    ├── src/
-    │   ├── middleware/       # Express middleware
-    │   ├── models/           # Mongoose data models
-    │   ├── routes/           # API endpoints
-    │   ├── services/         # Business logic
-    │   └── server.ts         # Server entry point
-    └── tests/                # Server tests
-```
+[Details about contributing, code style, branches, etc. - if applicable]
 
-## 🔒 Authentication
+## License
 
-The application uses JWT (JSON Web Tokens) for authentication. Tokens are stored in local storage and included with each API request. There are two user roles:
-
-- `restaurant`: Restaurant owners/managers with full access
-- `staff`: Staff members with limited access
-
-## 👏 Acknowledgements
-
-- MongoDB for database
-- Express for backend framework
-- React for frontend framework
-- Node.js for runtime environment
+[Specify your project's license, e.g., MIT]

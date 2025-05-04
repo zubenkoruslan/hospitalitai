@@ -1,6 +1,7 @@
 import express, { Request, Response, Router, NextFunction } from "express";
 import mongoose, { Types } from "mongoose";
 import { protect, restrictTo } from "../middleware/authMiddleware";
+import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware";
 import QuizResult from "../models/QuizResult"; // Import the QuizResult model
 import User from "../models/User"; // Needed for service method auth checks
 import Quiz from "../models/Quiz"; // Needed for service method population
@@ -13,27 +14,56 @@ const router: Router = express.Router();
 router.use(protect); // All results routes require login
 
 /**
- * @route   GET /api/results/my-results
- * @desc    Get all quiz results for the logged-in staff member
+ * @route   GET /api/quiz-results/my-results
+ * @desc    Get results for the logged-in staff member
  * @access  Private (Staff Role)
  */
 router.get(
   "/my-results",
   restrictTo("staff"),
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      // protect middleware ensures req.user exists, so this checks for userId specifically
-      return next(new AppError("User ID not found in token payload", 400));
-    }
+  ensureRestaurantAssociation,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user?.userId as mongoose.Types.ObjectId;
 
     try {
-      // Delegate logic to the service
       const results = await QuizResultService.getMyResults(userId);
       res.status(200).json({ results });
     } catch (error) {
-      // Service handles errors
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   GET /api/quiz-results/staff-ranking
+ * @desc    Get average score and rank for the logged-in staff member
+ * @access  Private (Staff Role)
+ */
+router.get(
+  "/staff-ranking",
+  restrictTo("staff"),
+  ensureRestaurantAssociation,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user?.userId as mongoose.Types.ObjectId;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+
+    if (!userId || !restaurantId) {
+      return next(
+        new AppError("User ID or Restaurant ID missing in token", 403)
+      );
+    }
+
+    try {
+      const rankingData = await QuizResultService.getStaffRankingData(
+        userId,
+        restaurantId
+      );
+      res.status(200).json(rankingData);
+    } catch (error) {
+      console.error(
+        "Error in GET /api/quiz-results/staff-ranking route:",
+        error
+      );
       next(error);
     }
   }
@@ -79,4 +109,11 @@ router.get(
   }
 );
 
-export default router; // Export as default
+/**
+ * @route   GET /api/quiz-results/:resultId
+ * @desc    Get detailed results for a specific quiz attempt
+ * @access  Private (Staff viewing own, Restaurant viewing own staff)
+ */
+// Removed example route section
+
+export { router as quizResultRouter }; // Export with a unique name

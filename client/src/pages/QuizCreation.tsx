@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api"; // Assuming api.ts is configured
 import Navbar from "../components/Navbar"; // Import Navbar
-import QuizAssignment from "../components/QuizAssignment"; // Import the QuizAssignment component
+// Remove QuizAssignment import
+// import QuizAssignment from "../components/QuizAssignment";
 // Import common components
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -45,6 +46,7 @@ interface QuizData {
   questions: Question[];
   restaurantId: string;
   isAssigned?: boolean; // Flag to indicate if the quiz has been assigned
+  isAvailable: boolean; // Add isAvailable field
   createdAt?: string;
   updatedAt?: string;
 }
@@ -144,23 +146,11 @@ const QuizCreation: React.FC = () => {
   // Editor Modal State
   const [quizForEditOrPreview, setQuizForEditOrPreview] =
     useState<QuizData | null>(null);
-  // isPreviewModalOpen state is removed, handled by quizForEditOrPreview !== null
   const [isSaving, setIsSaving] = useState<boolean>(false); // Moved saving state here
-
-  // Results Modal State
-  const [quizResults, setQuizResults] = useState<QuizResultDisplay | null>(
-    null
-  );
-  const [isResultsModalOpen, setIsResultsModalOpen] = useState<boolean>(false);
-  // isSaving state removed from here, moved to editor modal scope
 
   // Delete Confirmation
   const [quizToDelete, setQuizToDelete] = useState<QuizData | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-
-  // Assignment Modal State
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
-  const [quizToAssign, setQuizToAssign] = useState<QuizData | null>(null);
 
   // --- Data Fetching ---
   const fetchQuizzes = useCallback(async () => {
@@ -204,29 +194,15 @@ const QuizCreation: React.FC = () => {
     setIsCreateModalOpen(false);
   };
 
-  // Renamed openPreviewModal to handle opening the editor/preview
+  // Rename to reflect it always opens editor
   const openEditor = (quiz: QuizData) => {
     setQuizForEditOrPreview(quiz);
-    // Reset results modal if open
-    setIsResultsModalOpen(false);
-    setQuizResults(null);
+    // Remove startEditorInEditMode setting
+    // Remove results modal reset
   };
 
   const closeEditor = () => {
     setQuizForEditOrPreview(null);
-  };
-
-  // Handles showing results after preview
-  const handleShowResults = (results: QuizResultDisplay) => {
-    setQuizResults(results);
-    setIsResultsModalOpen(true);
-    // Editor modal closes itself via onClose in handlePreviewSubmit
-  };
-
-  const closeResultsModal = () => {
-    setIsResultsModalOpen(false);
-    setQuizResults(null);
-    // Should we also close the editor here? No, results are separate.
   };
 
   const openDeleteConfirm = (quiz: QuizData) => {
@@ -261,27 +237,6 @@ const QuizCreation: React.FC = () => {
     }
   };
 
-  // Add function to open assignment modal
-  const openAssignModal = (quiz: QuizData) => {
-    setQuizToAssign(quiz);
-    setIsAssignModalOpen(true);
-  };
-
-  // Add function to close assignment modal
-  const closeAssignModal = () => {
-    setIsAssignModalOpen(false);
-    setQuizToAssign(null);
-  };
-
-  // Add function to handle assignment success
-  const handleAssignmentSuccess = () => {
-    setSuccessMessage(
-      `Quiz "${quizToAssign?.title}" successfully assigned to staff.`
-    );
-    setIsAssignModalOpen(false);
-    setQuizToAssign(null);
-  };
-
   // --- Create/Generate Quiz Logic ---
   const handleGenerateQuiz = async (title: string, menuIds: string[]) => {
     setIsGenerating(true);
@@ -291,15 +246,47 @@ const QuizCreation: React.FC = () => {
         title: title,
         menuIds: menuIds,
       });
-      // Don't set quizForPreview, open editor directly
-      setSuccessMessage("Quiz generated successfully! Ready for preview/edit.");
+      setSuccessMessage("Quiz generated successfully! Ready for edit."); // Updated message
       setIsCreateModalOpen(false); // Close create modal on success
-      openEditor(response.data.quiz); // Open the editor with the new quiz
+      // Explicitly open the editor in edit mode for newly generated quiz
+      openEditor(response.data.quiz);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to generate quiz.");
       // Keep create modal open on error
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // --- Activate Quiz Logic ---
+  const handleActivateQuiz = async (quizId: string) => {
+    setError(null);
+    setSuccessMessage(null);
+    // Optionally set a specific loading state for activation?
+
+    try {
+      // Optimistic UI update?
+      // setQuizzes(prev => prev.map(q => q._id === quizId ? { ...q, isAvailable: true } : q));
+
+      // Use PATCH instead of PUT
+      const response = await api.patch<{ quiz: QuizData }>(`/quiz/${quizId}`, {
+        isAvailable: true,
+      });
+
+      // Update local state with the exact data from backend
+      setQuizzes((prev) =>
+        prev.map((q) => (q._id === quizId ? { ...response.data.quiz } : q))
+      );
+      setSuccessMessage(
+        `Quiz "${response.data.quiz.title}" activated and assigned to all staff.`
+      );
+    } catch (err: any) {
+      console.error("Activation error:", err);
+      setError(err.response?.data?.message || "Failed to activate quiz.");
+      // Revert optimistic update if implemented
+      // fetchQuizzes(); // Or refetch on error?
+    } finally {
+      // Clear specific loading state if used
     }
   };
 
@@ -432,8 +419,8 @@ const QuizCreation: React.FC = () => {
             <QuizList
               quizzes={quizzes}
               isLoading={isLoadingQuizzes}
-              onPreview={openEditor} // Pass openEditor here
-              onAssign={openAssignModal}
+              onPreview={openEditor}
+              onActivate={handleActivateQuiz}
               onDelete={handleDeleteRequest}
               isDeletingQuizId={isDeleting ? quizToDelete?._id || null : null}
               getMenuItemNames={getMenuItemNames} // Pass the utility function
@@ -460,25 +447,7 @@ const QuizCreation: React.FC = () => {
             initialQuizData={quizForEditOrPreview}
             onSave={handleSaveQuiz}
             isSaving={isSaving}
-            onShowResults={handleShowResults}
           />
-
-          {/* Results Modal - Use the new component */}
-          <QuizResultsModal
-            isOpen={isResultsModalOpen}
-            onClose={closeResultsModal}
-            results={quizResults}
-          />
-
-          {/* Assignment Modal */}
-          {isAssignModalOpen && quizToAssign && (
-            <QuizAssignment
-              quizId={quizToAssign._id || ""}
-              quizTitle={quizToAssign.title}
-              onClose={closeAssignModal}
-              onSuccess={handleAssignmentSuccess}
-            />
-          )}
         </div>
       </main>
     </div>

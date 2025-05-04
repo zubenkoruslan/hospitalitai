@@ -18,9 +18,17 @@ const DeleteMenuItemModal: React.FC<DeleteMenuItemModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+    >
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-auto">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">
+        <h2
+          id="delete-modal-title"
+          className="text-xl font-semibold mb-4 text-gray-800"
+        >
           Confirm Deletion
         </h2>
         <p className="mb-6 text-gray-700">

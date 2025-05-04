@@ -37,6 +37,7 @@ class QuizResultService {
    * @param userName - The name of the staff member (for notifications).
    * @param restaurantId - The ID of the restaurant.
    * @param answers - An array of numbers representing the chosen answer indices.
+   * @param cancelled - Indicates whether the quiz was cancelled.
    * @returns A promise resolving to an object containing the submission message, score, total questions, correct answer indices, and the saved result ID.
    * @throws {AppError} If the quiz is not found (404), if the answer count mismatch (400),
    *                    if saving the result fails (500), or for other unexpected errors (500).
@@ -46,7 +47,8 @@ class QuizResultService {
     userId: Types.ObjectId,
     userName: string,
     restaurantId: Types.ObjectId,
-    answers: number[]
+    answers: (number | undefined | null)[],
+    cancelled: boolean = false
   ): Promise<QuizSubmissionResult> {
     const quizObjectId =
       typeof quizId === "string" ? new Types.ObjectId(quizId) : quizId;
@@ -65,31 +67,43 @@ class QuizResultService {
       // 2. Validate answers length
       if (answers.length !== quiz.questions.length) {
         throw new AppError(
-          `Number of answers (${answers.length}) does not match number of questions (${quiz.questions.length})`,
+          `Number of answers provided (${answers.length}) does not match number of questions (${quiz.questions.length})`,
           400
         );
       }
 
-      // 3. Calculate score
+      // 3. Calculate score - treat undefined/null answers as incorrect
       let score = 0;
       const correctAnswers: (number | undefined)[] = [];
+      const processedAnswers: (number | null)[] = [];
+
       quiz.questions.forEach((question, index) => {
         correctAnswers.push(question.correctAnswer);
-        if (answers[index] === question.correctAnswer) {
+        const userAnswer = answers[index];
+        processedAnswers.push(userAnswer === undefined ? null : userAnswer);
+
+        if (
+          userAnswer !== undefined &&
+          userAnswer !== null &&
+          userAnswer === question.correctAnswer
+        ) {
           score++;
         }
       });
 
       // 4. Upsert QuizResult
+      const status = "completed";
+
       const savedResult: IQuizResult | null = await QuizResult.findOneAndUpdate(
         { quizId: quiz._id, userId: userId, restaurantId: restaurantId },
         {
           $set: {
-            answers: answers,
+            answers: processedAnswers,
             score: score,
             totalQuestions: quiz.questions.length,
-            status: "completed",
+            status: status,
             completedAt: new Date(),
+            wasCancelled: cancelled,
           },
           $inc: { retakeCount: 1 },
         },
@@ -135,10 +149,10 @@ class QuizResultService {
     restaurantId: Types.ObjectId
   ): Promise<StaffQuizViewItem[]> {
     try {
-      // 1. Fetch all quizzes for restaurant (lean)
+      // 1. Fetch only ACTIVE quizzes for restaurant (lean)
       // Select fields needed for the view + questions for count
       const availableQuizzes = await Quiz.find(
-        { restaurantId },
+        { restaurantId, isAvailable: true }, // Filter by isAvailable
         "_id title description questions createdAt"
       ).lean();
 
@@ -268,6 +282,161 @@ class QuizResultService {
         error
       );
       throw new AppError("Failed to calculate average score.", 500);
+    }
+  }
+
+  /**
+   * Calculates the average score for a single user based on their completed quizzes.
+   * Helper function for getStaffRankingData.
+   *
+   * @param userResults - Array of completed quiz results for a single user.
+   * @returns The average score percentage (0-100) or null if no valid results.
+   */
+  private static calculateUserAverage(
+    userResults: IQuizResult[]
+  ): number | null {
+    if (!userResults || userResults.length === 0) {
+      return null;
+    }
+
+    // Group results by unique quizId to average percentages correctly
+    const scoresByQuiz: {
+      [quizId: string]: {
+        scoreSum: number;
+        count: number;
+        totalPossibleScore: number;
+      };
+    } = {};
+    userResults.forEach((result) => {
+      // Only consider results with valid score and totalQuestions > 0
+      if (
+        result.score !== undefined &&
+        result.totalQuestions !== undefined &&
+        result.totalQuestions > 0 &&
+        result.quizId
+      ) {
+        const quizIdStr = result.quizId.toString();
+        if (!scoresByQuiz[quizIdStr]) {
+          scoresByQuiz[quizIdStr] = {
+            scoreSum: 0,
+            count: 0,
+            totalPossibleScore: 0,
+          };
+        }
+        // Use the latest attempt for calculating the average for that specific quiz
+        // For simplicity now, let's average all attempts for a quiz (could be refined)
+        // Or, let's just take the score / totalQuestions for the *first* valid result found for each quiz? Needs clarification.
+        // Let's refine: Calculate average percentage for each unique quiz, then average those percentages.
+        scoresByQuiz[quizIdStr].scoreSum += result.score;
+        scoresByQuiz[quizIdStr].count += 1;
+        scoresByQuiz[quizIdStr].totalPossibleScore += result.totalQuestions;
+      }
+    });
+
+    let sumOfQuizPercentages = 0;
+    let uniqueQuizzesCount = 0;
+
+    for (const quizIdStr in scoresByQuiz) {
+      const quizData = scoresByQuiz[quizIdStr];
+      if (quizData.totalPossibleScore > 0) {
+        // Avoid division by zero if count > 0 but totalPossible is 0
+        // Average score for *this specific quiz* across attempts
+        const averageScoreForQuiz = quizData.scoreSum / quizData.count;
+        const averageTotalForQuiz =
+          quizData.totalPossibleScore / quizData.count;
+        if (averageTotalForQuiz > 0) {
+          const percentageForQuiz =
+            (averageScoreForQuiz / averageTotalForQuiz) * 100;
+          sumOfQuizPercentages += percentageForQuiz;
+          uniqueQuizzesCount++;
+        }
+      } else {
+        console.warn(
+          `Quiz ${quizIdStr} has results but zero total possible score averaged across attempts.`
+        );
+      }
+    }
+
+    if (uniqueQuizzesCount === 0) {
+      return null; // No valid quizzes to calculate average from
+    }
+
+    return sumOfQuizPercentages / uniqueQuizzesCount;
+  }
+
+  /**
+   * Fetches ranking data for a staff member within their restaurant.
+   *
+   * @param requestingUserId - The ID of the staff user requesting their rank.
+   * @param restaurantId - The ID of the restaurant.
+   * @returns A promise resolving to an object { myAverageScore, myRank, totalRankedStaff }.
+   * @throws {AppError} If any database error occurs (500).
+   */
+  static async getStaffRankingData(
+    requestingUserId: Types.ObjectId,
+    restaurantId: Types.ObjectId
+  ): Promise<{
+    myAverageScore: number | null;
+    myRank: number | null;
+    totalRankedStaff: number;
+  }> {
+    try {
+      // 1. Fetch all completed results for the entire restaurant
+      const allResults = await QuizResult.find(
+        { restaurantId: restaurantId, status: "completed" },
+        "userId score totalQuestions quizId" // Include quizId
+      ).lean();
+
+      if (allResults.length === 0) {
+        return { myAverageScore: null, myRank: null, totalRankedStaff: 0 };
+      }
+
+      // 2. Group results by userId
+      const resultsByUser: { [userId: string]: IQuizResult[] } = {};
+      allResults.forEach((result) => {
+        const userIdStr = result.userId.toString();
+        if (!resultsByUser[userIdStr]) {
+          resultsByUser[userIdStr] = [];
+        }
+        resultsByUser[userIdStr].push(result as IQuizResult);
+      });
+
+      // 3. Calculate average score for each user
+      const userAverages: { userId: string; averageScore: number }[] = [];
+      for (const userIdStr in resultsByUser) {
+        const userAvg = QuizResultService.calculateUserAverage(
+          resultsByUser[userIdStr]
+        );
+        if (userAvg !== null) {
+          userAverages.push({ userId: userIdStr, averageScore: userAvg });
+        }
+      }
+
+      // 4. Sort users by average score (descending)
+      userAverages.sort((a, b) => b.averageScore - a.averageScore);
+
+      // 5. Find rank and score for the requesting user
+      let myRank: number | null = null;
+      let myAverageScore: number | null = null;
+      const requestingUserIdStr = requestingUserId.toString();
+
+      for (let i = 0; i < userAverages.length; i++) {
+        if (userAverages[i].userId === requestingUserIdStr) {
+          myRank = i + 1; // Rank is 1-based index
+          myAverageScore = userAverages[i].averageScore;
+          break;
+        }
+      }
+
+      // 6. Return results
+      return {
+        myAverageScore: myAverageScore,
+        myRank: myRank,
+        totalRankedStaff: userAverages.length, // Total number of staff with a calculated average
+      };
+    } catch (error: any) {
+      console.error("Error fetching staff ranking data in service:", error);
+      throw new AppError("Failed to fetch staff ranking data.", 500);
     }
   }
 

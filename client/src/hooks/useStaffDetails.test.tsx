@@ -1,8 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { useStaffDetails, StaffDetailsData } from "./useStaffDetails";
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { useStaffDetails } from "./useStaffDetails";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { AxiosResponse } from "axios";
+import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
 
 // Mock dependencies
 jest.mock("../services/api");

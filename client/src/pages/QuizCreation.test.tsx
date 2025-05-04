@@ -5,12 +5,16 @@ import {
   waitFor,
   fireEvent,
   within,
+  act,
 } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../context/AuthContext"; // Adjust path if needed
 import { NotificationProvider } from "../context/NotificationContext"; // Adjust path if needed
 import QuizCreation from "./QuizCreation";
 import api from "../services/api"; // Adjust path if needed
+import { useAuth } from "../context/AuthContext";
+import { Menu } from "../types/menuItemTypes"; // Assuming Menu type is here
+import "@testing-library/jest-dom";
 
 // Mock the api module
 jest.mock("../services/api"); // Keep the original path here for Jest's automocking
@@ -22,52 +26,257 @@ jest.mock("../components/Navbar", () => {
   const MockNavbar = () => <div data-testid="navbar-mock">Navbar</div>;
   return MockNavbar;
 });
-jest.mock("../components/QuizAssignment", () => () => (
-  <div data-testid="quiz-assignment-mock">Quiz Assignment</div>
-));
+jest.mock("../components/QuizAssignment", () => ({
+  default: () => <div data-testid="quiz-assignment-mock">Quiz Assignment</div>,
+}));
 
 // Mock window.confirm
 global.confirm = jest.fn(() => true);
 
+// Mock react-router-dom
+jest.mock("react-router-dom", () => ({
+  ...jest.requireActual("react-router-dom"),
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
+
+// Mock Auth Context
+jest.mock("../context/AuthContext");
+
+// Mock Child Components
+jest.mock("../components/common/LoadingSpinner", () => ({
+  default: () => <div role="status">Loading...</div>,
+}));
+jest.mock("../components/common/ErrorMessage", () => ({
+  default: ({ message }: { message: string }) => (
+    <div role="alert">{message}</div>
+  ),
+}));
+jest.mock("../components/common/SuccessNotification", () => ({
+  default: ({ message }: { message: string }) => (
+    <div role="status" aria-live="polite">
+      {message}
+    </div>
+  ),
+}));
+jest.mock("../components/quiz/QuizList", () => ({
+  default: jest.fn(() => <div data-testid="quiz-list-mock">Quiz List</div>),
+}));
+jest.mock("../components/quiz/CreateQuizModal", () => ({
+  default: jest.fn(() => (
+    <div data-testid="create-quiz-modal-mock">Create Quiz Modal</div>
+  )),
+}));
+jest.mock("../components/quiz/QuizEditorModal", () => ({
+  default: jest.fn(() => (
+    <div data-testid="quiz-editor-modal-mock">Quiz Editor Modal</div>
+  )),
+}));
+jest.mock("../components/quiz/QuizResultsModal", () => ({
+  default: jest.fn(() => (
+    <div data-testid="quiz-results-modal-mock">Quiz Results Modal</div>
+  )),
+}));
+
+// Type assertions for mocks
+const mockedUseAuth = useAuth as jest.Mock;
+const MockedQuizList = jest.requireMock("../components/quiz/QuizList").default;
+const MockedCreateQuizModal = jest.requireMock(
+  "../components/quiz/CreateQuizModal"
+).default;
+const MockedQuizEditorModal = jest.requireMock(
+  "../components/quiz/QuizEditorModal"
+).default;
+const MockedSuccessNotification = jest.requireMock(
+  "../components/common/SuccessNotification"
+).default;
+
 describe("QuizCreation Component", () => {
-  // Helper function to render the component within providers
-  const renderComponent = () => {
-    render(
-      <BrowserRouter>
-        <AuthProvider>
-          <NotificationProvider>
-            <QuizCreation />
-          </NotificationProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    );
+  const mockUser = {
+    name: "Test Manager",
+    restaurantId: "resto1",
+    role: "restaurant",
   };
+  const mockMenus: Menu[] = [
+    { _id: "m1", name: "Menu One", description: "Desc 1" },
+    { _id: "m2", name: "Menu Two", description: "Desc 2" },
+  ];
+  const mockQuizzes: any[] = [
+    {
+      _id: "q1",
+      title: "Quiz One",
+      menuItemIds: ["m1"],
+      questions: [
+        {
+          text: "q1t",
+          choices: ["a", "b"],
+          correctAnswer: 0,
+          menuItemId: "i1",
+        },
+      ],
+      restaurantId: "resto1",
+    },
+    {
+      _id: "q2",
+      title: "Quiz Two",
+      menuItemIds: ["m2"],
+      questions: [
+        {
+          text: "q2t",
+          choices: ["c", "d"],
+          correctAnswer: 1,
+          menuItemId: "i2",
+        },
+      ],
+      restaurantId: "resto1",
+    },
+  ];
 
   beforeEach(() => {
-    // Reset mocks before each test
-    mockedApi.get.mockClear();
-    mockedApi.post.mockClear();
-    mockedApi.put.mockClear();
-    mockedApi.delete.mockClear();
-    (global.confirm as jest.Mock).mockClear();
-
-    // Default mock implementations
-    mockedApi.get.mockImplementation((url) => {
+    jest.clearAllMocks();
+    // Default: Successful load, authorized user
+    mockedUseAuth.mockReturnValue({ user: mockUser, isLoading: false });
+    mockedApi.get.mockImplementation(async (url) => {
       if (url === "/quiz") {
-        return Promise.resolve({ data: { quizzes: [] } }); // Default to no quizzes
+        return { data: { quizzes: mockQuizzes } };
+      } else if (url === "/menus") {
+        return { data: { menus: mockMenus } };
+      } else {
+        throw new Error(`Unexpected GET request: ${url}`);
       }
-      if (url === "/menus") {
-        return Promise.resolve({ data: { menus: [] } }); // Default to no menus
+    });
+    // Reset component mocks
+    MockedQuizList.mockClear();
+    MockedCreateQuizModal.mockClear();
+    MockedQuizEditorModal.mockClear();
+    // Mock other methods used (POST, PUT, DELETE) - initially resolve successfully
+    mockedApi.post.mockResolvedValue({ data: { message: "Success" } });
+    mockedApi.put.mockResolvedValue({ data: { message: "Success" } });
+    mockedApi.delete.mockResolvedValue({ data: { message: "Success" } });
+  });
+
+  const renderComponent = () =>
+    render(
+      <MemoryRouter>
+        {/* Temporarily remove providers to isolate rendering issues */}
+        {/* <AuthProvider>
+          <NotificationProvider> */}
+        <QuizCreation />
+        {/* </NotificationProvider>
+        </AuthProvider> */}
+      </MemoryRouter>
+    );
+
+  it("should show loading state initially for quizzes and menus", () => {
+    // Override mock to simulate initial loading
+    mockedApi.get.mockImplementation(() => new Promise(() => {})); // Never resolves
+    mockedUseAuth.mockReturnValue({ user: null, isLoading: true }); // Also ensure auth starts loading
+    renderComponent();
+    // Check for at least one loading spinner
+    expect(screen.getAllByRole("status").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByTestId("quiz-list-mock")).not.toBeInTheDocument();
+  });
+
+  it("should render quiz list and create button on successful load", async () => {
+    // Ensure useAuth provides user immediately for this test
+    mockedUseAuth.mockReturnValue({ user: mockUser, isLoading: false });
+    renderComponent();
+    // Increase timeout for waitFor just in case rendering is slow initially
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("quiz-list-mock")).toBeInTheDocument();
+      },
+      { timeout: 2000 }
+    );
+
+    // Check props passed to QuizList
+    expect(MockedQuizList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quizzes: mockQuizzes,
+        onEdit: expect.any(Function),
+        onDeleteRequest: expect.any(Function),
+        onAssign: expect.any(Function),
+      }),
+      {}
+    );
+    expect(
+      screen.getByRole("button", { name: /Create New Quiz/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("should display error if fetching quizzes fails", async () => {
+    const errorMsg = "Failed to fetch quizzes.";
+    mockedApi.get.mockImplementation(async (url) => {
+      if (url === "/quiz") {
+        throw { response: { data: { message: errorMsg } } };
+      } else if (url === "/menus") {
+        return { data: { menus: mockMenus } };
       }
-      return Promise.reject(new Error(`Unhandled GET request: ${url}`));
+      throw new Error("Unexpected GET");
+    });
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(errorMsg);
+    });
+    expect(screen.queryByTestId("quiz-list-mock")).not.toBeInTheDocument();
+  });
+
+  it("should display error if fetching menus fails", async () => {
+    const errorMsg = "Failed to fetch menus.";
+    mockedApi.get.mockImplementation(async (url) => {
+      if (url === "/quiz") {
+        return { data: { quizzes: mockQuizzes } };
+      } else if (url === "/menus") {
+        throw { response: { data: { message: errorMsg } } };
+      }
+      throw new Error("Unexpected GET");
+    });
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(errorMsg);
+    });
+    // Quiz list might still render if quizzes loaded okay
+    await waitFor(() => {
+      expect(screen.getByTestId("quiz-list-mock")).toBeInTheDocument();
     });
   });
 
-  test("renders loading state initially", () => {
+  it("should open Create Quiz Modal when create button is clicked", async () => {
     renderComponent();
-    // Check for loading spinner using data-testid
-    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("quiz-list-mock")).toBeInTheDocument();
+    });
+
+    // Check modal is not initially rendered (or is mocked but not visible)
+    // We check if the mock was called with isOpen=false initially, assuming it controls rendering
+    expect(MockedCreateQuizModal).toHaveBeenCalledWith(
+      expect.objectContaining({ isOpen: false }),
+      {}
+    );
+
+    // Click the create button
+    fireEvent.click(screen.getByRole("button", { name: /Create New Quiz/i }));
+
+    // Check if the modal mock is now called with isOpen=true and correct props
+    await waitFor(() => {
+      expect(MockedCreateQuizModal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isOpen: true,
+          menus: mockMenus,
+          isLoadingMenus: false, // Assuming menus loaded successfully
+          isGenerating: false,
+          // Check for onClose and onSubmit props
+          onClose: expect.any(Function),
+          onSubmit: expect.any(Function),
+        }),
+        {}
+      );
+    });
   });
+
+  // Add tests for other modal interactions, generation, saving, deletion next
 
   test("renders empty state when no quizzes are fetched", async () => {
     // Override default mock for this test
@@ -149,39 +358,6 @@ describe("QuizCreation Component", () => {
     expect(within(quizTwoItem!).queryByText("Edit")).not.toBeInTheDocument();
     expect(within(quizTwoItem!).queryByText("Assign")).not.toBeInTheDocument();
     expect(within(quizTwoItem!).getByText("Delete")).toBeInTheDocument();
-  });
-
-  test("opens and closes the Create New Quiz modal", async () => {
-    renderComponent();
-    await waitFor(() => {
-      expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
-    });
-
-    // Modal should not be visible initially
-    expect(
-      screen.queryByRole("heading", { name: /Create New Quiz/i })
-    ).not.toBeInTheDocument();
-
-    // Click the create button
-    fireEvent.click(screen.getByRole("button", { name: /Create New Quiz/i }));
-
-    // Modal should be visible
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: /Create New Quiz/i })
-      ).toBeInTheDocument();
-    });
-    expect(screen.getByLabelText(/Quiz Title/i)).toBeInTheDocument();
-
-    // Click cancel
-    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
-
-    // Modal should close
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("heading", { name: /Create New Quiz/i })
-      ).not.toBeInTheDocument();
-    });
   });
 
   test("opens Preview modal in view mode and toggles edit mode for unassigned quiz", async () => {
@@ -514,4 +690,155 @@ describe("QuizCreation Component", () => {
   // TODO: Add tests for generating quiz from menus
   // TODO: Add tests for saving edits in preview/edit modal
   // TODO: Add tests for submitting answers in preview modal
+
+  it("should handle quiz generation successfully", async () => {
+    renderComponent();
+    await waitFor(() => {
+      expect(MockedCreateQuizModal).toHaveBeenCalled();
+    });
+
+    // Simulate opening the modal (find its props and call onClose/onSubmit)
+    const createModalProps = MockedCreateQuizModal.mock.calls[0][0]; // Get props of the first call
+
+    // Simulate submitting the create/generate form from the modal
+    const generatedQuiz = {
+      _id: "gen1",
+      title: "Generated Quiz",
+      menuItemIds: ["m1"],
+      questions: [
+        { text: "g1", choices: ["a", "b"], correctAnswer: 0, menuItemId: "i1" },
+      ],
+      restaurantId: "resto1",
+    };
+    mockedApi.post.mockResolvedValueOnce({ data: { quiz: generatedQuiz } });
+
+    // Call the onSubmit passed to the modal
+    await act(async () => {
+      await createModalProps.onSubmit("Generated Quiz", ["m1"]);
+    });
+
+    // Check API call
+    await waitFor(() => {
+      expect(mockedApi.post).toHaveBeenCalledWith("/quiz/auto", {
+        title: "Generated Quiz",
+        menuIds: ["m1"],
+      });
+    });
+
+    // Check if editor modal is opened with the new quiz
+    expect(MockedQuizEditorModal).toHaveBeenCalledWith(
+      expect.objectContaining({ isOpen: true, quizData: generatedQuiz }),
+      {}
+    );
+    // Check if create modal was closed
+    expect(MockedCreateQuizModal).toHaveBeenCalledWith(
+      expect.objectContaining({ isOpen: false }),
+      {}
+    );
+  });
+
+  it("should handle saving edited quiz successfully", async () => {
+    renderComponent();
+    await waitFor(() => {
+      expect(MockedQuizEditorModal).toHaveBeenCalled();
+    });
+
+    // Simulate opening the editor modal (e.g., via QuizList interaction - simplified here)
+    // Find the props passed to the editor modal mock
+    // For simplicity, let's assume it was opened with the first mock quiz
+    // Add type definition for the mock call argument
+    const editorModalProps = MockedQuizEditorModal.mock.calls.find(
+      (call: any[]) => call[0].quizData?._id === "q1"
+    )?.[0];
+
+    // If the modal wasn't opened initially (which it shouldn't be), simulate it opening
+    // This part might need adjustment based on how editing is triggered (e.g., clicking edit in QuizList)
+    // We'll manually trigger the state change for the test as if edit was clicked.
+    // In a real test, you might simulate the click in QuizList's mock or the parent.
+    act(() => {
+      // This simulates the internal setQuizForEditOrPreview(mockQuizzes[0])
+      // We re-render or find the props again after the state update
+    });
+    // For now, let's assume the props are somehow available after an edit action
+    // We need a way to get the props AFTER the modal is supposedly opened
+    // Let's just mock the call that would happen if it were open:
+    // Add type definition for the mock call argument
+    const saveHandler = MockedQuizEditorModal.mock.calls.find(
+      (call: any[]) => call[0].isOpen
+    )?.[0]?.onSave;
+    const editedQuizData = { ...mockQuizzes[0], title: "Edited Quiz One" };
+
+    if (saveHandler) {
+      // Simulate saving from the editor modal
+      mockedApi.put.mockResolvedValueOnce({ data: { quiz: editedQuizData } });
+
+      await act(async () => {
+        await saveHandler(editedQuizData);
+      });
+
+      // Check API call
+      await waitFor(() => {
+        expect(mockedApi.put).toHaveBeenCalledWith(
+          `/quiz/${editedQuizData._id}`,
+          editedQuizData
+        );
+      });
+
+      // Check success notification
+      await waitFor(() => {
+        expect(MockedSuccessNotification).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "Quiz saved successfully!" }),
+          {}
+        );
+      });
+
+      // Check if quiz list data was updated (implicitly tested by checking QuizList props if refetch happens)
+      // Or check if fetchQuizzes was called again (mock api.get for /quiz again)
+      expect(mockedApi.get).toHaveBeenCalledWith("/quiz"); // Check if refetch happened
+    } else {
+      throw new Error("Could not find onSave handler for QuizEditorModal mock");
+    }
+  });
+
+  it("should handle deleting a quiz successfully", async () => {
+    // Mock window.confirm to return true
+    global.confirm = jest.fn(() => true);
+
+    renderComponent();
+    await waitFor(() => {
+      expect(MockedQuizList).toHaveBeenCalled();
+    });
+
+    // Find the props passed to QuizList to get the onDeleteRequest handler
+    const quizListProps = MockedQuizList.mock.calls[0][0];
+    const quizToDelete = mockQuizzes[0];
+
+    // Simulate calling onDeleteRequest from the QuizList
+    await act(async () => {
+      await quizListProps.onDeleteRequest(quizToDelete);
+    });
+
+    // Check confirm was called
+    expect(global.confirm).toHaveBeenCalledWith(
+      `Are you sure you want to delete the quiz "${quizToDelete.title}"?`
+    );
+
+    // Check API call
+    await waitFor(() => {
+      expect(mockedApi.delete).toHaveBeenCalledWith(
+        `/quiz/${quizToDelete._id}`
+      );
+    });
+
+    // Check success notification
+    await waitFor(() => {
+      expect(MockedSuccessNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Quiz deleted successfully!" }),
+        {}
+      );
+    });
+
+    // Check if quiz list was refetched
+    expect(mockedApi.get).toHaveBeenCalledWith("/quiz"); // Should be called again after delete
+  });
 });

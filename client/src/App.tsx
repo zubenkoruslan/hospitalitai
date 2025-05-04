@@ -19,12 +19,10 @@ import StaffDashboard from "./pages/StaffDashboard";
 import MenusPage from "./pages/MenusPage";
 import MenuItemsPage from "./pages/MenuItemsPage";
 import QuizCreation from "./pages/QuizCreation";
-import StaffQuizListPage from "./pages/StaffQuizListPage";
 import QuizTakingPage from "./pages/QuizTakingPage";
 import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
-import MyResultsPage from "./pages/MyResultsPage";
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
 // Component to handle root path redirection based on auth state
@@ -143,26 +141,10 @@ function App() {
               }
             />
             <Route
-              path="/staff/quizzes"
-              element={
-                <ProtectedRoute requiredRole="staff">
-                  <StaffQuizListPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/staff/quiz/:quizId/take"
               element={
                 <ProtectedRoute requiredRole="staff">
                   <QuizTakingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/my-results"
-              element={
-                <ProtectedRoute requiredRole="staff">
-                  <MyResultsPage />
                 </ProtectedRoute>
               }
             />

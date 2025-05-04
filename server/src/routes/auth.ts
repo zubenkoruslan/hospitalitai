@@ -50,6 +50,7 @@ interface AuthPayload {
   name: string; // Add user name
   restaurantId?: mongoose.Types.ObjectId;
   restaurantName?: string; // Add restaurantName (optional)
+  professionalRole?: string; // Add professionalRole (optional)
 }
 
 interface SignupData {
@@ -124,6 +125,7 @@ router.post(
         name: userResultData.name,
         restaurantId: userResultData.restaurantId,
         restaurantName: restaurantNameForJwt,
+        professionalRole: userResultData.professionalRole,
       };
       const options: jwt.SignOptions = { expiresIn: JWT_EXPIRES_IN_SECONDS };
       const token = jwt.sign(payload, JWT_SECRET, options);
@@ -170,6 +172,7 @@ router.post(
         name: user.name,
         restaurantId: user.restaurantId,
         restaurantName: restaurantName,
+        professionalRole: user.professionalRole,
       };
 
       // Sign the token

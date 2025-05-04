@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { useQuizCount } from "./useQuizCount";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -39,6 +39,10 @@ describe("useQuizCount Hook", () => {
   it("should fetch quiz count successfully for authorized user", async () => {
     const { result } = renderHook(() => useQuizCount());
 
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    // Wait for the fetch to complete
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -55,13 +59,17 @@ describe("useQuizCount Hook", () => {
 
     const { result } = renderHook(() => useQuizCount());
 
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    // Wait for the fetch to complete and error to be set
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
     expect(mockedApi.get).toHaveBeenCalledTimes(1);
     expect(result.current.quizCount).toBe(0); // Defaults to 0 on error
-    expect(result.current.error).toContain(errorMessage);
+    expect(result.current.error).toBe("Failed to fetch quiz count.");
   });
 
   it("should return 0 for unauthorized user role and not call API", async () => {
