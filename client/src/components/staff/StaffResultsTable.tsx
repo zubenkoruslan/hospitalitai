@@ -170,6 +170,24 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                                   (Completed:{" "}
                                   {formatDate(result.completedAt, true)})
                                 </span>
+                                {result.totalQuestions > 0 && (
+                                  <span
+                                    className={`ml-2 font-semibold ${
+                                      (result.score / result.totalQuestions) *
+                                        100 >=
+                                      70
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    (
+                                    {(
+                                      (result.score / result.totalQuestions) *
+                                      100
+                                    ).toFixed(0)}
+                                    %)
+                                  </span>
+                                )}
                                 <span className="text-xs text-gray-500 ml-2">
                                   {" "}
                                   (Retakes:{" "}

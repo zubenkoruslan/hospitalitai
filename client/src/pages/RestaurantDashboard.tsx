@@ -239,7 +239,15 @@ const RestaurantDashboard: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-700">
                 Staff Performance (Avg. Score)
               </h3>
-              <p className="text-3xl font-semibold text-amber-600">
+              <p
+                className={`text-3xl font-semibold ${
+                  staffData.length === 0
+                    ? "text-gray-500"
+                    : parseFloat(overallAveragePerformance) >= 70
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
                 {staffData.length > 0 ? `${overallAveragePerformance}%` : "N/A"}
               </p>
               <Link
@@ -362,7 +370,15 @@ const RestaurantDashboard: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {staff.quizzesTaken ?? 0} / {totalQuizzes}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td
+                          className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
+                            staff.averageScore === null
+                              ? "text-gray-500"
+                              : staff.averageScore >= 70
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
                           {staff.averageScore !== null
                             ? `${staff.averageScore.toFixed(1)}%`
                             : "N/A"}

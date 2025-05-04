@@ -290,9 +290,18 @@ const StaffDashboard: React.FC = () => {
         <div className="space-y-2 text-sm text-gray-700">
           <p>
             <span className="font-medium">Your Average Score:</span>
-            {myAverageScore !== null
-              ? ` ${myAverageScore.toFixed(1)}%`
-              : " N/A (No completed quizzes)"}
+            {myAverageScore !== null ? (
+              // Add span with conditional coloring
+              <span
+                className={`font-semibold ${
+                  myAverageScore >= 70 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {` ${myAverageScore.toFixed(1)}%`}
+              </span>
+            ) : (
+              " N/A (No completed quizzes)"
+            )}
           </p>
           {/* 
           <p>

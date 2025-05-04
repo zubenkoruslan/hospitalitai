@@ -192,14 +192,22 @@ const StaffDetails: React.FC = () => {
                   </p>
                 )}
 
-                {/* Average Score Display */}
+                {/* Average Score Display - Add Styling */}
                 <div className="text-sm text-gray-600">
                   Average Score:{" "}
-                  <span className="font-semibold text-gray-800">
-                    {staffDetails.averageScore != null
-                      ? `${staffDetails.averageScore.toFixed(1)}%`
-                      : "N/A"}
-                  </span>
+                  {staffDetails.averageScore != null ? (
+                    <span
+                      className={`font-semibold ${
+                        staffDetails.averageScore >= 70
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {`${staffDetails.averageScore.toFixed(1)}%`}
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-gray-500">N/A</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -254,8 +262,25 @@ const StaffDetails: React.FC = () => {
                       <td className="px-4 py-3 text-gray-500">
                         {formatDate(result.completedAt, true)}
                       </td>
+                      {/* Score Column - Add Styling */}
                       <td className="px-4 py-3 text-gray-700">
                         {result.score}/{result.totalQuestions}
+                        {result.totalQuestions > 0 && (
+                          <span
+                            className={`ml-2 font-semibold ${
+                              (result.score / result.totalQuestions) * 100 >= 70
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            (
+                            {(
+                              (result.score / result.totalQuestions) *
+                              100
+                            ).toFixed(0)}
+                            %)
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {result.retakeCount > 0 ? result.retakeCount - 1 : 0}

@@ -46,10 +46,13 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
     return null;
   }
 
-  const scorePercentage =
+  // Calculate raw percentage first for comparison
+  const rawPercentage =
     results.totalQuestions > 0
-      ? ((results.score / results.totalQuestions) * 100).toFixed(0)
+      ? (results.score / results.totalQuestions) * 100
       : 0;
+  // Format percentage for display
+  const displayPercentage = rawPercentage.toFixed(0);
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
@@ -58,8 +61,13 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
         <h2 className="text-xl font-semibold mb-2 text-gray-800">
           Preview Results: {results.quizData.title}
         </h2>
-        <p className="text-lg font-medium mb-4 text-gray-700">
-          Score: {results.score} / {results.totalQuestions} ({scorePercentage}%)
+        <p
+          className={`text-lg font-medium mb-4 ${
+            rawPercentage >= 70 ? "text-green-600" : "text-red-600"
+          }`}
+        >
+          Score: {results.score} / {results.totalQuestions} ({displayPercentage}
+          %)
         </p>
 
         <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2">

@@ -172,12 +172,29 @@ const QuizResultDetailModal: React.FC<QuizResultDetailModalProps> = ({
                       <div>
                         <span className="text-gray-500">Score: </span>
                         <span className="font-medium">
-                          {result.score} / {result.totalQuestions} (
-                          {calculatePercentage(
-                            result.score,
-                            result.totalQuestions
+                          {/* Apply conditional color based on percentage */}
+                          {result.totalQuestions > 0 ? (
+                            <span
+                              className={`font-semibold ${
+                                (result.score / result.totalQuestions) * 100 >=
+                                70
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {result.score} / {result.totalQuestions} (
+                              {calculatePercentage(
+                                result.score,
+                                result.totalQuestions
+                              )}
+                              )
+                            </span>
+                          ) : (
+                            // Handle case with 0 total questions if possible
+                            <span className="text-gray-500">
+                              {result.score} / {result.totalQuestions} (N/A)
+                            </span>
                           )}
-                          )
                         </span>
                       </div>
                       <div>

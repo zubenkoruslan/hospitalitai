@@ -312,6 +312,11 @@ const QuizTakingPage: React.FC = () => {
     return <ErrorMessage message="Quiz data could not be loaded." />;
 
   if (submissionResult) {
+    // Calculate percentage for styling
+    const score = submissionResult.score;
+    const total = submissionResult.totalQuestions;
+    const percentage = total > 0 ? (score / total) * 100 : 0;
+
     return (
       <div className="min-h-screen bg-gray-100">
         <Navbar />
@@ -321,17 +326,18 @@ const QuizTakingPage: React.FC = () => {
               Quiz Submitted!
             </h1>
             <p className="text-lg text-gray-600 mb-4">Your score:</p>
-            <p className="text-4xl font-extrabold text-blue-600 mb-6">
-              {submissionResult.score} / {submissionResult.totalQuestions}
-            </p>
-            <p className="text-sm text-gray-500 mb-6">
-              (
-              {(
-                (submissionResult.score / submissionResult.totalQuestions) *
-                100
-              ).toFixed(0)}
-              %)
-            </p>
+            <div
+              className={`mb-6 font-extrabold ${
+                percentage >= 70 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              <p className="text-4xl">
+                {score} / {total}
+              </p>
+              <p className="text-sm font-semibold mt-1">
+                ({percentage.toFixed(0)}%)
+              </p>
+            </div>
             <Link
               to="/staff/dashboard"
               className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
