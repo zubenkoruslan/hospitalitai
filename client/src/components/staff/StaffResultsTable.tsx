@@ -141,53 +141,55 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                         </h4>
                         {completedQuizzes.length > 0 ? (
                           <ul className="space-y-2">
-                            {completedQuizzes.map((result) => (
-                              <li
-                                key={result._id}
-                                className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
-                              >
-                                <span className="font-medium">
-                                  {result.quizTitle}:
-                                </span>{" "}
-                                {result.score}/{result.totalQuestions} (
-                                {(
-                                  (result.score / result.totalQuestions) *
-                                  100
-                                ).toFixed(0)}
-                                %)
-                                <span className="text-xs text-gray-500 ml-2">
-                                  {" "}
-                                  (Completed:{" "}
-                                  {formatDate(result.completedAt, true)})
-                                </span>
-                                {result.totalQuestions > 0 && (
-                                  <span
-                                    className={`ml-2 font-semibold ${
-                                      (result.score / result.totalQuestions) *
-                                        100 >=
-                                      70
-                                        ? "text-green-600"
-                                        : "text-red-600"
-                                    }`}
-                                  >
-                                    (
-                                    {(
-                                      (result.score / result.totalQuestions) *
-                                      100
-                                    ).toFixed(0)}
-                                    %)
+                            {completedQuizzes.map((result) => {
+                              return (
+                                <li
+                                  key={result._id}
+                                  className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
+                                >
+                                  <span className="font-medium">
+                                    {result.quizTitle}
                                   </span>
-                                )}
-                                <span className="text-xs text-gray-500 ml-2">
-                                  {" "}
-                                  (Retakes:{" "}
-                                  {result.retakeCount > 0
-                                    ? result.retakeCount - 1
-                                    : 0}
-                                  )
-                                </span>
-                              </li>
-                            ))}
+                                  : {result.score}/{result.totalQuestions} (
+                                  {(
+                                    (result.score / result.totalQuestions) *
+                                    100
+                                  ).toFixed(0)}
+                                  %)
+                                  <span className="text-xs text-gray-500 ml-2">
+                                    {" "}
+                                    (Completed:{" "}
+                                    {formatDate(result.completedAt, true)})
+                                  </span>
+                                  {result.totalQuestions > 0 && (
+                                    <span
+                                      className={`ml-2 font-semibold ${
+                                        (result.score / result.totalQuestions) *
+                                          100 >=
+                                        70
+                                          ? "text-green-600"
+                                          : "text-red-600"
+                                      }`}
+                                    >
+                                      (
+                                      {(
+                                        (result.score / result.totalQuestions) *
+                                        100
+                                      ).toFixed(0)}
+                                      %)
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-500 ml-2">
+                                    {" "}
+                                    (Retakes:{" "}
+                                    {result.retakeCount > 0
+                                      ? result.retakeCount - 1
+                                      : 0}
+                                    )
+                                  </span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : (
                           <p className="text-gray-500 italic">

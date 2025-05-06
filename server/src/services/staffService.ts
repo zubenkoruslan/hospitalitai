@@ -101,10 +101,28 @@ class StaffService {
           // Fetch the results summary
           const resultsSummary = await QuizResult.find(
             { userId: staffObjectId, restaurantId: restaurantId },
-            "_id quizId quizTitle score totalQuestions completedAt status retakeCount" // Select fields matching ResultSummary
+            "_id quizId score totalQuestions completedAt status retakeCount"
           )
-            .sort({ completedAt: -1 }) // Optional: sort if needed
+            .populate<{ quizId: { title: string } | null }>({
+              path: "quizId",
+              select: "title",
+            })
+            .sort({ completedAt: -1 })
             .lean();
+
+          // Map results to include the populated title
+          const processedSummary = resultsSummary.map((result) => {
+            // Keep original quizId (ObjectId)
+            const originalQuizId = result.quizId;
+            // Get title from the populated object
+            const quizTitle = (result.quizId as any)?.title ?? "[Deleted Quiz]";
+
+            return {
+              ...result,
+              quizId: originalQuizId, // Ensure quizId remains the ObjectId/string
+              quizTitle: quizTitle, // Add the populated title
+            };
+          });
 
           // Construct the return object explicitly matching the interface
           return {
@@ -115,7 +133,7 @@ class StaffService {
             professionalRole: staff.professionalRole,
             averageScore: averageScore,
             quizzesTaken: quizzesTaken,
-            resultsSummary: resultsSummary, // Include the summary
+            resultsSummary: processedSummary,
           } as StaffMemberWithAverage;
         })
       );
