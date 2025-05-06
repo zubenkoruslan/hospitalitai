@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
+import Button from "../components/common/Button"; // Import Button
 // Import shared types
 import {
   MenuItem,
@@ -228,12 +229,9 @@ const MenuItemsPage: React.FC = () => {
                 &larr; Back to Menus
               </Link>
             </div>
-            <button
-              onClick={openAddModal}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
-            >
+            <Button variant="primary" onClick={openAddModal}>
               Add New Item
-            </button>
+            </Button>
           </div>
 
           {/* Notifications */}

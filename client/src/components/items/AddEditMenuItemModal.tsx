@@ -9,6 +9,8 @@ import {
 } from "../../types/menuItemTypes";
 import ErrorMessage from "../common/ErrorMessage";
 import LoadingSpinner from "../common/LoadingSpinner";
+import Button from "../common/Button";
+import Modal from "../common/Modal";
 
 interface AddEditMenuItemModalProps {
   isOpen: boolean;
@@ -212,230 +214,224 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     onSubmit(dataToSubmit, currentItem?._id || null);
   };
 
-  if (!isOpen) return null;
+  const footer = (
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={onClose}
+        disabled={isSubmitting}
+      >
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={isSubmitting || !!formError}
+        className="ml-3"
+        form="add-edit-item-form"
+      >
+        {isSubmitting
+          ? isEditMode
+            ? "Saving..."
+            : "Adding..."
+          : isEditMode
+          ? "Save Changes"
+          : "Add Item"}
+      </Button>
+    </>
+  );
 
-  // Restore input fields to use formData and handleInputChange
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-semibold mb-5 text-gray-800">
-          {isEditMode ? "Edit Menu Item" : "Add New Menu Item"}
-        </h2>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditMode ? "Edit Menu Item" : "Add New Menu Item"}
+      size="2xl"
+      footerContent={footer}
+    >
+      {formError && <ErrorMessage message={formError} />}
+      <form
+        onSubmit={handleSubmit}
+        id="add-edit-item-form"
+        className="space-y-4"
+      >
+        <div>
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="name"
+            id="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            required
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+          />
+        </div>
 
-        {formError && <ErrorMessage message={formError} />}
+        <div>
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Description
+          </label>
+          <textarea
+            name="description"
+            id="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            rows={3}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+          ></textarea>
+        </div>
 
-        {/* Restore form onSubmit */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name */}
+        <div>
+          <label
+            htmlFor="price"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Price ($)
+          </label>
+          <input
+            type="number"
+            name="price"
+            id="price"
+            value={formData.price}
+            onChange={handleInputChange}
+            step="0.01"
+            min="0"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+            placeholder="e.g., 12.99"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="ingredients"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Ingredients
+          </label>
+          <input
+            type="text"
+            name="ingredients"
+            id="ingredients"
+            value={formData.ingredients}
+            onChange={handleInputChange}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+            placeholder="e.g., Flour, Sugar, Eggs"
+          />
+          <p className="mt-1 text-xs text-gray-500">Comma-separated list.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label
-              htmlFor="name"
+              htmlFor="itemType"
               className="block text-sm font-medium text-gray-700"
             >
-              Name <span className="text-red-500">*</span>
+              Item Type <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              name="name"
-              id="name"
-              value={formData.name} // Use value prop
-              onChange={handleInputChange} // Use onChange
+            <select
+              name="itemType"
+              id="itemType"
+              value={formData.itemType}
+              onChange={handleInputChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+            >
+              <option value="" disabled>
+                Select Type...
+              </option>
+              <option value="food">Food</option>
+              <option value="beverage">Beverage</option>
+            </select>
           </div>
-
-          {/* Description */}
           <div>
             <label
-              htmlFor="description"
+              htmlFor="category"
               className="block text-sm font-medium text-gray-700"
             >
-              Description
+              Category <span className="text-red-500">*</span>
             </label>
-            <textarea
-              name="description"
-              id="description"
-              value={formData.description} // Use value prop
-              onChange={handleInputChange} // Use onChange
-              rows={3}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            ></textarea>
-          </div>
-
-          {/* Price */}
-          <div>
-            <label
-              htmlFor="price"
-              className="block text-sm font-medium text-gray-700"
+            <select
+              name="category"
+              id="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              required
+              disabled={!formData.itemType}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
             >
-              Price ($)
-            </label>
-            <input
-              type="number" // Keep type number for browser validation/keyboard
-              name="price"
-              id="price"
-              value={formData.price} // Use value prop (string)
-              onChange={handleInputChange} // Use onChange
-              step="0.01"
-              min="0" // Add min attribute for better validation
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="e.g., 12.99"
-            />
-          </div>
-
-          {/* Ingredients */}
-          <div>
-            <label
-              htmlFor="ingredients"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Ingredients
-            </label>
-            <input
-              type="text"
-              name="ingredients"
-              id="ingredients"
-              value={formData.ingredients} // Use value prop
-              onChange={handleInputChange} // Use onChange
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="e.g., Flour, Sugar, Eggs"
-            />
-            <p className="mt-1 text-xs text-gray-500">Comma-separated list.</p>
-          </div>
-
-          {/* Item Type & Category (Side-by-side) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="itemType"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Item Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="itemType"
-                id="itemType"
-                value={formData.itemType} // Use value prop
-                onChange={handleInputChange} // Use onChange
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="" disabled>
-                  Select Type...
+              <option value="" disabled>
+                {formData.itemType
+                  ? "Select Category..."
+                  : "Select Item Type First"}
+              </option>
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat} className="capitalize">
+                  {cat}
                 </option>
-                <option value="food">Food</option>
-                <option value="beverage">Beverage</option>
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="category"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Category <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="category"
-                id="category"
-                value={formData.category} // Use value prop
-                onChange={handleInputChange} // Use onChange
-                required
-                disabled={!formData.itemType} // Disable if no itemType selected
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
-              >
-                <option value="" disabled>
-                  {formData.itemType
-                    ? "Select Category..."
-                    : "Select Item Type First"}
-                </option>
-                {availableCategories.map((cat) => (
-                  <option key={cat} value={cat} className="capitalize">
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </select>
           </div>
+        </div>
 
-          {/* Dietary Information */}
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-2">
-              Dietary Information
-            </legend>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {(
-                [
-                  "isGlutenFree",
-                  "isDairyFree",
-                  "isVegetarian",
-                  "isVegan",
-                ] as const
-              ).map((flag) => {
-                const label = flag
-                  .substring(2)
-                  .replace(/([A-Z])/g, " $1")
-                  .trim(); // e.g., "Gluten Free"
-                // Disable 'Vegetarian' if 'Vegan' is checked
-                const isVegetarianDisabled =
-                  flag === "isVegetarian" && formData.isVegan;
-                return (
-                  <div key={flag} className="relative flex items-start">
-                    <div className="flex items-center h-5">
-                      <input
-                        id={flag}
-                        name={flag}
-                        type="checkbox"
-                        checked={formData[flag]} // Use checked prop
-                        onChange={handleInputChange} // Use onChange
-                        disabled={isVegetarianDisabled}
-                        className={`focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50`}
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      {/* Apply disabled styling to label as well */}
-                      <label
-                        htmlFor={flag}
-                        className={`font-medium text-gray-700 capitalize ${
-                          isVegetarianDisabled ? "text-gray-400" : ""
-                        }`}
-                      >
-                        {label}
-                      </label>
-                    </div>
+        <fieldset>
+          <legend className="block text-sm font-medium text-gray-700 mb-2">
+            Dietary Information
+          </legend>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {(
+              [
+                "isGlutenFree",
+                "isDairyFree",
+                "isVegetarian",
+                "isVegan",
+              ] as const
+            ).map((flag) => {
+              const label = flag
+                .substring(2)
+                .replace(/([A-Z])/g, " $1")
+                .trim();
+              const isVegetarianDisabled =
+                flag === "isVegetarian" && formData.isVegan;
+              return (
+                <div key={flag} className="relative flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id={flag}
+                      name={flag}
+                      type="checkbox"
+                      checked={formData[flag]}
+                      onChange={handleInputChange}
+                      disabled={isVegetarianDisabled}
+                      className={`focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50`}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
-            <button
-              type="button" // Ensure it doesn't submit form
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !!formError} // Disable if submitting or if there's a validation error shown
-              className="inline-flex justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <LoadingSpinner />
-              ) : isEditMode ? (
-                "Save Changes"
-              ) : (
-                "Add Item"
-              )}
-            </button>
+                  <div className="ml-3 text-sm">
+                    <label
+                      htmlFor={flag}
+                      className={`font-medium text-gray-700 capitalize ${
+                        isVegetarianDisabled ? "text-gray-400" : ""
+                      }`}
+                    >
+                      {label}
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </form>
-      </div>
-    </div>
+        </fieldset>
+      </form>
+    </Modal>
   );
 };
 

@@ -9,11 +9,13 @@ import Navbar from "../components/Navbar"; // Import Navbar
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
+import Button from "../components/common/Button"; // Import Button
 // Import quiz components
 import QuizList from "../components/quiz/QuizList"; // Import the new QuizList component
 import CreateQuizModal from "../components/quiz/CreateQuizModal"; // Import the new CreateQuizModal
 import QuizEditorModal from "../components/quiz/QuizEditorModal"; // Import the new editor modal
 import QuizResultsModal from "../components/quiz/QuizResultsModal"; // Import the results modal
+import Card from "../components/common/Card"; // Import Card
 
 // --- Interfaces (matching backend models) ---
 
@@ -393,12 +395,9 @@ const QuizCreation: React.FC = () => {
             <h1 className="text-2xl font-semibold text-gray-900">
               Quiz Management
             </h1>
-            <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
-            >
+            <Button variant="primary" onClick={openCreateModal}>
               Create New Quiz
-            </button>
+            </Button>
           </div>
 
           {/* Notifications */}
@@ -411,7 +410,7 @@ const QuizCreation: React.FC = () => {
           )}
 
           {/* Quiz List Section */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <Card className="p-0 overflow-hidden sm:rounded-lg">
             <h2 className="sr-only" id="quiz-list-title">
               Available Quizzes
             </h2>
@@ -425,7 +424,7 @@ const QuizCreation: React.FC = () => {
               isDeletingQuizId={isDeleting ? quizToDelete?._id || null : null}
               getMenuItemNames={getMenuItemNames} // Pass the utility function
             />
-          </div>
+          </Card>
 
           {/* --- Modals --- */}
           {/* (Keep all modal rendering logic here for now) */}

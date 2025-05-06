@@ -1,6 +1,8 @@
 import React, { useState, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import Button from "./common/Button";
+import ErrorMessage from "./common/ErrorMessage";
 // import { useAuth } from '../context/AuthContext'; // Import if login on signup is needed
 
 const SignupForm: React.FC = () => {
@@ -85,222 +87,201 @@ const SignupForm: React.FC = () => {
     }
   };
 
+  // Style constants for reuse (adjust as needed)
+  const inputClasses =
+    "appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
+  const labelClasses = "block text-sm font-medium text-gray-700";
+
   return (
-    <form onSubmit={handleSubmit} style={styles.form}>
-      <h2>Sign Up</h2>
-      {error && (
-        <p style={styles.errorText}>
-          {error.split("\n").map((line, i) => (
-            <span key={i}>
-              {line}
-              <br />
-            </span>
-          ))}
-        </p>
-      )}
-
-      {/* Role Selection */}
-      <div style={styles.inputGroup}>
-        <label style={styles.label}>I am a:</label>
-        <div style={{ display: "flex", justifyContent: "space-around" }}>
-          <label>
-            <input
-              type="radio"
-              name="role"
-              value="staff"
-              checked={role === "staff"}
-              onChange={() => setRole("staff")}
-              disabled={isLoading}
-            />{" "}
-            Staff
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="role"
-              value="restaurant"
-              checked={role === "restaurant"}
-              onChange={() => setRole("restaurant")}
-              disabled={isLoading}
-            />{" "}
-            Restaurant Owner/Manager
-          </label>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 shadow-md rounded-lg">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Create your account
+          </h2>
         </div>
-      </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && <ErrorMessage message={error} />}
 
-      {/* Common Fields */}
-      <div style={styles.inputGroup}>
-        <label htmlFor="name" style={styles.label}>
-          Full Name:
-        </label>
-        <input
-          type="text"
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
-      <div style={styles.inputGroup}>
-        <label htmlFor="email" style={styles.label}>
-          Email:
-        </label>
-        <input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
-      <div style={styles.inputGroup}>
-        <label htmlFor="password" style={styles.label}>
-          Password:
-        </label>
-        <input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
-      <div style={styles.inputGroup}>
-        <label htmlFor="confirmPassword" style={styles.label}>
-          Confirm Password:
-        </label>
-        <input
-          type="password"
-          id="confirmPassword"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
+          {/* Role Selection */}
+          <div className="space-y-2">
+            <label className={labelClasses}>I am a:</label>
+            <div className="flex items-center justify-around space-x-4 bg-gray-50 p-2 rounded-md">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="role"
+                  value="staff"
+                  checked={role === "staff"}
+                  onChange={() => setRole("staff")}
+                  disabled={isLoading}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Staff</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="role"
+                  value="restaurant"
+                  checked={role === "restaurant"}
+                  onChange={() => setRole("restaurant")}
+                  disabled={isLoading}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  Owner/Manager
+                </span>
+              </label>
+            </div>
+          </div>
 
-      {/* Conditional Fields */}
-      {role === "restaurant" && (
-        <div style={styles.inputGroup}>
-          <label htmlFor="restaurantName" style={styles.label}>
-            Restaurant Name:
-          </label>
-          <input
-            type="text"
-            id="restaurantName"
-            value={restaurantName}
-            onChange={(e) => setRestaurantName(e.target.value)}
-            required={role === "restaurant"}
-            style={styles.input}
-            disabled={isLoading}
-          />
-        </div>
-      )}
-      {role === "staff" && (
-        <>
-          <div style={styles.inputGroup}>
-            {/* This might be better as an invite code lookup later */}
-            <label htmlFor="restaurantId" style={styles.label}>
-              Restaurant ID (Provided by Manager):
+          {/* Common Fields */}
+          <div>
+            <label htmlFor="name" className={labelClasses}>
+              Full Name
             </label>
             <input
+              id="name"
+              name="name"
               type="text"
-              id="restaurantId"
-              value={restaurantId}
-              onChange={(e) => setRestaurantId(e.target.value)}
-              required={role === "staff"}
-              style={styles.input}
+              autoComplete="name"
+              required
+              className={inputClasses}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               disabled={isLoading}
             />
           </div>
-          <div style={styles.inputGroup}>
-            <label htmlFor="professionalRole" style={styles.label}>
-              Your Professional Role:
+          <div>
+            <label htmlFor="email" className={labelClasses}>
+              Email address
             </label>
             <input
-              type="text"
-              id="professionalRole"
-              value={professionalRole}
-              onChange={(e) => setProfessionalRole(e.target.value)}
-              required={role === "staff"}
-              placeholder="E.g., Waiter, Chef, Supervisor"
-              style={styles.input}
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className={inputClasses}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
             />
           </div>
-        </>
-      )}
+          <div>
+            <label htmlFor="password" className={labelClasses}>
+              Password (min. 6 characters)
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              className={inputClasses}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          <div>
+            <label htmlFor="confirmPassword" className={labelClasses}>
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              className={inputClasses}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
 
-      <button type="submit" disabled={isLoading} style={styles.button}>
-        {isLoading ? "Signing up..." : "Sign Up"}
-      </button>
+          {/* Conditional Fields */}
+          {role === "restaurant" && (
+            <div>
+              <label htmlFor="restaurantName" className={labelClasses}>
+                Restaurant Name
+              </label>
+              <input
+                id="restaurantName"
+                name="restaurantName"
+                type="text"
+                required={role === "restaurant"}
+                className={inputClasses}
+                value={restaurantName}
+                onChange={(e) => setRestaurantName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+          )}
+          {role === "staff" && (
+            <>
+              <div>
+                <label htmlFor="restaurantId" className={labelClasses}>
+                  Restaurant ID (Provided by Manager)
+                </label>
+                <input
+                  id="restaurantId"
+                  name="restaurantId"
+                  type="text"
+                  required={role === "staff"}
+                  className={inputClasses}
+                  value={restaurantId}
+                  onChange={(e) => setRestaurantId(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label htmlFor="professionalRole" className={labelClasses}>
+                  Your Professional Role
+                </label>
+                <input
+                  id="professionalRole"
+                  name="professionalRole"
+                  type="text"
+                  required={role === "staff"}
+                  placeholder="E.g., Waiter, Chef, Supervisor"
+                  className={inputClasses}
+                  value={professionalRole}
+                  onChange={(e) => setProfessionalRole(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
 
-      <p style={styles.loginLink}>
-        Already have an account? <a href="/login">Log In</a>
-      </p>
-    </form>
+          <div>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isLoading}
+              className="w-full flex justify-center"
+            >
+              {isLoading ? "Signing up..." : "Sign Up"}
+            </Button>
+          </div>
+        </form>
+        <div className="text-sm text-center">
+          <p className="text-gray-600">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Log In
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
-};
-
-// Reusing similar basic styles from LoginForm for consistency
-const styles: { [key: string]: React.CSSProperties } = {
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "2rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    maxWidth: "450px", // Slightly wider for more fields
-    margin: "2rem auto",
-    backgroundColor: "#f9f9f9",
-  },
-  inputGroup: {
-    marginBottom: "1rem",
-    width: "100%",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.5rem",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "0.75rem",
-    border: "1px solid #ccc",
-    borderRadius: "4px",
-    boxSizing: "border-box",
-  },
-  button: {
-    padding: "0.75rem 1.5rem",
-    backgroundColor: "#28a745", // Green for signup
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "1rem",
-    marginTop: "1rem",
-    opacity: 1,
-    transition: "opacity 0.3s ease",
-  },
-  errorText: {
-    color: "red",
-    marginBottom: "1rem",
-    textAlign: "center",
-    whiteSpace: "pre-line", // Allow newline characters for multiple errors
-  },
-  loginLink: {
-    marginTop: "1.5rem",
-    fontSize: "0.9rem",
-  },
 };
 
 export default SignupForm;

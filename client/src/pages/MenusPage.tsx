@@ -4,6 +4,8 @@ import { AxiosResponse } from "axios";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
+import Button from "../components/common/Button";
+import Card from "../components/common/Card";
 
 // --- Interfaces ---
 interface Menu {
@@ -284,15 +286,12 @@ const MenusPage: React.FC = () => {
         <div className="px-4 sm:px-0">
           {/* Page Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Menu Management
+            <h1 className="text-3xl font-bold leading-tight text-gray-900">
+              Menus
             </h1>
-            <button
-              onClick={openAddModal}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out text-sm font-medium"
-            >
+            <Button variant="primary" onClick={openAddModal}>
               Add New Menu
-            </button>
+            </Button>
           </div>
 
           {/* Notifications */}
@@ -308,7 +307,7 @@ const MenusPage: React.FC = () => {
           {isLoading ? (
             <LoadingSpinner />
           ) : (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <Card className="p-0 overflow-hidden sm:rounded-lg">
               {menus.length > 0 ? (
                 <ul
                   className="divide-y divide-gray-200"
@@ -366,7 +365,7 @@ const MenusPage: React.FC = () => {
                   No menus found. Add one to get started!
                 </p>
               )}
-            </div>
+            </Card>
           )}
         </div>
       </main>
@@ -417,26 +416,24 @@ const MenusPage: React.FC = () => {
                   disabled={isSubmitting}
                 />
               </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSubmitting}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Cancel
-                </button>
-                <button
+              <div className="mt-5 sm:mt-6 sm:flex sm:flex-row-reverse px-4 py-3 bg-gray-50 sm:px-6">
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={isSubmitting}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="ml-3 inline-flex justify-center"
                 >
                   {isSubmitting
-                    ? "Saving..."
+                    ? currentMenu
+                      ? "Saving..."
+                      : "Adding..."
                     : currentMenu
                     ? "Save Changes"
                     : "Add Menu"}
-                </button>
+                </Button>
+                <Button type="button" variant="secondary" onClick={closeModal}>
+                  Cancel
+                </Button>
               </div>
             </form>
           </div>
@@ -445,38 +442,83 @@ const MenusPage: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && currentMenu && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 my-8">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              Confirm Deletion
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete the menu "
-              <strong>{currentMenu.name}</strong>"? This action cannot be
-              undone.
-              <br />
-              <span className="text-red-600 font-medium">
-                Note: Deleting a menu will NOT delete its associated items.
-              </span>
-              {/* TODO: Decide if items should be deleted or unlinked when menu is deleted */}
-            </p>
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                type="button"
-                onClick={closeModal}
-                disabled={isSubmitting}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={isSubmitting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-              >
-                {isSubmitting ? "Deleting..." : "Delete Menu"}
-              </button>
+        <div
+          className="fixed z-10 inset-0 overflow-y-auto"
+          aria-labelledby="modal-title"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              aria-hidden="true"
+            ></div>
+
+            {/* Modal panel */}
+            <span
+              className="hidden sm:inline-block sm:align-middle sm:h-screen"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    {/* Heroicon name: outline/exclamation */}
+                    <svg
+                      className="h-6 w-6 text-red-600"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3
+                      className="text-lg leading-6 font-medium text-gray-900"
+                      id="modal-title"
+                    >
+                      Delete Menu
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete the menu "
+                        <strong>{currentMenu.name}</strong>"? This action cannot
+                        be undone.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={isSubmitting}
+                  onClick={handleDeleteConfirm}
+                  className="inline-flex justify-center w-full sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  {isSubmitting ? "Deleting..." : "Delete"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeModal}
+                  className="mt-3 inline-flex justify-center w-full sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>

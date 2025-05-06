@@ -16,6 +16,7 @@ import ErrorMessage from "../components/common/ErrorMessage"; // Import common E
 import ScoreDistributionChart from "../components/charts/ScoreDistributionChart"; // Import the chart
 import StaffResultsFilter from "../components/staff/StaffResultsFilter"; // Import the filter component
 import StaffResultsTable from "../components/staff/StaffResultsTable"; // Import the table component
+import Card from "../components/common/Card"; // Import Card
 // Import shared types
 import {
   ResultSummary,
@@ -62,10 +63,6 @@ const RestaurantStaffResultsPage: React.FC = () => {
   const { user } = useAuth(); // Still needed for potential conditional logic or display
   const navigate = useNavigate();
 
-  // Sorting state
-  const [sortBy, setSortBy] = useState<SortField>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-
   // Filtering state
   const [filters, setFilters] = useState<Filters>({
     name: "",
@@ -94,18 +91,6 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
   const toggleExpand = useCallback((staffId: string) => {
     setExpandedStaffId((prev) => (prev === staffId ? null : staffId));
-  }, []);
-
-  const handleSort = useCallback((field: SortField) => {
-    setSortBy((prevField) => {
-      if (prevField === field) {
-        setSortDirection((prevDir) => (prevDir === "asc" ? "desc" : "asc"));
-        return prevField; // Keep the same field
-      } else {
-        setSortDirection("asc"); // Default to ascending for new field
-        return field;
-      }
-    });
   }, []);
 
   const handleFilterChange = useCallback(
@@ -169,51 +154,11 @@ const RestaurantStaffResultsPage: React.FC = () => {
       });
     }
 
-    // Apply sorting
-    result.sort((a, b) => {
-      let comparison = 0;
-      const aScore = a.averageScore ?? -1; // Handle null scores for comparison
-      const bScore = b.averageScore ?? -1;
-
-      switch (sortBy) {
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "role":
-          comparison = (a.professionalRole || "").localeCompare(
-            b.professionalRole || ""
-          );
-          break;
-        case "quizzesTaken": // Sort by quizzesTaken
-          comparison = (a.quizzesTaken ?? 0) - (b.quizzesTaken ?? 0);
-          break;
-        case "averageScore": // Sort by averageScore
-          comparison = aScore - bScore;
-          break;
-        case "joined":
-          comparison =
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
+    // Default sort (e.g., by name) if needed, or keep API order
+    result.sort((a, b) => a.name.localeCompare(b.name));
 
     return result;
-  }, [staffData, filters, sortBy, sortDirection, selectedPerformanceCategory]);
-
-  const sortArrow = useCallback(
-    (field: SortField) => {
-      if (sortBy !== field) return null; // No arrow if not sorting by this field
-      return sortDirection === "asc" ? ( // Up arrow for ascending
-        <span className="ml-1">↑</span>
-      ) : (
-        // Down arrow for descending
-        <span className="ml-1">↓</span>
-      );
-    },
-    [sortBy, sortDirection]
-  );
+  }, [staffData, filters, selectedPerformanceCategory]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -251,20 +196,20 @@ const RestaurantStaffResultsPage: React.FC = () => {
               {/* Filters */}
               <StaffResultsFilter
                 filters={filters}
+                staffData={staffData}
+                selectedCategory={selectedPerformanceCategory}
                 onFilterChange={handleFilterChange}
+                onCategoryChange={setSelectedPerformanceCategory}
                 onResetFilters={resetFilters}
               />
 
-              <div className="bg-white shadow-md rounded-lg overflow-hidden">
+              {/* Use Card to wrap the table container */}
+              <Card className="p-0 overflow-hidden">
                 {filteredAndSortedStaff.length > 0 ? (
                   <StaffResultsTable
                     staff={filteredAndSortedStaff} // Uses derived data
-                    sortBy={sortBy}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
                     expandedStaffId={expandedStaffId}
                     onToggleExpand={toggleExpand}
-                    sortArrow={sortArrow}
                   />
                 ) : (
                   <p className="text-center text-gray-500 py-6 px-4">
@@ -273,7 +218,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       : "No staff members found."}
                   </p>
                 )}
-              </div>
+              </Card>
             </>
           )}
         </div>

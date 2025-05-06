@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import LoadingSpinner from "../common/LoadingSpinner";
 import ErrorMessage from "../common/ErrorMessage";
+import Button from "../common/Button";
+import Modal from "../common/Modal";
 
 // --- Interfaces ---
 // TODO: Move to a shared types file
@@ -66,99 +68,102 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
     onGenerate(quizTitle.trim(), selectedMenuIds);
   };
 
-  if (!isOpen) {
-    return null;
-  }
+  // Define footer content
+  const footer = (
+    <>
+      <Button type="button" variant="secondary" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        type="button"
+        onClick={handleGenerateClick}
+        disabled={
+          isGenerating || // Prop from parent
+          selectedMenuIds.length === 0 ||
+          !quizTitle.trim()
+        }
+        variant="primary"
+      >
+        {isGenerating ? (
+          <>
+            <LoadingSpinner />
+            Generating...
+          </>
+        ) : (
+          "Generate Quiz"
+        )}
+      </Button>
+    </>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 my-8">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">
-          Create New Quiz
-        </h2>
-        {error && <ErrorMessage message={error} />}
-        <div className="mb-4">
-          <label
-            htmlFor="quizTitleModal"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Quiz Title <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="quizTitleModal" // Use unique ID for modal input
-            value={quizTitle}
-            onChange={(e) => {
-              setQuizTitle(e.target.value);
-              if (error && e.target.value.trim()) {
-                setError(null);
-              }
-            }}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            placeholder="E.g., Appetizers Knowledge Check"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Menus to Generate Questions From{" "}
-            <span className="text-red-500">*</span>
-          </label>
-          {isLoadingMenus ? (
-            <LoadingSpinner />
-          ) : menus.length > 0 ? (
-            <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
-              {menus.map((menu) => (
-                <div key={menu._id} className="flex items-center">
-                  <input
-                    id={`modal-menu-${menu._id}`} // Unique ID
-                    name="modal-menus"
-                    type="checkbox"
-                    value={menu._id}
-                    checked={selectedMenuIds.includes(menu._id)}
-                    onChange={() => handleMenuSelection(menu._id)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor={`modal-menu-${menu._id}`}
-                    className="ml-3 text-sm text-gray-700"
-                  >
-                    {menu.name}
-                  </label>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">
-              No menus found. Please create menus first.
-            </p>
-          )}
-        </div>
-
-        <div className="flex justify-end space-x-3 mt-6">
-          <button
-            type="button"
-            onClick={onClose} // Use onClose prop
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleGenerateClick}
-            disabled={
-              isGenerating || // Prop from parent
-              selectedMenuIds.length === 0 ||
-              !quizTitle.trim()
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Create New Quiz"
+      size="lg" // Explicitly set size, default is md (max-w-lg)
+      footerContent={footer}
+    >
+      {error && <ErrorMessage message={error} />}
+      <div className="mb-4">
+        <label
+          htmlFor="quizTitleModal"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Quiz Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          id="quizTitleModal"
+          value={quizTitle}
+          onChange={(e) => {
+            setQuizTitle(e.target.value);
+            if (error && e.target.value.trim()) {
+              setError(null);
             }
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? "Generating..." : "Generate Quiz"}
-          </button>
-        </div>
+          }}
+          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+          placeholder="E.g., Appetizers Knowledge Check"
+          required
+        />
       </div>
-    </div>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Select Menus to Generate Questions From{" "}
+          <span className="text-red-500">*</span>
+        </label>
+        {isLoadingMenus ? (
+          <LoadingSpinner />
+        ) : menus.length > 0 ? (
+          <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
+            {menus.map((menu) => (
+              <div key={menu._id} className="flex items-center">
+                <input
+                  id={`modal-menu-${menu._id}`}
+                  name="modal-menus"
+                  type="checkbox"
+                  value={menu._id}
+                  checked={selectedMenuIds.includes(menu._id)}
+                  onChange={() => handleMenuSelection(menu._id)}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label
+                  htmlFor={`modal-menu-${menu._id}`}
+                  className="ml-3 text-sm text-gray-700"
+                >
+                  {menu.name}
+                </label>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">
+            No menus found. Please create menus first.
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 };
 

@@ -3,6 +3,8 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
+import Button from "../components/common/Button";
+import Card from "../components/common/Card";
 
 // --- Interfaces ---
 // Interface for a question received from the /take endpoint (no correctAnswer)
@@ -320,8 +322,8 @@ const QuizTakingPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100">
         <Navbar />
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="bg-white shadow-lg rounded-lg p-6 sm:p-8 max-w-md w-full text-center mx-auto">
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 flex justify-center items-start">
+          <Card className="shadow-lg p-6 sm:p-8 max-w-md w-full text-center">
             <h1 className="text-2xl font-bold text-gray-800 mb-2">
               Quiz Submitted!
             </h1>
@@ -338,13 +340,12 @@ const QuizTakingPage: React.FC = () => {
                 ({percentage.toFixed(0)}%)
               </p>
             </div>
-            <Link
-              to="/staff/dashboard"
-              className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Back to Dashboard
+            <Link to="/staff/dashboard" className="w-full inline-block">
+              <Button variant="primary" className="w-full">
+                Back to Dashboard
+              </Button>
             </Link>
-          </div>
+          </Card>
         </div>
       </div>
     );
@@ -371,8 +372,8 @@ const QuizTakingPage: React.FC = () => {
       />
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-auto overflow-hidden flex flex-col">
+        <div className="px-4 sm:px-0 flex justify-center">
+          <Card className="shadow-xl w-full max-w-2xl overflow-hidden flex flex-col p-0">
             <div className="px-6 py-4 border-b">
               <p className="text-sm font-medium text-gray-500">
                 Question {currentQuestionIndex + 1} of {totalQuestions}
@@ -409,55 +410,53 @@ const QuizTakingPage: React.FC = () => {
                 <ErrorMessage message={submitError} />
               </div>
             )}
-            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleCancelQuiz}
-                disabled={isSubmitting || isCancelling}
-                className="px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition duration-150 ease-in-out"
-              >
-                {isCancelling ? "Cancelling..." : "Cancel Quiz"}
-              </button>
-
+            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center space-x-3">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={goToPreviousQuestion}
-                  disabled={
-                    currentQuestionIndex === 0 || isSubmitting || isCancelling
-                  }
-                  className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  disabled={currentQuestionIndex === 0}
                 >
                   Previous
-                </button>
+                </Button>
+
+                <span className="text-sm text-gray-500">
+                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                </span>
 
                 {isLastQuestion ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="success"
                     onClick={handleSubmit}
-                    disabled={!allAnswered || isSubmitting || isCancelling}
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:bg-green-300"
+                    disabled={isSubmitting || !allAnswered}
                   >
                     {isSubmitting ? "Submitting..." : "Submit Quiz"}
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={goToNextQuestion}
-                    disabled={
-                      userAnswers[currentQuestionIndex] === undefined ||
-                      userAnswers[currentQuestionIndex] === null ||
-                      isSubmitting ||
-                      isCancelling
-                    }
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-blue-300"
+                    disabled={isLastQuestion}
                   >
                     Next
-                  </button>
+                  </Button>
                 )}
               </div>
+              <div className="text-right">
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelQuiz}
+                  disabled={isCancelling}
+                  className="mb-1"
+                >
+                  {isCancelling ? "Cancelling..." : "Cancel Quiz"}
+                </Button>
+                <p className="text-xs text-gray-500">
+                  (Cancelling saves attempt as is)
+                </p>
+              </div>
             </div>
-          </div>
+          </Card>
         </div>
       </main>
     </div>

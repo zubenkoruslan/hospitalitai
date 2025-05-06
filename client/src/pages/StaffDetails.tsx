@@ -9,6 +9,8 @@ import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersMo
 import { formatDate } from "../utils/helpers";
 import { useStaffDetails } from "../hooks/useStaffDetails";
 import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
+import Button from "../components/common/Button";
+import Card from "../components/common/Card";
 
 // --- Main Component ---
 const StaffDetails: React.FC = () => {
@@ -131,8 +133,8 @@ const StaffDetails: React.FC = () => {
           &larr; Back to Staff List
         </button>
 
-        {/* Staff Header */}
-        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        {/* Staff Header - Use Card */}
+        <Card className="mb-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
@@ -155,23 +157,25 @@ const StaffDetails: React.FC = () => {
                       value={editedRole}
                       onChange={handleRoleChange}
                       disabled={isSavingRole}
-                      className="block w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
                       aria-label="Professional Role"
                     />
-                    <button
+                    <Button
+                      variant="success"
                       onClick={handleSaveRole}
                       disabled={isSavingRole}
-                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                      className="text-xs py-1.5 whitespace-nowrap"
                     >
                       {isSavingRole ? "Saving..." : "Save"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
                       onClick={handleEditRoleToggle}
                       disabled={isSavingRole}
-                      className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 disabled:opacity-50 whitespace-nowrap"
+                      className="text-xs py-1.5 whitespace-nowrap"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-2">
@@ -212,10 +216,10 @@ const StaffDetails: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
-        {/* Quiz Results Table */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        {/* Quiz Results Table - Use Card */}
+        <Card className="p-0 overflow-hidden">
           <h3 className="text-lg font-semibold text-gray-800 p-4 border-b">
             Tests Taken
           </h3>
@@ -307,7 +311,7 @@ const StaffDetails: React.FC = () => {
               No quizzes have been completed by this staff member.
             </p>
           )}
-        </div>
+        </Card>
       </main>
 
       {/* Modal for Incorrect Answers */}

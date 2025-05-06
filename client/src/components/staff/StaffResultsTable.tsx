@@ -6,6 +6,7 @@ import {
   SortDirection,
 } from "../../types/staffTypes"; // Corrected import path
 import { formatDate, isCompletedQuiz } from "../../utils/helpers";
+import Button from "../common/Button"; // Import Button
 
 // Interfaces (Copied - consider shared types)
 // // Removed local definitions
@@ -16,23 +17,15 @@ import { formatDate, isCompletedQuiz } from "../../utils/helpers";
 // Prop Interface
 interface StaffResultsTableProps {
   staff: StaffMemberWithData[];
-  sortBy: SortField;
-  sortDirection: SortDirection;
-  onSort: (field: SortField) => void;
   expandedStaffId: string | null;
   onToggleExpand: (staffId: string) => void;
-  sortArrow: (field: SortField) => React.ReactNode;
 }
 
 // Staff Results Table Component
 const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
   staff,
-  sortBy,
-  sortDirection,
-  onSort,
   expandedStaffId,
   onToggleExpand,
-  sortArrow,
 }) => {
   return (
     <div className="overflow-x-auto">
@@ -41,38 +34,33 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
           <tr>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              onClick={() => onSort("name")}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             >
-              Name {sortArrow("name")}
+              Name
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              onClick={() => onSort("role")}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             >
-              Role {sortArrow("role")}
+              Role
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              onClick={() => onSort("quizzesTaken")}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             >
-              Quizzes Taken {sortArrow("quizzesTaken")}
+              Quizzes Taken
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              onClick={() => onSort("averageScore")}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             >
-              Avg. Score {sortArrow("averageScore")}
+              Avg. Score
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              onClick={() => onSort("joined")}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             >
-              Joined {sortArrow("joined")}
+              Joined
             </th>
             <th scope="col" className="relative px-6 py-3">
               <span className="sr-only">Details</span>
@@ -121,12 +109,14 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                     {formatDate(staffMember.createdAt)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => onToggleExpand(staffMember._id)}
-                      className={`p-1 px-2 rounded text-xs ${
+                      className={`text-xs py-1 ${
+                        // Adjust padding/size
                         isExpanded
-                          ? "bg-blue-200 text-blue-800"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                          ? "!bg-blue-200 !text-blue-800 hover:!bg-blue-300 focus:!ring-blue-500"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-indigo-500"
                       }`}
                       aria-expanded={isExpanded}
                       aria-controls={`details-${staffMember._id}`}
@@ -135,7 +125,7 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                       } quiz details for ${staffMember.name}`}
                     >
                       {isExpanded ? "Hide" : "Details"}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
                 {isExpanded && (
@@ -218,4 +208,5 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
 };
 
 // Memoize the component
-export default React.memo(StaffResultsTable);
+// export default React.memo(StaffResultsTable); // Remove React.memo for diagnostics
+export default StaffResultsTable; // Export directly

@@ -1,84 +1,53 @@
-# HospitalityAI Project Status
+Okay, let's brainstorm some improvements for both the frontend and backend, focusing on simplicity, ease of use, and navigation for both Restaurant Managers and Staff.
 
-## Overview
+**I. Frontend Improvements (React - `client/src/`)**
 
-This document outlines the current status of the HospitalityAI project. It's a web application built using the MERN stack (MongoDB, Express.js, React, Node.js) with TypeScript, designed to facilitate restaurant staff training through quizzes and provide management dashboards.
+- **General UI/UX & Navigation:**
 
-## Technology Stack
+  - [ ] **Consistent Design System:** Ensure all components (`Button`, `Modal`, `Card`, input fields, etc.) have a unified look and feel using Tailwind CSS consistently across `StaffDashboard`, `RestaurantDashboard`, `QuizTakingPage`, `QuizCreation`, `MenusPage`, etc. Standardize padding, margins, font sizes, and color usage.
+    - [x] Standardize Buttons (`client/src/components/common/Button.tsx` and usage)
+    - [x] Standardize Modals (`client/src/components/common/Modal.tsx` and usage)
+    - [x] Standardize Cards
+    - [x] Standardize Input Fields
+  - [x] **Simplified Navbar:** Review `Navbar.tsx`. Is it clear? Does it adapt well for both roles? Could dropdowns or sidebars simplify options for users with more complex roles (Restaurant)?
+  - [ ] **Mobile-First Responsive Design:** Re-evaluate all pages (`StaffDashboard`, `RestaurantDashboard`, `QuizTakingPage`, etc.) to ensure flawless usability on smaller screens. Test lists, tables, and forms specifically.
+  - [ ] **Contextual Help/Tooltips:** Add small "?" icons or info tooltips next to complex elements (e.g., "Average Score calculation", "Quiz Availability Toggle") to explain functionality without cluttering the UI.
+  - [ ] **Enhanced Feedback:**
+    - [ ] Replace generic `LoadingSpinner` with more specific indicators (e.g., "Loading Quizzes...", "Calculating Results...").
+    - [ ] Make `ErrorMessage` components more descriptive, perhaps suggesting solutions.
+    - [ ] Use `SuccessNotification` more consistently after actions like saving quizzes, updating roles, etc.
 
-- **Frontend:**
-  - Framework/Library: React (using functional components and hooks)
-  - Language: TypeScript
-  - Build Tool: Vite
-  - Styling: Tailwind CSS
-  - State Management: React Context API (implied via `useAuth`), local component state (`useState`)
-  - Testing: Jest, React Testing Library
-- **Backend:**
-  - Framework: Node.js, Express.js
-  - Language: TypeScript
-  - Database: MongoDB (with Mongoose ODM)
-  - Authentication: JWT (implied by `authMiddleware.ts` rule, `auth.test.ts`)
-  - Testing: Vitest
-- **Shared:**
-  - Strict TypeScript type safety enforced across frontend and backend.
+- **Staff User (`StaffDashboard`, `QuizTakingPage`):**
 
-## Project Structure
+  - [ ] **Dashboard Clarity:**
+    - [ ] Group completed quizzes under a collapsible section to reduce clutter.
+    - [ ] Add a "Start Next Recommended Quiz" button based on assignment date or restaurant priority.
+    - [ ] Visualize score history with a simple sparkline chart next to the average score.
+  - [ ] **Quiz Taking Experience:**
+    - [ ] Improve the progress indicator during quizzes (e.g., visual bar).
+    - [ ] On the results screen (`QuizTakingPage` after submission), add a button "Review Incorrect Answers" leading directly to relevant feedback, rather than just showing the score.
+  - [ ] **"My Results" Page:** Create a dedicated page (if not already present) for staff to view _all_ their past results, filterable by quiz or date, maybe accessible from the `StaffDashboard`.
 
-The project follows a standard monorepo structure with separate `client` and `server` directories:
+- **Restaurant User (`RestaurantDashboard`, `QuizCreation`, `RestaurantStaffResultsPage`, `MenusPage`):**
+  - [ ] **Actionable Dashboard:**
+    - [ ] Convert summary stats into actionable insights. E.g., below "Staff Performance", show "Lowest Performing Staff (Avg < 70%)" with links to their details (`StaffDetails`).
+    - [ ] Add a "Recently Completed Quizzes" feed showing which staff finished which quizzes lately.
+  - [ ] **Staff Management & Results (`RestaurantStaffResultsPage`, `StaffDetails`):**
+    - [ ] Implement bulk actions on the staff results table (e.g., select multiple staff to send a reminder/message).
+    - [ ] Add robust filtering and sorting to the staff results table (filter by quiz, role, score range; sort by name, score, completion date).
+    - [ ] Offer a CSV export option for staff results.
+  - [ ] **Quiz Management (`QuizCreation`):**
+    - [ ] Simplify the quiz creation/editing modals (`CreateQuizModal`, `QuizEditorModal`). Perhaps use a step-by-step wizard for creating new quizzes.
+    - [ ] Implement a "Question Bank" feature where managers can save frequently used questions and reuse them across different quizzes.
+    - [ ] Improve the preview function - show exactly how the quiz will look to staff.
+  - [ ] **Menu Management (`MenusPage`, `MenuItemsPage`):**
+    - [ ] Allow drag-and-drop reordering of menu items or categories.
+    - [ ] Implement bulk editing for common fields (e.g., adding an allergen tag to multiple items).
 
-- **`client/`**: Contains the React frontend application.
-  - `src/components/`: Reusable UI components (common elements, items, quiz, staff).
-  - `src/pages/`: Top-level components corresponding to application routes (Dashboard, Menu Items, Staff Management, etc.).
-  - `src/hooks/`: Custom React hooks encapsulating reusable logic (data fetching, state management).
-  - `src/types/`: Shared TypeScript interfaces and types for frontend data structures.
-  - `src/services/`: Modules for interacting with the backend API (e.g., `api.ts`).
-  - `src/context/`: React Context providers (e.g., `AuthContext`).
-- **`server/`**: Contains the Node.js/Express backend API.
-  - `src/models/`: Mongoose schemas and models (`User`, `Quiz`, `QuizResult`, etc.).
-  - `src/routes/`: API endpoint definitions (`auth`, `quiz`, `staff`, `menu`, etc.).
-  - `src/controllers/`: Logic handling requests for specific routes.
-  - `src/services/`: Core business logic layer (`authService`, `quizService`, `quizResultService`, etc.).
-  - `src/middleware/`: Express middleware (authentication, error handling).
-  - `src/utils/`: Utility functions (e.g., `errorHandler`).
+**II. Backend Improvements (Node.js/Express - `server/src/`)**
 
-## Current Functionality (Based on Recent Activity & Structure)
+- **API Design & Performance:**
 
-- **Authentication:** User signup and login for different roles (restaurant owner, staff). JWT-based session management.
-- **Restaurant Dashboard:** Displays summary information for restaurant owners, likely including:
-  - Staff summary (`useStaffSummary`).
-  - Total quiz count (`useQuizCount`).
-  - List of available menus (`useMenus`).
-- **Menu Management (Owner):**
-  - Viewing list of menus (`useMenus`).
-  - Viewing menu items within a specific menu (`MenuItemsPage`, `MenuItemList`).
-  - Adding, editing, and deleting menu items via modals (`AddEditMenuItemModal`, `DeleteMenuItemModal`).
-  - Data fetching and state managed by `useMenuData`.
-- **Staff Management (Owner):**
-  - Viewing a summary list of staff members with quiz statistics (`RestaurantStaffResultsPage`, `useStaffSummary`).
-  - Viewing detailed information and full quiz results for a specific staff member (`StaffDetails`, `useStaffDetails`).
-- **Quiz Management (Owner):**
-  - Creating quizzes (likely via `QuizCreation` page and modals).
-  - Viewing quiz count (`useQuizCount`).
-- **Quiz Taking & Results (Staff/Owner):**
-  - Staff can likely take assigned quizzes (functionality implied by results).
-  - Staff can view their own past quiz results (`getMyResults` service method).
-  - Owners/Staff can view detailed results for a specific quiz attempt, including incorrect answers (`getResultDetails` service method, `ViewIncorrectAnswersModal`).
-  - Backend services handle quiz submission, scoring, and result storage (`quizResultService`).
-
-## Recent Progress & Current State
-
-- **Testing Focus:** Significant effort has been put into increasing test coverage.
-  - **Frontend:** Added comprehensive Jest/RTL tests for components (`DeleteMenuItemModal`, `AddEditMenuItemModal`, `MenuItemList`) and custom hooks (`useMenuData`, `useStaffDetails`, `useStaffSummary`, `useQuizCount`, `useMenus`).
-  - **Backend:** Addressed multiple failures in `quizResultService.test.ts`, ensuring all server-side tests (`Vitest`) are now passing. Reviewed test logs for other services (`quizService`, `auth`).
-- **Refactoring:**
-  - Improved code organization by moving shared TypeScript types from hooks (`useStaffDetails`, `useMenus`) into dedicated type files (`client/src/types/staffTypes.ts`, `client/src/types/menuItemTypes.ts`).
-  - Refactored frontend components (e.g., `MenuItemsPage`) to utilize custom hooks for better separation of concerns and state management.
-- **Stability:** Addressed and fixed various bugs and type errors identified during testing and refactoring on both client and server. The main backend test suite is currently stable.
-
-## Potential Next Steps
-
-- Continue increasing frontend test coverage for pages (`RestaurantDashboard`, `StaffDetails`, `QuizCreation`) and remaining components/hooks.
-- Address any remaining `// TODO` comments in the codebase.
-- Run frontend tests (`npm test` in `client/`) to ensure new tests pass and check coverage.
-- Implement any missing UI elements or features identified.
-- Review logged errors during backend tests (even if tests pass) for potential silent issues or areas for improvement in error handling/mocking.
+  - [ ] **Endpoint Review:** Re-evaluate API routes (`quiz.ts`, `quizResult.ts`, `staff.ts`, `menu.ts`, `user.ts`). Are they logically grouped? Is data fetching efficient? Could some endpoints be combined or paginated?
+  - [ ] **Payload Optimization:** Ensure endpoints only return necessary data. For example, when listing quizzes (`GET /api/quiz`), don't return _all_ questions and answers, just metadata like title, description, number of questions.
+  - [ ] **Database Indexing:** Double-check indexes in Mongoose models (`QuizModel`, `QuizResultModel`, `UserModel`, `MenuItemModel`). Are fields used in common queries (like `restaurantId`, `userId`, `

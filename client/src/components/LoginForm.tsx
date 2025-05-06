@@ -1,6 +1,8 @@
 import React, { useState, FormEvent, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext"; // Fixed import path
+import Button from "./common/Button"; // Import Button component
+import ErrorMessage from "./common/ErrorMessage"; // Assuming ErrorMessage uses Tailwind
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState<string>("");
@@ -62,111 +64,95 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={styles.form}>
-      <h2>Login</h2>
-      {/* Display component error OR auth error */}
-      {(componentError || authError) && (
-        <p style={styles.errorText}>{componentError || authError}</p>
-      )}
-      <div style={styles.inputGroup}>
-        <label htmlFor="email" style={styles.label}>
-          Email:
-        </label>
-        <input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
-      <div style={styles.inputGroup}>
-        <label htmlFor="password" style={styles.label}>
-          Password:
-        </label>
-        <input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={styles.input}
-          disabled={isLoading}
-        />
-      </div>
-      <button type="submit" disabled={isLoading} style={styles.button}>
-        {isLoading ? "Logging in..." : "Login"}
-      </button>
-      {/* Add link to signup page */}
-      <p style={styles.signupLink}>
-        Don't have an account? <a href="/signup">Sign Up</a>
-      </p>
-      {/* Add forgot password link */}
-      <p style={styles.forgotPasswordLink}>
-        <a href="/forgot-password">Forgot Password?</a>
-      </p>
-    </form>
-  );
-};
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 shadow-md rounded-lg">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Sign in to your account
+          </h2>
+        </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {/* Display component error OR auth error using ErrorMessage component */}
+          {(componentError || authError) && (
+            <ErrorMessage
+              message={componentError || authError || "An error occurred"}
+            />
+          )}
+          <input type="hidden" name="remember" defaultValue="true" />
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="email-address" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
 
-// Basic inline styles for demonstration
-const styles: { [key: string]: React.CSSProperties } = {
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "2rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    maxWidth: "400px",
-    margin: "2rem auto",
-    backgroundColor: "#f9f9f9",
-  },
-  inputGroup: {
-    marginBottom: "1rem",
-    width: "100%",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.5rem",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "0.75rem",
-    border: "1px solid #ccc",
-    borderRadius: "4px",
-    boxSizing: "border-box", // Required for correct width calculation with padding
-  },
-  button: {
-    padding: "0.75rem 1.5rem",
-    backgroundColor: "#007bff",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "1rem",
-    marginTop: "1rem",
-    opacity: 1, // Default opacity
-    transition: "opacity 0.3s ease",
-  },
-  // Note: Styling disabled state directly via inline styles is limited.
-  // Consider CSS Modules or styled-components for pseudo-classes like :disabled.
-  errorText: {
-    color: "red",
-    marginBottom: "1rem",
-    textAlign: "center",
-  },
-  signupLink: {
-    marginTop: "1rem",
-    fontSize: "0.9rem",
-  },
-  forgotPasswordLink: {
-    marginTop: "0.5rem",
-    fontSize: "0.9rem",
-  },
+          <div className="flex items-center justify-between text-sm">
+            {/* Optional: Add remember me checkbox here if needed */}
+            <div className="text-sm">
+              <Link
+                to="/forgot-password"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center"
+            >
+              {isLoading ? "Signing in..." : "Sign in"}
+            </Button>
+          </div>
+        </form>
+        <div className="text-sm text-center">
+          <p className="text-gray-600">
+            Don't have an account?{" "}
+            <Link
+              to="/signup"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Sign Up
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default LoginForm;

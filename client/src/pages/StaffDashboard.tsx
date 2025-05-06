@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import Button from "../components/common/Button";
+import Card from "../components/common/Card";
 
 // Types needed for Quiz Data (copied from deleted StaffQuizListPage)
 interface QuizListItem {
@@ -162,12 +164,13 @@ const StaffDashboard: React.FC = () => {
             "Access Denied. Please log in as Staff."
           }
         />
-        <button
+        <Button
+          variant="primary"
           onClick={() => navigate("/login")}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="mt-4"
         >
           Go to Login
-        </button>
+        </Button>
       </div>
     );
   }
@@ -183,7 +186,7 @@ const StaffDashboard: React.FC = () => {
     }
 
     return (
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+      <Card className="p-0 overflow-hidden">
         <ul className="divide-y divide-gray-200">
           {quizzes.map((quiz) => {
             const hasResult = quiz.status === "completed" && quiz.completedAt;
@@ -251,17 +254,21 @@ const StaffDashboard: React.FC = () => {
                       {/* Allow retake even if completed */}
                       <Link
                         to={`/staff/quiz/${quiz._id}/take`}
-                        className="inline-block text-center w-full sm:w-auto px-4 py-2 bg-blue-100 text-blue-700 text-xs font-medium rounded hover:bg-blue-200 transition duration-150 ease-in-out"
+                        className="w-full sm:w-auto"
                       >
-                        Repeat Quiz
+                        <Button variant="secondary" className="w-full text-xs">
+                          Repeat Quiz
+                        </Button>
                       </Link>
                     </>
                   ) : (
                     <Link
                       to={`/staff/quiz/${quiz._id}/take`}
-                      className="inline-block text-center w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition duration-150 ease-in-out"
+                      className="w-full sm:w-auto"
                     >
-                      Take Quiz
+                      <Button variant="primary" className="w-full">
+                        Take Quiz
+                      </Button>
                     </Link>
                   )}
                 </div>
@@ -269,7 +276,7 @@ const StaffDashboard: React.FC = () => {
             );
           })}
         </ul>
-      </div>
+      </Card>
     );
   };
 
@@ -283,10 +290,7 @@ const StaffDashboard: React.FC = () => {
     const { myAverageScore, myRank, totalRankedStaff } = rankingData;
 
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-          Performance Summary
-        </h3>
+      <Card title="Performance Summary">
         <div className="space-y-2 text-sm text-gray-700">
           <p>
             <span className="font-medium">Your Average Score:</span>
@@ -313,7 +317,7 @@ const StaffDashboard: React.FC = () => {
           {totalRankedStaff === 0 && <p className="text-xs text-gray-500">(No staff have completed quizzes yet)</p>}
           */}
         </div>
-      </div>
+      </Card>
     );
   };
 

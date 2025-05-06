@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import ErrorMessage from "../common/ErrorMessage"; // Assuming needed
 import SuccessNotification from "../common/SuccessNotification"; // Assuming needed
 import LoadingSpinner from "../common/LoadingSpinner"; // Assuming needed
+import Button from "../common/Button"; // Import Button
+import Modal from "../common/Modal"; // Import Modal
 import QuestionDisplay from "./QuestionDisplay"; // Import QuestionDisplay
 import AddQuestionModal from "./AddQuestionModal"; // Import AddQuestionModal
 
@@ -153,96 +155,84 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
   // const canEdit = !isAssigned;
 
   return (
-    // Use a full-screen modal style or adjust as needed
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header: Title and Buttons */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Edit Quiz: {quizData.title} {/* Always Edit Title */}
-          </h2>
-          <div className="flex space-x-3">
-            {/* Show 'Add Question' button always (owner is editing) */}
-            <button
-              onClick={openAddQuestionModal}
-              className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium"
-            >
-              Add Question
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Edit Quiz: ${quizData.title}`}
+      size="2xl" // Use a large size
+      // No footerContent needed, keeping footer inside children
+    >
+      {/* Modal children now contain title input and scrollable questions */}
+      {/* Input for Quiz Title - Remains near top */}
+      <div className="mb-4">
+        <label
+          htmlFor="quizEditTitle"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Quiz Title
+        </label>
+        <input
+          id="quizEditTitle"
+          type="text"
+          value={quizData.title}
+          onChange={(e) =>
+            setQuizData((prev) =>
+              prev ? { ...prev, title: e.target.value } : null
+            )
+          }
+          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+          placeholder="Quiz Title"
+        />
+      </div>
 
-        {/* Editing View Content - Rendered Unconditionally */}
-        <div className="mb-6">
-          {/* Removed outer conditional rendering based on isEditMode */}
-          <h3 className="text-lg font-medium mb-4">Edit Quiz Questions</h3>
-          <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
-            {quizData.questions.map((question, idx) => (
-              <QuestionDisplay
-                key={question._id || `new-${idx}`}
-                question={question}
-                index={idx}
-                userAnswer={undefined} // Not applicable
-                isEditing={true} // Always true for editing fields
-                onAnswerSelect={() => {}} // Not applicable
-                onQuestionChange={handleQuestionChange} // Always allow change
-                onQuestionDelete={handleQuestionDelete} // Always allow delete
-              />
-            ))}
-            {quizData.questions.length === 0 && (
-              <p className="text-center text-gray-500 py-4">
-                No questions yet. Add one!
-              </p>
-            )}
-          </div>
-
-          {error && <ErrorMessage message={error} />}
-
-          {/* Edit Footer (Title edit + Save) - Always show */}
-          <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
-            <div>
-              <label htmlFor="quizEditTitle" className="sr-only">
-                Quiz Title
-              </label>
-              <input
-                id="quizEditTitle"
-                type="text"
-                value={quizData.title}
-                onChange={(e) =>
-                  setQuizData((prev) =>
-                    prev ? { ...prev, title: e.target.value } : null
-                  )
-                }
-                className="px-4 py-2 border border-gray-300 rounded-md"
-                placeholder="Quiz Title"
-              />
-            </div>
-            <button
-              onClick={handleSaveClick}
-              disabled={isSaving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save Quiz Changes"}
-            </button>
-          </div>
+      {/* Main Content Area (Scrollable) */}
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-4">Edit Quiz Questions</h3>
+        {/* Adjust max-height for sticky footer */}
+        <div className="space-y-4 overflow-y-auto max-h-[calc(80vh - 200px)] pr-2">
+          {/* Adjusted max-h estimate */}
+          {quizData.questions.map((question, idx) => (
+            <QuestionDisplay
+              key={question._id || `new-${idx}`}
+              question={question}
+              index={idx}
+              userAnswer={undefined}
+              isEditing={true}
+              onAnswerSelect={() => {}}
+              onQuestionChange={handleQuestionChange}
+              onQuestionDelete={handleQuestionDelete}
+            />
+          ))}
+          {quizData.questions.length === 0 && (
+            <p className="text-center text-gray-500 py-4">
+              No questions yet. Add one!
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Add Question Modal (Rendered within Editor Modal) */}
-      {/* Always render Add Question Modal */}
+      {error && <ErrorMessage message={error} />}
+
+      {/* Sticky Footer with Buttons */}
+      <div className="sticky bottom-0 p-4 z-10 flex justify-end items-center space-x-3">
+        {/* Add Question Button - Moved to sticky footer */}
+        <Button variant="success" onClick={openAddQuestionModal}>
+          Add Question
+        </Button>
+        {/* Save Button - Moved back to sticky footer */}
+        <Button variant="primary" onClick={handleSaveClick} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Quiz Changes"}
+        </Button>
+      </div>
+
+      {/* Add Question Modal remains nested (outside the main modal flow) */}
       <AddQuestionModal
         isOpen={isAddQuestionModalOpen}
         onClose={() => setIsAddQuestionModalOpen(false)}
         onSubmit={handleAddQuestionSubmit}
         initialMenuItemId={getInitialMenuItemIdForNewQuestion()}
       />
-    </div>
+    </Modal>
   );
 };
 

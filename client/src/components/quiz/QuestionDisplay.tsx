@@ -59,7 +59,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
             type="text"
             value={question.text}
             onChange={handleTextChange}
-            className="w-full p-2 border border-gray-300 rounded-md"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
           />
         </div>
       ) : (
@@ -86,7 +86,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                   onChange={(e) =>
                     handleChoiceChange(choiceIndex, e.target.value)
                   }
-                  className="flex-1 p-2 border border-gray-300 rounded-md"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
                   placeholder={`Option ${choiceIndex + 1}`}
                 />
               </>
