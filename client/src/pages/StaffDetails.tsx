@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
+import SuccessNotification from "../components/common/SuccessNotification";
 import { formatDate } from "../utils/helpers";
 import { useStaffDetails } from "../hooks/useStaffDetails";
 import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
@@ -30,6 +31,7 @@ const StaffDetails: React.FC = () => {
   const [editedRole, setEditedRole] = useState<string>("");
   const [isSavingRole, setIsSavingRole] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Update editedRole when staffDetails load or change (if not already editing)
   useEffect(() => {
@@ -75,10 +77,12 @@ const StaffDetails: React.FC = () => {
 
     setIsSavingRole(true);
     setRoleError(null);
+    setSuccessMessage(null);
     try {
       await api.patch(`/staff/${staffId}`, { professionalRole: editedRole });
       fetchStaffDetails(); // Re-fetch details to get updated data
       setIsEditingRole(false);
+      setSuccessMessage("Role updated successfully.");
     } catch (err: any) {
       console.error("Error saving role:", err);
       setRoleError(err.response?.data?.message || "Failed to update role.");
@@ -90,9 +94,11 @@ const StaffDetails: React.FC = () => {
   // --- Render Logic ---
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen flex flex-col">
         <Navbar />
-        <LoadingSpinner />
+        <main className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Loading staff details..." />
+        </main>
       </div>
     );
   }
@@ -132,6 +138,16 @@ const StaffDetails: React.FC = () => {
         >
           &larr; Back to Staff List
         </button>
+
+        {/* Notifications Area */}
+        <div className="mb-4">
+          {successMessage && (
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={() => setSuccessMessage(null)}
+            />
+          )}
+        </div>
 
         {/* Staff Header - Use Card */}
         <Card className="mb-6">
@@ -182,12 +198,13 @@ const StaffDetails: React.FC = () => {
                     <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
                       Role: {staffDetails.professionalRole || "Not Set"}
                     </span>
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={handleEditRoleToggle}
-                      className="text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap"
+                      className="text-xs py-1 px-2 whitespace-nowrap"
                     >
                       Edit Role
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {roleError && (
@@ -246,12 +263,6 @@ const StaffDetails: React.FC = () => {
                     >
                       Score
                     </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-2 text-left font-medium tracking-wider"
-                    >
-                      Retakes
-                    </th>
                     <th scope="col" className="relative px-4 py-2">
                       <span className="sr-only">View Incorrect</span>
                     </th>
@@ -286,17 +297,22 @@ const StaffDetails: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {result.retakeCount > 0 ? result.retakeCount - 1 : 0}
-                      </td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => handleOpenModal(result)}
                           className="text-indigo-600 hover:text-indigo-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={result.incorrectQuestions.length === 0}
+                          disabled={
+                            // If incorrectQuestions exists, use it, otherwise check score vs totalQuestions
+                            (result.incorrectQuestions?.length || 0) === 0 &&
+                            result.score >= result.totalQuestions
+                          }
                           aria-label={`View incorrect answers for ${result.quizTitle}`}
                         >
-                          {result.incorrectQuestions.length > 0
+                          {/* Determine if there are incorrect answers by: 
+                              1. incorrectQuestions array length or 
+                              2. comparing score to totalQuestions */}
+                          {(result.incorrectQuestions?.length || 0) > 0 ||
+                          result.score < result.totalQuestions
                             ? "View Incorrect"
                             : "All Correct"}
                         </button>

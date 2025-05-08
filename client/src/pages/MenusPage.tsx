@@ -6,86 +6,35 @@ import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import ErrorMessage from "../components/common/ErrorMessage";
+import SuccessNotification from "../components/common/SuccessNotification";
+import { Menu } from "../types/menuItemTypes";
+import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 // --- Interfaces ---
-interface Menu {
-  _id: string;
-  name: string;
-  description?: string;
-  restaurantId: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface MenuData {
+// Define FormData specific to this page's modal
+interface MenuFormData {
   name: string;
   description: string;
 }
 
-// --- Helper Components ---
-
-// Simple Loading Spinner
-const LoadingSpinner: React.FC = () => (
-  <div className="flex justify-center items-center p-4">
-    <svg
-      className="animate-spin h-8 w-8 text-blue-600"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      ></circle>
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      ></path>
-    </svg>
-  </div>
-);
-
-// Simple Error Message
-const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
-  <div
-    className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative my-4"
-    role="alert"
-  >
-    <strong className="font-bold">Error: </strong>
-    <span className="block sm:inline">{message}</span>
-  </div>
-);
-
-// Simple Success Notification (Disappears after a delay)
-const SuccessNotification: React.FC<{
-  message: string;
-  onDismiss: () => void;
-}> = ({ message, onDismiss }) => {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 3000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div
-      className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative my-4"
-      role="alert"
-    >
-      <span className="block sm:inline">{message}</span>
-      <button
-        onClick={onDismiss}
-        className="absolute top-0 bottom-0 right-0 px-4 py-3"
-        aria-label="Dismiss notification"
-      >
-        <span className="text-xl font-bold">&times;</span>
-      </button>
-    </div>
-  );
+// --- Error Formatting Helper ---
+const formatApiError = (err: any, context: string): string => {
+  console.error(`Error ${context}:`, err);
+  if (err.response) {
+    let message =
+      err.response.data?.message ||
+      `Request failed with status ${err.response.status}.`;
+    if (err.response.status >= 500) {
+      message += " Please try again later.";
+    }
+    return message;
+  } else if (err.request) {
+    return `Network error while ${context}. Please check your connection and try again.`;
+  } else {
+    return `An unexpected error occurred while ${context}. Please try again.`;
+  }
 };
 
 // --- Main Component ---
@@ -105,8 +54,8 @@ const MenusPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Form state
-  const initialFormData: MenuData = { name: "", description: "" };
-  const [formData, setFormData] = useState<MenuData>(initialFormData);
+  const initialFormData: MenuFormData = { name: "", description: "" };
+  const [formData, setFormData] = useState<MenuFormData>(initialFormData);
   const [formError, setFormError] = useState<string | null>(null);
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
@@ -121,10 +70,12 @@ const MenusPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ menus: Menu[] }>("/menus");
+      const response = await api.get<{ menus: Menu[] }>("/menus", {
+        params: { restaurantId },
+      });
       setMenus(response.data.menus || []);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch menus.");
+      setError(formatApiError(err, "fetching menus"));
       setMenus([]);
     } finally {
       setIsLoading(false);
@@ -132,8 +83,10 @@ const MenusPage: React.FC = () => {
   }, [restaurantId]);
 
   useEffect(() => {
-    fetchMenus();
-  }, [fetchMenus]);
+    if (restaurantId) {
+      fetchMenus();
+    }
+  }, [fetchMenus, restaurantId]);
 
   // --- Modal Handlers ---
   const openAddModal = () => {
@@ -172,7 +125,7 @@ const MenusPage: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev: MenuFormData) => ({ ...prev, [name]: value }));
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -270,14 +223,78 @@ const MenusPage: React.FC = () => {
       setSuccessMessage("Menu deleted successfully.");
       closeModal();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete menu.");
-      setIsSubmitting(false);
-    } finally {
-      // No need to set isSubmitting to false here if modal closes on success
+      // Use the helper for the main page error display
+      setError(formatApiError(err, "deleting menu"));
+      setIsSubmitting(false); // Stop submitting indicator on error
     }
+    // No finally needed here as isSubmitting should remain true only on success path before modal close
+  };
+
+  // Display menus in a responsive grid
+  const renderMenusGrid = () => {
+    if (!isLoading && menus.length === 0 && !error) {
+      return (
+        <p className="text-center text-gray-500 py-8">
+          No menus created yet. Click "Add New Menu" to get started.
+        </p>
+      );
+    }
+    if (menus.length > 0) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {menus.map((menu) => (
+            <Card
+              key={menu._id}
+              className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out"
+            >
+              <div className="flex-grow">
+                <h3 className="text-lg font-semibold text-blue-700 truncate mb-1">
+                  {menu.name}
+                </h3>
+                <p className="text-sm text-gray-600 min-h-[2.5em] line-clamp-2">
+                  {menu.description || (
+                    <span className="italic text-gray-400">No description</span>
+                  )}
+                </p>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <Link
+                  to={`/menu/${menu._id}/items`}
+                  className="block w-full mb-2"
+                >
+                  <Button variant="primary" className="w-full">
+                    View Menu
+                  </Button>
+                </Link>
+                <Button
+                  variant="destructive"
+                  onClick={() => openDeleteModal(menu)}
+                  className="w-full text-sm"
+                >
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   // --- Render Logic ---
+  if (isLoading && menus.length === 0 && !error) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="flex-grow flex justify-center items-center">
+          <LoadingSpinner message="Loading menus..." />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
@@ -304,68 +321,12 @@ const MenusPage: React.FC = () => {
           )}
 
           {/* Content Area */}
-          {isLoading ? (
-            <LoadingSpinner />
+          {isLoading && menus.length > 0 ? (
+            <div className="text-center py-10">
+              <LoadingSpinner message="Refreshing menus list..." />
+            </div>
           ) : (
-            <Card className="p-0 overflow-hidden sm:rounded-lg">
-              {menus.length > 0 ? (
-                <ul
-                  className="divide-y divide-gray-200"
-                  aria-labelledby="menu-list-title"
-                >
-                  {menus.map((menu) => (
-                    <li
-                      key={menu._id}
-                      className="px-4 py-4 sm:px-6 hover:bg-gray-50"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          {/* Link to view items within this menu */}
-                          <Link
-                            to={`/menu/${menu._id}/items`} // Navigate to items page
-                            className="text-lg font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block"
-                            aria-label={`View items for ${menu.name}`}
-                          >
-                            {menu.name}
-                          </Link>
-                          {menu.description && (
-                            <p className="text-sm text-gray-500 mt-1 truncate">
-                              {menu.description}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1">
-                            Created:{" "}
-                            {menu.createdAt
-                              ? new Date(menu.createdAt).toLocaleDateString()
-                              : "N/A"}
-                          </p>
-                        </div>
-                        <div className="ml-4 flex-shrink-0 flex space-x-2">
-                          <button
-                            onClick={() => openEditModal(menu)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            aria-label={`Edit menu ${menu.name}`}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => openDeleteModal(menu)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            aria-label={`Delete menu ${menu.name}`}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-center text-gray-500 py-8">
-                  No menus found. Add one to get started!
-                </p>
-              )}
-            </Card>
+            renderMenusGrid()
           )}
         </div>
       </main>

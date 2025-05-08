@@ -25,6 +25,7 @@ interface StaffQuizViewItem {
   completedAt?: Date | null;
   retakeCount?: number;
   status?: "pending" | "completed" | "in-progress"; // Use specific statuses
+  latestResultId?: string; // Added field for the specific result ID
 }
 
 class QuizResultService {
@@ -150,34 +151,43 @@ class QuizResultService {
   ): Promise<StaffQuizViewItem[]> {
     try {
       // 1. Fetch only ACTIVE quizzes for restaurant (lean)
-      // Select fields needed for the view + questions for count
       const availableQuizzes = await Quiz.find(
-        { restaurantId, isAvailable: true }, // Filter by isAvailable
+        { restaurantId, isAvailable: true },
         "_id title description questions createdAt"
-      ).lean();
+      )
+        .sort({ createdAt: -1 }) // Keep quizzes sorted by newest
+        .lean();
 
-      // 2. Fetch all results for the user for this restaurant (lean)
+      // 2. Fetch all results for the user for this restaurant (lean), sorted by latest first
       const userResults = await QuizResult.find(
-        { userId: userId, restaurantId: restaurantId }, // Filter by restaurant too
-        "quizId score totalQuestions completedAt retakeCount status"
-      ).lean();
+        { userId: userId, restaurantId: restaurantId },
+        "_id quizId score totalQuestions completedAt retakeCount status" // Ensure _id (resultId) is fetched
+      )
+        .sort({ completedAt: -1 }) // Sort by most recent completion
+        .lean();
 
-      // 3. Create a map for efficient lookup
-      const resultsMap = new Map<string, Partial<IQuizResult>>();
+      // 3. Create a map for efficient lookup of the latest result
+      const resultsMap = new Map<
+        string,
+        Partial<IQuizResult> & { _id: Types.ObjectId }
+      >(); // Ensure _id is part of the map value
       userResults.forEach((result) => {
-        if (result.quizId) {
-          // Ensure quizId exists
-          resultsMap.set(result.quizId.toString(), result);
+        if (result.quizId && !resultsMap.has(result.quizId.toString())) {
+          // Store only the first one encountered (latest due to sort)
+          resultsMap.set(result.quizId.toString(), {
+            ...result,
+            _id: result._id as Types.ObjectId, // Ensure _id from QuizResult is stored
+          });
         }
       });
 
       // 4. Merge data
       const combinedView = availableQuizzes.map((quiz) => {
         const result = resultsMap.get(quiz._id.toString());
-        const status = result?.status || "pending"; // Default to pending if no result
+        const status = result?.status || "pending";
 
         return {
-          _id: quiz._id as Types.ObjectId, // Cast back to ObjectId
+          _id: quiz._id as Types.ObjectId, // This is quizId
           title: quiz.title,
           description: quiz.description,
           numQuestions: quiz.questions?.length || 0,
@@ -186,19 +196,21 @@ class QuizResultService {
           totalQuestions: result?.totalQuestions,
           completedAt: result?.completedAt,
           retakeCount: result?.retakeCount,
-          // Ensure status type matches StaffQuizViewItem
           status: status as StaffQuizViewItem["status"],
+          latestResultId: result?._id?.toString(), // This is the resultId
         };
       });
 
-      // 5. Sort results: Pending first, then by newest quiz creation date
+      // 5. Sort results: Pending first, then by newest quiz creation date (already done for availableQuizzes)
+      // The primary sort for the final list should be by quiz availability/creation, then status.
+      // The current sort on availableQuizzes handles the primary criteria.
+      // We need to ensure pending quizzes appear logically.
       combinedView.sort((a, b) => {
-        const statusOrder = { pending: 0, completed: 1, "in-progress": 2 }; // Define order
+        const statusOrder = { pending: 0, "in-progress": 1, completed: 2 };
         const statusA = statusOrder[a.status || "pending"] ?? 99;
         const statusB = statusOrder[b.status || "pending"] ?? 99;
         if (statusA !== statusB) return statusA - statusB;
-        // If statuses are the same, sort by newest quiz first
-        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0); // Fallback to quiz creation date
       });
 
       return combinedView;

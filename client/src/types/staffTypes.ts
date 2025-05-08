@@ -9,7 +9,6 @@ export interface ResultSummary {
   totalQuestions: number;
   completedAt?: string;
   status: string;
-  retakeCount: number;
 }
 
 // Additional detail for incorrect answers within a quiz result
@@ -27,8 +26,17 @@ export interface QuizResultDetails {
   completedAt?: string;
   score: number;
   totalQuestions: number;
-  retakeCount: number;
-  incorrectQuestions: IncorrectQuestionDetail[];
+  retakeCount?: number;
+  questions?: {
+    text: string;
+    choices: string[];
+    userAnswerIndex: number;
+    userAnswer: string;
+    correctAnswerIndex: number;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }[];
+  incorrectQuestions?: IncorrectQuestionDetail[];
 }
 
 // Interface for a staff member with their results

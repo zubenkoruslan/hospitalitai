@@ -168,7 +168,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
             Staff Quiz Results
           </h1>
-          {loading && <LoadingSpinner />}
+          {loading && <LoadingSpinner message="Loading staff results..." />}
           {error && <ErrorMessage message={error} />}
           {!loading && !error && (
             <>

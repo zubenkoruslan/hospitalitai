@@ -131,10 +131,9 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                 {isExpanded && (
                   <tr id={`details-${staffMember._id}`}>
                     <td
-                      colSpan={6} // Adjusted colspan
+                      colSpan={6} // Colspan might need adjustment if columns are added/removed later
                       className="px-6 py-4 bg-gray-50 border-t border-gray-200"
                     >
-                      {/* TODO: Extract this detail view to StaffResultRowDetail.tsx later? */}
                       <div className="text-sm text-gray-800">
                         <h4 className="font-semibold mb-2 text-gray-700">
                           Quiz Details:
@@ -157,35 +156,8 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                                   ).toFixed(0)}
                                   %)
                                   <span className="text-xs text-gray-500 ml-2">
-                                    {" "}
                                     (Completed:{" "}
                                     {formatDate(result.completedAt, true)})
-                                  </span>
-                                  {result.totalQuestions > 0 && (
-                                    <span
-                                      className={`ml-2 font-semibold ${
-                                        (result.score / result.totalQuestions) *
-                                          100 >=
-                                        70
-                                          ? "text-green-600"
-                                          : "text-red-600"
-                                      }`}
-                                    >
-                                      (
-                                      {(
-                                        (result.score / result.totalQuestions) *
-                                        100
-                                      ).toFixed(0)}
-                                      %)
-                                    </span>
-                                  )}
-                                  <span className="text-xs text-gray-500 ml-2">
-                                    {" "}
-                                    (Retakes:{" "}
-                                    {result.retakeCount > 0
-                                      ? result.retakeCount - 1
-                                      : 0}
-                                    )
                                   </span>
                                 </li>
                               );

@@ -85,10 +85,10 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
         variant="primary"
       >
         {isGenerating ? (
-          <>
-            <LoadingSpinner />
-            Generating...
-          </>
+          <span className="flex items-center justify-center">
+            <LoadingSpinner message="" />
+            <span className="ml-2">Generating...</span>
+          </span>
         ) : (
           "Generate Quiz"
         )}
@@ -134,7 +134,7 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
           <span className="text-red-500">*</span>
         </label>
         {isLoadingMenus ? (
-          <LoadingSpinner />
+          <LoadingSpinner message="Loading menus..." />
         ) : menus.length > 0 ? (
           <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
             {menus.map((menu) => (

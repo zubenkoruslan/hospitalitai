@@ -1,5 +1,6 @@
 import React from "react";
 import { MenuItem } from "../../types/menuItemTypes"; // Import shared type
+import Button from "../common/Button"; // Added import for Button component
 
 interface MenuItemListProps {
   items: MenuItem[];
@@ -77,19 +78,22 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
               )}
             </div>
           </div>
-          <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-end space-x-2">
-            <button
+          {/* Responsive Card Footer Buttons */}
+          <div className="p-3 bg-gray-50 border-t border-gray-200 flex flex-col space-y-2 sm:flex-row sm:justify-end sm:space-y-0 sm:space-x-2">
+            <Button
+              variant="secondary" // Using secondary for edit action
               onClick={() => onEdit(item)}
-              className="px-3 py-1 text-sm font-medium rounded-md text-blue-600 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+              className="w-full sm:w-auto text-sm" // Ensure text size is appropriate if needed
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="destructive" // Using destructive for delete action
               onClick={() => onDelete(item)}
-              className="px-3 py-1 text-sm font-medium rounded-md text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
+              className="w-full sm:w-auto text-sm" // Ensure text size is appropriate if needed
             >
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       ))}

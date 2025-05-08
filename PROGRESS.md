@@ -10,17 +10,17 @@ Okay, let's brainstorm some improvements for both the frontend and backend, focu
     - [x] Standardize Cards
     - [x] Standardize Input Fields
   - [x] **Simplified Navbar:** Review `Navbar.tsx`. Is it clear? Does it adapt well for both roles? Could dropdowns or sidebars simplify options for users with more complex roles (Restaurant)?
-  - [ ] **Mobile-First Responsive Design:** Re-evaluate all pages (`StaffDashboard`, `RestaurantDashboard`, `QuizTakingPage`, etc.) to ensure flawless usability on smaller screens. Test lists, tables, and forms specifically.
+  - [x] **Mobile-First Responsive Design:** Re-evaluate all pages (`StaffDashboard`, `RestaurantDashboard`, `QuizTakingPage`, etc.) to ensure flawless usability on smaller screens. Test lists, tables, and forms specifically.
   - [ ] **Contextual Help/Tooltips:** Add small "?" icons or info tooltips next to complex elements (e.g., "Average Score calculation", "Quiz Availability Toggle") to explain functionality without cluttering the UI.
   - [ ] **Enhanced Feedback:**
-    - [ ] Replace generic `LoadingSpinner` with more specific indicators (e.g., "Loading Quizzes...", "Calculating Results...").
-    - [ ] Make `ErrorMessage` components more descriptive, perhaps suggesting solutions.
-    - [ ] Use `SuccessNotification` more consistently after actions like saving quizzes, updating roles, etc.
+    - [x] Replace generic `LoadingSpinner` with more specific indicators (e.g., "Loading Quizzes...", "Calculating Results...").
+    - [x] Make `ErrorMessage` components more descriptive, perhaps suggesting solutions.
+    - [x] Use `SuccessNotification` more consistently after actions like saving quizzes, updating roles, etc.
 
 - **Staff User (`StaffDashboard`, `QuizTakingPage`):**
 
   - [ ] **Dashboard Clarity:**
-    - [ ] Group completed quizzes under a collapsible section to reduce clutter.
+    - [x] Group completed quizzes under a collapsible section to reduce clutter.
     - [ ] Add a "Start Next Recommended Quiz" button based on assignment date or restaurant priority.
     - [ ] Visualize score history with a simple sparkline chart next to the average score.
   - [ ] **Quiz Taking Experience:**

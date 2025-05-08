@@ -5,6 +5,8 @@ import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import ErrorMessage from "../components/common/ErrorMessage";
 
 // --- Interfaces ---
 // Interface for a question received from the /take endpoint (no correctAnswer)
@@ -30,43 +32,6 @@ interface QuizSubmissionResult {
   totalQuestions: number;
   correctAnswers: number[]; // Array of correct answer indices (for review AFTER submission)
 }
-
-// --- Helper Components ---
-// Assuming LoadingSpinner, ErrorMessage exist
-const LoadingSpinner: React.FC = () => (
-  <div className="flex justify-center items-center p-8">
-    <svg
-      className="animate-spin h-8 w-8 text-blue-600"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      ></circle>
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      ></path>
-    </svg>
-  </div>
-);
-
-const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
-  <div
-    className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative my-4"
-    role="alert"
-  >
-    <strong className="font-bold">Error: </strong>
-    <span className="block sm:inline">{message}</span>
-  </div>
-);
 
 // --- Main Component ---
 const QuizTakingPage: React.FC = () => {
@@ -270,9 +235,10 @@ const QuizTakingPage: React.FC = () => {
       );
       setSubmissionResult(response.data);
     } catch (err: any) {
-      setSubmitError(err.response?.data?.message || "Failed to submit quiz.");
+      setSubmitError("Failed to submit quiz. Please try again.");
     } finally {
       setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
@@ -308,10 +274,31 @@ const QuizTakingPage: React.FC = () => {
     !isCancellingRef.current;
 
   // --- Render Logic ---
-  if (isLoading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} />;
-  if (!quizData)
-    return <ErrorMessage message="Quiz data could not be loaded." />;
+  if (isLoading && !quizData && !submissionResult)
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar
+          isBlockingNavigation={isQuizInProgress}
+          onAttemptBlockedNavigation={confirmNavigation}
+        />
+        <div className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Loading quiz..." />
+        </div>
+      </div>
+    );
+  if (isLoading && submissionResult === undefined)
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar
+          isBlockingNavigation={isQuizInProgress}
+          onAttemptBlockedNavigation={confirmNavigation}
+        />
+        <div className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Submitting answers..." />
+        </div>
+      </div>
+    );
+  if (error && !quizData) return <ErrorMessage message={error} />;
 
   if (submissionResult) {
     // Calculate percentage for styling
@@ -351,6 +338,18 @@ const QuizTakingPage: React.FC = () => {
     );
   }
 
+  // Add early return if quizData is null
+  if (!quizData) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Navbar />
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 flex justify-center items-start">
+          <ErrorMessage message="Quiz data could not be loaded." />
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = quizData.questions[currentQuestionIndex];
   const totalQuestions = quizData.questions.length;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
@@ -359,7 +358,8 @@ const QuizTakingPage: React.FC = () => {
   );
 
   if (!currentQuestion) {
-    if (isLoading) return <LoadingSpinner />;
+    if (isLoading)
+      return <LoadingSpinner message="Loading current question..." />;
     if (error) return <ErrorMessage message={error} />;
     return <ErrorMessage message="Could not load current question." />;
   }

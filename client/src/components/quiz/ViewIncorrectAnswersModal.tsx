@@ -54,7 +54,25 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose]);
 
-  const incorrectQuestions = quizResult?.incorrectQuestions || [];
+  // Get incorrectQuestions from the API or calculate from questions
+  let incorrectQuestions: IncorrectQuestionDetail[] = [];
+
+  if (
+    quizResult?.incorrectQuestions &&
+    quizResult.incorrectQuestions.length > 0
+  ) {
+    // Case 1: Using incorrectQuestions directly from the API (StaffDetails view)
+    incorrectQuestions = quizResult.incorrectQuestions;
+  } else if (quizResult?.questions) {
+    // Case 2: Calculate from questions array (QuizResultDetailModal view)
+    incorrectQuestions = quizResult.questions
+      .filter((q) => q.userAnswerIndex !== q.correctAnswerIndex)
+      .map((q) => ({
+        questionText: q.text,
+        userAnswer: q.userAnswer,
+        correctAnswer: q.correctAnswer,
+      }));
+  }
 
   const footer = (
     <Button variant="primary" onClick={onClose}>
