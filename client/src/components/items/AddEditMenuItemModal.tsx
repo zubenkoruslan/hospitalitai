@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   MenuItem,
   MenuItemFormData,
@@ -20,6 +20,7 @@ interface AddEditMenuItemModalProps {
   menuId: string; // Needed for context or potentially validation
   restaurantId: string; // Needed for context or potentially validation
   isSubmitting: boolean;
+  allItemsInMenu?: MenuItem[]; // Added prop for all items in the current menu
 }
 
 const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
@@ -30,6 +31,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   menuId, // Currently unused, but good to have for context
   restaurantId, // Currently unused
   isSubmitting,
+  allItemsInMenu, // Destructure the new prop
 }) => {
   const initialFormData: MenuItemFormData = {
     name: "",
@@ -49,9 +51,45 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
 
   const isEditMode = currentItem !== null;
-  // Use formData for available categories
-  const availableCategories =
-    formData.itemType === "food" ? FOOD_CATEGORIES : BEVERAGE_CATEGORIES;
+
+  // Categories for the datalist suggestions
+  const categorySuggestions = useMemo(() => {
+    const suggestions = new Set<string>();
+
+    // Add categories from all items in the current menu
+    if (allItemsInMenu) {
+      allItemsInMenu.forEach((item) => {
+        if (item.category) {
+          // Ensure category is not null or empty before adding
+          suggestions.add(item.category);
+        }
+      });
+    }
+
+    // Ensure current item's category is in suggestions if editing and it exists
+    if (isEditMode && currentItem?.category) {
+      suggestions.add(currentItem.category);
+    }
+
+    // If there are no suggestions from existing items (e.g. new menu, no items yet, or items have no categories),
+    // then, as a fallback, provide standard categories based on the selected item type.
+    // This prevents an empty suggestion list when starting fresh.
+    if (suggestions.size === 0 && formData.itemType) {
+      const standardCategoriesFallback =
+        formData.itemType === "food" ? FOOD_CATEGORIES : BEVERAGE_CATEGORIES;
+      standardCategoriesFallback.forEach((cat) => suggestions.add(cat));
+    }
+
+    console.log("[AddEditModal] categorySuggestions computed:", {
+      itemType: formData.itemType,
+      allItemsInMenuCount: allItemsInMenu?.length,
+      finalSuggestions: Array.from(suggestions).sort(),
+      isEditMode,
+      currentCategory: currentItem?.category,
+    });
+
+    return Array.from(suggestions).sort();
+  }, [formData.itemType, allItemsInMenu, currentItem, isEditMode]);
 
   // Restore useEffect using useState
   useEffect(() => {
@@ -69,22 +107,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       if (isEditMode && currentItem) {
         try {
           console.log("[Modal useEffect] Populating form for edit.");
-          // Validate category based on item type
-          let categoryToSet: ItemCategory | "" = currentItem.category;
-          const currentTypeCategories =
-            currentItem.itemType === "food"
-              ? FOOD_CATEGORIES
-              : BEVERAGE_CATEGORIES;
-          if (
-            !(currentTypeCategories as ReadonlyArray<string>).includes(
-              currentItem.category
-            )
-          ) {
-            console.warn(
-              `[Modal useEffect] Category '${currentItem.category}' invalid for type '${currentItem.itemType}'. Resetting.`
-            );
-            categoryToSet = "";
-          }
+          // Preserve the category from currentItem directly
+          const categoryToSet: string = currentItem.category; // Changed: No longer reset if not in hardcoded lists. Use string type.
 
           // Map MenuItem to MenuItemFormData, handle potential missing fields
           const newData: MenuItemFormData = {
@@ -93,7 +117,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             price: currentItem.price != null ? String(currentItem.price) : "", // Convert price to string
             ingredients: (currentItem.ingredients || []).join(", "), // Join array to string
             itemType: currentItem.itemType,
-            category: categoryToSet,
+            category: categoryToSet, // Use the preserved category
             // Assuming dietary flags are directly on MenuItem based on previous context
             // If they were nested under dietaryInfo, this needs adjustment
             isGlutenFree: currentItem.isGlutenFree ?? false,
@@ -119,7 +143,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       }
     }
     // Rerun when modal opens/closes, mode changes, or item changes
-  }, [currentItem, isEditMode, isOpen, initialFormData]); // Added initialFormData dependency
+  }, [currentItem, isEditMode, isOpen]); // Removed initialFormData from dependency array
 
   // Restore handleInputChange using useState
   const handleInputChange = (
@@ -127,6 +151,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
+    // console.log("[Modal handleInputChange] CALLED for input:", e.target.name, "value:", e.target.value);
     const { name, value, type } = e.target;
 
     let newValue: string | boolean = value;
@@ -137,13 +162,6 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     setFormData((prev) => {
       const updatedData = { ...prev, [name]: newValue };
 
-      // Reset category if itemType changes
-      if (name === "itemType" && prev.itemType !== newValue) {
-        console.log(
-          `[Modal InputChange] Item type changed from ${prev.itemType} to ${newValue}. Resetting category.`
-        );
-        updatedData.category = ""; // Reset category selection
-      }
       // Auto-check vegetarian if vegan is checked
       if (name === "isVegan" && newValue === true) {
         updatedData.isVegetarian = true;
@@ -165,35 +183,26 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   // Restore handleSubmit using useState
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("[Modal] handleSubmit triggered with formData:", formData);
     setFormError(null); // Clear previous errors
 
     // Basic Validation
     console.log("[Modal] Running validation. Name:", formData.name);
     if (!formData.name.trim()) {
-      console.log("[Modal] Validation failed: Name required");
       setFormError("Item name is required.");
       return;
     }
-    console.log("[Modal] Running validation. Type:", formData.itemType);
     if (!formData.itemType) {
-      console.log("[Modal] Validation failed: Type required");
       setFormError("Item type is required.");
       return;
     }
-    console.log("[Modal] Running validation. Category:", formData.category);
     if (!formData.category) {
-      console.log("[Modal] Validation failed: Category required");
       setFormError("Category is required.");
       return;
     }
-    console.log("[Modal] Running validation. Price:", formData.price);
-    // Price is optional, but if provided, must be valid non-negative number
     if (
       formData.price &&
       (isNaN(parseFloat(formData.price)) || parseFloat(formData.price) < 0)
     ) {
-      console.log("[Modal] Validation failed: Invalid Price", formData.price);
       setFormError("Price must be a valid non-negative number.");
       return;
     }
@@ -360,26 +369,21 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             >
               Category <span className="text-red-500">*</span>
             </label>
-            <select
+            <input
+              type="text"
               name="category"
               id="category"
+              list="category-suggestions"
               value={formData.category}
               onChange={handleInputChange}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               required
-              disabled={!formData.itemType}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-            >
-              <option value="" disabled>
-                {formData.itemType
-                  ? "Select Category..."
-                  : "Select Item Type First"}
-              </option>
-              {availableCategories.map((cat) => (
-                <option key={cat} value={cat} className="capitalize">
-                  {cat}
-                </option>
+            />
+            <datalist id="category-suggestions">
+              {categorySuggestions.map((cat) => (
+                <option key={cat} value={cat} />
               ))}
-            </select>
+            </datalist>
           </div>
         </div>
 

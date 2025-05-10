@@ -189,9 +189,13 @@ const MenuItemsPage: React.FC = () => {
             ? parseFloat(submittedFormData.price)
             : undefined,
           ingredients: submittedFormData.ingredients
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
+            ? submittedFormData.ingredients.split(",").map((s) => s.trim())
+            : [],
+          // Ensure all boolean flags are present, even if false, as per IMenuItem expectations
+          isGlutenFree: submittedFormData.isGlutenFree ?? false,
+          isDairyFree: submittedFormData.isDairyFree ?? false,
+          isVegetarian: submittedFormData.isVegetarian ?? false,
+          isVegan: submittedFormData.isVegan ?? false,
           menuId: menuId,
           restaurantId: restaurantId,
         };
@@ -415,15 +419,17 @@ const MenuItemsPage: React.FC = () => {
         {/* --- Modals --- */}
 
         {/* Add/Edit Modal - Use the new component */}
-        <AddEditMenuItemModal
-          isOpen={isAddEditModalOpen}
-          onClose={closeModal}
-          onSubmit={handleMenuItemFormSubmit}
-          currentItem={currentItem}
-          menuId={menuId || ""}
-          restaurantId={restaurantId || ""}
-          isSubmitting={isSubmittingItem}
-        />
+        {isAddEditModalOpen && (
+          <AddEditMenuItemModal
+            isOpen={isAddEditModalOpen}
+            onClose={closeModal}
+            onSubmit={handleMenuItemFormSubmit}
+            currentItem={currentItem}
+            isSubmitting={isSubmittingItem}
+            menuId={menuId ?? ""}
+            allItemsInMenu={items}
+          />
+        )}
 
         {/* Delete Confirmation Modal (Use the new component) */}
         {isDeleteModalOpen && currentItem && (

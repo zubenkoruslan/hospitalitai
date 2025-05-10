@@ -1,6 +1,11 @@
 import React from "react";
 
-type ButtonVariant = "primary" | "secondary" | "success" | "destructive"; // Added destructive
+type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "success"
+  | "destructive"
+  | "white"; // Added white variant
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -38,6 +43,10 @@ const Button: React.FC<ButtonProps> = ({
     case "destructive": // Added destructive style
       variantStyles =
         "border border-transparent text-white bg-red-600 hover:bg-red-700 focus:ring-red-500";
+      break;
+    case "white": // Added white style
+      variantStyles =
+        "border border-transparent text-blue-600 bg-white hover:bg-gray-100 focus:ring-blue-500";
       break;
     case "primary": // Default case
     default:

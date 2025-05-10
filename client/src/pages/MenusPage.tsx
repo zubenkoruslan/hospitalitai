@@ -10,7 +10,13 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import { Menu } from "../types/menuItemTypes";
-import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowUpTrayIcon,
+} from "@heroicons/react/24/outline";
+import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 
 // --- Interfaces ---
 // Define FormData specific to this page's modal
@@ -52,6 +58,8 @@ const MenusPage: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [currentMenu, setCurrentMenu] = useState<Menu | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] =
+    useState<boolean>(false);
 
   // Form state
   const initialFormData: MenuFormData = { name: "", description: "" };
@@ -118,6 +126,26 @@ const MenusPage: React.FC = () => {
     setFormData(initialFormData);
     setFormError(null);
     setIsSubmitting(false);
+  };
+
+  const openPdfUploadModal = () => {
+    setIsPdfUploadModalOpen(true);
+  };
+
+  const closePdfUploadModal = () => {
+    setIsPdfUploadModalOpen(false);
+  };
+
+  const handlePdfUploadSuccess = (newMenuData: any) => {
+    setSuccessMessage(
+      `Menu \"${newMenuData.name}\" imported successfully from PDF!`
+    );
+    fetchMenus();
+    closePdfUploadModal();
+  };
+
+  const handlePdfUploadError = (errorMessage: string) => {
+    setError(`PDF Upload Failed: ${errorMessage}`);
   };
 
   // --- Form Handlers ---
@@ -302,13 +330,20 @@ const MenusPage: React.FC = () => {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 sm:px-0">
           {/* Page Header */}
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200 gap-4">
             <h1 className="text-3xl font-bold leading-tight text-gray-900">
               Menus
             </h1>
-            <Button variant="primary" onClick={openAddModal}>
-              Add New Menu
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="secondary" onClick={openPdfUploadModal}>
+                <ArrowUpTrayIcon className="h-5 w-5 mr-2 inline" />
+                Upload PDF Menu
+              </Button>
+              <Button variant="primary" onClick={openAddModal}>
+                <PlusIcon className="h-5 w-5 mr-2 inline" />
+                Add New Menu Manually
+              </Button>
+            </div>
           </div>
 
           {/* Notifications */}
@@ -481,6 +516,38 @@ const MenusPage: React.FC = () => {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Upload Modal/Section - Can be a modal or inline */}
+      {isPdfUploadModalOpen && restaurantId && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto my-8 relative">
+            <button
+              onClick={closePdfUploadModal}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+              aria-label="Close"
+            >
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            <PdfMenuUpload
+              restaurantId={restaurantId}
+              onUploadSuccess={handlePdfUploadSuccess}
+              onUploadError={handlePdfUploadError}
+            />
           </div>
         </div>
       )}

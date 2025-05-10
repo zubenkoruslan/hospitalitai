@@ -6,6 +6,8 @@ import MenuItem, {
   ITEM_TYPES,
   FOOD_CATEGORIES,
   BEVERAGE_CATEGORIES,
+  FoodCategory,
+  BeverageCategory,
 } from "../models/MenuItem";
 import Menu from "../models/Menu";
 import { AppError } from "../utils/errorHandler";
@@ -33,7 +35,7 @@ interface ItemData {
   name: string;
   menuId: string | Types.ObjectId;
   itemType: ItemType;
-  category: ItemCategory;
+  category: string;
   description?: string;
   price?: number;
   ingredients?: string[];
@@ -49,7 +51,7 @@ interface ItemUpdateData {
   price?: number;
   ingredients?: string[];
   itemType?: ItemType;
-  category?: ItemCategory;
+  category?: string;
   isGlutenFree?: boolean;
   isDairyFree?: boolean;
   isVegetarian?: boolean;
@@ -104,16 +106,6 @@ class ItemService {
     if (!ITEM_TYPES.includes(itemType)) {
       throw new AppError(
         `Invalid item type. Must be one of: ${ITEM_TYPES.join(", ")}`,
-        400
-      );
-    }
-    if (!isValidCategory(itemType, category)) {
-      const allowed =
-        itemType === "food"
-          ? FOOD_CATEGORIES.join(", ")
-          : BEVERAGE_CATEGORIES.join(", ");
-      throw new AppError(
-        `Invalid category '${category}' for type '${itemType}'. Allowed: ${allowed}`,
         400
       );
     }
@@ -302,25 +294,10 @@ class ItemService {
     // Prepare and validate update data
     const preparedUpdate: { [key: string]: any } = {};
 
-    if (updateData.name !== undefined) {
-      if (
-        typeof updateData.name !== "string" ||
-        updateData.name.trim().length < 2 ||
-        updateData.name.trim().length > 50
-      ) {
-        throw new AppError(
-          "Item name must be between 2 and 50 characters",
-          400
-        );
-      }
-      preparedUpdate.name = updateData.name.trim();
-    }
-    if (updateData.description !== undefined) {
-      if (typeof updateData.description !== "string") {
-        throw new AppError("Description must be a string", 400);
-      }
-      preparedUpdate.description = updateData.description.trim();
-    }
+    if (updateData.name !== undefined)
+      preparedUpdate.name = (updateData.name as string).trim();
+    if (updateData.description !== undefined)
+      preparedUpdate.description = (updateData.description as string).trim();
     if (updateData.price !== undefined) {
       if (
         typeof updateData.price !== "number" ||
@@ -335,25 +312,12 @@ class ItemService {
       }
       preparedUpdate.price = updateData.price;
     }
-    if (updateData.ingredients !== undefined) {
-      if (!Array.isArray(updateData.ingredients)) {
-        throw new AppError("Ingredients must be an array", 400);
-      }
-      const processedIngredients = updateData.ingredients
-        .map((s) => String(s).trim())
+    if (updateData.ingredients !== undefined)
+      preparedUpdate.ingredients = updateData.ingredients
+        .map((s) => s.trim())
         .filter(Boolean);
-      for (const ing of processedIngredients) {
-        if (ing.length > 50) {
-          throw new AppError(
-            "Ingredient names cannot exceed 50 characters",
-            400
-          );
-        }
-      }
-      preparedUpdate.ingredients = processedIngredients;
-    }
     if (updateData.itemType !== undefined) {
-      if (!ITEM_TYPES.includes(updateData.itemType)) {
+      if (!ITEM_TYPES.includes(updateData.itemType as ItemType)) {
         throw new AppError(
           `Invalid item type. Must be one of: ${ITEM_TYPES.join(", ")}`,
           400
@@ -361,11 +325,8 @@ class ItemService {
       }
       preparedUpdate.itemType = updateData.itemType;
     }
-    if (updateData.category !== undefined) {
-      // Category validation happens later, depends on final itemType
+    if (updateData.category !== undefined)
       preparedUpdate.category = updateData.category;
-    }
-    // Boolean flags
     if (updateData.isGlutenFree !== undefined)
       preparedUpdate.isGlutenFree = Boolean(updateData.isGlutenFree);
     if (updateData.isDairyFree !== undefined)
@@ -376,40 +337,64 @@ class ItemService {
       preparedUpdate.isVegan = Boolean(updateData.isVegan);
 
     if (Object.keys(preparedUpdate).length === 0) {
-      throw new AppError("No update data provided", 400);
+      throw new AppError("No valid update data provided", 400);
     }
 
     try {
-      // Find the existing item first to get current values for validation
       const existingItem = await this.getItemById(itemObjectId, restaurantId);
       if (!existingItem) {
-        throw new AppError("Menu item not found or access denied", 404); // Should be caught by getItemById but double-check
+        throw new AppError("Menu item not found or access denied", 404);
       }
 
-      // Validate category against the final item type (updated or existing)
-      const finalItemType = preparedUpdate.itemType || existingItem.itemType;
-      const finalCategory = preparedUpdate.category || existingItem.category;
+      // Validation for itemType and category changes:
+      // If itemType is being changed, and category is NOT explicitly being changed in this update:
+      // Then, if the existingItem.category is a STANDARD category, it must be valid for the new itemType.
+      // If existingItem.category is custom, or if category IS being explicitly changed, this specific check is bypassed.
       if (
-        preparedUpdate.category !== undefined ||
-        preparedUpdate.itemType !== undefined
+        preparedUpdate.itemType &&
+        preparedUpdate.itemType !== existingItem.itemType &&
+        !preparedUpdate.category
       ) {
-        if (!isValidCategory(finalItemType, finalCategory)) {
-          const allowed =
-            finalItemType === "food"
-              ? FOOD_CATEGORIES.join(", ")
-              : BEVERAGE_CATEGORIES.join(", ");
-          throw new AppError(
-            `Invalid category '${finalCategory}' for type '${finalItemType}'. Allowed: ${allowed}`,
-            400
-          );
+        const isExistingCategoryStandardFood = FOOD_CATEGORIES.includes(
+          existingItem.category as FoodCategory
+        );
+        const isExistingCategoryStandardBeverage = BEVERAGE_CATEGORIES.includes(
+          existingItem.category as BeverageCategory
+        );
+
+        if (
+          isExistingCategoryStandardFood ||
+          isExistingCategoryStandardBeverage
+        ) {
+          // Only validate if the existing category is one of the standard types.
+          if (
+            !isValidCategory(
+              preparedUpdate.itemType,
+              existingItem.category as ItemCategory
+            )
+          ) {
+            const allowed =
+              preparedUpdate.itemType === "food"
+                ? FOOD_CATEGORIES.join(", ")
+                : BEVERAGE_CATEGORIES.join(", ");
+            throw new AppError(
+              `Existing category '${existingItem.category}' is not valid for new item type '${preparedUpdate.itemType}'. Allowed standard categories for this type: ${allowed}`,
+              400
+            );
+          }
         }
       }
-      // Update category in preparedUpdate if it wasn't explicitly set but itemType was
+      // If category IS being explicitly changed (i.e., preparedUpdate.category is set),
+      // we accept the new string value. No further validation against standard lists here,
+      // as users can now type in completely custom categories.
+
+      // If itemType was changed but category was not explicitly provided in updateData,
+      // ensure preparedUpdate.category is populated with the existingItem.category.
+      // This carries over either a validated standard category (if applicable from block above) or an unvalidated custom one.
       if (preparedUpdate.itemType && preparedUpdate.category === undefined) {
-        preparedUpdate.category = existingItem.category; // Keep existing category if only type changed, may need revalidation above
+        preparedUpdate.category = existingItem.category;
       }
 
-      // Enforce dietary consistency (Vegan implies Vegetarian)
       const finalIsVegan = preparedUpdate.isVegan ?? existingItem.isVegan;
       const intendedIsVegetarian =
         preparedUpdate.isVegetarian ?? existingItem.isVegetarian;
@@ -417,15 +402,13 @@ class ItemService {
         preparedUpdate.isVegetarian = true;
       }
 
-      // Perform the update
       const updatedItem = await MenuItem.findByIdAndUpdate(
         itemObjectId,
         { $set: preparedUpdate },
-        { new: true, runValidators: true } // Run schema validators
+        { new: true, runValidators: true }
       );
 
       if (!updatedItem) {
-        // This might occur if the item was deleted between find and update, or concurrent modification
         throw new AppError("Menu item update failed unexpectedly.", 500);
       }
 

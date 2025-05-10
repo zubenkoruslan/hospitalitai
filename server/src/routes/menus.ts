@@ -11,6 +11,8 @@ import {
 import mongoose from "mongoose";
 import { AppError } from "../utils/errorHandler";
 import MenuService from "../services/menuService";
+import * as menuController from "../controllers/menuController";
+import { uploadPdf } from "../middleware/uploadMiddleware";
 
 const router: Router = express.Router();
 
@@ -142,6 +144,15 @@ router.delete(
       next(error);
     }
   }
+);
+
+// New route for PDF menu upload
+router.post(
+  "/:restaurantId/upload-pdf",
+  protect,
+  restrictTo("restaurant"),
+  uploadPdf.single("menuPdf"),
+  menuController.uploadMenuPdf
 );
 
 export default router;

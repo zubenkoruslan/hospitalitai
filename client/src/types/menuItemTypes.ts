@@ -8,7 +8,7 @@ export interface MenuItem {
   price?: number;
   ingredients?: string[];
   itemType: ItemType; // Use shared type
-  category: ItemCategory; // Use shared type
+  category: string; // MODIFIED: Allow any string for dynamic/custom categories
   menuId: string;
   restaurantId: string;
   createdAt?: string;
@@ -48,7 +48,7 @@ export interface MenuItemFormData {
   price: string; // Use string for form input
   ingredients: string; // Comma-separated string for form input
   itemType: ItemType | ""; // Allow empty for initial state
-  category: ItemCategory | ""; // Allow empty for initial state
+  category: string; // MODIFIED: Allow any string for dynamic categories
   isGlutenFree: boolean;
   isDairyFree: boolean;
   isVegetarian: boolean;

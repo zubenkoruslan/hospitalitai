@@ -30,7 +30,7 @@ export interface IMenuItem extends Document {
   price?: number;
   ingredients?: string[];
   itemType: ItemType;
-  category: ItemCategory;
+  category: string;
   menuId: Types.ObjectId;
   restaurantId: Types.ObjectId;
 
@@ -74,23 +74,6 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       required: [true, "Item category is required"],
       trim: true,
       index: true,
-      validate: {
-        validator: function (this: IMenuItem, value: string): boolean {
-          if (this.itemType === "food") {
-            return (FOOD_CATEGORIES as ReadonlyArray<string>).includes(value);
-          }
-          if (this.itemType === "beverage") {
-            return (BEVERAGE_CATEGORIES as ReadonlyArray<string>).includes(
-              value
-            );
-          }
-          return false; // Should not happen if itemType is validated
-        },
-        message: (props: any) =>
-          `Category \`${props.value}\` is not valid for item type \`${
-            (props.ownerDocument as IMenuItem)?.itemType
-          }\`.`,
-      },
     },
     menuId: {
       type: Schema.Types.ObjectId,

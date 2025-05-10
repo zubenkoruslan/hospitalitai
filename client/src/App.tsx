@@ -23,10 +23,11 @@ import QuizTakingPage from "./pages/QuizTakingPage";
 import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
+import HomePage from "./pages/HomePage";
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
-// Component to handle root path redirection based on auth state
-const RootRedirect: React.FC = () => {
+// Component to handle authenticated user redirection based on role
+const AuthRedirect: React.FC = () => {
   const { user, token, isLoading } = useAuth();
 
   if (isLoading) {
@@ -44,8 +45,8 @@ const RootRedirect: React.FC = () => {
       return <Navigate to="/login" replace />;
     }
   } else {
-    // User is not logged in, redirect to login
-    return <Navigate to="/login" replace />;
+    // User is not logged in, redirect to homepage
+    return <Navigate to="/" replace />;
   }
 };
 
@@ -58,8 +59,10 @@ function App() {
           {/* Removed */}
           <Routes>
             {/* Public Routes */}
+            <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginForm />} />
             <Route path="/signup" element={<SignupForm />} />
+            <Route path="/auth-redirect" element={<AuthRedirect />} />
 
             {/* Shared Protected Routes (Removed Notifications) */}
             {/*
@@ -148,9 +151,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Root path handled by RootRedirect component */}
-            <Route path="/" element={<RootRedirect />} />
 
             {/* Catch-all for 404 Not Found */}
             <Route path="*" element={<div>404 Not Found</div>} />
