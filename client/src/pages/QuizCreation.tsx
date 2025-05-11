@@ -141,6 +141,9 @@ const QuizCreation: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Restaurant ID from auth context
+  const restaurantId = useMemo(() => user?.restaurantId, [user]);
+
   // Create/Generate Quiz Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -169,23 +172,51 @@ const QuizCreation: React.FC = () => {
   }, []);
 
   const fetchMenus = useCallback(async () => {
+    if (!restaurantId) {
+      setError("Restaurant ID not found. Cannot fetch menus.");
+      setIsLoadingMenus(false);
+      setMenus([]); // Clear menus if no restaurantId
+      return;
+    }
     setIsLoadingMenus(true);
-    setError(null); // Might reset general error, consider separate menuError state if needed
+    // setError(null); // Let general error handling catch it or use a specific menuError state
     try {
       // Fetch all menus for the restaurant
-      const response = await api.get<{ menus: Menu[] }>("/menus"); // Assumes GET /menus returns { menus: [...] }
-      setMenus(response.data.menus || []);
+      const response = await api.get<{
+        success: boolean;
+        count: number;
+        data: Menu[];
+        message?: string;
+      }>(`/menus/restaurant/${restaurantId}`);
+      if (response.data && response.data.success) {
+        setMenus(response.data.data || []);
+      } else {
+        // If success is false, use a generic message or a message from the response if available (though not typical for this specific success=false case)
+        const errorMessage =
+          response.data?.message ||
+          "Failed to fetch menus: API request indicates failure.";
+        setError(errorMessage);
+        setMenus([]);
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch menus.");
+      console.error("Error fetching menus:", err);
+      setError(
+        err.response?.data?.message ||
+          "An unexpected error occurred while fetching menus."
+      );
+      setMenus([]); // Clear menus on error
     } finally {
       setIsLoadingMenus(false);
     }
-  }, []);
+  }, [restaurantId]); // Add restaurantId as a dependency
 
   useEffect(() => {
     fetchQuizzes();
-    fetchMenus(); // Fetch menus instead of menu items
-  }, [fetchQuizzes, fetchMenus]);
+    if (restaurantId) {
+      // Only fetch menus if restaurantId is available
+      fetchMenus();
+    }
+  }, [fetchQuizzes, fetchMenus, restaurantId]); // Add restaurantId here too
 
   // --- Modal Control Handlers ---
   const openCreateModal = () => {

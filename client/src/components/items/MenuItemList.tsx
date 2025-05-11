@@ -27,35 +27,28 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="divide-y divide-gray-200">
       {items.map((item) => (
-        // TODO: Consider extracting this card into MenuItemCard.tsx if it gets more complex
         <div
           key={item._id}
-          className="bg-white rounded-lg shadow overflow-hidden transition hover:shadow-md flex flex-col"
+          className="py-4 flex flex-col sm:flex-row sm:justify-between sm:items-start"
         >
-          <div className="p-4 flex-grow">
+          <div className="flex-grow mb-3 sm:mb-0 sm:mr-4">
             <h3
-              className="text-lg font-semibold text-gray-800 mb-1 truncate"
+              className="text-lg font-semibold text-gray-800 mb-1"
               title={item.name}
             >
               {item.name}
             </h3>
-            <p className="text-sm text-gray-600 mb-2 h-10 overflow-hidden line-clamp-2">
-              {item.description || (
-                <span className="italic text-gray-400">No description</span>
-              )}
-            </p>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-lg font-bold text-green-600">
+            {item.description && (
+              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+            )}
+            <div className="flex items-center text-sm mb-2">
+              <span className="text-xl font-bold text-green-600">
                 ${item.price?.toFixed(2) ?? "N/A"}
               </span>
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full capitalize">
-                {item.category}
-              </span>
             </div>
-            {/* Optional: Display Dietary Flags */}
-            <div className="flex flex-wrap gap-1 mt-2 text-xs">
+            <div className="flex flex-wrap gap-1 text-xs">
               {item.isGlutenFree && (
                 <span className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
                   GF
@@ -78,19 +71,19 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
               )}
             </div>
           </div>
-          {/* Responsive Card Footer Buttons */}
-          <div className="p-3 bg-gray-50 border-t border-gray-200 flex flex-col space-y-2 sm:flex-row sm:justify-end sm:space-y-0 sm:space-x-2">
+
+          <div className="flex-shrink-0 flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
             <Button
-              variant="secondary" // Using secondary for edit action
+              variant="secondary"
               onClick={() => onEdit(item)}
-              className="w-full sm:w-auto text-sm" // Ensure text size is appropriate if needed
+              className="w-full sm:w-auto text-sm"
             >
               Edit
             </Button>
             <Button
-              variant="destructive" // Using destructive for delete action
+              variant="destructive"
               onClick={() => onDelete(item)}
-              className="w-full sm:w-auto text-sm" // Ensure text size is appropriate if needed
+              className="w-full sm:w-auto text-sm"
             >
               Delete
             </Button>

@@ -10,6 +10,12 @@ interface UseMenuDataReturn {
   fetchData: () => void;
 }
 
+// Define the expected response structure from the single API call
+interface MenuWithItemsResponse {
+  success: boolean;
+  data: Menu & { items: MenuItem[] }; // Menu details are at the root of 'data', with an 'items' array inside
+}
+
 export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
   const [menuDetails, setMenuDetails] = useState<Menu | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -27,18 +33,36 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
 
     setLoading(true);
     setError(null);
+    console.log(`[useMenuData] Fetching data for menuId: ${menuId}`);
     try {
-      // Fetch both in parallel
-      const [menuDetailsResponse, itemsResponse] = await Promise.all([
-        api.get<{ menu: Menu }>(`/menus/${menuId}`),
-        api.get<{ items: MenuItem[] }>("/items", { params: { menuId } }),
-      ]);
+      // Single API call to fetch menu details and its items
+      const response = await api.get<MenuWithItemsResponse>(`/menus/${menuId}`);
 
-      setMenuDetails(menuDetailsResponse.data.menu || null);
-      setItems(itemsResponse.data.items || []);
+      if (response.data && response.data.success && response.data.data) {
+        const { items: fetchedItems, ...menuData } = response.data.data;
+        setMenuDetails(menuData as Menu); // Cast because ...menuData will be of type Menu
+        setItems(fetchedItems || []);
+      } else {
+        // Handle cases where the response structure is not as expected
+        // or success is false
+        const message =
+          response.data?.success === false
+            ? "API request was not successful."
+            : "Menu data is not in the expected format or is missing.";
+        console.error("Error fetching or processing menu data:", response.data);
+        setError(message);
+        setMenuDetails(null);
+        setItems([]);
+      }
     } catch (err: any) {
       console.error(`Error fetching data for menu ${menuId}:`, err);
-      setError(err.response?.data?.message || "Failed to fetch menu data.");
+      let errorMessage = "Failed to fetch menu data.";
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
       setMenuDetails(null);
       setItems([]);
     } finally {
@@ -48,7 +72,7 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]); // Re-fetch if menuId changes
+  }, [fetchData]); // Re-fetch if menuId changes (fetchData dependency includes menuId)
 
   return { menuDetails, items, loading, error, fetchData };
 }

@@ -8,6 +8,7 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button"; // Import Button
+import { TrashIcon } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
   MenuItem,
@@ -24,7 +25,6 @@ import {
 import QuizList from "../components/quiz/QuizList";
 import CreateQuizModal from "../components/quiz/CreateQuizModal";
 import QuizEditorModal from "../components/quiz/QuizEditorModal";
-import QuizResultsModal from "../components/quiz/QuizResultsModal";
 // Import item components
 import AddEditMenuItemModal from "../components/items/AddEditMenuItemModal"; // Import the new modal
 import MenuItemList from "../components/items/MenuItemList"; // Import the item list
@@ -32,6 +32,7 @@ import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal"; // Im
 // Import the custom hook
 import { useMenuData } from "../hooks/useMenuData";
 import MenuDetailsEditModal from "../components/menu/MenuDetailsEditModal"; // Import the new menu details modal
+import DeleteCategoryModal from "../components/category/DeleteCategoryModal"; // Import DeleteCategoryModal
 
 // --- Error Formatting Helper ---
 const formatApiError = (err: any, context: string): string => {
@@ -51,9 +52,20 @@ const formatApiError = (err: any, context: string): string => {
   }
 };
 
+// --- Helper function to convert string to Title Case ---
+const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 // --- Main Component ---
 const MenuItemsPage: React.FC = () => {
   const { menuId } = useParams<{ menuId: string }>();
+  console.log(`[MenuItemsPage] menuId from useParams: ${menuId}`);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -83,40 +95,27 @@ const MenuItemsPage: React.FC = () => {
     useState<boolean>(false);
   const [menuDetailsError, setMenuDetailsError] = useState<string | null>(null);
 
+  // State for managing expanded categories
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({});
+
+  // State for deleting categories
+  const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] =
+    useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
-  // Remove the useEffect for fetching data - handled by the hook
-  /*
-  const fetchData = useCallback(async () => {
-    if (!menuId || !restaurantId) {
-      setError("Menu ID or restaurant information is missing.");
-      setIsLoading(false);
-      return;
+  // Memoize unique categories from the current menu items
+  const uniqueCategories = useMemo(() => {
+    if (!items || items.length === 0) {
+      return [];
     }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const menuDetailsResponse = await api.get<{ menu: Menu }>(
-        `/menus/${menuId}`
-      );
-      setMenuDetails(menuDetailsResponse.data.menu);
-      const itemsResponse = await api.get<{ items: MenuItem[] }>("/items", {
-        params: { menuId },
-      });
-      setItems(itemsResponse.data.items || []);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch menu data.");
-      setMenuDetails(null);
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [menuId, restaurantId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-  */
+    const categories = items.map((item) => item.category).filter(Boolean); // Filter out empty/null categories
+    return [...new Set(categories)].sort(); // Get unique, sorted categories
+  }, [items]);
 
   // Effect to initialize editing fields when menuDetails load or change
   useEffect(() => {
@@ -299,16 +298,83 @@ const MenuItemsPage: React.FC = () => {
       return {};
     }
 
-    // Group by itemType (food/beverage)
+    // Group by itemCategory (e.g., Appetizer, Main Course, Dessert, Soft Drink)
     return items.reduce((acc, item) => {
-      const typeKey = item.itemType || "uncategorized"; // Group items lacking type under 'uncategorized'
-      if (!acc[typeKey]) {
-        acc[typeKey] = [];
+      const categoryKey = item.category || "Uncategorized"; // Default for items without a category
+      if (!acc[categoryKey]) {
+        acc[categoryKey] = [];
       }
-      acc[typeKey].push(item);
+      acc[categoryKey].push(item);
       return acc;
     }, {} as Record<string, MenuItem[]>);
   }, [items]);
+
+  // --- Toggle Category Expansion ---
+  const toggleCategory = useCallback((categoryName: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryName]: !prev[categoryName],
+    }));
+  }, []);
+
+  // --- Category Delete Handlers ---
+  const openDeleteCategoryModal = useCallback((category: string) => {
+    // Prevent deletion of special categories
+    if (
+      category.toLowerCase() === "uncategorized" ||
+      category.toLowerCase() === "non assigned"
+    ) {
+      // Optionally show a message that these categories cannot be deleted
+      alert(`The category "${category}" cannot be deleted.`);
+      return;
+    }
+    setCategoryToDelete(category);
+    setIsDeleteCategoryModalOpen(true);
+  }, []);
+
+  const closeDeleteCategoryModal = useCallback(() => {
+    setIsDeleteCategoryModalOpen(false);
+    setCategoryToDelete(null);
+  }, []);
+
+  const handleConfirmDeleteCategory = useCallback(async () => {
+    if (!categoryToDelete || !menuId) return;
+
+    setIsDeletingCategory(true);
+    setSuccessMessage(null);
+    // setError(null); // Error is handled by the hook, let's manage specific delete error if needed
+
+    try {
+      // Replace the placeholder with an actual API call
+      // The backend would handle finding items in `categoryToDelete` for this `menuId`
+      // and reassigning them to "Non Assigned".
+      await api.delete(
+        `/menus/${menuId}/categories/${encodeURIComponent(categoryToDelete)}`
+      );
+
+      setSuccessMessage(
+        `Category "${categoryToDelete}" deleted successfully. Items reassigned.`
+      );
+      fetchData(); // Refresh data from the server
+      closeDeleteCategoryModal();
+    } catch (err: any) {
+      console.error(
+        formatApiError(err, `deleting category ${categoryToDelete}`)
+      );
+      // If you have a dedicated error state for this modal/action, set it here.
+      // For now, relying on console and potentially a general error message if fetchData fails.
+      // setError(formatApiError(err, `deleting category ${categoryToDelete}`));
+      alert(
+        `Failed to delete category "${categoryToDelete}". ${formatApiError(
+          err,
+          "deleting category"
+        )}`
+      );
+      closeDeleteCategoryModal(); // Still close modal on error
+    } finally {
+      setIsDeletingCategory(false);
+    }
+  }, [categoryToDelete, menuId, fetchData, closeDeleteCategoryModal]);
 
   // --- Render Logic ---
   if (!menuId && !loading) {
@@ -395,16 +461,92 @@ const MenuItemsPage: React.FC = () => {
           {!loading && !error && (
             <>
               {Object.keys(groupedItems).length > 0 ? (
-                Object.entries(groupedItems).map(([itemType, itemList]) => (
-                  <div key={itemType} className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-700 mb-3 capitalize border-b pb-2">
-                      {itemType} Items
-                    </h2>
-                    <MenuItemList
-                      items={itemList}
-                      onEdit={openEditModal}
-                      onDelete={openDeleteModal}
-                    />
+                Object.entries(groupedItems).map(([category, itemList]) => (
+                  <div key={category} className="mb-6">
+                    <div // Changed from button to div to contain multiple interactive elements
+                      className="w-full text-left px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-t-md focus:outline-none flex justify-between items-center"
+                    >
+                      <button // Button for expanding/collapsing
+                        onClick={() => toggleCategory(category)}
+                        className="flex-grow flex items-center focus:outline-none"
+                      >
+                        <h2 className="text-xl font-semibold text-gray-700 flex items-center">
+                          {toTitleCase(category)}
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">
+                            {itemList.length}
+                          </span>
+                        </h2>
+                      </button>
+
+                      <div className="flex items-center">
+                        {" "}
+                        {/* Container for action icons */}
+                        {category.toLowerCase() !== "uncategorized" &&
+                          category.toLowerCase() !== "non assigned" && (
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent card from toggling
+                                openDeleteCategoryModal(category);
+                              }}
+                              aria-label={`Delete category ${category}`}
+                              className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 mr-2" // Adjusted for icon button appearance
+                              type="button" // Explicitly type button
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </Button>
+                          )}
+                        <button // Chevron button remains for expand/collapse visual cue, though outer click also works
+                          onClick={() => toggleCategory(category)}
+                          className="focus:outline-none"
+                          aria-label={
+                            expandedCategories[category]
+                              ? "Collapse category"
+                              : "Expand category"
+                          }
+                        >
+                          {expandedCategories[category] ? (
+                            <svg
+                              className="w-5 h-5 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M5 15l7-7 7 7"
+                              ></path>
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5 text-gray-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M19 9l-7 7-7-7"
+                              ></path>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    {expandedCategories[category] && (
+                      <div className="border border-t-0 border-gray-200 rounded-b-md p-4">
+                        <MenuItemList
+                          items={itemList}
+                          onEdit={openEditModal}
+                          onDelete={openDeleteModal}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -428,6 +570,8 @@ const MenuItemsPage: React.FC = () => {
             isSubmitting={isSubmittingItem}
             menuId={menuId ?? ""}
             allItemsInMenu={items}
+            restaurantId={restaurantId ?? ""}
+            availableCategories={uniqueCategories}
           />
         )}
 
@@ -453,6 +597,15 @@ const MenuItemsPage: React.FC = () => {
             error={menuDetailsError}
           />
         )}
+
+        {/* Delete Category Modal */}
+        <DeleteCategoryModal
+          isOpen={isDeleteCategoryModalOpen}
+          onClose={closeDeleteCategoryModal}
+          onConfirm={handleConfirmDeleteCategory}
+          categoryName={categoryToDelete}
+          isDeleting={isDeletingCategory}
+        />
       </main>
     </div>
   );

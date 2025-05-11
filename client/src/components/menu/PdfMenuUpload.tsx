@@ -60,9 +60,8 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
 
     try {
       // Adjust the API endpoint as per your backend route structure
-      // Current backend route is /api/menus/:restaurantId/upload-pdf
       const response = await axios.post(
-        `/api/menus/${restaurantId}/upload-pdf`, // Corrected API endpoint
+        `/api/menus/upload/pdf/${restaurantId}`, // Corrected API endpoint to match backend
         formData,
         {
           headers: {

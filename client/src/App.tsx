@@ -94,7 +94,7 @@ function App() {
               }
             />
             <Route
-              path="/menu/:menuId/items"
+              path="/menu/:menuId"
               element={
                 <ProtectedRoute requiredRole="restaurant">
                   <MenuItemsPage />

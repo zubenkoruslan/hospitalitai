@@ -28,20 +28,41 @@ export function useMenus(): UseMenusReturn {
   const { user } = useAuth();
 
   const fetchMenus = useCallback(async () => {
-    // Assuming only restaurant owners can fetch the full menu list
-    if (!(user && user.role === "restaurant")) {
-      setError("Access denied. Only restaurant owners can view menus.");
+    // Ensure user and restaurantId are available
+    if (!user || !user.restaurantId) {
+      setError(
+        user
+          ? "User is not associated with a restaurant."
+          : "User not authenticated."
+      );
       setLoading(false);
       setMenus([]);
       return;
     }
 
+    // Optional: Role check if needed, e.g., allow 'manager' as well
+    // if (!["restaurant", "restaurantAdmin", "manager"].includes(user.role)) {
+    //   setError("Access denied. Insufficient role to view menus.");
+    //   setLoading(false);
+    //   setMenus([]);
+    //   return;
+    // }
+
     setLoading(true);
     setError(null);
     try {
-      // Adjust the expected response structure based on your API
-      const response = await api.get<{ menus: Menu[] }>("/menus"); // Expect Menu[]
-      setMenus(response.data.menus || []);
+      const apiUrl = `/menus/restaurant/${user.restaurantId}`; // Construct URL
+      console.log("Calling API with URL:", apiUrl); // Log the URL
+
+      // Ensure the expected response type matches the actual backend response structure
+      const response = await api.get<{
+        success: boolean;
+        count: number;
+        data: Menu[];
+      }>(
+        apiUrl // Use the constructed URL
+      );
+      setMenus(response.data.data || []); // Adjusted to access response.data.data
     } catch (err: any) {
       console.error("Error fetching menus:", err);
       setError(err.response?.data?.message || "Failed to fetch menus.");
