@@ -24,6 +24,8 @@ import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
 import HomePage from "./pages/HomePage";
+import QuestionBankListPage from "./pages/QuestionBankListPage";
+import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
 // Component to handle authenticated user redirection based on role
@@ -130,6 +132,22 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="restaurant">
                   <StaffDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/question-banks"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <QuestionBankListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/question-banks/:bankId"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <QuestionBankDetailPage />
                 </ProtectedRoute>
               }
             />

@@ -21,9 +21,10 @@ import {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
-  SchemaType,
   Part,
   FunctionDeclaration,
+  FunctionDeclarationSchemaType,
+  FunctionDeclarationSchema,
 } from "@google/generative-ai"; // Import Gemini SDK
 
 // Interface for data used in create/update
@@ -89,57 +90,59 @@ const menuExtractionFunctionSchema: FunctionDeclaration = {
   description:
     "Extracts structured menu data from raw menu text according to the provided instructions and schema.",
   parameters: {
-    type: SchemaType.OBJECT,
+    type: FunctionDeclarationSchemaType.OBJECT,
     properties: {
       menuName: {
-        type: SchemaType.STRING,
+        type: FunctionDeclarationSchemaType.STRING,
         description:
           'The overall name of the menu (e.g., "Dinner Menu"). Use original filename if not found in text.',
       },
       menuItems: {
-        type: SchemaType.ARRAY,
+        type: FunctionDeclarationSchemaType.ARRAY,
         description: "A list of all items found on the menu.",
         items: {
-          type: SchemaType.OBJECT,
+          type: FunctionDeclarationSchemaType.OBJECT,
           properties: {
             itemName: {
-              type: SchemaType.STRING,
+              type: FunctionDeclarationSchemaType.STRING,
               description:
                 'The name of the menu item (e.g., "Classic Burger").',
             },
             itemPrice: {
-              type: SchemaType.NUMBER,
+              type: FunctionDeclarationSchemaType.NUMBER,
               description:
                 'The price of the menu item as a number (e.g., 12.99). Null if not applicable (e.g. "Market Price") or not listed.',
             },
             itemType: {
-              type: SchemaType.STRING,
+              type: FunctionDeclarationSchemaType.STRING,
               description:
                 'The type of the item, must be either "food" or "beverage".',
             },
             itemIngredients: {
-              type: SchemaType.ARRAY,
+              type: FunctionDeclarationSchemaType.ARRAY,
               description:
                 'List of ingredients for the item (e.g., ["caramelised onion", "tomato relish"]).',
-              items: { type: SchemaType.STRING },
+              items: {
+                type: FunctionDeclarationSchemaType.STRING,
+              } as FunctionDeclarationSchema,
             },
             itemCategory: {
-              type: SchemaType.STRING,
+              type: FunctionDeclarationSchemaType.STRING,
               description:
                 'The category the item belongs to, ideally derived from section headers in the menu text (e.g., "Starters", "Main Courses", "Sides", "Butchers block"). If no header, infer from context. Use exact header wording if possible.',
             },
             isGlutenFree: {
-              type: SchemaType.BOOLEAN,
+              type: FunctionDeclarationSchemaType.BOOLEAN,
               description:
                 "True if the item is marked or inferred as gluten-free, otherwise false.",
             },
             isVegan: {
-              type: SchemaType.BOOLEAN,
+              type: FunctionDeclarationSchemaType.BOOLEAN,
               description:
                 "True if the item is marked or inferred as vegan, otherwise false.",
             },
             isVegetarian: {
-              type: SchemaType.BOOLEAN,
+              type: FunctionDeclarationSchemaType.BOOLEAN,
               description:
                 "True if the item is marked or inferred as vegetarian, otherwise false.",
             },

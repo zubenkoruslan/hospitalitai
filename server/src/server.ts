@@ -14,6 +14,8 @@ import itemRoutes from "./routes/items";
 import { router as quizRoutes } from "./routes/quiz";
 import { quizResultRouter } from "./routes/quizResult";
 import staffRoutes from "./routes/staff";
+import questionBankRoutes from "./routes/questionBankRoutes";
+import questionRoutes from "./routes/questionRoutes";
 import { protect } from "./middleware/authMiddleware";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -78,6 +80,8 @@ app.use("/api/items", itemRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/quiz-results", quizResultRouter);
 app.use("/api/staff", staffRoutes);
+app.use("/api/question-banks", questionBankRoutes);
+app.use("/api/questions", questionRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

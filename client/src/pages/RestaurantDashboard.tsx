@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -44,6 +50,7 @@ const isCompletedQuiz = (result: ResultSummary): boolean => {
 const RestaurantDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use custom hooks for data fetching
   const {
@@ -56,11 +63,21 @@ const RestaurantDashboard: React.FC = () => {
     loading: quizCountLoading,
     error: quizCountError,
   } = useQuizCount();
-  const { menus, loading: menuLoading, error: menuError } = useMenus();
+  const {
+    menus,
+    loading: menuLoading,
+    error: menuError,
+    fetchMenus,
+  } = useMenus();
 
   // Keep other state
   const [copied, setCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // State for menu upload
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
   // Memoize calculations based on staffData from the hook
   const overallAveragePerformance = useMemo(() => {
@@ -109,6 +126,48 @@ const RestaurantDashboard: React.FC = () => {
     },
     []
   ); // No dependency needed
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+      setUploadMessage(null); // Clear previous messages
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !user?.restaurantId) {
+      setUploadMessage("Please select a file and ensure you are logged in.");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadMessage(null);
+    const formData = new FormData();
+    formData.append("menuPdf", selectedFile);
+
+    try {
+      await api.post(`/menus/upload/pdf/${user.restaurantId}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setUploadMessage("Menu uploaded successfully!");
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; // Reset the file input
+      }
+      fetchMenus(); // Refresh menus list
+    } catch (err: any) {
+      setUploadMessage(
+        err.response?.data?.message ||
+          "Failed to upload menu. Please try again."
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Combine loading and error states for overall display
   const isLoading =
@@ -163,24 +222,19 @@ const RestaurantDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-100">
       <Navbar />
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0">
-          <div className="pb-5 border-b border-gray-200 mb-6">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">
-              Restaurant Dashboard
+        <div>
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900">
+              {user!.restaurantName} Dashboard
             </h1>
-            {user?.restaurantName && (
-              <p className="mt-1 text-lg text-gray-500">
-                {user.restaurantName}
-              </p>
-            )}
           </div>
 
-          <div className="px-4 sm:px-0">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
               Dashboard Summary
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-              <Card className="text-center md:text-left">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
                 <h3 className="text-lg font-medium text-gray-700">
                   Total Staff
                 </h3>
@@ -195,7 +249,7 @@ const RestaurantDashboard: React.FC = () => {
                 </Link>
               </Card>
 
-              <Card className="text-center md:text-left">
+              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
                 <h3 className="text-lg font-medium text-gray-700">
                   Menu Management
                 </h3>
@@ -210,7 +264,7 @@ const RestaurantDashboard: React.FC = () => {
                 </Link>
               </Card>
 
-              <Card className="text-center md:text-left">
+              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
                 <h3 className="text-lg font-medium text-gray-700">
                   Available Quizzes
                 </h3>
@@ -225,7 +279,7 @@ const RestaurantDashboard: React.FC = () => {
                 </Link>
               </Card>
 
-              <Card className="text-center md:text-left">
+              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
                 <h3 className="text-lg font-medium text-gray-700">
                   Avg. Staff Score
                 </h3>
@@ -250,139 +304,188 @@ const RestaurantDashboard: React.FC = () => {
                 </Link>
               </Card>
 
-              <Card className="flex flex-col justify-between xl:col-span-4">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">
-                    Restaurant Invitation Code
-                  </h3>
-                  <div className="mb-1 text-sm text-gray-600">
-                    <span className="font-medium">Your Restaurant ID:</span>
-                    <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
-                        {user?.restaurantId}
-                      </code>
-                      <Button
-                        variant="secondary"
-                        onClick={handleCopyId}
-                        className={`text-xs px-2 py-1 ${
-                          copied
-                            ? "bg-green-100 !text-green-700 hover:bg-green-200 focus:ring-green-500"
-                            : ""
-                        }`}
-                        aria-label="Copy restaurant ID"
-                      >
-                        {copied ? "Copied!" : "Copy"}
-                      </Button>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Share this ID with your staff to register.
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 mt-6 pt-6 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">
+                      Upload New Menu (PDF)
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Upload your menu in PDF format.
                     </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Overview Section Card */}
-            <Card className="overflow-x-auto">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Staff Overview
-                </h2>
-                <div className="relative w-full sm:w-64">
-                  <input
-                    type="text"
-                    placeholder="Search staff by name..."
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    aria-label="Search staff"
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-gray-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileChange}
+                      ref={fileInputRef}
+                      style={{ display: "none" }}
+                      id="menuPdfUpload"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="mb-2 w-full text-sm py-2 truncate"
                     >
-                      <path
-                        fillRule="evenodd"
-                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
+                      {selectedFile ? selectedFile.name : "Select PDF File"}
+                    </Button>
+                    {selectedFile && (
+                      <Button
+                        variant="primary"
+                        onClick={handleFileUpload}
+                        disabled={isUploading || !selectedFile}
+                        className="w-full text-sm py-2"
+                      >
+                        {isUploading ? <LoadingSpinner /> : "Upload Menu"}
+                      </Button>
+                    )}
+                    {uploadMessage && (
+                      <p
+                        className={`mt-3 text-xs ${
+                          uploadMessage.includes("success")
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {uploadMessage}
+                      </p>
+                    )}
+                  </Card>
+
+                  <Card className="flex flex-col justify-between p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-700">
+                        Restaurant Invitation Code
+                      </h3>
+                      <div className="mb-1 text-sm text-gray-600">
+                        <span className="font-medium">Your Restaurant ID:</span>
+                        <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
+                            {user?.restaurantId}
+                          </code>
+                          <Button
+                            variant="secondary"
+                            onClick={handleCopyId}
+                            className={`text-xs px-2 py-1 ${
+                              copied
+                                ? "bg-green-100 !text-green-700 hover:bg-green-200 focus:ring-green-500"
+                                : ""
+                            }`}
+                            aria-label="Copy restaurant ID"
+                          >
+                            {copied ? "Copied!" : "Copy"}
+                          </Button>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Share this ID with your staff to register.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
                 </div>
               </div>
-
-              {filteredStaffData.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">
-                  {searchTerm.length >= 3
-                    ? `No staff found matching "${searchTerm}".`
-                    : "No staff members found or no results available yet."}
-                </p>
-              ) : (
-                <Card className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Staff Name
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Role
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Quizzes Taken
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Average Score
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredStaffData.map((staff) => {
-                          return (
-                            <tr key={staff._id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <Link
-                                  to={`/staff/${staff._id}`}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                                  aria-label={`View details for ${staff.name}`}
-                                >
-                                  {staff.name}
-                                </Link>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {staff.professionalRole || "-"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {staff.quizzesTaken ?? 0} / {totalQuizzes}
-                              </td>
-                              <td
-                                className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
-                                  staff.averageScore === null
-                                    ? "text-gray-500"
-                                    : staff.averageScore >= 70
-                                    ? "text-green-600"
-                                    : "text-red-600"
-                                }`}
-                              >
-                                {staff.averageScore !== null
-                                  ? `${staff.averageScore.toFixed(1)}%`
-                                  : "N/A"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              )}
-            </Card>
+            </div>
           </div>
+
+          <Card className="overflow-x-auto p-6 bg-white shadow rounded-lg">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Staff Overview
+              </h2>
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  placeholder="Search staff by name..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Search staff"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {filteredStaffData.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">
+                {searchTerm.length >= 3
+                  ? `No staff found matching "${searchTerm}".`
+                  : "No staff members found or no results available yet."}
+              </p>
+            ) : (
+              <Card className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Staff Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Role
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quizzes Taken
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Average Score
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredStaffData.map((staff) => {
+                        return (
+                          <tr key={staff._id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <Link
+                                to={`/staff/${staff._id}`}
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                aria-label={`View details for ${staff.name}`}
+                              >
+                                {staff.name}
+                              </Link>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {staff.professionalRole || "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {staff.quizzesTaken ?? 0} / {totalQuizzes}
+                            </td>
+                            <td
+                              className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
+                                staff.averageScore === null
+                                  ? "text-gray-500"
+                                  : staff.averageScore >= 70
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {staff.averageScore !== null
+                                ? `${staff.averageScore.toFixed(1)}%`
+                                : "N/A"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </Card>
         </div>
       </main>
     </div>

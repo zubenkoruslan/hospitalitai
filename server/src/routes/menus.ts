@@ -26,7 +26,7 @@ router.get(
 router.post(
   "/",
   protect,
-  restrictTo("restaurantAdmin"), // Example: Only restaurant admins can create a base menu
+  restrictTo("restaurant"), // Example: Only restaurant admins can create a base menu
   menuController.createMenu
 );
 
@@ -34,7 +34,7 @@ router.post(
 router.put(
   "/:menuId",
   protect,
-  restrictTo("restaurantAdmin"), // Example: Only restaurant admins can update menu details
+  restrictTo("restaurant"), // Example: Only restaurant admins can update menu details
   menuController.updateMenuDetails
 );
 
@@ -43,7 +43,7 @@ router.put(
 router.delete(
   "/:menuId",
   protect,
-  restrictTo("restaurantAdmin"), // Example: Only restaurant admins can delete menus
+  restrictTo("restaurant"), // Example: Only restaurant admins can delete menus
   menuController.deleteMenu
 );
 

@@ -59,6 +59,7 @@ const Navbar: React.FC<NavbarProps> = ({
     { name: "Quiz Management", path: "/quiz-management" },
     { name: "Staff Management", path: "/staff" },
     { name: "Quiz Results", path: "/staff-results" },
+    { name: "Question Banks", path: "/question-banks" },
   ];
 
   // Combine links based on role

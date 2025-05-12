@@ -94,4 +94,185 @@ api.interceptors.response.use(
   }
 );
 
+// Import question bank types
+import {
+  IQuestionBank,
+  CreateQuestionBankData,
+  UpdateQuestionBankData,
+  IQuestion, // Assuming we might need this later for question-specific calls
+  NewQuestionClientData,
+  AiGenerationClientParams,
+  CreateQuestionBankFromMenuClientData,
+} from "../types/questionBankTypes";
+
+// Import menu types
+import { IMenuClient, IMenuWithItemsClient } from "../types/menuTypes"; // Added import for menu types
+
+// Question Bank Endpoints
+
+/**
+ * Fetches all question banks for the current restaurant.
+ */
+export const getQuestionBanks = async (): Promise<IQuestionBank[]> => {
+  const response = await api.get<{ data: IQuestionBank[] }>("/question-banks");
+  return response.data.data; // Assuming backend wraps in a 'data' object
+};
+
+/**
+ * Creates a new question bank.
+ * @param data - The data for the new question bank.
+ */
+export const createQuestionBank = async (
+  data: CreateQuestionBankData
+): Promise<IQuestionBank> => {
+  const response = await api.post<{ data: IQuestionBank }>(
+    "/question-banks",
+    data
+  );
+  return response.data.data; // Assuming backend wraps in a 'data' object
+};
+
+/**
+ * Fetches a single question bank by its ID.
+ * @param bankId - The ID of the question bank.
+ */
+export const getQuestionBankById = async (
+  bankId: string
+): Promise<IQuestionBank> => {
+  const response = await api.get<{ data: IQuestionBank }>(
+    `/question-banks/${bankId}`
+  );
+  return response.data.data;
+};
+
+/**
+ * Updates an existing question bank.
+ * @param bankId - The ID of the question bank to update.
+ * @param data - The data to update the question bank with.
+ */
+export const updateQuestionBank = async (
+  bankId: string,
+  data: UpdateQuestionBankData
+): Promise<IQuestionBank> => {
+  const response = await api.patch<{ data: IQuestionBank }>(
+    `/question-banks/${bankId}`,
+    data
+  );
+  return response.data.data;
+};
+
+/**
+ * Deletes a question bank by its ID.
+ * @param bankId - The ID of the question bank to delete.
+ */
+export const deleteQuestionBank = async (bankId: string): Promise<void> => {
+  await api.delete(`/question-banks/${bankId}`);
+};
+
+// Functions for managing questions within a bank
+
+/**
+ * Adds a question to a specific question bank.
+ * @param bankId The ID of the question bank.
+ * @param questionId The ID of the question to add.
+ */
+export const addQuestionToBank = async (
+  bankId: string,
+  questionId: string
+): Promise<IQuestionBank> => {
+  const response = await api.post<{ data: IQuestionBank }>(
+    `/question-banks/${bankId}/questions`,
+    { questionId } // Backend expects an object with questionId
+  );
+  return response.data.data;
+};
+
+/**
+ * Removes a question from a specific question bank.
+ * @param bankId The ID of the question bank.
+ * @param questionId The ID of the question to remove.
+ */
+export const removeQuestionFromBank = async (
+  bankId: string,
+  questionId: string
+): Promise<IQuestionBank> => {
+  const response = await api.delete<{ data: IQuestionBank }>(
+    `/question-banks/${bankId}/questions/${questionId}`
+  );
+  return response.data.data; // Assuming backend returns the updated bank
+};
+
+// Question Endpoints (Individual Question CRUD)
+
+/**
+ * Creates a new question.
+ * @param data - The data for the new question.
+ */
+export const createQuestion = async (
+  data: NewQuestionClientData
+): Promise<IQuestion> => {
+  // The backend /api/questions route handles setting restaurantId and createdBy: 'manual'
+  const response = await api.post<{ data: IQuestion }>("/questions", data);
+  return response.data.data; // Assuming backend wraps in a 'data' object and returns the full IQuestion
+};
+
+/**
+ * Generates questions using AI.
+ * @param params - Parameters for AI question generation.
+ */
+export const generateAiQuestions = async (
+  params: AiGenerationClientParams
+): Promise<IQuestion[]> => {
+  // The backend /api/questions/generate route handles setting restaurantId and createdBy: 'ai' for each question
+  const response = await api.post<{ data: IQuestion[] }>(
+    "/questions/generate",
+    params
+  );
+  return response.data.data; // Assuming backend wraps in a 'data' object and returns an array of IQuestion
+};
+
+// Create a new question bank from a menu
+export const createQuestionBankFromMenu = async (
+  data: CreateQuestionBankFromMenuClientData
+): Promise<IQuestionBank> => {
+  const response = await api.post<{
+    message: string;
+    data: IQuestionBank;
+  }>(`${API_BASE_URL}/question-banks/from-menu`, data);
+  return response.data.data;
+};
+
+// Menu Endpoints
+
+/**
+ * Fetches all menus for a specific restaurant.
+ * @param restaurantId - The ID of the restaurant.
+ */
+export const getRestaurantMenus = async (
+  restaurantId: string
+): Promise<IMenuClient[]> => {
+  const response = await api.get<{
+    success: boolean;
+    count: number;
+    data: IMenuClient[];
+  }>(`/menus/restaurant/${restaurantId}`);
+  return response.data.data; // data is the array of IMenuClient
+};
+
+/**
+ * Fetches a single menu by its ID, including its items.
+ * @param menuId - The ID of the menu.
+ */
+export const getMenuWithItems = async (
+  menuId: string
+): Promise<IMenuWithItemsClient> => {
+  const response = await api.get<{
+    success: boolean;
+    data: IMenuWithItemsClient;
+  }>(`/menus/${menuId}`);
+  return response.data.data; // data is the IMenuWithItemsClient object
+};
+
+// TODO: Add functions for Get All, Get One, Update, Delete for individual questions if needed
+
 export default api;
