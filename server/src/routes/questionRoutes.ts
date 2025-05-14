@@ -14,7 +14,7 @@ const router = express.Router();
 // All routes below are protected.
 // Restaurant owners/admins should be able to manage questions for their restaurant.
 router.use(protect);
-// router.use(restrictTo('restaurant', 'admin')); // Add role restriction if needed, e.g. only restaurant owners can manage their questions
+router.use(restrictTo("restaurant"));
 
 router.post("/generate", generateAiQuestionsController); // New route for AI question generation
 

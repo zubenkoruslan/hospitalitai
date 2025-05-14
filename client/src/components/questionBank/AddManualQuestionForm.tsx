@@ -3,15 +3,19 @@ import {
   NewQuestionClientData,
   QuestionType,
   IOption,
+  IQuestion,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import Card from "../common/Card";
-import { XMarkIcon } from "@heroicons/react/24/outline"; // Corrected v2 import
+import { XMarkIcon } from "@heroicons/react/24/outline";
+import { createQuestion as apiCreateQuestion } from "../../services/api";
+import { useValidation } from "../../context/ValidationContext";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 interface AddManualQuestionFormProps {
-  onSubmit: (data: NewQuestionClientData) => Promise<void>;
+  onQuestionAdded: (newQuestion: IQuestion) => void;
   onClose: () => void;
-  isLoading: boolean;
+  initialBankCategories?: string[];
 }
 
 const questionTypes: QuestionType[] = [
@@ -23,9 +27,9 @@ const questionTypes: QuestionType[] = [
 const difficultyLevels = ["easy", "medium", "hard"];
 
 const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
-  onSubmit,
+  onQuestionAdded,
   onClose,
-  isLoading,
+  initialBankCategories,
 }) => {
   const [questionText, setQuestionText] = useState("");
   const [questionType, setQuestionType] = useState<QuestionType>(
@@ -35,11 +39,17 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
   ]);
-  const [categories, setCategories] = useState(""); // Comma-separated string
+  const [categories, setCategories] = useState(
+    initialBankCategories && initialBankCategories.length > 0
+      ? initialBankCategories.join(", ")
+      : ""
+  );
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "">(
     ""
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [internalIsLoading, setInternalIsLoading] = useState(false);
+  const { formatErrorMessage } = useValidation();
 
   const handleOptionChange = (
     index: number,
@@ -47,35 +57,30 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     value: string | boolean
   ) => {
     const newOptions = [...options];
-    // Type assertion needed as field could be '_id' which we don't use here for value assignment of boolean
     (newOptions[index] as any)[field] = value;
     setOptions(newOptions);
   };
 
   const addOption = () => {
     if (options.length < 6) {
-      // Max 6 options for multiple choice
       setOptions([...options, { text: "", isCorrect: false }]);
     }
   };
 
   const removeOption = (index: number) => {
     if (options.length > 2) {
-      // Min 2 options
       const newOptions = options.filter((_, i) => i !== index);
       setOptions(newOptions);
     }
   };
 
-  // Adjust options when question type changes
   useEffect(() => {
     if (questionType === "true-false") {
       setOptions([
-        { text: "True", isCorrect: false },
+        { text: "True", isCorrect: true },
         { text: "False", isCorrect: false },
       ]);
     } else {
-      // Reset to default 2 empty options if not true-false and options were for true-false
       if (
         options.length === 2 &&
         (options[0].text === "True" || options[1].text === "True")
@@ -88,6 +93,12 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     }
   }, [questionType]);
 
+  useEffect(() => {
+    if (initialBankCategories && initialBankCategories.length > 0) {
+      setCategories(initialBankCategories.join(", "));
+    }
+  }, [initialBankCategories]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -97,13 +108,17 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
       isCorrect: !!opt.isCorrect,
     }));
 
-    // Validation
     if (!questionText.trim()) {
       setFormError("Question text cannot be empty.");
       return;
     }
-    if (finalOptions.some((opt) => !opt.text.trim())) {
-      setFormError("All option texts must be filled.");
+    if (
+      questionType !== "true-false" &&
+      finalOptions.some((opt) => !opt.text.trim())
+    ) {
+      setFormError(
+        "All option texts must be filled for multiple choice questions."
+      );
       return;
     }
     const correctOptionsCount = finalOptions.filter(
@@ -134,7 +149,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     }
 
     const data: NewQuestionClientData = {
-      questionText,
+      questionText: questionText.trim(),
       questionType,
       options: finalOptions,
       categories: categories
@@ -143,7 +158,21 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         .filter((cat) => cat),
       difficulty: difficulty || undefined,
     };
-    await onSubmit(data);
+
+    setInternalIsLoading(true);
+    try {
+      const newQuestion = await apiCreateQuestion(data);
+      if (newQuestion) {
+        onQuestionAdded(newQuestion);
+      } else {
+        setFormError("Failed to create question. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error creating question:", err);
+      setFormError(formatErrorMessage(err));
+    } finally {
+      setInternalIsLoading(false);
+    }
   };
 
   const commonInputClass =
@@ -160,6 +189,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
           aria-label="Close form"
+          disabled={internalIsLoading}
         >
           <XMarkIcon className="h-6 w-6" />
         </button>
@@ -184,6 +214,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
               required
               rows={3}
               className={commonInputClass}
+              disabled={internalIsLoading}
             />
           </div>
 
@@ -199,6 +230,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
                   setQuestionType(e.target.value as QuestionType)
                 }
                 className={commonInputClass}
+                disabled={internalIsLoading}
               >
                 {questionTypes.map((type) => (
                   <option key={type} value={type}>
@@ -218,6 +250,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as any)}
                 className={commonInputClass}
+                disabled={internalIsLoading}
               >
                 <option value="">Select Difficulty</option>
                 {difficultyLevels.map((level) => (
@@ -244,40 +277,49 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
                   }
                   className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   disabled={
-                    questionType === "multiple-choice-single" &&
-                    options.filter((o) => o.isCorrect).length >= 1 &&
-                    !opt.isCorrect
+                    internalIsLoading ||
+                    (questionType === "multiple-choice-single" &&
+                      options.filter((o) => o.isCorrect).length >= 1 &&
+                      !opt.isCorrect)
                   }
                 />
                 <input
                   type="text"
-                  value={opt.text || ""}
+                  placeholder={`Option ${index + 1}`}
+                  value={
+                    opt.text ||
+                    (questionType === "true-false"
+                      ? index === 0
+                        ? "True"
+                        : "False"
+                      : "")
+                  }
                   onChange={(e) =>
                     handleOptionChange(index, "text", e.target.value)
                   }
-                  placeholder={`Option ${index + 1}`}
-                  required
                   className={`${commonInputClass} flex-grow`}
-                  disabled={questionType === "true-false"}
+                  disabled={internalIsLoading || questionType === "true-false"}
                 />
-                {options.length > 2 && questionType !== "true-false" && (
-                  <Button
+                {questionType !== "true-false" && options.length > 2 && (
+                  <button
                     type="button"
-                    variant="destructive"
                     onClick={() => removeOption(index)}
-                    className="text-xs px-2 py-1"
+                    className="text-red-500 hover:text-red-700 p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                    aria-label="Remove option"
+                    disabled={internalIsLoading}
                   >
-                    Remove
-                  </Button>
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
                 )}
               </div>
             ))}
             {questionType !== "true-false" && options.length < 6 && (
               <Button
                 type="button"
-                variant="secondary"
                 onClick={addOption}
-                className="text-sm mt-1"
+                variant="secondary"
+                className="mt-2"
+                disabled={internalIsLoading}
               >
                 Add Option
               </Button>
@@ -293,23 +335,28 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
               type="text"
               value={categories}
               onChange={(e) => setCategories(e.target.value)}
-              placeholder="e.g., Red Wine, Appetizers, Safety Procedures"
+              placeholder="e.g., Appetizers, Wines, Safety Procedures"
               required
               className={commonInputClass}
+              disabled={internalIsLoading}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-3">
+          <div className="flex justify-end space-x-3 pt-4">
             <Button
               type="button"
               variant="secondary"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={internalIsLoading}
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Question"}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={internalIsLoading}
+            >
+              {internalIsLoading ? <LoadingSpinner /> : "Add Question"}
             </Button>
           </div>
         </form>

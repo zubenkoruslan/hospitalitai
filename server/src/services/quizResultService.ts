@@ -79,14 +79,26 @@ class QuizResultService {
       const processedAnswers: (number | null)[] = [];
 
       quiz.questions.forEach((question, index) => {
-        correctAnswers.push(question.correctAnswer);
+        // Find the index of the correct option
+        let correctOptionIndex = -1;
+        if (question.options && Array.isArray(question.options)) {
+          // Ensure options exist and is an array
+          correctOptionIndex = question.options.findIndex(
+            (opt) => opt.isCorrect
+          );
+        }
+
+        correctAnswers.push(
+          correctOptionIndex !== -1 ? correctOptionIndex : undefined
+        );
         const userAnswer = answers[index];
         processedAnswers.push(userAnswer === undefined ? null : userAnswer);
 
         if (
           userAnswer !== undefined &&
           userAnswer !== null &&
-          userAnswer === question.correctAnswer
+          correctOptionIndex !== -1 && // Check if a correct option was identified
+          userAnswer === correctOptionIndex // Compare user's answer index with the found correct option index
         ) {
           score++;
         }
@@ -558,18 +570,50 @@ class QuizResultService {
         );
       }
 
-      // Helper to safely get choice text
+      // Helper function to get choice text safely, now defined inside getResultDetails
       const getChoiceText = (
-        choices: string[] | undefined,
-        index: number
+        optionsArray: Array<{ text: string }> | undefined,
+        index: number | null | undefined
       ): string => {
-        return choices && index >= 0 && index < choices.length
-          ? choices[index]
-          : "N/A";
+        if (
+          optionsArray &&
+          index !== null &&
+          index !== undefined &&
+          index >= 0 &&
+          index < optionsArray.length
+        ) {
+          return optionsArray[index]?.text || "N/A"; // Access text property
+        }
+        return "N/A";
       };
 
-      // Process details
-      const detailedResult = {
+      const formattedQuestions = quiz.questions.map((question, index) => {
+        // CORRECTED: savedResult.answers[index] directly gives the userAnswerIndex (number or null)
+        const userAnswerIndex = result.answers[index];
+
+        // Find the index of the correct option for this question
+        let correctOptIdx = -1;
+        if (question.options && Array.isArray(question.options)) {
+          correctOptIdx = question.options.findIndex((opt) => opt.isCorrect);
+        }
+
+        return {
+          originalQuestionId: question._id?.toString(),
+          questionText: question.questionText,
+          options: question.options,
+          userAnswerIndex: userAnswerIndex, // This is now number | null
+          userAnswerText: getChoiceText(question.options, userAnswerIndex),
+          correctAnswerIndex: correctOptIdx,
+          correctAnswerText: getChoiceText(question.options, correctOptIdx),
+          isCorrect:
+            correctOptIdx !== -1 &&
+            userAnswerIndex !== null &&
+            userAnswerIndex === correctOptIdx, // Added null check for userAnswerIndex
+          questionType: question.questionType,
+        };
+      });
+
+      return {
         _id: result._id,
         quizId: quiz._id,
         quizTitle: quiz.title,
@@ -578,24 +622,8 @@ class QuizResultService {
         completedAt: result.completedAt,
         status: result.status.charAt(0).toUpperCase() + result.status.slice(1),
         retakeCount: result.retakeCount,
-        questions: quiz.questions.map((question, index) => {
-          const userAnswerIndex = result.answers[index];
-          return {
-            text: question.text,
-            choices: question.choices,
-            userAnswerIndex: userAnswerIndex,
-            userAnswer: getChoiceText(question.choices, userAnswerIndex),
-            correctAnswerIndex: question.correctAnswer,
-            correctAnswer: getChoiceText(
-              question.choices,
-              question.correctAnswer
-            ),
-            isCorrect: userAnswerIndex === question.correctAnswer,
-          };
-        }),
+        questions: formattedQuestions,
       };
-
-      return detailedResult;
     } catch (error: any) {
       console.error("Error fetching detailed quiz result in service:", error);
       if (error instanceof AppError) throw error;

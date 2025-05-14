@@ -133,7 +133,8 @@ export const updateQuestion = async (
 ): Promise<void> => {
   try {
     const { questionId } = req.params;
-    const { questionText, options, categories, difficulty } = req.body;
+    const { questionText, questionType, options, categories, difficulty } =
+      req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -144,7 +145,8 @@ export const updateQuestion = async (
 
     const updateData: QuestionService.UpdateQuestionData = {};
     if (questionText !== undefined) updateData.questionText = questionText;
-    if (options !== undefined) updateData.options = options; // Service will validate these if provided
+    if (questionType !== undefined) updateData.questionType = questionType;
+    if (options !== undefined) updateData.options = options;
     if (categories !== undefined) updateData.categories = categories;
     if (difficulty !== undefined) updateData.difficulty = difficulty;
 
@@ -231,67 +233,72 @@ export const generateAiQuestionsController = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { categories, targetQuestionCount, menuContext, geminiModelName } =
-      req.body;
+    // Destructure based on AiGenerationClientParams from frontend / AiGenerationParams in service
+    const {
+      menuId,
+      bankId,
+      itemIds,
+      categoriesToFocus,
+      numQuestionsPerItem,
+      // geminiModelName, // If you decide to use it, ensure it's in AiGenerationParams
+    } = req.body as QuestionService.AiGenerationParams; // Using service's AiGenerationParams for type safety
 
     if (!req.user || !req.user.restaurantId) {
       return next(
         new AppError("User not authenticated or restaurantId missing", 401)
       );
     }
-    const restaurantId = req.user.restaurantId;
+    // Ensure restaurantId is converted to mongoose.Types.ObjectId if it isn't already
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
 
     // Basic validation for required fields
-    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+    if (!menuId || !bankId) {
       return next(
         new AppError(
-          "Missing or invalid 'categories': must be a non-empty array.",
+          "Missing required fields: menuId and bankId are required for AI question generation from a menu.",
           400
         )
       );
     }
-    if (
-      !targetQuestionCount ||
-      typeof targetQuestionCount !== "number" ||
-      targetQuestionCount <= 0
-    ) {
-      return next(
-        new AppError(
-          "Missing or invalid 'targetQuestionCount': must be a positive number.",
-          400
-        )
-      );
-    }
-    if (menuContext && typeof menuContext !== "string") {
-      return next(
-        new AppError("Invalid 'menuContext': must be a string.", 400)
-      );
-    }
-    if (geminiModelName && typeof geminiModelName !== "string") {
-      return next(
-        new AppError("Invalid 'geminiModelName': must be a string.", 400)
-      );
-    }
-
-    const generationParams: QuestionService.AiGenerationParams = {
-      restaurantId,
-      categories,
-      targetQuestionCount,
-      menuContext,
-      geminiModelName,
-    };
 
     const generatedQuestions = await QuestionService.generateAiQuestionsService(
-      generationParams
+      {
+        restaurantId,
+        menuId,
+        bankId,
+        itemIds, // Pass through optional params
+        categoriesToFocus,
+        numQuestionsPerItem,
+        // geminiModelName, // Pass through if used
+      }
     );
 
+    if (!generatedQuestions || generatedQuestions.length === 0) {
+      // Handle case where service returns empty array (e.g., no matching menu items)
+      // Or if service throws an error for this, this check might not be hit often.
+      res.status(200).json({
+        status: "success",
+        message: "No questions were generated based on the provided criteria.",
+        data: [],
+      });
+      return; // Exit after sending response
+    }
+
     res.status(201).json({
-      // 201 Created, as new question resources are made
       status: "success",
-      message: `${generatedQuestions.length} questions generated successfully by AI.`,
+      message: "AI questions generated successfully from menu.",
+      results: generatedQuestions.length,
       data: generatedQuestions,
     });
   } catch (error) {
+    // The service should throw AppError for known issues, which will be handled by global error handler
+    // Log unexpected errors before passing to next
+    if (!(error instanceof AppError)) {
+      console.error(
+        "Unexpected error in generateAiQuestionsController:",
+        error
+      );
+    }
     next(error);
   }
 };

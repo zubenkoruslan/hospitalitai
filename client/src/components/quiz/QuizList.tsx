@@ -1,38 +1,16 @@
 import React from "react";
 import LoadingSpinner from "../common/LoadingSpinner";
-
-// --- Interfaces (Copied from QuizCreation.tsx for now) ---
-// Consider moving these to a shared types file (e.g., src/types/quizTypes.ts)
-
-interface Question {
-  _id?: string;
-  text: string;
-  choices: string[];
-  correctAnswer: number;
-  menuItemId: string;
-}
-
-interface QuizData {
-  _id?: string;
-  title: string;
-  menuItemIds: string[] | { _id: string; name: string }[];
-  questions: Question[];
-  restaurantId: string;
-  isAssigned?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  isAvailable: boolean;
-}
+import { ClientIQuiz } from "../../services/api";
 
 // --- Component Props ---
 interface QuizListProps {
-  quizzes: QuizData[];
+  quizzes: ClientIQuiz[];
   isLoading: boolean;
-  onPreview: (quiz: QuizData) => void;
+  onPreview: (quiz: ClientIQuiz) => void;
   onActivate: (quizId: string) => void;
-  onDelete: (quiz: QuizData) => void;
+  onDelete: (quiz: ClientIQuiz) => void;
   isDeletingQuizId: string | null;
-  getMenuItemNames: (quiz: QuizData) => string;
+  getMenuItemNames: (quiz: ClientIQuiz) => string;
 }
 
 // --- Component ---
@@ -67,10 +45,10 @@ const QuizList: React.FC<QuizListProps> = ({
                 {quiz.title}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Associated Menus: {getMenuItemNames(quiz)}
+                Source: {getMenuItemNames(quiz)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Questions: {quiz.questions.length}
+                Questions: {quiz.numberOfQuestions}
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 Created:{" "}
@@ -99,7 +77,7 @@ const QuizList: React.FC<QuizListProps> = ({
                   >
                     Edit / Preview
                   </button>
-                  {!quiz.isAvailable && (
+                  {quiz.isAvailable === false && (
                     <button
                       onClick={() => onActivate(quiz._id!)}
                       className="w-full sm:w-auto text-sm font-medium text-green-600 hover:text-green-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-green-50 transition-colors duration-150"

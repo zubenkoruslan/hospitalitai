@@ -99,10 +99,11 @@ import {
   IQuestionBank,
   CreateQuestionBankData,
   UpdateQuestionBankData,
-  IQuestion, // Assuming we might need this later for question-specific calls
+  IQuestion,
   NewQuestionClientData,
   AiGenerationClientParams,
   CreateQuestionBankFromMenuClientData,
+  UpdateQuestionClientData,
 } from "../types/questionBankTypes";
 
 // Import menu types
@@ -196,10 +197,10 @@ export const removeQuestionFromBank = async (
   bankId: string,
   questionId: string
 ): Promise<IQuestionBank> => {
-  const response = await api.delete<{ data: IQuestionBank }>(
+  const response = await api.delete(
     `/question-banks/${bankId}/questions/${questionId}`
   );
-  return response.data.data; // Assuming backend returns the updated bank
+  return response.data.data; // Assuming backend returns { success: true, data: updatedBank }
 };
 
 // Question Endpoints (Individual Question CRUD)
@@ -273,6 +274,90 @@ export const getMenuWithItems = async (
   return response.data.data; // data is the IMenuWithItemsClient object
 };
 
-// TODO: Add functions for Get All, Get One, Update, Delete for individual questions if needed
+// ADDED: Get a single question by ID
+/**
+ * Fetches a single question by its ID.
+ * @param questionId - The ID of the question.
+ */
+export const getQuestionById = async (
+  questionId: string
+): Promise<IQuestion> => {
+  const response = await api.get<{ data: IQuestion }>(
+    `/questions/${questionId}`
+  );
+  return response.data.data;
+};
 
+// ADDED: Update an existing question
+/**
+ * Updates an existing question.
+ * @param questionId - The ID of the question to update.
+ * @param data - The data to update the question with.
+ */
+export const updateQuestion = async (
+  questionId: string,
+  data: UpdateQuestionClientData
+): Promise<IQuestion> => {
+  const response = await api.patch<{ data: IQuestion }>(
+    `/questions/${questionId}`,
+    data
+  );
+  return response.data.data;
+};
+
+// Quiz Endpoints
+
+// Define a basic IQuiz for the client-side if not already defined elsewhere
+// TODO: Consolidate with a shared IQuiz type if available in client/src/types/quizTypes.ts
+export interface ClientIQuiz {
+  _id: string;
+  title: string;
+  description?: string;
+  restaurantId: string;
+  sourceQuestionBankIds: string[];
+  questions: any[]; // Define more specific question type if needed
+  numberOfQuestions: number;
+  isAvailable?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GenerateQuizFromBanksClientData {
+  title: string;
+  description?: string;
+  questionBankIds: string[];
+  numberOfQuestions: number;
+}
+
+/**
+ * Generates a new quiz from selected question banks.
+ * @param data - The data for generating the quiz.
+ */
+export const generateQuizFromQuestionBanks = async (
+  data: GenerateQuizFromBanksClientData
+): Promise<ClientIQuiz> => {
+  const response = await api.post<{
+    status: string;
+    message: string;
+    data: ClientIQuiz; // The backend returns the quiz under the 'data' key
+  }>("/quiz/from-banks", data);
+  return response.data.data;
+};
+
+// ADDED: Function to get all quizzes for the restaurant
+/**
+ * Fetches all quizzes for the current restaurant.
+ */
+export const getQuizzes = async (): Promise<ClientIQuiz[]> => {
+  // Assuming the backend returns { success: boolean, count: number, data: ClientIQuiz[] }
+  // or simply { data: ClientIQuiz[] } or even ClientIQuiz[] directly.
+  // Adjust based on actual backend response structure.
+  // For now, let's assume it's similar to getRestaurantMenus or question bank fetches.
+  const response = await api.get<{ data: ClientIQuiz[] }>("/quiz"); // Endpoint might be /quizzes
+  return response.data.data; // Assuming quizzes are in response.data.data
+  // If backend returns { quizzes: ClientIQuiz[] }, then it would be response.data.quizzes
+  // If backend returns ClientIQuiz[] directly, then it would be response.data
+};
+
+// Default export
 export default api;

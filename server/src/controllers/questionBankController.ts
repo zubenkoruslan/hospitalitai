@@ -226,10 +226,7 @@ export const deleteQuestionBank = async (
       );
     }
 
-    res.status(204).json({
-      status: "success",
-      data: null, // Or message: "Question bank deleted successfully."
-    });
+    res.status(204).send(); // Send no content for 204 status
   } catch (error) {
     next(error);
   }
@@ -411,6 +408,119 @@ export const getQuestionBankById = async (
     res.status(200).json({
       status: "success",
       data: bank,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Controller to add a category to a question bank
+export const addCategoryToQuestionBank = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId } = req.params;
+    const { categoryName } = req.body;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
+    }
+
+    if (
+      !categoryName ||
+      typeof categoryName !== "string" ||
+      categoryName.trim() === ""
+    ) {
+      return next(
+        new AppError(
+          "Category name must be a non-empty string and provided in the request body.",
+          400
+        )
+      );
+    }
+
+    const updatedBank =
+      await QuestionBankService.addCategoryToQuestionBankService(
+        bankId,
+        restaurantId,
+        categoryName.trim()
+      );
+
+    // The service throws a 404 if bank is not found, so we don't need to re-check here.
+    // If updatedBank is null for other reasons (though service aims to throw), it would be an issue.
+
+    res.status(200).json({
+      status: "success",
+      message: "Category added to question bank successfully.",
+      data: updatedBank,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Controller to remove a category from a question bank
+export const removeCategoryFromQuestionBank = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId, categoryName: categoryNameFromParams } = req.params; // categoryName from URL
+    // For consistency, let's expect categoryName in params, matching the DELETE route structure.
+    // If it were from body: const { categoryName: categoryNameFromBody } = req.body;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
+    }
+
+    const categoryName = categoryNameFromParams; // Use the one from params
+
+    if (
+      !categoryName ||
+      typeof categoryName !== "string" ||
+      categoryName.trim() === ""
+    ) {
+      // This validation might be redundant if Express routing already ensures categoryName is present
+      // but good for robustness if param might be missing or empty despite route structure.
+      return next(
+        new AppError(
+          "Category name must be a non-empty string and provided in the URL path.",
+          400
+        )
+      );
+    }
+
+    const updatedBank =
+      await QuestionBankService.removeCategoryFromQuestionBankService(
+        bankId,
+        restaurantId,
+        categoryName.trim()
+      );
+
+    // Service throws 404 if bank not found.
+
+    res.status(200).json({
+      status: "success",
+      message: "Category removed from question bank successfully.",
+      data: updatedBank, // Contains the bank state *after* removal.
+      // If category wasn't there, $pull does nothing, bank is returned as is.
     });
   } catch (error) {
     next(error);

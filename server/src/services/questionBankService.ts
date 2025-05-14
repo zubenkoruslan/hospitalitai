@@ -25,6 +25,11 @@ export interface UpdateQuestionBankData {
   // categories and questions will be handled by separate dedicated functions usually
 }
 
+interface MenuSpecificAiParams {
+  targetQuestionCount?: number; // This is what the client sends for "create bank from menu"
+  geminiModelName?: string; // If client sends this
+}
+
 // Interface for the data needed for creating a question bank from a menu
 export interface CreateQuestionBankFromMenuData {
   name: string;
@@ -33,10 +38,7 @@ export interface CreateQuestionBankFromMenuData {
   menuId: mongoose.Types.ObjectId;
   selectedCategoryNames: string[]; // Categories from the menu to associate with the bank
   generateAiQuestions?: boolean; // Flag to trigger AI question generation
-  aiParams?: Omit<
-    AiGenerationParams,
-    "restaurantId" | "categories" | "menuContext"
-  >; // AI parameters like targetQuestionCount, geminiModelName
+  aiParams?: MenuSpecificAiParams; // Use the new specific interface
 }
 
 // Placeholder for createQuestionBankService
@@ -192,38 +194,30 @@ export const addQuestionToBankService = async (
       );
     }
 
-    // 2. Find the question bank
-    const bank = await QuestionBankModel.findById(bankId);
+    // 2. Find the question bank and ensure it belongs to the restaurant
+    const bank = await QuestionBankModel.findOne({
+      _id: bankId,
+      restaurantId: restaurantId,
+    });
     if (!bank) {
-      throw new AppError(`Question bank not found with ID: ${bankId}.`, 404);
-    }
-
-    // 3. Check if bank belongs to the same restaurant (additional safeguard)
-    if (!bank.restaurantId.equals(restaurantId)) {
       throw new AppError(
-        `Question bank with ID: ${bankId} does not belong to this restaurant.`,
-        403
+        `Question bank not found with ID: ${bankId} for this restaurant.`,
+        404
       );
     }
 
     // 4. Check if question is already in the bank
-    // The questions array stores ObjectIds. new Types.ObjectId(questionId) ensures comparison of ObjectId instances.
-    if (
-      bank.questions.find((qId) =>
-        qId.equals(new mongoose.Types.ObjectId(questionId))
-      )
-    ) {
-      // Question already exists, return current bank or throw specific error
-      // For now, let's consider this a no-op and return the bank
-      // Or throw: new AppError(`Question with ID: ${questionId} already exists in this bank.`, 409);
-      return bank;
+    const objectQuestionId = new mongoose.Types.ObjectId(questionId);
+    if (bank.questions.find((qId) => qId.equals(objectQuestionId))) {
+      // Question already exists, return current bank (idempotent behavior for POST), populated.
+      return bank.populate("questions");
     }
 
     // 5. Add questionId to the bank
-    bank.questions.push(new mongoose.Types.ObjectId(questionId));
+    bank.questions.push(objectQuestionId);
 
     await bank.save();
-    return bank;
+    return bank.populate("questions"); // Populate questions before returning
   } catch (error) {
     console.error("Error adding question ID to bank in service:", error);
     if (error instanceof AppError) {
@@ -258,14 +252,12 @@ export const removeQuestionFromBankService = async (
       { _id: bankId, restaurantId: restaurantId }, // Query to find the correct bank
       { $pull: { questions: objectQuestionId } }, // Operation to remove the questionId from the array
       { new: true } // Options: return the modified document
-    );
+    ).populate("questions"); // Populate questions to return the updated list
 
     if (!updatedBank) {
-      // This could mean the bank was not found for that restaurant, or the question was already not in the bank (though $pull wouldn't error).
-      // To be more specific, we might need a separate check first if the bank exists.
-      // For now, if updatedBank is null, we assume bank not found or not owned.
+      // This implies bank not found for that restaurant.
       throw new AppError(
-        `Question bank not found with ID: ${bankId} for this restaurant, or question ${questionId} not in bank.`,
+        `Question bank not found with ID: ${bankId} for this restaurant.`,
         404
       );
     }
@@ -322,56 +314,33 @@ export const createQuestionBankFromMenuService = async (
 
     await newBank.save({ session });
 
-    if (generateAiQuestions && aiParams && aiParams.targetQuestionCount > 0) {
-      // 1. Fetch menu items for context based on menuId and selectedCategoryNames
-      const menuItemsForContext: IMenuItem[] = await MenuItemModel.find({
-        menuId,
-        restaurantId, // Ensure items belong to the same restaurant
-        category: { $in: selectedCategoryNames }, // Filter by selected categories
-      })
-        .limit(50) // Limit context size for performance/token limits
-        .session(session)
-        .lean(); // Use lean for performance as we only need data
-
-      let menuContextString = "";
-      if (menuItemsForContext.length > 0) {
-        menuContextString = menuItemsForContext
-          .map(
-            (item) =>
-              `Item: ${item.name}, Type: ${item.itemType}, Category: ${
-                item.category
-              }, Description: ${item.description || "N/A"}, Ingredients: ${
-                item.ingredients?.join(", ") || "N/A"
-              }`
-          )
-          .join("\n---\n");
-      } else {
-        // Fallback if no menu items found for selected categories,
-        // use just category names as context.
-        menuContextString = `General knowledge questions about: ${selectedCategoryNames.join(
-          ", "
-        )}`;
-      }
-
-      // 2. Call generateAiQuestionsService
-      const aiGenParams: AiGenerationParams = {
-        restaurantId,
-        categories: selectedCategoryNames, // Use the bank's categories for AI generation
-        targetQuestionCount: aiParams.targetQuestionCount,
-        menuContext: menuContextString,
-        geminiModelName: aiParams.geminiModelName, // Optional
+    /*
+    // Temporarily commented out AI Question Generation
+    if (
+      generateAiQuestions &&
+      aiParams &&
+      aiParams.targetQuestionCount &&
+      aiParams.targetQuestionCount > 0
+    ) {
+      const serviceParams: AiGenerationParams = { // Using the imported AiGenerationParams directly
+        restaurantId: data.restaurantId,
+        menuId: data.menuId.toString(),
+        bankId: newBank._id.toString(), // newBank._id should be available after save
+        numQuestionsPerItem: aiParams.targetQuestionCount, 
+        // geminiModelName: aiParams.geminiModelName, // Add if AiGenerationParams in questionService supports it
       };
-
-      const generatedQuestions = await generateAiQuestionsService(aiGenParams); // This function does not take session
+      const generatedQuestions =
+        await generateAiQuestionsService(serviceParams); // Calling the imported function directly
 
       if (generatedQuestions && generatedQuestions.length > 0) {
         const questionIds = generatedQuestions.map(
-          (q) => q._id as mongoose.Types.ObjectId
-        ); // Ensure _id is treated as ObjectId
+          (q: IQuestion) => q._id as mongoose.Types.ObjectId // Added IQuestion type for q
+        ); 
         newBank.questions.push(...questionIds);
         await newBank.save({ session });
       }
     }
+    */
 
     await session.commitTransaction();
     session.endSession();
@@ -384,5 +353,96 @@ export const createQuestionBankFromMenuService = async (
     }
     console.error("Error creating question bank from menu in service:", error);
     throw new AppError("Failed to create question bank from menu.", 500);
+  }
+};
+
+// Service to add a category to a specific question bank
+export const addCategoryToQuestionBankService = async (
+  bankId: string,
+  restaurantId: mongoose.Types.ObjectId,
+  categoryName: string
+): Promise<IQuestionBank | null> => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      throw new AppError(`Invalid bank ID format: ${bankId}`, 400);
+    }
+    if (
+      !categoryName ||
+      typeof categoryName !== "string" ||
+      categoryName.trim() === ""
+    ) {
+      throw new AppError("Category name must be a non-empty string.", 400);
+    }
+
+    const updatedBank = await QuestionBankModel.findOneAndUpdate(
+      { _id: bankId, restaurantId },
+      { $addToSet: { categories: categoryName.trim() } },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedBank) {
+      // This could mean bank not found or doesn't belong to restaurant
+      throw new AppError(
+        `Question bank not found with ID: ${bankId} for this restaurant, or category update failed.`,
+        404
+      );
+    }
+    return updatedBank;
+  } catch (error) {
+    console.error("Error adding category to question bank in service:", error);
+    if (error instanceof AppError) throw error;
+    if (error instanceof mongoose.Error.ValidationError) {
+      throw new AppError(`Validation Error: ${error.message}`, 400);
+    }
+    throw new AppError("Failed to add category to question bank.", 500);
+  }
+};
+
+// Service to remove a category from a specific question bank
+export const removeCategoryFromQuestionBankService = async (
+  bankId: string,
+  restaurantId: mongoose.Types.ObjectId,
+  categoryName: string
+): Promise<IQuestionBank | null> => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      throw new AppError(`Invalid bank ID format: ${bankId}`, 400);
+    }
+    if (
+      !categoryName ||
+      typeof categoryName !== "string" ||
+      categoryName.trim() === ""
+    ) {
+      throw new AppError("Category name must be a non-empty string.", 400);
+    }
+
+    const updatedBank = await QuestionBankModel.findOneAndUpdate(
+      { _id: bankId, restaurantId },
+      { $pull: { categories: categoryName.trim() } },
+      { new: true, runValidators: true } // runValidators might not be strictly necessary for $pull on string array but good practice
+    );
+
+    if (!updatedBank) {
+      // This could mean bank not found or doesn't belong to restaurant
+      // Or category was not in the array (though $pull doesn't error for non-existent items)
+      // To be more precise, one might check if the category was actually present before $pull
+      // For now, not finding the bank is the primary concern for a 404
+      throw new AppError(
+        `Question bank not found with ID: ${bankId} for this restaurant, or category removal failed.`,
+        404
+      );
+    }
+    return updatedBank;
+  } catch (error) {
+    console.error(
+      "Error removing category from question bank in service:",
+      error
+    );
+    if (error instanceof AppError) throw error;
+    if (error instanceof mongoose.Error.ValidationError) {
+      // Less likely for $pull of string
+      throw new AppError(`Validation Error: ${error.message}`, 400);
+    }
+    throw new AppError("Failed to remove category from question bank.", 500);
   }
 };

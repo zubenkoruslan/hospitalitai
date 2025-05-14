@@ -18,7 +18,7 @@ import RestaurantDashboard from "./pages/RestaurantDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
 import MenusPage from "./pages/MenusPage";
 import MenuItemsPage from "./pages/MenuItemsPage";
-import QuizCreation from "./pages/QuizCreation";
+import QuizAndBankManagementPage from "./pages/QuizAndBankManagementPage";
 import QuizTakingPage from "./pages/QuizTakingPage";
 import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
@@ -26,6 +26,8 @@ import StaffDetails from "./pages/StaffDetails";
 import HomePage from "./pages/HomePage";
 import QuestionBankListPage from "./pages/QuestionBankListPage";
 import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
+import QuestionBankEditPage from "./pages/QuestionBankEditPage";
+// import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
 // Component to handle authenticated user redirection based on role
@@ -107,7 +109,7 @@ function App() {
               path="/quiz-management"
               element={
                 <ProtectedRoute requiredRole="restaurant">
-                  <QuizCreation />
+                  <QuizAndBankManagementPage />
                 </ProtectedRoute>
               }
             />
@@ -151,6 +153,25 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/question-banks/:bankId/edit"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <QuestionBankEditPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* REMOVED: Route for generating quiz from question banks (now a modal) */}
+            {/*
+            <Route
+              path="/generate-quiz"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <GenerateQuizPage />
+                </ProtectedRoute>
+              }
+            />
+            */}
 
             {/* Staff Protected Routes */}
             <Route

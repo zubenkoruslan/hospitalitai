@@ -26,6 +26,7 @@ export interface NewQuestionData {
 // Interface for the data allowed when updating an existing question
 export interface UpdateQuestionData {
   questionText?: string;
+  questionType?: QuestionType;
   options?: Array<{
     text: string;
     isCorrect: boolean;
@@ -139,27 +140,47 @@ export const updateQuestionService = async (
     if (!mongoose.Types.ObjectId.isValid(questionId)) {
       throw new AppError(`Invalid question ID format: ${questionId}`, 400);
     }
+
     const existingQuestion = await QuestionModel.findOne({
       _id: questionId,
       restaurantId,
     });
+
     if (!existingQuestion) {
       throw new AppError(
         `Question not found with ID: ${questionId} for this restaurant.`,
         404
       );
     }
-    const currentQuestionType = existingQuestion.questionType;
+
+    // Determine the question type to use for option validation
+    let typeForValidation: QuestionType = existingQuestion.questionType;
+    if (
+      data.questionType &&
+      data.questionType !== existingQuestion.questionType
+    ) {
+      typeForValidation = data.questionType;
+      // If question type is changing, options MUST be provided and valid for the new type.
+      if (!data.options) {
+        throw new AppError(
+          "Options must be provided when changing the question type.",
+          400
+        );
+      }
+    }
+
+    // Validate options if they are being updated or if type is changing (which requires options)
     if (data.options) {
-      if (currentQuestionType === "true-false" && data.options.length !== 2) {
+      // Use typeForValidation for all option checks
+      if (typeForValidation === "true-false" && data.options.length !== 2) {
         throw new AppError(
           "True/False questions must have exactly 2 options.",
           400
         );
       }
       if (
-        (currentQuestionType === "multiple-choice-single" ||
-          currentQuestionType === "multiple-choice-multiple") &&
+        (typeForValidation === "multiple-choice-single" ||
+          typeForValidation === "multiple-choice-multiple") &&
         (data.options.length < 2 || data.options.length > 6)
       ) {
         throw new AppError(
@@ -167,12 +188,14 @@ export const updateQuestionService = async (
           400
         );
       }
+
       const correctOptionsCount = data.options.filter(
         (opt) => opt.isCorrect
       ).length;
+
       if (
-        currentQuestionType === "multiple-choice-single" ||
-        currentQuestionType === "true-false"
+        typeForValidation === "multiple-choice-single" ||
+        typeForValidation === "true-false"
       ) {
         if (correctOptionsCount !== 1) {
           throw new AppError(
@@ -180,7 +203,7 @@ export const updateQuestionService = async (
             400
           );
         }
-      } else if (currentQuestionType === "multiple-choice-multiple") {
+      } else if (typeForValidation === "multiple-choice-multiple") {
         if (correctOptionsCount < 1) {
           throw new AppError(
             "Multiple-answer multiple choice questions must have at least one correct option.",
@@ -188,18 +211,34 @@ export const updateQuestionService = async (
           );
         }
       }
-    }
-    const updatedQuestion = await QuestionModel.findOneAndUpdate(
-      { _id: questionId, restaurantId: restaurantId },
-      { $set: data },
-      { new: true, runValidators: true }
-    );
-    if (!updatedQuestion) {
+    } else if (
+      data.questionType &&
+      data.questionType !== existingQuestion.questionType
+    ) {
+      // This case is already handled above by throwing an error if options are not provided when type changes.
+      // This explicit check is redundant if the above logic is correct, but kept for clarity during dev.
       throw new AppError(
-        `Question not found with ID: ${questionId} for this restaurant, or no update was performed.`,
-        404
+        "Internal Server Error: Options should have been validated if question type changed.",
+        500
       );
     }
+
+    // If we reach here, data is considered valid for update
+    const updatedQuestion = await QuestionModel.findOneAndUpdate(
+      { _id: questionId, restaurantId: restaurantId }, // Ensure ownership
+      { $set: data }, // This will update all fields in data, including questionType if present
+      { new: true, runValidators: true } // Return new doc, run schema validators
+    );
+
+    // findOneAndUpdate returns null if no document matched the query.
+    // We already checked for existingQuestion, so this implies an issue with the update itself if null.
+    if (!updatedQuestion) {
+      throw new AppError(
+        `Question update failed for ID: ${questionId}. The document might have been deleted or an unknown issue occurred.`,
+        404 // Or 500, depending on expected cause
+      );
+    }
+
     return updatedQuestion;
   } catch (error) {
     if (error instanceof mongoose.Error.ValidationError) {
@@ -256,17 +295,32 @@ export const deleteQuestionService = async (
   }
 };
 
-// Interface for the data expected by the AI generation service
-export interface AiGenerationParams {
-  restaurantId: mongoose.Types.ObjectId;
-  categories: string[];
-  targetQuestionCount: number;
-  menuContext?: string;
-  geminiModelName?: string;
+// Interface for the data allowed when updating an existing question
+export interface UpdateQuestionData {
+  questionText?: string;
+  questionType?: QuestionType;
+  options?: Array<{
+    text: string;
+    isCorrect: boolean;
+    _id?: mongoose.Types.ObjectId;
+  }>;
+  categories?: string[];
+  difficulty?: "easy" | "medium" | "hard";
 }
 
-// Placeholder for the structure of a single question object expected from the AI model
-interface AiGeneratedQuestion {
+// New AiGenerationParams to align with client and new logic
+export interface AiGenerationParams {
+  restaurantId: mongoose.Types.ObjectId;
+  menuId: string;
+  bankId: string;
+  itemIds?: string[]; // Optional: specific menu items to focus on
+  categoriesToFocus?: string[]; // Optional: specific categories from the menu to focus on
+  numQuestionsPerItem?: number; // Optional: number of questions to generate per item/category
+  // geminiModelName?: string; // Keep if used by actual AI call
+}
+
+interface AiGeneratedQuestionContent {
+  // Renamed from AiGeneratedQuestion to avoid conflict if IQuestion uses it
   questionText: string;
   questionType: QuestionType;
   options: Array<{ text: string; isCorrect: boolean }>;
@@ -275,98 +329,197 @@ interface AiGeneratedQuestion {
   difficulty?: "easy" | "medium" | "hard";
 }
 
+// Placeholder for MenuModel and MenuItem, replace with actual imports and interfaces
+interface IMenuItemSubDocument {
+  // Assuming menu items might be subdocuments or populated
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  description?: string;
+  category?: string; // Category of the menu item itself
+  // other relevant fields for AI context
+}
+
+interface IMenuDocument extends mongoose.Document {
+  _id: mongoose.Types.ObjectId;
+  restaurantId: mongoose.Types.ObjectId;
+  name: string;
+  items: mongoose.Types.ObjectId[] | IMenuItemSubDocument[]; // Or just IMenuItemSubDocument[] if always populated
+  // other fields
+}
+
 export const generateAiQuestionsService = async (
   params: AiGenerationParams
 ): Promise<IQuestion[]> => {
-  const { restaurantId, categories, targetQuestionCount, menuContext } = params;
-
-  if (categories.length === 0 || targetQuestionCount <= 0) {
-    throw new AppError(
-      "Categories and a positive target question count are required for AI generation.",
-      400
-    );
-  }
-
-  const aiServiceUrl = process.env.AI_QUESTION_GENERATION_URL;
-  const aiApiKey = process.env.AI_API_KEY;
-
-  if (!aiServiceUrl) {
-    throw new AppError(
-      "AI service URL (AI_QUESTION_GENERATION_URL) is not configured in environment variables.",
-      500
-    );
-  }
-
-  console.log(
-    `AI Service: Attempting to generate ${targetQuestionCount} questions for categories: ${categories.join(
-      ", "
-    )} using ${aiServiceUrl}`
-  );
-
-  let aiResponse: AiGeneratedQuestion[];
-
-  const mockAiResponse: AiGeneratedQuestion[] = [];
-  for (let i = 0; i < targetQuestionCount; i++) {
-    const category = categories[i % categories.length];
-    mockAiResponse.push({
-      questionText: `Mock AI Question ${
-        i + 1
-      } about ${category} (actual AI integration pending)?`,
-      questionType: "multiple-choice-single",
-      options: [
-        { text: "Correct Answer", isCorrect: true },
-        { text: "Wrong Answer A", isCorrect: false },
-        { text: "Wrong Answer B", isCorrect: false },
-      ],
-      category: category,
-      difficulty: "medium",
-    });
-  }
-  aiResponse = mockAiResponse;
-
-  if (!aiResponse || aiResponse.length === 0) {
-    console.warn(
-      "AI model returned no questions or an empty array for the given parameters."
-    );
-    throw new AppError(
-      "AI model did not return any questions for the provided input.",
-      404
-    );
-  }
-
-  const questionsToSave: NewQuestionData[] = aiResponse.map(
-    (q: AiGeneratedQuestion) => ({
-      ...q,
-      restaurantId: restaurantId,
-      createdBy: "ai",
-      categories: [q.category || "Uncategorized"],
-    })
-  );
-
   try {
-    const createdQuestions = await QuestionModel.insertMany(questionsToSave, {
-      ordered: false,
+    const {
+      restaurantId,
+      menuId,
+      bankId,
+      itemIds,
+      categoriesToFocus,
+      numQuestionsPerItem = 1, // Default to 1 question per item if not specified
+    } = params;
+
+    // 1. Fetch the Question Bank to get its categories
+    const questionBank = await QuestionBankModel.findOne({
+      _id: bankId,
+      restaurantId,
     });
-    return createdQuestions;
-  } catch (error: any) {
-    if (error.name === "MongoBulkWriteError" && error.writeErrors) {
-      console.error(
-        "Error inserting AI generated questions (some may have failed validation):",
-        error.writeErrors
-      );
-      const successfulCount = error.result?.nInserted || 0;
+    if (!questionBank) {
       throw new AppError(
-        `AI generated ${successfulCount} questions successfully, but some failed validation during save.`,
-        500
+        `Question Bank with ID ${bankId} not found for this restaurant.`,
+        404
       );
-    } else if (error instanceof mongoose.Error.ValidationError) {
-      const messages = Object.values(error.errors).map((e: any) => e.message);
+    }
+    const bankCategories = questionBank.categories || [];
+
+    // 2. Fetch the Menu and its items
+    // TODO: Replace with actual MenuModel and populate items if necessary
+    // const menu = await MenuModel.findOne({ _id: menuId, restaurantId }).populate('items');
+    // For now, using a placeholder for menu and items.
+    // Ensure MenuModel is imported and IMenuDocument/IMenuItemSubDocument match your models.
+
+    // Example: Using a placeholder for menu items for now.
+    // You'll need to replace this with actual database fetching and type for MenuModel
+    const MenuModel = mongoose.model<IMenuDocument>(
+      "Menu",
+      new mongoose.Schema({
+        name: String,
+        restaurantId: mongoose.Schema.Types.ObjectId,
+        items: [
+          new mongoose.Schema({
+            name: String,
+            description: String,
+            category: String,
+          }),
+        ],
+      })
+    ); // Define a placeholder MenuModel if not imported
+
+    const menu = await MenuModel.findOne({ _id: menuId, restaurantId })
+      // .populate<{ items: IMenuItemSubDocument[] }>("items") // Example of typed populate
+      .exec();
+
+    if (!menu) {
       throw new AppError(
-        `Validation Error saving AI questions: ${messages.join(", ")}`,
+        `Menu with ID ${menuId} not found for this restaurant.`,
+        404
+      );
+    }
+
+    let menuItemsToProcess: IMenuItemSubDocument[] = [];
+    if (menu.items && menu.items.length > 0) {
+      // Ensure items are populated if they are ObjectIds
+      // This check handles if 'items' are already populated objects or need population.
+      // This is a simplified check; robust population check might be needed.
+      if (menu.items[0] instanceof mongoose.Types.ObjectId) {
+        // If items are ObjectIds, you'd need to populate them.
+        // This example assumes they are either populated or the schema structure is simpler.
+        // For a real scenario: await menu.populate('items');
+        // menuItemsToProcess = menu.items as IMenuItemSubDocument[]; // after population
+        throw new AppError(
+          "Menu items are not populated. Implement population for MenuModel.",
+          500
+        );
+      } else {
+        menuItemsToProcess = menu.items as IMenuItemSubDocument[];
+      }
+    }
+
+    // Filter items if itemIds or categoriesToFocus are provided
+    if (itemIds && itemIds.length > 0) {
+      const selectedItemIds = new Set(itemIds);
+      menuItemsToProcess = menuItemsToProcess.filter((item) =>
+        selectedItemIds.has(item._id.toString())
+      );
+    } else if (categoriesToFocus && categoriesToFocus.length > 0) {
+      const selectedMenuCategories = new Set(categoriesToFocus);
+      menuItemsToProcess = menuItemsToProcess.filter(
+        (item) => item.category && selectedMenuCategories.has(item.category)
+      );
+    }
+
+    if (menuItemsToProcess.length === 0) {
+      // No items to process, maybe return empty or throw error
+      // For now, returning empty array as no questions can be generated
+      return [];
+      // Or: throw new AppError("No menu items found matching the criteria for AI generation.", 404);
+    }
+
+    const allGeneratedQuestionsData: NewQuestionData[] = [];
+
+    // 3. Iterate through selected menu items and generate questions
+    for (const menuItem of menuItemsToProcess) {
+      // Prepare context for AI based on menuItem
+      const aiContext = `Menu Item: ${menuItem.name}. Description: ${
+        menuItem.description || "N/A"
+      }. Category: ${menuItem.category || "N/A"}.`;
+
+      // Simulate AI Call - Placeholder for actual Gemini API call
+      // TODO: Replace this section with your actual AI question generation logic
+      // The AI should ideally return: questionText, questionType, options, and its derived category (menuItem.category)
+      // For each item, generate 'numQuestionsPerItem' questions
+      for (let i = 0; i < numQuestionsPerItem; i++) {
+        // --- Placeholder AI Generation Start ---
+        const aiGeneratedContent: AiGeneratedQuestionContent = {
+          questionText: `What is special about ${menuItem.name}? (Variation ${
+            i + 1
+          })`,
+          questionType: "multiple-choice-single", // Example
+          options: [
+            { text: "Option A for " + menuItem.name, isCorrect: true },
+            { text: "Option B for " + menuItem.name, isCorrect: false },
+            { text: "Option C for " + menuItem.name, isCorrect: false },
+          ],
+          category: menuItem.category || "General", // AI should determine this from context or be told
+          difficulty: "medium",
+        };
+        // --- Placeholder AI Generation End ---
+
+        // Merge categories: menuItem's category + bank's categories
+        const combinedCategories = new Set<string>();
+        if (menuItem.category) {
+          combinedCategories.add(menuItem.category);
+        }
+        bankCategories.forEach((cat) => combinedCategories.add(cat));
+
+        const questionData: NewQuestionData = {
+          questionText: aiGeneratedContent.questionText,
+          questionType: aiGeneratedContent.questionType,
+          options: aiGeneratedContent.options.map((opt) => ({
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+          })), // Ensure options have _id removed if it's part of AiGeneratedQuestionContent
+          categories: Array.from(combinedCategories),
+          restaurantId: restaurantId,
+          createdBy: "ai",
+          difficulty: aiGeneratedContent.difficulty || "medium",
+        };
+        allGeneratedQuestionsData.push(questionData);
+      }
+    }
+
+    // 4. Bulk create questions
+    if (allGeneratedQuestionsData.length === 0) {
+      return []; // Or throw error if no questions could be formed
+    }
+
+    const createdQuestions = await QuestionModel.insertMany(
+      allGeneratedQuestionsData
+    );
+    return createdQuestions as unknown as IQuestion[]; // Asserting the type via unknown
+  } catch (error) {
+    console.error("Error in generateAiQuestionsService:", error);
+    if (error instanceof AppError) {
+      throw error;
+    }
+    // Check for Mongoose validation error specifically for insertMany, if applicable
+    if (error instanceof mongoose.Error.ValidationError) {
+      throw new AppError(
+        `Validation Error during question creation: ${error.message}`,
         400
       );
     }
-    console.error("Error saving AI generated questions to database:", error);
-    throw new AppError("Failed to save AI generated questions.", 500);
+    throw new AppError("Failed to generate AI questions.", 500);
   }
 };

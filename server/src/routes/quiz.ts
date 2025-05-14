@@ -1,7 +1,8 @@
 import express, { Request, Response, Router, NextFunction } from "express";
 import mongoose, { Types } from "mongoose";
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import Quiz, { IQuiz, IQuestion } from "../models/Quiz";
+import Quiz, { IQuiz } from "../models/Quiz";
+import { IQuestion } from "../models/QuestionModel";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
 import MenuItem, { IMenuItem } from "../models/MenuItem";
 import Menu from "../models/Menu"; // Import Menu model if needed for fetching items by menu
@@ -19,6 +20,7 @@ import {
 import { AppError } from "../utils/errorHandler";
 import QuizResultService from "../services/quizResultService"; // Import QuizResultService
 import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware"; // Re-added this import
+import { generateQuizFromBanksController } from "../controllers/quizController";
 
 const router: Router = express.Router();
 
@@ -80,9 +82,11 @@ router.get(
 
 /**
  * @route   POST /api/quiz/auto
- * @desc    Generate quiz questions based on selected menus
+ * @desc    Generate quiz questions based on selected menus (Likely deprecated by from-banks)
  * @access  Private (Restaurant Role)
  */
+/*
+// Temporarily commenting out the /api/quiz/auto route as it uses the old QuizService.generateQuizQuestions
 router.post(
   "/auto",
   restrictTo("restaurant"),
@@ -105,12 +109,15 @@ router.post(
     }
   }
 );
+*/
 
 /**
  * @route   POST /api/quiz
- * @desc    Save a quiz
+ * @desc    Save a quiz (Likely deprecated by from-banks)
  * @access  Private (Restaurant Role)
  */
+/*
+// Temporarily commenting out the /api/quiz route as it uses the old QuizService.createQuiz
 router.post(
   "/",
   restrictTo("restaurant"),
@@ -136,6 +143,7 @@ router.post(
     }
   }
 );
+*/
 
 /**
  * @route   PUT /api/quiz/:quizId
@@ -367,6 +375,14 @@ router.get(
       next(error);
     }
   }
+);
+
+// NEW ROUTE for generating quiz from question banks
+router.post(
+  "/from-banks",
+  restrictTo("restaurant"),
+  // TODO: Add validation middleware if one is created for this payload
+  generateQuizFromBanksController
 );
 
 export { router };

@@ -58,6 +58,7 @@ export interface AiGenerationClientParams {
   targetQuestionCount: number;
   menuContext?: string;
   geminiModelName?: string;
+  bankId?: string; // ADDED: To associate generated questions with a bank
 }
 
 // Specific AI params for creating bank from menu (subset of AiGenerationClientParams)
@@ -84,4 +85,14 @@ export interface NewQuestionClientData {
   categories: string[];
   difficulty?: "easy" | "medium" | "hard";
   // restaurantId and createdBy are added by the backend or service layer calling createQuestion
+}
+
+// For updating an individual question (client-side)
+// Note: questionType is generally not updated directly; delete and re-create if type change is needed.
+export interface UpdateQuestionClientData {
+  questionText?: string;
+  questionType?: QuestionType;
+  options?: Omit<IOption, "_id">[]; // Options might be entirely new or have existing _ids for merging on backend (if supported)
+  categories?: string[];
+  difficulty?: "easy" | "medium" | "hard";
 }

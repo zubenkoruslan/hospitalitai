@@ -1,41 +1,59 @@
-import React, { useState, FormEvent } from "react";
-import { AiGenerationClientParams } from "../../types/questionBankTypes";
+import React, { useState, FormEvent, useEffect } from "react";
+import {
+  AiGenerationClientParams,
+  IQuestion,
+} from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import Card from "../common/Card";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { generateAiQuestions as apiGenerateAiQuestions } from "../../services/api";
+import { useValidation } from "../../context/ValidationContext";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 interface GenerateAiQuestionsFormProps {
-  onSubmit: (data: AiGenerationClientParams) => Promise<void>;
+  bankId: string;
+  bankCategories: string[];
+  onAiQuestionsGenerated: (questions: IQuestion[]) => void;
   onClose: () => void;
-  isLoading: boolean;
 }
 
 const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
-  onSubmit,
+  bankId,
+  bankCategories,
+  onAiQuestionsGenerated,
   onClose,
-  isLoading,
 }) => {
-  const [categories, setCategories] = useState(""); // Comma-separated string
+  const { formatErrorMessage } = useValidation();
+  const [categories, setCategories] = useState("");
   const [targetQuestionCount, setTargetQuestionCount] = useState<number>(5);
   const [menuContext, setMenuContext] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  // Optional: Add geminiModelName if you want to allow users to select it
-  // const [geminiModelName, setGeminiModelName] = useState('');
+  const [internalIsLoading, setInternalIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (bankCategories && bankCategories.length > 0) {
+      setCategories(bankCategories.join(", "));
+    }
+  }, [bankCategories]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setInternalIsLoading(true);
 
     const parsedCategories = categories
       .split(",")
       .map((cat) => cat.trim())
       .filter((cat) => cat);
+
     if (parsedCategories.length === 0) {
-      setFormError("Please provide at least one category.");
+      setFormError("Please provide at least one category for AI generation.");
+      setInternalIsLoading(false);
       return;
     }
     if (targetQuestionCount <= 0) {
       setFormError("Target question count must be a positive number.");
+      setInternalIsLoading(false);
       return;
     }
 
@@ -43,13 +61,28 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       categories: parsedCategories,
       targetQuestionCount,
       menuContext: menuContext.trim() || undefined,
-      // geminiModelName: geminiModelName || undefined, // Add if implementing model selection
+      bankId: bankId,
     };
-    await onSubmit(data);
+
+    try {
+      const generatedQuestions = await apiGenerateAiQuestions(data);
+      if (generatedQuestions && generatedQuestions.length > 0) {
+        onAiQuestionsGenerated(generatedQuestions);
+      } else {
+        setFormError(
+          "The AI did not generate any questions for the given criteria. Try adjusting the categories or context."
+        );
+      }
+    } catch (err) {
+      console.error("Error generating AI questions:", err);
+      setFormError(formatErrorMessage(err));
+    } finally {
+      setInternalIsLoading(false);
+    }
   };
 
   const commonInputClass =
-    "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
+    "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed";
   const commonLabelClass = "block text-sm font-medium text-gray-700";
 
   return (
@@ -60,8 +93,9 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 disabled:text-gray-300"
           aria-label="Close form"
+          disabled={internalIsLoading}
         >
           <XMarkIcon className="h-6 w-6" />
         </button>
@@ -70,14 +104,17 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
           className="p-5 space-y-4 overflow-y-auto flex-grow"
         >
           {formError && (
-            <p className="text-red-500 text-sm bg-red-100 p-2 rounded-md">
+            <div
+              className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md"
+              role="alert"
+            >
               {formError}
-            </p>
+            </div>
           )}
 
           <div>
             <label htmlFor="aiCategories" className={commonLabelClass}>
-              Categories (comma-separated)
+              Categories for AI Generation (comma-separated)
             </label>
             <input
               id="aiCategories"
@@ -87,7 +124,13 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
               placeholder="e.g., Red Wine, Italian Cuisine, Allergens"
               required
               className={commonInputClass}
+              disabled={internalIsLoading}
             />
+            {bankCategories && bankCategories.length > 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                Suggested from bank: {bankCategories.join(", ")}
+              </p>
+            )}
           </div>
 
           <div>
@@ -102,50 +145,43 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
                 setTargetQuestionCount(parseInt(e.target.value, 10) || 1)
               }
               min="1"
-              max="20" // Sensible max for a single request
+              max="20"
               required
               className={commonInputClass}
+              disabled={internalIsLoading}
             />
           </div>
 
           <div>
             <label htmlFor="menuContext" className={commonLabelClass}>
-              Menu Context / Additional Instructions (Optional)
+              Additional Context / Instructions (Optional)
             </label>
             <textarea
               id="menuContext"
               value={menuContext}
               onChange={(e) => setMenuContext(e.target.value)}
               rows={4}
-              placeholder="Provide context from your menu or specific topics you want the AI to focus on. E.g., 'Focus on our new vegan menu items.' or 'Generate questions about wine pairings with our steak dishes.'"
+              placeholder="Provide context from your menu or specific topics... E.g., 'Focus on vegan items.'"
               className={commonInputClass}
+              disabled={internalIsLoading}
             />
           </div>
-
-          {/* Optional: Gemini Model Name input if needed */}
-          {/* <div>
-            <label htmlFor="geminiModelName" className={commonLabelClass}>Gemini Model (Optional)</label>
-            <input
-              id="geminiModelName"
-              type="text"
-              value={geminiModelName}
-              onChange={(e) => setGeminiModelName(e.target.value)}
-              placeholder="e.g., gemini-pro"
-              className={commonInputClass}
-            />
-          </div> */}
 
           <div className="flex justify-end space-x-2 pt-3">
             <Button
               type="button"
               variant="secondary"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={internalIsLoading}
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={isLoading}>
-              {isLoading ? "Generating..." : "Generate Questions"}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={internalIsLoading}
+            >
+              {internalIsLoading ? <LoadingSpinner /> : "Generate Questions"}
             </Button>
           </div>
         </form>

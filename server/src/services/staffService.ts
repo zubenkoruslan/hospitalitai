@@ -1,7 +1,8 @@
 import mongoose, { Types } from "mongoose";
 import User, { IUser } from "../models/User";
 import QuizResult from "../models/QuizResult";
-import Quiz, { IQuiz, IQuestion } from "../models/Quiz";
+import Quiz, { IQuiz } from "../models/Quiz";
+import { IQuestion } from "../models/QuestionModel";
 import QuizResultService from "./quizResultService";
 import { AppError } from "../utils/errorHandler";
 
@@ -58,13 +59,20 @@ interface StaffUpdateResponse {
 }
 
 // Helper within the service scope
-const getChoiceText = (
-  choices: string[] | undefined,
-  index: number
+const getChoiceTextFromOptions = (
+  options: Array<{ text: string; isCorrect?: boolean }> | undefined,
+  index: number | null | undefined
 ): string => {
-  return choices && index >= 0 && index < choices.length
-    ? choices[index]
-    : "N/A"; // Return N/A instead of throwing error
+  if (
+    options &&
+    index !== null &&
+    index !== undefined &&
+    index >= 0 &&
+    index < options.length
+  ) {
+    return options[index]?.text || "N/A";
+  }
+  return "N/A";
 };
 
 class StaffService {
@@ -217,13 +225,33 @@ class StaffService {
           if (quizData && quizData.questions && Array.isArray(result.answers)) {
             quizData.questions.forEach((question: IQuestion, index: number) => {
               const userAnswerIndex = result.answers[index];
-              if (userAnswerIndex !== question.correctAnswer) {
+
+              // Find the correct answer's index from the options array
+              const correctOptionIndex = question.options?.findIndex(
+                (opt) => opt.isCorrect
+              );
+
+              // Check if the user's answer is incorrect
+              let isIncorrect = false;
+              if (userAnswerIndex !== null && userAnswerIndex !== undefined) {
+                if (
+                  correctOptionIndex === undefined ||
+                  userAnswerIndex !== correctOptionIndex
+                ) {
+                  isIncorrect = true;
+                }
+              }
+
+              if (isIncorrect) {
                 incorrectQuestions.push({
-                  questionText: question.text,
-                  userAnswer: getChoiceText(question.choices, userAnswerIndex),
-                  correctAnswer: getChoiceText(
-                    question.choices,
-                    question.correctAnswer
+                  questionText: question.questionText,
+                  userAnswer: getChoiceTextFromOptions(
+                    question.options,
+                    userAnswerIndex
+                  ),
+                  correctAnswer: getChoiceTextFromOptions(
+                    question.options,
+                    correctOptionIndex
                   ),
                 });
               }

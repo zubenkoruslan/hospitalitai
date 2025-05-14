@@ -4,23 +4,22 @@ import {
   CreateQuestionBankFromMenuClientData,
   MenuAiGenerationClientParams,
 } from "../../types/questionBankTypes";
-import { IMenuClient, IMenuWithItemsClient } from "../../types/menuTypes";
+import { IMenuClient } from "../../types/menuTypes"; // IMenuWithItemsClient seems unused directly
 import {
   getRestaurantMenus,
   getMenuWithItems,
   createQuestionBankFromMenu,
-  createQuestionBank as apiCreateQuestionBank, // Renaming to avoid conflict if useQuestionBanks is used
+  createQuestionBank as apiCreateQuestionBank,
 } from "../../services/api";
 import Button from "../common/Button";
 import Card from "../common/Card";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { useAuth } from "../../context/AuthContext";
+import { useValidation } from "../../context/ValidationContext"; // Import useValidation
 
 interface CreateQuestionBankFormProps {
   onBankCreated: () => void;
   onCancel: () => void;
-  // We'll manage loading state internally primarily, but parent might have an overall loading state.
-  // For now, let's assume internal management is sufficient.
 }
 
 const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
@@ -28,6 +27,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   onCancel,
 }) => {
   const { user } = useAuth();
+  const { formatErrorMessage } = useValidation(); // Get formatErrorMessage
   const restaurantId = user?.restaurantId;
 
   const [newBankName, setNewBankName] = useState("");
@@ -41,11 +41,14 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   const [aiTargetQuestionCount, setAiTargetQuestionCount] =
     useState<number>(10);
 
-  const [isLoading, setIsLoading] = useState(false); // General loading for form submission
+  const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null); // For API call errors
+  const [nameError, setNameError] = useState<string | null>(null); // For name validation
+
   const [isLoadingMenus, setIsLoadingMenus] = useState(false);
-  const [menusError, setMenusError] = useState<Error | null>(null);
+  const [menusError, setMenusError] = useState<string | null>(null); // Changed to string | null
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [categoriesError, setCategoriesError] = useState<Error | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null); // Changed to string | null
 
   useEffect(() => {
     const loadMenus = async () => {
@@ -53,12 +56,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setMenus([]);
         if (user?.role !== "restaurant" && restaurantId) {
           setMenusError(
-            new Error("Only restaurant accounts can create banks from menus.")
+            "Only restaurant accounts can create banks from menus."
           );
         } else if (!restaurantId) {
-          setMenusError(
-            new Error("Restaurant ID not available. Cannot load menus.")
-          );
+          setMenusError("Restaurant ID not available. Cannot load menus.");
         }
         return;
       }
@@ -69,12 +70,12 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setMenus(fetchedMenus);
       } catch (err: any) {
         console.error("Error fetching menus:", err);
-        setMenusError(err);
+        setMenusError(formatErrorMessage(err));
       }
       setIsLoadingMenus(false);
     };
     loadMenus();
-  }, [restaurantId, user?.role]);
+  }, [restaurantId, user?.role, formatErrorMessage]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -93,19 +94,22 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setMenuCategories(uniqueCategories);
       } catch (err: any) {
         console.error("Error fetching menu categories:", err);
-        setCategoriesError(err);
+        setCategoriesError(formatErrorMessage(err));
       }
       setIsLoadingCategories(false);
     };
     if (selectedMenuId) {
       loadCategories();
     }
-  }, [selectedMenuId]);
+  }, [selectedMenuId, formatErrorMessage]);
 
   const handleCreateBank = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null); // Clear previous API errors
+    setNameError(null); // Clear previous name validation error
+
     if (!newBankName.trim()) {
-      alert("Question bank name cannot be empty.");
+      setNameError("Question bank name cannot be empty.");
       return;
     }
     setIsLoading(true);
@@ -131,17 +135,12 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
           name: newBankName.trim(),
           description: newBankDescription.trim() || undefined,
         };
-        // Directly use the imported API service
         await apiCreateQuestionBank(data);
       }
-      onBankCreated(); // Notify parent
+      onBankCreated();
     } catch (error: any) {
       console.error("Error creating bank:", error);
-      alert(
-        `Failed to create bank: ${
-          error.response?.data?.message || error.message
-        }`
-      );
+      setFormError(formatErrorMessage(error)); // Use formatted error message
     } finally {
       setIsLoading(false);
     }
@@ -150,6 +149,11 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   return (
     <Card title="Create New Question Bank" className="mb-6">
       <form onSubmit={handleCreateBank} className="p-4 space-y-4">
+        {formError && (
+          <div className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md">
+            {formError}
+          </div>
+        )}
         <div>
           <label
             htmlFor="bankName"
@@ -161,11 +165,25 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
             id="bankName"
             type="text"
             value={newBankName}
-            onChange={(e) => setNewBankName(e.target.value)}
+            onChange={(e) => {
+              setNewBankName(e.target.value);
+              if (nameError && e.target.value.trim()) {
+                setNameError(null); // Clear error once user starts typing valid name
+              }
+            }}
             placeholder="e.g., Wine Knowledge, Cocktail Recipes"
             required
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            className={`mt-1 block w-full px-3 py-2 border ${
+              nameError ? "border-red-500" : "border-gray-300"
+            } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+            aria-invalid={!!nameError}
+            aria-describedby={nameError ? "bankName-error" : undefined}
           />
+          {nameError && (
+            <p className="mt-1 text-xs text-red-600" id="bankName-error">
+              {nameError}
+            </p>
+          )}
         </div>
         <div>
           <label
@@ -215,9 +233,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
               <p className="text-sm text-gray-500 mt-1">Loading menus...</p>
             )}
             {menusError && (
-              <p className="text-sm text-red-500 mt-1">
-                Error: {menusError.message}
-              </p>
+              <p className="text-sm text-red-500 mt-1">Error: {menusError}</p>
             )}
             {!isLoadingMenus &&
               menus.length === 0 &&
@@ -255,37 +271,21 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                       }}
                       className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
                     />
-                    <span>{category}</span>
+                    <span className="text-sm text-gray-700">{category}</span>
                   </label>
                 ))}
               </div>
-              {selectedCategories.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Select at least one category if creating from this menu.
-                </p>
-              )}
             </div>
           )}
-        {isLoadingCategories && (
-          <p className="text-sm text-gray-500 mt-1">Loading categories...</p>
-        )}
-        {categoriesError && (
+        {selectedMenuId && !isLoadingCategories && categoriesError && (
           <p className="text-sm text-red-500 mt-1">
-            Error: {categoriesError.message}
+            Error loading categories: {categoriesError}
           </p>
         )}
-        {selectedMenuId &&
-          !isLoadingCategories &&
-          menuCategories.length === 0 &&
-          !categoriesError && (
-            <p className="text-sm text-gray-500 mt-1">
-              No categories found for the selected menu.
-            </p>
-          )}
 
         {selectedMenuId && selectedCategories.length > 0 && (
           <div className="pt-2 border-t mt-4">
-            <label className="flex items-center space-x-2 mb-2">
+            <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 checked={isAiGenerationEnabled}
@@ -293,26 +293,26 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                 className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
               />
               <span className="text-sm font-medium text-gray-700">
-                Generate Questions with AI
+                Generate Questions with AI for selected categories
               </span>
             </label>
             {isAiGenerationEnabled && (
-              <div>
+              <div className="mt-2 pl-6">
                 <label
-                  htmlFor="aiQuestionCount"
+                  htmlFor="aiTargetQuestionCount"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Number of Questions to Generate
+                  Number of Questions to Generate (approx.)
                 </label>
                 <input
-                  id="aiQuestionCount"
+                  id="aiTargetQuestionCount"
                   type="number"
                   value={aiTargetQuestionCount}
                   onChange={(e) =>
                     setAiTargetQuestionCount(parseInt(e.target.value, 10) || 1)
                   }
                   min="1"
-                  max="50"
+                  max="50" // Example max
                   className="mt-1 block w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
               </div>
@@ -320,25 +320,17 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
           </div>
         )}
 
-        <div className="flex justify-end pt-4 space-x-3">
+        <div className="flex justify-end space-x-3 pt-4">
           <Button
             type="button"
-            onClick={onCancel}
             variant="secondary"
+            onClick={onCancel}
             disabled={isLoading}
           >
             Cancel
           </Button>
-          <Button
-            type="submit"
-            disabled={
-              isLoading ||
-              !newBankName.trim() ||
-              (!!selectedMenuId && selectedCategories.length === 0)
-            }
-            variant="primary"
-          >
-            {isLoading ? <LoadingSpinner /> : "Save Bank"}
+          <Button type="submit" variant="primary" disabled={isLoading}>
+            {isLoading ? <LoadingSpinner /> : "Create Bank"}
           </Button>
         </div>
       </form>
