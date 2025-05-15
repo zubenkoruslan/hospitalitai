@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useParams,
+  useNavigate /*, useLocation*/,
+} from "react-router-dom"; // useLocation might be used for quizTitle
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import {
+  ClientQuestionForAttempt,
+  ClientQuizAttemptSubmitData,
+  ClientSubmitAttemptResponse,
+  startQuizAttempt,
+  submitQuizAttempt,
+  ClientAnswerForSubmission,
+  ClientQuestionOption,
+} from "../services/api";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
@@ -9,51 +21,58 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 
 // --- Interfaces ---
-// Interface for a question received from the /take endpoint (no correctAnswer)
+// Old QuizQuestion and QuizForTaking interfaces are no longer needed
+/*
 interface QuizQuestion {
-  _id: string; // Question ID (might be needed for result tracking)
+  _id: string; 
   text: string;
   choices: string[];
-  menuItemId: string; // Keep for context if needed
+  menuItemId: string; 
 }
-
-// Interface for the Quiz data received from the /take endpoint
 interface QuizForTaking {
   _id: string;
   title: string;
   questions: QuizQuestion[];
-  // Add other fields if needed (e.g., menu item names if populated)
 }
+*/
 
-// Interface for the result received after submission
+// Old QuizSubmissionResult interface is replaced by ClientSubmitAttemptResponse
+/*
 interface QuizSubmissionResult {
   message: string;
   score: number;
   totalQuestions: number;
-  correctAnswers: number[]; // Array of correct answer indices (for review AFTER submission)
+  correctAnswers: number[];
 }
+*/
 
 // --- Main Component ---
 const QuizTakingPage: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  // const location = useLocation(); // Potentially for quizTitle
 
-  const [quizData, setQuizData] = useState<QuizForTaking | null>(null);
+  // const [quizData, setQuizData] = useState<QuizForTaking | null>(null); // Old
+  const [quizTitle, setQuizTitle] = useState<string>(""); // To store quiz title if needed from somewhere, or pass via route state
+  const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]); // New state for questions
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
-  const [userAnswers, setUserAnswers] = useState<(number | undefined | null)[]>(
-    []
-  );
+  // Store answers as a map: { questionId: answerGiven }
+  // answerGiven can be string (for TF/MC-Single option._id) or string[] (for MC-Multiple option._id array)
+  const [userAnswers, setUserAnswers] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  // const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null); // Old
   const [submissionResult, setSubmissionResult] =
-    useState<QuizSubmissionResult | null>(null);
+    useState<ClientSubmitAttemptResponse | null>(null); // New type
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false); // Keep cancellation logic if desired
 
-  // --- Refs to track state for cleanup function ---
+  const startTimeRef = useRef<number | null>(null); // For duration
+
+  // --- Refs to track state for cleanup function (update as needed) ---
   const quizIdRef = useRef(quizId);
   const userAnswersRef = useRef(userAnswers);
   const isSubmittingRef = useRef(isSubmitting);
@@ -67,10 +86,10 @@ const QuizTakingPage: React.FC = () => {
     isSubmittingRef.current = isSubmitting;
     isCancellingRef.current = isCancelling;
     submissionResultRef.current = submissionResult;
-  }); // Runs on every render to keep refs fresh
+  });
 
-  // Fetch the specific quiz data (without answers)
-  const fetchQuizForTaking = useCallback(async () => {
+  // Fetch questions by calling startQuizAttempt service
+  const loadQuizQuestions = useCallback(async () => {
     if (!quizId) {
       setError("Quiz ID not found in URL.");
       setIsLoading(false);
@@ -78,103 +97,97 @@ const QuizTakingPage: React.FC = () => {
     }
     setIsLoading(true);
     setError(null);
+    setQuestions([]);
+    setUserAnswers({});
+    setSubmissionResult(null);
+    setCurrentQuestionIndex(0); // Reset index
+    startTimeRef.current = Date.now();
+
+    // const { quizTitleFromState } = (location.state as { quizTitleFromState?: string }) || {};
+    // if (quizTitleFromState) setQuizTitle(quizTitleFromState);
+    // else { /* Fetch quiz title if needed via another API call using quizId */ }
+
     try {
-      const response = await api.get<{ quiz: QuizForTaking }>(
-        `/quiz/${quizId}/take`
-      );
-      setQuizData(response.data.quiz);
-      // Initialize answers array based on fetched questions
-      setUserAnswers(
-        new Array(response.data.quiz.questions.length).fill(undefined)
-      );
+      const fetchedQuestions = await startQuizAttempt(quizId);
+      if (fetchedQuestions && fetchedQuestions.length > 0) {
+        setQuestions(fetchedQuestions);
+      } else {
+        setError("No questions available for this quiz attempt.");
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load quiz.");
-      setQuizData(null);
+      setError(err.response?.data?.message || "Failed to load quiz questions.");
     } finally {
       setIsLoading(false);
     }
   }, [quizId]);
 
   useEffect(() => {
-    fetchQuizForTaking();
-  }, [fetchQuizForTaking]);
+    loadQuizQuestions();
+  }, [loadQuizQuestions]);
 
-  // --- Function to submit cancelled quiz (no state updates/navigation) ---
+  // --- Function to submit cancelled quiz (needs update) ---
   const submitQuizInBackground = useCallback(async () => {
     const currentQuizId = quizIdRef.current;
-    const currentAnswers = userAnswersRef.current;
+    const currentAnswersMap = userAnswersRef.current;
+    const currentQuestions = questions; // Closure will capture questions state at time of definition
 
-    if (!currentQuizId || !currentAnswers) {
-      console.error("[QuizTakingPage] Missing data for background submission.");
+    if (!currentQuizId) return;
+    if (
+      currentQuestions.length === 0 &&
+      Object.keys(currentAnswersMap).length === 0
+    )
       return;
-    }
 
-    console.log(
-      "[QuizTakingPage] Attempting background cancellation submission..."
+    const answersToSubmit: ClientAnswerForSubmission[] = currentQuestions.map(
+      (q) => ({
+        questionId: q._id,
+        answerGiven: currentAnswersMap[q._id],
+      })
     );
-
+    const duration = startTimeRef.current
+      ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+      : 0;
+    const submissionData: ClientQuizAttemptSubmitData = {
+      questions: answersToSubmit,
+      durationInSeconds: duration,
+    };
     try {
-      await api.post<QuizSubmissionResult>(`/quiz/${currentQuizId}/submit`, {
-        answers: currentAnswers,
-        cancelled: true,
-      });
-      console.log(
-        "[QuizTakingPage] Background cancellation submission successful."
-      );
+      await submitQuizAttempt(currentQuizId, submissionData);
     } catch (err: any) {
-      // Log error, but don't attempt state updates as component is unmounting
-      console.error(
-        "[QuizTakingPage] Error during background cancellation submission:",
-        err.response?.data?.message || err.message || err
-      );
+      console.error("Error during background answers submission:", err);
     }
-  }, []); // No dependencies needed as it reads refs
+  }, [questions]); // Added questions to dependency array
 
-  // --- Effect for handling unmount ---
   useEffect(() => {
-    // Return cleanup function
     return () => {
-      // Check refs to see if we need to submit automatically
       if (
-        !submissionResultRef.current && // Not already submitted
-        !isSubmittingRef.current && // Not currently submitting
-        !isCancellingRef.current // Not currently cancelling explicitly
+        !submissionResultRef.current &&
+        !isSubmittingRef.current &&
+        !isCancellingRef.current
       ) {
-        console.log(
-          "[QuizTakingPage] Unmounting, triggering background cancellation."
-        );
         submitQuizInBackground();
-      } else {
-        console.log(
-          "[QuizTakingPage] Unmounting, no background submission needed."
-        );
       }
     };
-  }, [submitQuizInBackground]); // Dependency on the submit function itself
+  }, [submitQuizInBackground]);
 
   // --- Effect for warning on page unload/navigation ---
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Check refs to see if quiz is in progress
       if (
-        !submissionResultRef.current && // Not submitted
-        !isSubmittingRef.current && // Not submitting
-        !isCancellingRef.current // Not cancelling
+        !submissionResultRef.current &&
+        !isSubmittingRef.current &&
+        !isCancellingRef.current
       ) {
-        // Standard way to trigger the browser's generic confirmation dialog
         event.preventDefault();
-        event.returnValue = ""; // Required for Chrome
-        return ""; // Required for older browsers
+        event.returnValue = "";
+        return "";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // Cleanup function to remove the listener when the component unmounts
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []); // Empty dependency array: refs are updated via their own effect, listener logic depends on refs
+  }, []);
 
   // --- Confirmation function for navigation attempts ---
   const confirmNavigation = (): boolean => {
@@ -185,23 +198,32 @@ const QuizTakingPage: React.FC = () => {
   };
 
   // --- Answer Handling ---
-  const handleAnswerSelect = (choiceIndex: number) => {
-    if (userAnswers.length === 0 && quizData) {
-      setUserAnswers(new Array(quizData.questions.length).fill(undefined));
-    }
-    setUserAnswers((prev) => {
-      const newAnswers = prev ? [...prev] : [];
-      if (currentQuestionIndex < newAnswers.length) {
-        newAnswers[currentQuestionIndex] = choiceIndex;
+  const handleAnswerSelect = (
+    questionId: string,
+    selectedValue: string,
+    questionType: string
+  ) => {
+    setUserAnswers((prevAnswers) => {
+      const newAnswers = { ...prevAnswers };
+      if (questionType === "multiple-choice-multiple") {
+        const currentSelection = (newAnswers[questionId] as string[]) || [];
+        if (currentSelection.includes(selectedValue)) {
+          newAnswers[questionId] = currentSelection.filter(
+            (item) => item !== selectedValue
+          );
+        } else {
+          newAnswers[questionId] = [...currentSelection, selectedValue];
+        }
       } else {
-        console.error("Attempted to set answer for out-of-bounds index.");
+        // For single-select types like mc-single, true-false
+        newAnswers[questionId] = selectedValue;
       }
       return newAnswers;
     });
   };
 
   const goToNextQuestion = () => {
-    if (quizData && currentQuestionIndex < quizData.questions.length - 1) {
+    if (questions.length > 0 && currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -214,67 +236,72 @@ const QuizTakingPage: React.FC = () => {
 
   // --- Submission Handling ---
   const handleSubmit = async () => {
-    if (!quizData || !quizId) return;
+    if (questions.length === 0 || !quizId) return;
 
-    if (userAnswers.some((ans) => ans === undefined || ans === null)) {
-      setSubmitError("Please answer all questions before submitting.");
-      return;
+    const answeredQuestionsCount = questions.filter(
+      (q) =>
+        userAnswers[q._id] !== undefined &&
+        (Array.isArray(userAnswers[q._id])
+          ? userAnswers[q._id].length > 0
+          : true)
+    ).length;
+
+    if (answeredQuestionsCount < questions.length) {
+      const confirmSubmit = window.confirm(
+        "You have unanswered questions. Are you sure you want to submit?"
+      );
+      if (!confirmSubmit) return;
     }
 
     setSubmitError(null);
     setIsSubmitting(true);
     setSubmissionResult(null);
 
+    const answersToSubmit: ClientAnswerForSubmission[] = questions.map((q) => ({
+      questionId: q._id,
+      answerGiven: userAnswers[q._id] === undefined ? null : userAnswers[q._id], // Send null for unanswered
+    }));
+
+    const durationInSeconds = startTimeRef.current
+      ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+      : 0;
+
+    const submissionData: ClientQuizAttemptSubmitData = {
+      questions: answersToSubmit,
+      durationInSeconds,
+    };
+
     try {
-      const response = await api.post<QuizSubmissionResult>(
-        `/quiz/${quizId}/submit`,
-        {
-          answers: userAnswers,
-          cancelled: false,
-        }
-      );
-      setSubmissionResult(response.data);
+      const result = await submitQuizAttempt(quizId, submissionData);
+      setSubmissionResult(result);
     } catch (err: any) {
-      setSubmitError("Failed to submit quiz. Please try again.");
+      setSubmitError(
+        err.response?.data?.message ||
+          "Failed to submit quiz. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
-      setIsLoading(false);
     }
   };
 
   // --- Cancellation Handling (Explicit Button Click) ---
-  const handleCancelQuiz = async () => {
-    if (!quizData || !quizId || isSubmitting || isCancelling) return;
-
+  const handleCancelQuiz = () => {
+    if (isSubmitting || isCancelling) return;
     const confirmation = window.confirm(
-      "Are you sure you want to cancel? Unanswered questions will be marked incorrect."
+      "Are you sure you want to cancel and leave this quiz? Your attempt will be recorded with current answers."
     );
-    if (!confirmation) return;
-
-    setSubmitError(null);
-    setIsCancelling(true);
-    setSubmissionResult(null);
-
-    try {
-      await api.post<QuizSubmissionResult>(`/quiz/${quizId}/submit`, {
-        answers: userAnswers,
-        cancelled: true,
-      });
+    if (confirmation) {
+      setIsCancelling(true); // Set flag to prevent double submission from unmount
+      // submitQuizInBackground(); // This will be called by unmount logic if not submitted
       navigate("/staff/dashboard");
-    } catch (err: any) {
-      setSubmitError(err.response?.data?.message || "Failed to cancel quiz.");
-      setIsCancelling(false);
     }
   };
 
   // Determine if quiz is actively in progress for blocking purposes
-  const isQuizInProgress =
-    !submissionResultRef.current &&
-    !isSubmittingRef.current &&
-    !isCancellingRef.current;
+  const isQuizInProgress = !submissionResult && !isSubmitting && !isCancelling;
 
   // --- Render Logic ---
-  if (isLoading && !quizData && !submissionResult)
+  if (isLoading && !questions.length && !submissionResult)
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar
@@ -298,48 +325,86 @@ const QuizTakingPage: React.FC = () => {
         </div>
       </div>
     );
-  if (error && !quizData) return <ErrorMessage message={error} />;
+  if (error && !questions.length) return <ErrorMessage message={error} />;
 
   if (submissionResult) {
-    // Calculate percentage for styling
-    const score = submissionResult.score;
-    const total = submissionResult.totalQuestions;
-    const percentage = total > 0 ? (score / total) * 100 : 0;
-
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen flex flex-col bg-gray-100">
         <Navbar />
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 flex justify-center items-start">
-          <Card className="shadow-lg p-6 sm:p-8 max-w-md w-full text-center">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              Quiz Submitted!
+        <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center">
+          <Card className="w-full max-w-xl text-center p-6 md:p-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">
+              Quiz Completed!
             </h1>
-            <p className="text-lg text-gray-600 mb-4">Your score:</p>
-            <div
-              className={`mb-6 font-extrabold ${
-                percentage >= 70 ? "text-green-600" : "text-red-600"
-              }`}
+            <p className="text-xl text-gray-700 mb-2">
+              Your Score: {submissionResult.score} /{" "}
+              {submissionResult.totalQuestionsAttempted}
+            </p>
+            <p className="text-lg text-gray-600 mb-6">
+              Thank you for completing the quiz.
+            </p>
+            {/* Detailed results can be shown here by mapping submissionResult.questions */}
+            {submissionResult.questions &&
+              submissionResult.questions.length > 0 && (
+                <div className="mt-6 text-left">
+                  <h3 className="text-xl font-semibold mb-3">
+                    Review Your Answers:
+                  </h3>
+                  <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                    {submissionResult.questions.map((gradedQ, index) => {
+                      const originalQuestion = questions.find(
+                        (q) => q._id === gradedQ.questionId
+                      );
+                      return (
+                        <li
+                          key={gradedQ.questionId}
+                          className={`p-3 rounded-md border ${
+                            gradedQ.isCorrect
+                              ? "bg-green-50 border-green-300"
+                              : "bg-red-50 border-red-300"
+                          }`}
+                        >
+                          <p className="font-semibold">
+                            {index + 1}.{" "}
+                            {originalQuestion?.questionText ||
+                              "Question not found"}
+                          </p>
+                          <p className="text-sm">
+                            Your answer:{" "}
+                            {gradedQ.answerGiven === null ? (
+                              <em className="text-gray-500">Not answered</em>
+                            ) : (
+                              JSON.stringify(gradedQ.answerGiven)
+                            )}
+                          </p>
+                          {!gradedQ.isCorrect &&
+                            gradedQ.correctAnswer !== undefined && (
+                              <p className="text-sm text-green-700 font-medium">
+                                Correct answer:{" "}
+                                {JSON.stringify(gradedQ.correctAnswer)}
+                              </p>
+                            )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            <Button
+              variant="primary"
+              onClick={() => navigate("/staff/dashboard")}
+              className="mt-8"
             >
-              <p className="text-4xl">
-                {score} / {total}
-              </p>
-              <p className="text-sm font-semibold mt-1">
-                ({percentage.toFixed(0)}%)
-              </p>
-            </div>
-            <Link to="/staff/dashboard" className="w-full inline-block">
-              <Button variant="primary" className="w-full">
-                Back to Dashboard
-              </Button>
-            </Link>
+              Back to Dashboard
+            </Button>
           </Card>
-        </div>
+        </main>
       </div>
     );
   }
 
-  // Add early return if quizData is null
-  if (!quizData) {
+  // Add early return if questions are null
+  if (!questions.length) {
     return (
       <div className="min-h-screen bg-gray-100">
         <Navbar />
@@ -350,10 +415,11 @@ const QuizTakingPage: React.FC = () => {
     );
   }
 
-  const currentQuestion = quizData.questions[currentQuestionIndex];
-  const totalQuestions = quizData.questions.length;
+  const currentQuestion = questions[currentQuestionIndex];
+  const totalQuestions = questions.length;
+  const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
-  const allAnswered = userAnswers.every(
+  const allAnswered = Object.values(userAnswers).every(
     (ans) => ans !== undefined && ans !== null
   );
 
@@ -365,7 +431,7 @@ const QuizTakingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen flex flex-col bg-gray-100">
       <Navbar
         isBlockingNavigation={isQuizInProgress}
         onAttemptBlockedNavigation={confirmNavigation}
@@ -375,39 +441,75 @@ const QuizTakingPage: React.FC = () => {
         <div className="px-4 sm:px-0 flex justify-center">
           <Card className="shadow-xl w-full max-w-2xl overflow-hidden flex flex-col p-0">
             <div className="px-6 py-4 border-b">
-              <p className="text-sm font-medium text-gray-500">
-                Question {currentQuestionIndex + 1} of {totalQuestions}
-              </p>
-              <p className="text-lg font-semibold text-gray-900 mt-1">
-                {currentQuestion.text}
-              </p>
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-1">
+                  {currentQuestion.questionText}
+                </h2>
+                <p className="text-sm text-gray-500 mb-4">
+                  Question Type: {currentQuestion.questionType}
+                </p>
+              </div>
             </div>
             <div className="px-6 py-4 flex-1 space-y-3">
-              {currentQuestion.choices.map((choice, index) => (
-                <label
-                  key={index}
-                  className={`flex items-center p-3 border rounded-md hover:bg-gray-100 cursor-pointer transition duration-150 ease-in-out ${
-                    userAnswers[currentQuestionIndex] === index
-                      ? "bg-blue-50 border-blue-300 ring-2 ring-blue-200"
-                      : "border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`question-${currentQuestionIndex}`}
-                    value={index}
-                    checked={userAnswers[currentQuestionIndex] === index}
-                    onChange={() => handleAnswerSelect(index)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-0 disabled:opacity-50"
-                    disabled={isSubmitting || isCancelling}
-                  />
-                  <span className="ml-3 text-sm text-gray-800">{choice}</span>
-                </label>
-              ))}
+              {currentQuestion.options.map(
+                (option: ClientQuestionOption, index: number) => {
+                  const isSelected =
+                    userAnswers[currentQuestion._id] === option.text;
+                  return (
+                    <div
+                      key={option._id}
+                      className={`flex items-center p-3 border rounded-md hover:bg-gray-100 cursor-pointer transition duration-150 ease-in-out ${
+                        isSelected
+                          ? "bg-blue-50 border-blue-300 ring-2 ring-blue-200"
+                          : "border-gray-300"
+                      }`}
+                      onClick={() =>
+                        handleAnswerSelect(
+                          currentQuestion._id,
+                          option.text,
+                          currentQuestion.questionType
+                        )
+                      }
+                    >
+                      <input
+                        type={
+                          currentQuestion.questionType ===
+                          "multiple-choice-multiple"
+                            ? "checkbox"
+                            : "radio"
+                        }
+                        name={`question-${currentQuestion._id}${
+                          currentQuestion.questionType !==
+                          "multiple-choice-multiple"
+                            ? ""
+                            : "-" + option._id
+                        }`}
+                        value={option.text}
+                        checked={isSelected}
+                        onChange={() =>
+                          handleAnswerSelect(
+                            currentQuestion._id,
+                            option.text,
+                            currentQuestion.questionType
+                          )
+                        }
+                        className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-0 disabled:opacity-50 mr-3"
+                        disabled={isSubmitting || !!submissionResult}
+                      />
+                      <span className="text-gray-700 flex-grow">
+                        {option.text}
+                      </span>
+                    </div>
+                  );
+                }
+              )}
             </div>
             {submitError && (
               <div className="px-6 pb-4">
-                <ErrorMessage message={submitError} />
+                <ErrorMessage
+                  message={submitError}
+                  onDismiss={() => setSubmitError(null)}
+                />
               </div>
             )}
             <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between flex-wrap gap-4">
@@ -428,7 +530,8 @@ const QuizTakingPage: React.FC = () => {
                   <Button
                     variant="success"
                     onClick={handleSubmit}
-                    disabled={isSubmitting || !allAnswered}
+                    isLoading={isSubmitting}
+                    disabled={!!submissionResult || isSubmitting}
                   >
                     {isSubmitting ? "Submitting..." : "Submit Quiz"}
                   </Button>

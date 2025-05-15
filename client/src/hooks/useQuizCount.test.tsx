@@ -48,7 +48,7 @@ describe("useQuizCount Hook", () => {
     });
 
     expect(mockedApi.get).toHaveBeenCalledTimes(1);
-    expect(mockedApi.get).toHaveBeenCalledWith("/quiz/count");
+    expect(mockedApi.get).toHaveBeenCalledWith("/quizzes/count");
     expect(result.current.quizCount).toBe(mockCount);
     expect(result.current.error).toBeNull();
   });
@@ -98,5 +98,26 @@ describe("useQuizCount Hook", () => {
     expect(mockedApi.get).not.toHaveBeenCalled();
     expect(result.current.quizCount).toBe(0);
     expect(result.current.error).toBeNull(); // No error set for null user
+  });
+
+  it("should refetch quiz count", async () => {
+    const { result } = renderHook(() => useQuizCount());
+
+    // Initial fetch will happen, let it resolve first
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Reset mocks for the refetch call, or ensure the previous call is accounted for if checking times
+    mockedApi.get.mockClear();
+    // If mockResolvedValue was for specific count for this test, re-apply or adjust
+    mockedApi.get.mockResolvedValue({ data: { count: 5 } } as AxiosResponse<{
+      count: number;
+    }>);
+
+    await act(async () => {
+      result.current.fetchQuizCount(); // MODIFIED: Changed from refetchQuizCount
+    });
+
+    expect(mockedApi.get).toHaveBeenCalledWith("/quizzes/count");
+    expect(result.current.quizCount).toBe(5);
+    expect(result.current.loading).toBe(false); // MODIFIED: Changed from isLoading
   });
 });

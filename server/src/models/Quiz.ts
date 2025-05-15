@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 // import { IMenuItem } from "./MenuItem"; // No longer directly primary source for quiz structure, commented out
 import { IUser } from "./User"; // Import for referencing
 // MODIFIED: Import main IQuestion from QuestionModel and QuestionModel itself to access its schema
-import QuestionModel, { IQuestion as MainIQuestion } from "./QuestionModel";
+// import QuestionModel, { IQuestion as MainIQuestion } from "./QuestionModel"; // Commented out as questions array is removed
 
 // REMOVED local IQuestion interface and QuestionSchema definition that was here
 
@@ -11,18 +11,19 @@ export interface IQuiz extends Document {
   _id: Types.ObjectId; // Explicitly add _id type
   title: string;
   description?: string; // Add optional description field
-  menuItemIds?: Types.ObjectId[]; // MADE OPTIONAL: References to MenuItems used in the quiz
+  // menuItemIds?: Types.ObjectId[]; // REMOVED: References to MenuItems used in the quiz
 
   // NEW: References to QuestionBanks used as source
   sourceQuestionBankIds: Types.ObjectId[];
 
-  questions: MainIQuestion[]; // Array of question subdocuments from QuestionModel
+  // questions: MainIQuestion[]; // REMOVED: Array of question subdocuments from QuestionModel
 
-  numberOfQuestions: number; // ADDED numberOfQuestions
+  numberOfQuestionsPerAttempt: number; // RENAMED from numberOfQuestions
 
   restaurantId: Types.ObjectId; // Reference to the User (Restaurant) who owns the quiz
   isAssigned: boolean; // Flag to indicate if the quiz has been assigned to any staff
   isAvailable: boolean; // Flag to control if staff can see/take this quiz
+  totalUniqueQuestionsInSourceSnapshot?: number; // ADDED: Optional field
   // Timestamps added automatically
   createdAt?: Date; // Add createdAt
   updatedAt?: Date; // Add updatedAt
@@ -43,35 +44,33 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       maxLength: [500, "Description cannot be more than 500 characters"],
       default: null,
     },
-    menuItemIds: [
-      // MADE OPTIONAL
-      {
-        type: Schema.Types.ObjectId,
-        ref: "MenuItem",
-        // required: true, // No longer strictly required if bank-driven
-      },
-    ],
+    // menuItemIds: [ // REMOVED
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "MenuItem",
+    //   },
+    // ],
     sourceQuestionBankIds: [
       // NEW FIELD
       {
         type: Schema.Types.ObjectId,
         ref: "QuestionBank", // Reference to QuestionBankModel
-        required: true,
+        required: [true, "Source Question Bank ID is required"], // Made required message more specific
       },
     ],
-    questions: {
-      type: [QuestionModel.schema], // Use QuestionModel.schema directly
-      required: true,
-      validate: [
-        (val: MainIQuestion[]) => val.length > 0,
-        "Quiz must contain at least one question",
-      ],
-    },
-    numberOfQuestions: {
-      // ADDED numberOfQuestions to schema
+    // questions: { // REMOVED
+    //   type: [QuestionModel.schema],
+    //   required: true,
+    //   validate: [
+    //     (val: MainIQuestion[]) => val.length > 0,
+    //     "Quiz must contain at least one question",
+    //   ],
+    // },
+    numberOfQuestionsPerAttempt: {
+      // RENAMED from numberOfQuestions
       type: Number,
-      required: [true, "Number of questions is required."],
-      min: [1, "Quiz must have at least one question."],
+      required: [true, "Number of questions per attempt is required."],
+      min: [1, "Quiz must have at least one question per attempt."],
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
@@ -89,6 +88,12 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       required: true,
       default: false, // Default to not available
       index: true, // Index for efficient querying by staff
+    },
+    totalUniqueQuestionsInSourceSnapshot: {
+      // ADDED
+      type: Number,
+      min: [0, "Total unique questions snapshot cannot be negative."],
+      default: undefined, // Explicitly undefined, will be set programmatically
     },
   },
   {

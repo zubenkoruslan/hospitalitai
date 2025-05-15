@@ -286,21 +286,21 @@ export const createQuestionBankFromMenuService = async (
     aiParams,
   } = data;
 
+  // Validate basic inputs
   if (!name || name.trim() === "") {
     throw new AppError("Question bank name is required.", 400);
   }
-  if (!menuId) {
-    throw new AppError("Menu ID is required to create a bank from menu.", 400);
-  }
-  if (!selectedCategoryNames || selectedCategoryNames.length === 0) {
-    throw new AppError(
-      "At least one menu category must be selected for the question bank.",
-      400
-    );
+  if (!mongoose.Types.ObjectId.isValid(menuId)) {
+    throw new AppError("Invalid Menu ID format.", 400);
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const useTransactions = process.env.NODE_ENV !== "development"; // Example condition
+  let session: mongoose.ClientSession | null = null;
+
+  if (useTransactions) {
+    session = await mongoose.startSession();
+    session.startTransaction();
+  }
 
   try {
     const newBank = new QuestionBankModel({
@@ -312,7 +312,7 @@ export const createQuestionBankFromMenuService = async (
       createdBy: restaurantId, // Assuming the user creating it owns the restaurant
     });
 
-    await newBank.save({ session });
+    await newBank.save(session ? { session } : undefined); // Pass session only if it exists
 
     /*
     // Temporarily commented out AI Question Generation
@@ -337,17 +337,21 @@ export const createQuestionBankFromMenuService = async (
           (q: IQuestion) => q._id as mongoose.Types.ObjectId // Added IQuestion type for q
         ); 
         newBank.questions.push(...questionIds);
-        await newBank.save({ session });
+        await newBank.save(session ? { session } : undefined); // Pass session only if it exists
       }
     }
     */
 
-    await session.commitTransaction();
-    session.endSession();
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
     return newBank;
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
     if (error instanceof AppError) {
       throw error;
     }
@@ -444,5 +448,67 @@ export const removeCategoryFromQuestionBankService = async (
       throw new AppError(`Validation Error: ${error.message}`, 400);
     }
     throw new AppError("Failed to remove category from question bank.", 500);
+  }
+};
+
+// New service to get unique, valid question IDs from a list of bank IDs
+export const getUniqueValidQuestionIdsFromQuestionBanks = async (
+  bankIds: mongoose.Types.ObjectId[],
+  restaurantId: mongoose.Types.ObjectId // Added restaurantId for scoping bank and question lookups
+): Promise<mongoose.Types.ObjectId[]> => {
+  if (!bankIds || bankIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const questionBanks = await QuestionBankModel.find({
+      _id: { $in: bankIds },
+      restaurantId: restaurantId, // Ensure banks belong to the restaurant
+    })
+      .select("questions")
+      .lean();
+
+    let allQuestionIdsFromBanks: mongoose.Types.ObjectId[] = [];
+    questionBanks.forEach((bank) => {
+      if (bank.questions && bank.questions.length > 0) {
+        // Assuming bank.questions are already ObjectIds or can be cast
+        allQuestionIdsFromBanks.push(
+          ...bank.questions.map((qId) => new mongoose.Types.ObjectId(qId))
+        );
+      }
+    });
+
+    if (allQuestionIdsFromBanks.length === 0) {
+      return [];
+    }
+
+    // Deduplicate
+    const uniqueQuestionIdStrings = [
+      ...new Set(allQuestionIdsFromBanks.map((id) => id.toString())),
+    ];
+    const uniqueQuestionIds = uniqueQuestionIdStrings.map(
+      (idStr) => new mongoose.Types.ObjectId(idStr)
+    );
+
+    // Validate that these questions actually exist and belong to the restaurant
+    const validQuestions = await QuestionModel.find({
+      _id: { $in: uniqueQuestionIds },
+      restaurantId: restaurantId, // Ensure questions also belong to the restaurant
+      isActive: true, // Added filter for active questions
+    })
+      .select("_id")
+      .lean();
+
+    return validQuestions.map((q) => new mongoose.Types.ObjectId(q._id as any)); // Explicitly cast to ObjectId
+  } catch (error) {
+    console.error(
+      "Error in getUniqueValidQuestionIdsFromQuestionBanks:",
+      error
+    );
+    // Depending on how critical this is, either throw or return empty/handle upstream
+    throw new AppError(
+      "Failed to retrieve unique question IDs from banks.",
+      500
+    );
   }
 };

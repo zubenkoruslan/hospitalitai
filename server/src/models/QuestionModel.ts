@@ -27,6 +27,7 @@ export interface IQuestion extends Document {
   restaurantId: Types.ObjectId;
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
+  isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -82,6 +83,11 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       type: String,
       enum: ["easy", "medium", "hard"],
       required: false,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
     },
   },
   { timestamps: true }

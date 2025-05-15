@@ -315,33 +315,38 @@ export interface ClientIQuiz {
   description?: string;
   restaurantId: string;
   sourceQuestionBankIds: string[];
-  questions: any[]; // Define more specific question type if needed
-  numberOfQuestions: number;
+  totalUniqueQuestionsInSourceSnapshot?: number;
+  numberOfQuestionsPerAttempt: number;
   isAvailable?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  isAssigned?: boolean;
 }
 
+// Data structure for creating a quiz from question banks via the API
 export interface GenerateQuizFromBanksClientData {
   title: string;
   description?: string;
   questionBankIds: string[];
-  numberOfQuestions: number;
+  numberOfQuestionsPerAttempt: number;
 }
 
 /**
- * Generates a new quiz from selected question banks.
- * @param data - The data for generating the quiz.
+ * Generates a new quiz definition from selected question banks.
+ * @param data - The data for the new quiz definition.
  */
 export const generateQuizFromQuestionBanks = async (
   data: GenerateQuizFromBanksClientData
 ): Promise<ClientIQuiz> => {
+  // The POST request to generate a quiz from question banks
+  // Server-side route is POST /api/quizzes/from-banks
+  // MODIFIED: Updated expected response type and return value
   const response = await api.post<{
     status: string;
     message: string;
-    data: ClientIQuiz; // The backend returns the quiz under the 'data' key
-  }>("/quiz/from-banks", data);
-  return response.data.data;
+    data: ClientIQuiz; // The actual quiz is in the 'data' property of the response's data
+  }>("/quizzes/from-banks", data);
+  return response.data.data; // Extract the quiz object from the nested data property
 };
 
 // ADDED: Function to get all quizzes for the restaurant
@@ -349,14 +354,174 @@ export const generateQuizFromQuestionBanks = async (
  * Fetches all quizzes for the current restaurant.
  */
 export const getQuizzes = async (): Promise<ClientIQuiz[]> => {
-  // Assuming the backend returns { success: boolean, count: number, data: ClientIQuiz[] }
-  // or simply { data: ClientIQuiz[] } or even ClientIQuiz[] directly.
-  // Adjust based on actual backend response structure.
-  // For now, let's assume it's similar to getRestaurantMenus or question bank fetches.
-  const response = await api.get<{ data: ClientIQuiz[] }>("/quiz"); // Endpoint might be /quizzes
-  return response.data.data; // Assuming quizzes are in response.data.data
-  // If backend returns { quizzes: ClientIQuiz[] }, then it would be response.data.quizzes
-  // If backend returns ClientIQuiz[] directly, then it would be response.data
+  const response = await api.get<{ quizzes: ClientIQuiz[] }>("/quizzes"); // Corrected: Server sends { quizzes: [...] }
+  return response.data.quizzes;
+};
+
+// ADDED: Function to update quiz details
+/**
+ * Updates specific details of a quiz.
+ * @param quizId - The ID of the quiz to update.
+ * @param quizData - The partial data to update the quiz with.
+ */
+export const updateQuizDetails = async (
+  quizId: string,
+  quizData: Partial<ClientIQuiz>
+): Promise<ClientIQuiz> => {
+  // MODIFIED: Changed from api.patch to api.put
+  // The PUT route on the backend is designed to handle these fields.
+  const response = await api.put<{ message: string; quiz: ClientIQuiz }>(
+    `/quizzes/${quizId}`,
+    quizData
+  );
+  // The PUT route returns { message: string, quiz: ClientIQuiz }, so we extract quiz
+  return response.data.quiz;
+};
+
+// New types and services for staff dashboard
+
+export interface ClientAvailableQuiz {
+  _id: string;
+  title: string;
+  description?: string;
+  createdAt?: string; // Date as string
+  // numQuestions was totalUniqueQuestionsInSourceSnapshot or numberOfQuestionsPerAttempt
+  // To be clear, let's use what quiz definition has: numberOfQuestionsPerAttempt
+  // and totalUniqueQuestionsInSourceSnapshot if available and needed for display
+  numberOfQuestionsPerAttempt: number;
+  totalUniqueQuestionsInSourceSnapshot?: number;
+  isAvailable?: boolean; // From ClientIQuiz, good to have here
+}
+
+export interface ClientStaffQuizProgress {
+  _id: string; // ID of the progress document itself
+  staffUserId: string;
+  quizId: string;
+  restaurantId: string;
+  seenQuestionIds: string[];
+  totalUniqueQuestionsInSource: number;
+  isCompletedOverall: boolean;
+  lastAttemptTimestamp?: string;
+  questionsAnsweredToday: number;
+  lastActivityDateForDailyReset?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Fetches available quizzes for the current staff member's restaurant.
+ */
+export const getAvailableQuizzesForStaff = async (): Promise<ClientIQuiz[]> => {
+  // Assuming the backend /api/quiz/available returns objects compatible with ClientIQuiz
+  // (or at least containing all fields ClientIQuiz requires).
+  // The backend currently returns { quizzes: AvailableQuizInfo[] }, where AvailableQuizInfo
+  // has numQuestions. This needs to align for ClientIQuiz fields like
+  // numberOfQuestionsPerAttempt, restaurantId, sourceQuestionBankIds etc. to be present.
+  // For now, assuming the backend is adjusted or this ClientIQuiz type is what's desired for available quizzes.
+  const response = await api.get<{ quizzes: ClientIQuiz[] }>(
+    "/quizzes/available"
+  );
+  return response.data.quizzes; // Directly return what's assumed to be ClientIQuiz[]
+};
+
+/**
+ * Fetches the staff member's progress for a specific quiz.
+ * @param quizId - The ID of the quiz.
+ */
+export const getMyQuizProgress = async (
+  quizId: string
+): Promise<ClientStaffQuizProgress | null> => {
+  const response = await api.get<{ data: ClientStaffQuizProgress | null }>(
+    `/quizzes/${quizId}/my-progress`
+  );
+  return response.data.data; // Backend returns { data: IStaffQuizProgress | null }
+};
+
+// Type for staff progress as returned for a restaurant owner viewing all staff for a quiz.
+// ClientStaffQuizProgress can be reused if staffUserId is populated with name details.
+// If not, a new type might be needed that includes IUser partial for staff details.
+// For now, assuming ClientStaffQuizProgress is sufficient and backend populates staff name.
+
+/**
+ * Fetches all staff progress for a specific quiz (for restaurant owner).
+ * @param quizId - The ID of the quiz.
+ */
+export const getRestaurantQuizStaffProgress = async (
+  quizId: string
+): Promise<ClientStaffQuizProgress[]> => {
+  const response = await api.get<{ data: ClientStaffQuizProgress[] }>(
+    `/quizzes/${quizId}/all-staff-progress`
+  );
+  return response.data.data; // Backend returns { data: IStaffQuizProgress[] }
+};
+
+// Types and services for Quiz Taking Page
+
+export interface ClientQuestionOption {
+  _id: string; // Option ID
+  text: string;
+}
+
+export interface ClientQuestionForAttempt {
+  _id: string; // Question ID
+  questionText: string;
+  questionType: string; // e.g., "multiple-choice-single", "true-false"
+  options: ClientQuestionOption[];
+  categories?: string[];
+  difficulty?: string;
+}
+
+export interface ClientAnswerForSubmission {
+  questionId: string;
+  answerGiven: any; // string for MC-single/TF, string[] for MC-multiple, etc.
+}
+
+export interface ClientQuizAttemptSubmitData {
+  questions: ClientAnswerForSubmission[];
+  durationInSeconds?: number;
+}
+
+export interface ClientGradedQuestion {
+  questionId: string;
+  answerGiven: any;
+  isCorrect: boolean;
+  correctAnswer?: any; // string | string[] | etc.
+}
+
+export interface ClientSubmitAttemptResponse {
+  score: number;
+  totalQuestionsAttempted: number;
+  attemptId: string;
+  questions: ClientGradedQuestion[];
+}
+
+/**
+ * Starts a quiz attempt and fetches questions.
+ * @param quizId - The ID of the quiz.
+ */
+export const startQuizAttempt = async (
+  quizId: string
+): Promise<ClientQuestionForAttempt[]> => {
+  const response = await api.post<{ data: ClientQuestionForAttempt[] }>(
+    `/quizzes/${quizId}/start-attempt`
+  );
+  return response.data.data; // Backend returns { data: QuestionForQuizAttempt[] }
+};
+
+/**
+ * Submits a quiz attempt.
+ * @param quizId - The ID of the quiz.
+ * @param attemptData - The submission data.
+ */
+export const submitQuizAttempt = async (
+  quizId: string,
+  attemptData: ClientQuizAttemptSubmitData
+): Promise<ClientSubmitAttemptResponse> => {
+  const response = await api.post<{ data: ClientSubmitAttemptResponse }>(
+    `/quizzes/${quizId}/submit-attempt`,
+    attemptData
+  );
+  return response.data.data; // Backend returns { data: { score, totalQuestionsAttempted, ... } }
 };
 
 // Default export

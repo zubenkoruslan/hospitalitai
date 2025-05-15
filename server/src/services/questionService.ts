@@ -104,6 +104,7 @@ export const getQuestionByIdService = async (
     const question = await QuestionModel.findOne({
       _id: questionId,
       restaurantId: restaurantId,
+      isActive: true,
     });
     return question;
   } catch (error) {
@@ -117,10 +118,16 @@ export const getQuestionByIdService = async (
 
 export const getAllQuestionsService = async (
   restaurantId: mongoose.Types.ObjectId,
-  queryParams?: any
+  queryParams?: { isActive?: boolean }
 ): Promise<IQuestion[]> => {
   try {
-    const questions = await QuestionModel.find({ restaurantId: restaurantId });
+    const filter: any = { restaurantId: restaurantId };
+    if (queryParams && typeof queryParams.isActive === "boolean") {
+      filter.isActive = queryParams.isActive;
+    } else {
+      filter.isActive = true;
+    }
+    const questions = await QuestionModel.find(filter);
     return questions;
   } catch (error) {
     console.error(
@@ -521,5 +528,30 @@ export const generateAiQuestionsService = async (
       );
     }
     throw new AppError("Failed to generate AI questions.", 500);
+  }
+};
+
+// New service to get multiple questions by their IDs
+export const getQuestionsByIdsService = async (
+  questionIds: mongoose.Types.ObjectId[],
+  restaurantId: mongoose.Types.ObjectId
+): Promise<IQuestion[]> => {
+  if (!questionIds || questionIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const questions = await QuestionModel.find({
+      _id: { $in: questionIds },
+      restaurantId: restaurantId,
+      isActive: true, // Ensure questions are active
+    });
+    return questions;
+  } catch (error) {
+    console.error("Error fetching questions by IDs in service:", error);
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError("Failed to fetch questions by IDs.", 500);
   }
 };

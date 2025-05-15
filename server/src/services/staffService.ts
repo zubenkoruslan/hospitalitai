@@ -198,10 +198,10 @@ class StaffService {
         restaurantId: restaurantId,
       })
         .populate<{
-          quizId: Pick<IQuiz, "_id" | "title" | "questions"> | null;
+          quizId: Pick<IQuiz, "_id" | "title"> | null;
         }>({
           path: "quizId",
-          select: "title questions",
+          select: "title",
         })
         .sort({ completedAt: -1 })
         .lean();
@@ -222,41 +222,43 @@ class StaffService {
           const incorrectQuestions: IncorrectQuestionDetail[] = [];
           const quizData = result.quizId;
 
-          if (quizData && quizData.questions && Array.isArray(result.answers)) {
-            quizData.questions.forEach((question: IQuestion, index: number) => {
-              const userAnswerIndex = result.answers[index];
+          // MODIFIED: The block below is commented out as quizData.questions is no longer available.
+          // This means 'incorrectQuestions' will remain empty.
+          // if (quizData && quizData.questions && Array.isArray(result.answers)) {
+          //   quizData.questions.forEach((question: IQuestion, index: number) => {
+          //     const userAnswerIndex = result.answers[index];
 
-              // Find the correct answer's index from the options array
-              const correctOptionIndex = question.options?.findIndex(
-                (opt) => opt.isCorrect
-              );
+          //     // Find the correct answer's index from the options array
+          //     const correctOptionIndex = question.options?.findIndex(
+          //       (opt) => opt.isCorrect
+          //     );
 
-              // Check if the user's answer is incorrect
-              let isIncorrect = false;
-              if (userAnswerIndex !== null && userAnswerIndex !== undefined) {
-                if (
-                  correctOptionIndex === undefined ||
-                  userAnswerIndex !== correctOptionIndex
-                ) {
-                  isIncorrect = true;
-                }
-              }
+          //     // Check if the user's answer is incorrect
+          //     let isIncorrect = false;
+          //     if (userAnswerIndex !== null && userAnswerIndex !== undefined) {
+          //       if (
+          //         correctOptionIndex === undefined ||
+          //         userAnswerIndex !== correctOptionIndex
+          //       ) {
+          //         isIncorrect = true;
+          //       }
+          //     }
 
-              if (isIncorrect) {
-                incorrectQuestions.push({
-                  questionText: question.questionText,
-                  userAnswer: getChoiceTextFromOptions(
-                    question.options,
-                    userAnswerIndex
-                  ),
-                  correctAnswer: getChoiceTextFromOptions(
-                    question.options,
-                    correctOptionIndex
-                  ),
-                });
-              }
-            });
-          }
+          //     if (isIncorrect) {
+          //       incorrectQuestions.push({
+          //         questionText: question.questionText,
+          //         userAnswer: getChoiceTextFromOptions(
+          //           question.options,
+          //           userAnswerIndex
+          //         ),
+          //         correctAnswer: getChoiceTextFromOptions(
+          //           question.options,
+          //           correctOptionIndex
+          //         ),
+          //       });
+          //     }
+          //   });
+          // }
 
           return {
             _id: result._id as Types.ObjectId,

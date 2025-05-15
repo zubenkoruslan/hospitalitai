@@ -24,7 +24,8 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
 }) => {
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [numberOfQuestions, setNumberOfQuestions] = useState<number>(10);
+  const [numberOfQuestionsPerAttempt, setNumberOfQuestionsPerAttempt] =
+    useState<number>(10);
   const [availableBanks, setAvailableBanks] = useState<IQuestionBank[]>([]);
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false); // For form submission
@@ -54,7 +55,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       // Reset form when modal is closed or becomes non-visible
       setTitle("");
       setDescription("");
-      setNumberOfQuestions(10);
+      setNumberOfQuestionsPerAttempt(10);
       setSelectedBankIds([]);
       setError(null);
       setFetchError(null);
@@ -83,8 +84,8 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       setError("Please select at least one question bank.");
       return;
     }
-    if (numberOfQuestions <= 0) {
-      setError("Number of questions must be greater than zero.");
+    if (numberOfQuestionsPerAttempt <= 0) {
+      setError("Number of questions per attempt must be greater than zero.");
       return;
     }
 
@@ -93,7 +94,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       title,
       description,
       questionBankIds: selectedBankIds,
-      numberOfQuestions,
+      numberOfQuestionsPerAttempt,
     };
 
     try {
@@ -181,17 +182,18 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
 
             <div className="mb-4">
               <label
-                htmlFor="modal-quiz-numberOfQuestions"
+                htmlFor="modal-quiz-numberOfQuestionsPerAttempt"
                 className="block text-gray-700 font-semibold mb-1"
               >
-                Number of Questions <span className="text-red-500">*</span>
+                Number of Questions Per Attempt{" "}
+                <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
-                id="modal-quiz-numberOfQuestions"
-                value={numberOfQuestions}
+                id="modal-quiz-numberOfQuestionsPerAttempt"
+                value={numberOfQuestionsPerAttempt}
                 onChange={(e) =>
-                  setNumberOfQuestions(parseInt(e.target.value, 10))
+                  setNumberOfQuestionsPerAttempt(parseInt(e.target.value, 10))
                 }
                 min="1"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150"

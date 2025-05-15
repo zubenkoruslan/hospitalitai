@@ -27,7 +27,7 @@ export function useQuizCount(): UseQuizCountReturn {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ count: number }>("/quiz/count");
+      const response = await api.get<{ count: number }>("/quizzes/count");
       setQuizCount(response.data.count || 0);
     } catch (err: any) {
       console.error("Error fetching quiz count:", err);

@@ -2,7 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
-import api from "../services/api";
+import api, {
+  ClientIQuiz,
+  ClientStaffQuizProgress,
+  getAvailableQuizzesForStaff,
+  getMyQuizProgress,
+} from "../services/api";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -21,6 +26,11 @@ interface QuizListItem {
   retakeCount?: number;
   status?: string; // e.g., 'pending', 'completed'
   latestResultId?: string; // Added field for the specific result ID from backend
+}
+
+// New interface for combining Quiz definition with its progress
+interface StaffQuizDisplayItem extends ClientIQuiz {
+  progress?: ClientStaffQuizProgress | null;
 }
 
 // Interface for Ranking Data
@@ -53,106 +63,77 @@ const formatApiError = (err: any, context: string): string => {
 
 // --- Helper Component for Rendering a Single Quiz Item ---
 interface QuizItemProps {
-  quiz: QuizListItem;
+  quizDisplayItem: StaffQuizDisplayItem;
   formatDate: (dateString?: string | Date) => string;
-  onOpenDetailModal: (resultId: string) => void;
 }
 
-const QuizItem: React.FC<QuizItemProps> = ({
-  quiz,
-  formatDate,
-  onOpenDetailModal,
-}) => {
-  const hasResult = quiz.status === "completed" && quiz.completedAt;
-  const percentage =
-    hasResult &&
-    quiz.totalQuestions &&
-    quiz.totalQuestions > 0 &&
-    quiz.score !== undefined
-      ? ((quiz.score / quiz.totalQuestions) * 100).toFixed(0) + "%"
-      : "0%";
+const QuizItem: React.FC<QuizItemProps> = ({ quizDisplayItem, formatDate }) => {
+  const { title, description, numberOfQuestionsPerAttempt, progress } =
+    quizDisplayItem;
+  const isCompletedOverall = progress?.isCompletedOverall || false;
+  const questionsAnsweredToday = progress?.questionsAnsweredToday || 0;
+  const seenQuestionsCount = progress?.seenQuestionIds?.length || 0;
+  const totalUniqueInSource =
+    progress?.totalUniqueQuestionsInSource || numberOfQuestionsPerAttempt; // Fallback for display
 
-  const handleQuizItemClick = () => {
-    console.log("Quiz item clicked:", quiz);
-    if (hasResult && quiz.latestResultId) {
-      onOpenDetailModal(quiz.latestResultId);
-    } else if (hasResult) {
-      console.warn(
-        "Clicked a completed quiz but latestResultId is missing. This may prevent viewing details.",
-        quiz
-      );
-      alert(
-        "Cannot display quiz details. This quiz result may not be properly saved in the system."
-      );
-    }
-  };
+  // Overall Progress calculation
+  const overallProgressPercentage =
+    totalUniqueInSource > 0
+      ? Math.round((seenQuestionsCount / totalUniqueInSource) * 100)
+      : 0;
+
+  // Daily Progress calculation (example)
+  const dailyProgressDisplay = `${questionsAnsweredToday} / ${numberOfQuestionsPerAttempt}`;
 
   const commonClasses =
     "px-4 py-4 sm:px-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-colors duration-150";
-  const clickableClasses = hasResult
-    ? "hover:bg-blue-50 cursor-pointer"
-    : "hover:bg-gray-50";
+  const clickableClasses = "hover:bg-gray-50";
 
   return (
     <li
-      key={quiz._id}
+      key={quizDisplayItem._id}
       className={`${commonClasses} ${clickableClasses}`}
-      onClick={handleQuizItemClick}
-      role={hasResult ? "button" : undefined}
-      tabIndex={hasResult ? 0 : undefined}
-      onKeyDown={
-        hasResult
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") handleQuizItemClick();
-            }
-          : undefined
-      }
     >
       {/* Quiz Info Section */}
       <div className="flex-1 min-w-0 mb-3 sm:mb-0 sm:mr-4">
         <h3 className="text-lg font-semibold text-gray-900 truncate">
-          {quiz.title}
+          {title}
         </h3>
-        {quiz.description && (
-          <p className="text-sm text-gray-600 mt-1 truncate">
-            {quiz.description}
-          </p>
+        {description && (
+          <p className="text-sm text-gray-600 mt-1 truncate">{description}</p>
         )}
-        {hasResult ? (
-          <p className="text-sm text-gray-500 mt-1">
-            Completed: {formatDate(quiz.completedAt)}
-          </p>
-        ) : (
-          <p className="text-sm text-gray-500 mt-1">
-            {quiz.numQuestions} Questions
-          </p>
-        )}
+        <p className="text-sm text-gray-500 mt-1">
+          Overall Progress: {seenQuestionsCount} / {totalUniqueInSource} (
+          {overallProgressPercentage}%)
+          {isCompletedOverall && (
+            <span className="ml-2 text-green-600 font-semibold">
+              (Completed)
+            </span>
+          )}
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Questions per Attempt: {numberOfQuestionsPerAttempt}
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Answered Today: {dailyProgressDisplay}
+        </p>
       </div>
 
       {/* Action/Score Section */}
       <div className="flex-shrink-0 flex flex-col items-stretch sm:items-end space-y-2 w-full sm:w-auto">
-        {hasResult ? (
-          <div className="text-right">
-            <p className="text-lg font-medium text-gray-900">
-              Score: {quiz.score} / {quiz.totalQuestions} ({percentage})
-            </p>
-            <p
-              className={`text-sm font-semibold ${
-                parseInt(percentage) >= 70 ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {parseInt(percentage) >= 70 ? "Passed" : "Failed"}
-            </p>
-          </div>
-        ) : (
+        {!isCompletedOverall ? (
           <Link
-            to={`/staff/quiz/${quiz._id}/take`}
+            to={`/staff/quiz/${quizDisplayItem._id}/take`}
             className="w-full sm:w-auto"
           >
             <Button variant="primary" className="w-full">
               Take Quiz
             </Button>
           </Link>
+        ) : (
+          <Button variant="secondary" className="w-full" disabled>
+            Quiz Completed
+          </Button>
         )}
       </div>
     </li>
@@ -169,7 +150,7 @@ const StaffDashboard: React.FC = () => {
   }, [user]);
 
   // State for quizzes
-  const [quizzes, setQuizzes] = useState<QuizListItem[]>([]);
+  const [quizzes, setQuizzes] = useState<StaffQuizDisplayItem[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState<boolean>(true);
   const [quizError, setQuizError] = useState<string | null>(null);
   const [isCompletedVisible, setIsCompletedVisible] = useState<boolean>(false); // State for collapsible section
@@ -192,20 +173,33 @@ const StaffDashboard: React.FC = () => {
       if (!user || user.role !== "staff") {
         setLoadingQuizzes(false);
         setLoadingRanking(false);
-        // Set appropriate errors if needed, or rely on the main check below
         return;
       }
 
-      // Fetch Quizzes
       setLoadingQuizzes(true);
       setQuizError(null);
       try {
-        const quizResponse = await api.get<{ quizzes: QuizListItem[] }>(
-          "/quiz/staff-view"
+        // 1. Fetch available quiz definitions
+        const availableQuizzes = await getAvailableQuizzesForStaff();
+
+        // 2. For each quiz, fetch its progress
+        const quizzesWithProgress = await Promise.all(
+          availableQuizzes.map(async (quizDef) => {
+            try {
+              const progress = await getMyQuizProgress(quizDef._id);
+              return { ...quizDef, progress: progress || undefined }; // Ensure progress is undefined not null if not found
+            } catch (progressError) {
+              console.error(
+                `Failed to fetch progress for quiz ${quizDef._id}:`,
+                progressError
+              );
+              return { ...quizDef, progress: undefined }; // Attach quiz def even if progress fails
+            }
+          })
         );
-        setQuizzes(quizResponse.data.quizzes);
+        setQuizzes(quizzesWithProgress);
       } catch (err: any) {
-        setQuizError(formatApiError(err, "fetching quizzes"));
+        setQuizError(formatApiError(err, "fetching quizzes and progress"));
       } finally {
         setLoadingQuizzes(false);
       }
@@ -283,20 +277,28 @@ const StaffDashboard: React.FC = () => {
 
   // Display Quiz List - Modified
   const renderQuizList = () => {
-    if (loadingQuizzes) return <LoadingSpinner message="Loading quizzes..." />;
-    if (quizError) return <ErrorMessage message={quizError} />;
-    if (quizzes.length === 0 && !loadingQuizzes) {
+    if (loadingQuizzes && !quizzes.length) {
+      return <LoadingSpinner />;
+    }
+    if (!quizzes.length && !quizError && !loadingQuizzes) {
       return (
-        <p className="text-gray-600">No quizzes available at the moment.</p>
+        <Card>
+          <p className="text-center text-gray-500 py-8">
+            No quizzes available at the moment.
+          </p>
+        </Card>
       );
     }
 
-    // Separate quizzes
-    const pendingQuizzes = quizzes.filter((q) => q.status !== "completed");
-    const completedQuizzes = quizzes.filter((q) => q.status === "completed");
+    const pendingQuizzes = quizzes.filter(
+      (quiz) => !quiz.progress?.isCompletedOverall
+    );
+    const completedQuizzes = quizzes.filter(
+      (quiz) => quiz.progress?.isCompletedOverall
+    );
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Pending Quizzes */}
         <Card className="p-0 overflow-hidden">
           <h3 className="text-md font-semibold text-gray-700 px-4 py-3 border-b bg-gray-50">
@@ -307,9 +309,8 @@ const StaffDashboard: React.FC = () => {
               {pendingQuizzes.map((quiz) => (
                 <QuizItem
                   key={quiz._id}
-                  quiz={quiz}
+                  quizDisplayItem={quiz}
                   formatDate={formatDate}
-                  onOpenDetailModal={handleOpenQuizDetailModal}
                 />
               ))}
             </ul>
@@ -365,9 +366,8 @@ const StaffDashboard: React.FC = () => {
                 {completedQuizzes.map((quiz) => (
                   <QuizItem
                     key={quiz._id}
-                    quiz={quiz}
+                    quizDisplayItem={quiz}
                     formatDate={formatDate}
-                    onOpenDetailModal={handleOpenQuizDetailModal}
                   />
                 ))}
               </ul>

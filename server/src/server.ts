@@ -11,7 +11,7 @@ import { globalErrorHandler, AppError } from "./utils/errorHandler";
 import authRoutes from "./routes/auth";
 import menuRoutes from "./routes/menus";
 import itemRoutes from "./routes/items";
-import { router as quizRoutes } from "./routes/quiz";
+import quizRoutes from "./routes/quiz";
 import { quizResultRouter } from "./routes/quizResult";
 import staffRoutes from "./routes/staff";
 import questionBankRoutes from "./routes/questionBankRoutes";
@@ -77,7 +77,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/menus", menuRoutes);
 app.use("/api/items", itemRoutes);
-app.use("/api/quiz", quizRoutes);
+app.use("/api/quizzes", quizRoutes);
 app.use("/api/quiz-results", quizResultRouter);
 app.use("/api/staff", staffRoutes);
 app.use("/api/question-banks", questionBankRoutes);

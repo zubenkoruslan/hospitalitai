@@ -20,7 +20,13 @@ import {
 import { AppError } from "../utils/errorHandler";
 import QuizResultService from "../services/quizResultService"; // Import QuizResultService
 import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware"; // Re-added this import
-import { generateQuizFromBanksController } from "../controllers/quizController";
+import {
+  generateQuizFromBanksController,
+  startQuizAttemptController,
+  submitQuizAttemptController,
+  getStaffQuizProgressController,
+  getRestaurantQuizStaffProgressController,
+} from "../controllers/quizController";
 
 const router: Router = express.Router();
 
@@ -154,25 +160,38 @@ router.put(
   "/:quizId",
   restrictTo("restaurant"),
   validateQuizIdParam,
-  validateQuizBody, // Use same validation as create for updatable fields
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
     // Extract only the fields allowed for update from the body
-    const { title, menuItemIds, questions, isAvailable } = req.body;
+    const {
+      title,
+      description,
+      sourceQuestionBankIds,
+      numberOfQuestionsPerAttempt,
+      isAvailable,
+    } = req.body;
     const updateData: Partial<IQuiz> = {};
     if (title !== undefined) updateData.title = title;
-    if (menuItemIds !== undefined) updateData.menuItemIds = menuItemIds;
-    if (questions !== undefined) updateData.questions = questions;
+    if (description !== undefined) updateData.description = description;
+    if (sourceQuestionBankIds !== undefined)
+      updateData.sourceQuestionBankIds = sourceQuestionBankIds;
+    if (numberOfQuestionsPerAttempt !== undefined)
+      updateData.numberOfQuestionsPerAttempt = numberOfQuestionsPerAttempt;
     if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
 
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return next(new AppError("No valid fields provided for update", 400));
+    }
 
     try {
       const updatedQuiz = await QuizService.updateQuiz(
         new Types.ObjectId(quizId),
         restaurantId,
-        updateData // Pass only the allowed update fields
+        updateData
       );
       res.status(200).json({
         message: "Quiz updated successfully",
@@ -249,12 +268,8 @@ router.delete(
         new Types.ObjectId(quizId),
         restaurantId
       );
-      res.status(200).json({
-        message: "Quiz deleted successfully",
-        deletedResultsCount: result.deletedResultsCount,
-      });
+      res.status(200).json(result);
     } catch (error) {
-      console.error("Error in DELETE /api/quiz/:quizId route:", error);
       next(error);
     }
   }
@@ -385,4 +400,51 @@ router.post(
   generateQuizFromBanksController
 );
 
-export { router };
+// New routes for quiz attempts and progress
+
+// Staff starts a quiz attempt
+router.post(
+  "/:quizId/start-attempt",
+  ensureRestaurantAssociation, // Any authenticated user associated with the restaurant can start an attempt
+  validateQuizIdParam, // Ensure quizId is a valid ObjectId
+  handleValidationErrors,
+  startQuizAttemptController
+);
+
+// Staff submits a quiz attempt
+router.post(
+  "/:quizId/submit-attempt",
+  ensureRestaurantAssociation, // Any authenticated user associated with the restaurant can submit
+  validateQuizIdParam, // Ensure quizId is a valid ObjectId
+  // TODO: Add specific validation middleware for submitQuizAttempt request body
+  handleValidationErrors,
+  submitQuizAttemptController
+);
+
+// Staff gets their own progress for a specific quiz
+router.get(
+  "/:quizId/my-progress",
+  ensureRestaurantAssociation, // Any authenticated user associated with the restaurant can check their progress
+  validateQuizIdParam, // Ensure quizId is a valid ObjectId
+  handleValidationErrors,
+  getStaffQuizProgressController
+);
+
+// Restaurant owner gets progress for all staff on a specific quiz
+router.get(
+  "/:quizId/all-staff-progress",
+  restrictTo("restaurant"), // Only restaurant owners
+  ensureRestaurantAssociation,
+  validateQuizIdParam, // Ensure quizId is a valid ObjectId
+  handleValidationErrors,
+  getRestaurantQuizStaffProgressController // Controller will use req.user.restaurantId
+);
+
+// The `generateQuizFromBanksController` is already imported.
+// The route `POST /` using it is added above.
+
+// TODO: Review all middleware, especially ensureRestaurantAssociation vs restrictTo for staff routes.
+// For staff routes like start-attempt, submit-attempt, my-progress, ensureRestaurantAssociation is good.
+// protect is already applied globally at the top of this router.
+
+export default router;

@@ -14,139 +14,140 @@
 
 ### 2.1. `Quiz` Model (Refactor `server/src/models/Quiz.ts`)
 
-- [ ] Modify `Quiz` schema:
-  - [ ] Keep `title: string`
-  - [ ] Keep `description?: string`
-  - [ ] Keep `restaurantId: Types.ObjectId` (ref: 'User')
-  - [ ] Keep `sourceQuestionBankIds: Types.ObjectId[]` (ref: 'QuestionBank')
-  - [ ] Rename `numberOfQuestions` to `numberOfQuestionsPerAttempt: number`
-  - [ ] Keep `isAvailable: boolean`
-  - [ ] Keep `isAssigned: boolean` (for admin lifecycle, if still desired)
-  - [ ] **REMOVE** `questions: MainIQuestion[]` (array of populated questions)
-  - [ ] **REMOVE** `menuItemIds?: Types.ObjectId[]` (if fully deprecated in favor of banks)
-  - [ ] Consider adding `totalUniqueQuestionsInSourceSnapshot: number` (optional, see discussion below).
+- [x] Modify `Quiz` schema:
+  - [x] Keep `title: string`
+  - [x] Keep `description?: string`
+  - [x] Keep `restaurantId: Types.ObjectId` (ref: 'User')
+  - [x] Keep `sourceQuestionBankIds: Types.ObjectId[]` (ref: 'QuestionBank')
+  - [x] Rename `numberOfQuestions` to `numberOfQuestionsPerAttempt: number`
+  - [x] Keep `isAvailable: boolean`
+  - [x] Keep `isAssigned: boolean` (for admin lifecycle, if still desired)
+  - [x] **REMOVE** `questions: MainIQuestion[]` (array of populated questions)
+  - [x] **REMOVE** `menuItemIds?: Types.ObjectId[]` (if fully deprecated in favor of banks)
+  - [x] Consider adding `totalUniqueQuestionsInSourceSnapshot: number` (optional, see discussion below).
 
 ### 2.2. `StaffQuizProgress` Model (New File: `server/src/models/StaffQuizProgress.ts`)
 
-- [ ] Create `StaffQuizProgressSchema`:
-  - [ ] `staffUserId: Types.ObjectId` (ref: 'User', indexed)
-  - [ ] `quizId: Types.ObjectId` (ref: 'Quiz', indexed) - Links to the Quiz _definition_
-  - [ ] `restaurantId: Types.ObjectId` (ref: 'User', indexed)
-  - [ ] `seenQuestionIds: Types.ObjectId[]` (ref: 'Question', default: [])
-  - [ ] `totalUniqueQuestionsInSource: number` (snapshot of unique questions from source bank(s) for this quiz)
-  - [ ] `isCompletedOverall: boolean` (default: `false`)
-  - [ ] `lastAttemptDate?: Date`
-  - [ ] `questionsAnsweredToday: number` (default: 0)
-  - [ ] `lastActivityDateForDailyReset: Date` (to manage daily reset of `questionsAnsweredToday`)
-  - [ ] Add compound index on `staffUserId` and `quizId`.
-- [ ] Create `StaffQuizProgressModel`.
+- [x] Create `StaffQuizProgressSchema`:
+  - [x] `staffUserId: Types.ObjectId` (ref: 'User', indexed)
+  - [x] `quizId: Types.ObjectId` (ref: 'Quiz', indexed) - Links to the Quiz _definition_
+  - [x] `restaurantId: Types.ObjectId` (ref: 'User', indexed)
+  - [x] `seenQuestionIds: Types.ObjectId[]` (ref: 'Question', default: [])
+  - [x] `totalUniqueQuestionsInSource: number` (snapshot of unique questions from source bank(s) for this quiz)
+  - [x] `isCompletedOverall: boolean` (default: `false`)
+  - [x] `lastAttemptTimestamp?: Date`
+  - [x] **RE-EVALUATE/REMOVE:** `questionsAnsweredToday: number` (default: 0)
+  - [x] **RE-EVALUATE/REMOVE:** `lastActivityDateForDailyReset: Date`
+  - [x] Add compound index on `staffUserId`, `quizId`.
+- [x] Create `StaffQuizProgressModel`.
 
 ### 2.3. `QuizAttempt` Model (New or Refactor `server/src/models/QuizResult.ts`)
 
-- [ ] Decide if enhancing `QuizResult` or creating new `QuizAttempt`.
-- [ ] Define schema:
-  - [ ] `staffUserId: Types.ObjectId` (ref: 'User')
-  - [ ] `quizId: Types.ObjectId` (ref: 'Quiz') - The Quiz _definition_
-  - [ ] `restaurantId: Types.ObjectId` (ref: 'User')
-  - [ ] `questionsPresented: [{ questionId: Types.ObjectId, answerGiven?: any, isCorrect?: boolean, sortOrder?: number }]` (Store actual questions and answers for this specific attempt)
-  - [ ] `score: number`
-  - [ ] `attemptDate: Date` (default: `Date.now`)
-  - [ ] `duration?: number` (time taken, optional)
+- [x] Decide if enhancing `QuizResult` or creating new `QuizAttempt`. **Decision: Created new `QuizAttempt.ts` model.**
+- [x] Define schema:
+  - [x] `staffUserId: Types.ObjectId` (ref: 'User')
+  - [x] `quizId: Types.ObjectId` (ref: 'Quiz') - The Quiz _definition_
+  - [x] `restaurantId: Types.ObjectId` (ref: 'User') // Consistent with other models
+  - [x] `questionsPresented: [{ questionId: Types.ObjectId, answerGiven?: any, isCorrect?: boolean, sortOrder?: number }]` (Store actual questions and answers for this specific attempt)
+  - [x] `score: number`
+  - [x] `attemptDate: Date` (default: `Date.now`)
+  - [x] `duration?: number` (time taken, optional) // Implemented as durationInSeconds
 
 ## 3. Backend Service Logic Refactor & Implementation
 
 ### 3.1. `quizService.ts` (`server/src/services/quizService.ts`)
 
-- [ ] **Refactor `generateQuizFromBanksService` (or new `createQuizDefinitionService`):**
+- [x] **Refactor `generateQuizFromBanksService` (or new `createQuizDefinitionService`):**
 
-  - [ ] Adapt to save the new `Quiz` model structure (no fixed questions array, `numberOfQuestionsPerAttempt`).
-  - [ ] (Optional) When a quiz is created/activated, calculate and store `totalUniqueQuestionsInSourceSnapshot` on the `Quiz` model by fetching unique, active questions from linked banks. This is a design choice regarding when this count is fixed.
+  - [x] Adapt to save the new `Quiz` model structure (no fixed questions array, `numberOfQuestionsPerAttempt`).
+  - [x] (Optional) When a quiz is created/activated, calculate and store `totalUniqueQuestionsInSourceSnapshot` on the `Quiz` model by fetching unique, active questions from linked banks. This is a design choice regarding when this count is fixed. (Implemented in `generateQuizFromBanksService` and `updateQuiz`)
 
-- [ ] **New `startQuizAttemptService(staffUserId, quizId)`:**
+- [x] **New `startQuizAttemptService(staffUserId, quizId)`:**
 
-  - [ ] Input: `staffUserId`, `quizId` (of the Quiz definition).
-  - [ ] Find or create `StaffQuizProgress` for this `staffUserId` and `quizId`.
-    - If new, calculate `totalUniqueQuestionsInSource` by fetching unique active question IDs from `quiz.sourceQuestionBankIds` and store it in `StaffQuizProgress`.
-  - [ ] Fetch all active question IDs from the `Quiz` definition's `sourceQuestionBankIds`.
-  - [ ] Filter out question IDs already present in `StaffQuizProgress.seenQuestionIds`. This is the `availablePool`.
-  - [ ] If `availablePool` is empty:
-    - [ ] Set `StaffQuizProgress.isCompletedOverall = true` and save.
-    - [ ] Return a status indicating completion (e.g., no new questions, or a specific "completed" state).
-  - [ ] Randomly select `quiz.numberOfQuestionsPerAttempt` questions from the `availablePool`.
-  - [ ] Return the _full question objects_ for these selected IDs to the frontend.
-  - [ ] **Important:** Do _not_ add these questions to `seenQuestionIds` in `StaffQuizProgress` at this stage.
+  - [x] Input: `staffUserId`, `quizId` (of the Quiz definition).
+  - [x] Find or create `StaffQuizProgress` for this `staffUserId` and `quizId`.
+    - [x] If new, calculate `totalUniqueQuestionsInSource` by fetching unique active question IDs from `quiz.sourceQuestionBankIds` and store it in `StaffQuizProgress`. (Note: Implemented by copying `quiz.totalUniqueQuestionsInSourceSnapshot` to `StaffQuizProgress.totalUniqueQuestionsInSource`)
+  - [x] Fetch all active question IDs from the `Quiz` definition's `sourceQuestionBankIds`.
+  - [x] Filter out question IDs already present in `StaffQuizProgress.seenQuestionIds`. This is the `availablePool`.
+  - [x] If `availablePool` is empty:
+    - [x] Set `StaffQuizProgress.isCompletedOverall = true` and save.
+    - [x] Return a status indicating completion (e.g., no new questions, or a specific "completed" state).
+  - [x] Randomly select `quiz.numberOfQuestionsPerAttempt` questions from the `availablePool`.
+  - [x] Return the _full question objects_ for these selected IDs to the frontend.
+  - [x] **Important:** Do _not_ add these questions to `seenQuestionIds` in `StaffQuizProgress` at this stage. Also, do _not_ update `attemptMadeOnDate` or `lastAttemptTimestamp` here; this occurs upon submission. (Adhered to, attemptMadeOnDate part is now moot)
 
-- [ ] **Refactor/New `submitQuizAttemptService(staffUserId, quizId, attemptData)`:**
+- [x] **Refactor/New `submitQuizAttemptService(staffUserId, quizId, attemptData)`:**
 
-  - [ ] Input: `staffUserId`, `quizId`, `attemptData` (containing presented question IDs and their answers).
-  - [ ] Grade the attempt.
-  - [ ] Create a `QuizAttempt` (or `QuizResult`) document.
-  - [ ] Update `StaffQuizProgress` for `staffUserId` and `quizId`:
-    - [ ] Add all `questionId`s from the _current submitted attempt_ to `StaffQuizProgress.seenQuestionIds` (use `$addToSet`).
-    - [ ] Update `StaffQuizProgress.lastAttemptDate`.
-    - [ ] Implement logic to update `StaffQuizProgress.questionsAnsweredToday` and `lastActivityDateForDailyReset` (handle daily reset).
-    - [ ] Check if `StaffQuizProgress.seenQuestionIds.length >= StaffQuizProgress.totalUniqueQuestionsInSource`. If true, set `StaffQuizProgress.isCompletedOverall = true`.
-    - [ ] Save `StaffQuizProgress`.
-  - [ ] Return attempt results (score, correct/incorrect).
+  - [x] Input: `staffUserId`, `quizId`, `attemptData` (containing presented question IDs and their answers).
+  - [x] Grade the attempt. (Basic grading implemented with TODO for comprehensive logic)
+  - [x] Create a `QuizAttempt` (or `QuizResult`) document. (Implemented using new `QuizAttempt` model)
+  - [x] Update `StaffQuizProgress` for `staffUserId` and `quizId`:
+    - [x] Add all `questionId`s from the _current submitted attempt_ to `StaffQuizProgress.seenQuestionIds` (use `$addToSet`).
+    - [x] Update `StaffQuizProgress.lastAttemptTimestamp = new Date()`.
+    - [x] **RE-EVALUATE/REMOVE:** Implement logic to update `StaffQuizProgress.questionsAnsweredToday` and `lastActivityDateForDailyReset` (handle daily reset). (Implemented, noted for re-evaluation)
+    - [x] Check if `StaffQuizProgress.seenQuestionIds.length >= StaffQuizProgress.totalUniqueQuestionsInSource`. If true, set `StaffQuizProgress.isCompletedOverall = true`.
+    - [x] Save `StaffQuizProgress`.
+  - [x] Return attempt results (score, correct/incorrect). (Implemented)
 
-- [ ] **New `getStaffQuizProgressService(staffUserId, quizId)`:**
+- [x] **New `getStaffQuizProgressService(staffUserId, quizId)`:**
 
-  - [ ] Fetch `StaffQuizProgress` for a user and a specific quiz definition. Used by staff dashboard.
+  - [x] Fetch `StaffQuizProgress` for a user and a specific quiz definition. Used by staff dashboard.
 
-- [ ] **New `getRestaurantQuizStaffProgressService(restaurantId, quizId)`:**
+- [x] **New `getRestaurantQuizStaffProgressService(restaurantId, quizId)`:**
 
-  - [ ] For a given `quizId`, fetch all `StaffQuizProgress` documents for staff in the `restaurantId`. Used by restaurant owner view.
+  - [x] For a given `quizId`, fetch all `StaffQuizProgress` documents for staff in the `restaurantId`. Used by restaurant owner view.
 
 - [ ] **(Optional) Daily Reset Logic for `questionsAnsweredToday`:**
   - [ ] Implement a mechanism (e.g., on staff login, on first quiz access of the day, or a scheduled job) to check `lastActivityDateForDailyReset` in `StaffQuizProgress` and reset `questionsAnsweredToday` if it's a new day.
+  - [ ] **Note:** This section might be significantly simplified or removed if the "one quiz attempt per day" rule is strictly enforced, as the check would be handled by `attemptMadeOnDate`.
 
 ### 3.2. `questionBankService.ts` & `questionService.ts`
 
-- [ ] Ensure services that provide questions from banks can efficiently return unique, active question IDs or full question objects as needed.
+- [x] Ensure services that provide questions from banks can efficiently return unique, active question IDs or full question objects as needed.
 
 ## 4. Backend Controller & Route Updates
 
 ### 4.1. `quizController.ts`
 
-- [ ] Update `createQuiz` controller to use the refactored service.
-- [ ] New controller for `startQuizAttempt`.
-- [ ] Update/New controller for `submitQuizAttempt`.
-- [ ] New controllers for fetching staff progress (for staff view and restaurant view).
+- [x] Update `createQuiz` controller to use the refactored service.
+- [x] New controller for `startQuizAttempt`.
+- [x] Update/New controller for `submitQuizAttempt`.
+- [x] New controllers for fetching staff progress (for staff view and restaurant view).
 
 ### 4.2. `quizRoutes.ts`
 
-- [ ] `POST /api/quizzes` (or similar for quiz definition creation) - points to updated controller.
-- [ ] `POST /api/quizzes/:quizId/start-attempt` - for staff to start/get questions.
-- [ ] `POST /api/quizzes/:quizId/submit-attempt` - for staff to submit answers.
-- [ ] `GET /api/quizzes/:quizId/my-progress` - for staff to see their progress on a specific quiz.
-- [ ] `GET /api/restaurants/:restaurantId/quizzes/:quizId/staff-progress` - for restaurant owner.
+- [x] `POST /api/quizzes` (or similar for quiz definition creation) - points to updated controller.
+- [x] `POST /api/quizzes/:quizId/start-attempt` - for staff to start/get questions.
+- [x] `POST /api/quizzes/:quizId/submit-attempt` - for staff to submit answers.
+- [x] `GET /api/quizzes/:quizId/my-progress` - for staff to see their progress on a specific quiz.
+- [x] `GET /api/restaurants/:restaurantId/quizzes/:quizId/staff-progress` - for restaurant owner. (Implemented as GET /api/quizzes/:quizId/all-staff-progress)
 
 ## 5. Frontend Changes
 
 ### 5.1. Quiz Creation (Restaurant - `client/src/pages/QuizAndBankManagementPage.tsx` & Modals)
 
-- [ ] Update "Create Quiz from Banks" modal/form:
-  - [ ] Input field for `numberOfQuestionsPerAttempt`.
-  - [ ] Remove UI related to selecting specific questions if any.
-  - [ ] API call to the refactored quiz creation endpoint.
+- [x] Update "Create Quiz from Banks" modal/form:
+  - [x] Input field for `numberOfQuestionsPerAttempt`.
+  - [x] Remove UI related to selecting specific questions if any. (Verified no such UI exists for removal)
+  - [x] API call to the refactored quiz creation endpoint.
 
 ### 5.2. Staff Quiz Taking (`client/src/pages/QuizTakingPage.tsx` & `StaffDashboard.tsx`)
 
-- [ ] **Staff Dashboard:**
-  - [ ] Fetch list of _available_ Quiz Definitions (`isAvailable: true`).
-  - [ ] For each quiz, potentially display daily progress (`questionsAnsweredToday / numberOfQuestionsPerAttempt`) and overall completion status from `StaffQuizProgress`.
-- [ ] **Quiz Taking Page:**
-  - [ ] On "Start Quiz", call `POST /api/quizzes/:quizId/start-attempt`.
-  - [ ] Receive the dynamically selected questions and render them.
-  - [ ] On submission, call `POST /api/quizzes/:quizId/submit-attempt`.
-  - [ ] Display results and updated progress.
+- [x] **Staff Dashboard:**
+  - [x] Fetch list of _available_ Quiz Definitions (`isAvailable: true`).
+  - [x] For each quiz, potentially display daily progress (`questionsAnsweredToday / numberOfQuestionsPerAttempt`) and overall completion status from `StaffQuizProgress`.
+- [x] **Quiz Taking Page:**
+  - [x] On "Start Quiz", call `POST /api/quizzes/:quizId/start-attempt`.
+  - [x] Receive the dynamically selected questions and render them.
+  - [x] On submission, call `POST /api/quizzes/:quizId/submit-attempt`.
+  - [x] Display results and updated progress.
 
 ### 5.3. Restaurant View of Staff Progress (Enhance `QuizAndBankManagementPage.tsx` or new page)
 
-- [ ] When a restaurant user views a specific Quiz they've created:
-  - [ ] Add a section/tab to see "Staff Progress".
-  - [ ] Fetch data from `GET /api/restaurants/:restaurantId/quizzes/:quizId/staff-progress`.
-  - [ ] Display a list of staff members with their `(seenQuestionIds.length / totalUniqueQuestionsInSource) * 100 %` completion and `isCompletedOverall` status for that quiz.
+- [x] When a restaurant user views a specific Quiz they've created:
+  - [x] Add a section/tab to see "Staff Progress". (Implemented via "View Progress" button opening a modal)
+  - [x] Fetch data from `GET /api/quizzes/:quizId/all-staff-progress`.
+  - [x] Display a list of staff members with their `(seenQuestionIds.length / totalUniqueQuestionsInSource) * 100 %` completion and `isCompletedOverall` status for that quiz.
 
 ## 6. Considerations & Open Questions
 

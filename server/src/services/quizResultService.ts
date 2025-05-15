@@ -58,7 +58,7 @@ class QuizResultService {
       // 1. Find Quiz - Fetch full document to ensure _id is ObjectId instance
       const quiz = await Quiz.findOne(
         { _id: quizObjectId, restaurantId: restaurantId },
-        "questions title" // Still select only necessary fields
+        "title numberOfQuestionsPerAttempt" // MODIFIED: Removed 'questions', added 'numberOfQuestionsPerAttempt'
       ); // Removed .lean()
 
       if (!quiz) {
@@ -66,9 +66,9 @@ class QuizResultService {
       }
 
       // 2. Validate answers length
-      if (answers.length !== quiz.questions.length) {
+      if (answers.length !== quiz.numberOfQuestionsPerAttempt) {
         throw new AppError(
-          `Number of answers provided (${answers.length}) does not match number of questions (${quiz.questions.length})`,
+          `Number of answers provided (${answers.length}) does not match number of questions (${quiz.numberOfQuestionsPerAttempt})`,
           400
         );
       }
@@ -78,30 +78,39 @@ class QuizResultService {
       const correctAnswers: (number | undefined)[] = [];
       const processedAnswers: (number | null)[] = [];
 
-      quiz.questions.forEach((question, index) => {
-        // Find the index of the correct option
-        let correctOptionIndex = -1;
-        if (question.options && Array.isArray(question.options)) {
-          // Ensure options exist and is an array
-          correctOptionIndex = question.options.findIndex(
-            (opt) => opt.isCorrect
-          );
-        }
+      // quiz.questions.forEach((question, index) => { // OLD CODE
+      //   // Find the index of the correct option
+      //   let correctOptionIndex = -1;
+      //   if (question.options && Array.isArray(question.options)) {
+      //     // Ensure options exist and is an array
+      //     correctOptionIndex = question.options.findIndex(
+      //       (opt) => opt.isCorrect
+      //     );
+      //   }
 
-        correctAnswers.push(
-          correctOptionIndex !== -1 ? correctOptionIndex : undefined
-        );
-        const userAnswer = answers[index];
-        processedAnswers.push(userAnswer === undefined ? null : userAnswer);
+      //   correctAnswers.push(
+      //     correctOptionIndex !== -1 ? correctOptionIndex : undefined
+      //   );
+      //   const userAnswer = answers[index];
+      //   processedAnswers.push(userAnswer === undefined ? null : userAnswer);
 
-        if (
-          userAnswer !== undefined &&
-          userAnswer !== null &&
-          correctOptionIndex !== -1 && // Check if a correct option was identified
-          userAnswer === correctOptionIndex // Compare user's answer index with the found correct option index
-        ) {
-          score++;
-        }
+      //   if (
+      //     userAnswer !== undefined &&
+      //     userAnswer !== null &&
+      //     correctOptionIndex !== -1 && // Check if a correct option was identified
+      //     userAnswer === correctOptionIndex // Compare user's answer index with the found correct option index
+      //   ) {
+      //     score++;
+      //   }
+      // });
+
+      // MODIFIED: The scoring logic above is commented out because `quiz.questions` is no longer available
+      // on the IQuiz model. The `score` will remain 0 and `correctAnswers` will be empty.
+      // This function needs redesign if it's still intended to calculate scores.
+      // For now, we will process answers as given, but without scoring.
+      answers.forEach((ans, index) => {
+        processedAnswers.push(ans === undefined ? null : ans);
+        // correctAnswers will remain empty as we cannot determine them here.
       });
 
       // 4. Upsert QuizResult
@@ -112,8 +121,8 @@ class QuizResultService {
         {
           $set: {
             answers: processedAnswers,
-            score: score,
-            totalQuestions: quiz.questions.length,
+            score: score, // Score will be 0 due to commented out logic
+            totalQuestions: quiz.numberOfQuestionsPerAttempt, // MODIFIED: Changed from quiz.questions.length
             status: status,
             completedAt: new Date(),
             wasCancelled: cancelled,
@@ -137,7 +146,7 @@ class QuizResultService {
       return {
         message: "Quiz submitted successfully",
         score: score,
-        totalQuestions: quiz.questions.length,
+        totalQuestions: quiz.numberOfQuestionsPerAttempt,
         correctAnswers: correctAnswers,
         savedResultId: savedResult._id,
       };
@@ -165,7 +174,7 @@ class QuizResultService {
       // 1. Fetch only ACTIVE quizzes for restaurant (lean)
       const availableQuizzes = await Quiz.find(
         { restaurantId, isAvailable: true },
-        "_id title description questions createdAt"
+        "_id title description createdAt numberOfQuestionsPerAttempt" // MODIFIED: Removed 'questions', added 'numberOfQuestionsPerAttempt'
       )
         .sort({ createdAt: -1 }) // Keep quizzes sorted by newest
         .lean();
@@ -202,7 +211,7 @@ class QuizResultService {
           _id: quiz._id as Types.ObjectId, // This is quizId
           title: quiz.title,
           description: quiz.description,
-          numQuestions: quiz.questions?.length || 0,
+          numQuestions: quiz.numberOfQuestionsPerAttempt || 0, // MODIFIED: from quiz.questions?.length
           createdAt: quiz.createdAt,
           score: result?.score,
           totalQuestions: result?.totalQuestions,
@@ -534,10 +543,10 @@ class QuizResultService {
 
     try {
       const result = await QuizResult.findById(resultObjectId).populate<{
-        quizId: Pick<IQuiz, "_id" | "title" | "questions"> | null;
+        quizId: Pick<IQuiz, "_id" | "title"> | null;
       }>({
         path: "quizId",
-        select: "title questions", // Need questions and title
+        select: "title",
       });
 
       if (!result) {
@@ -587,31 +596,36 @@ class QuizResultService {
         return "N/A";
       };
 
-      const formattedQuestions = quiz.questions.map((question, index) => {
-        // CORRECTED: savedResult.answers[index] directly gives the userAnswerIndex (number or null)
-        const userAnswerIndex = result.answers[index];
+      // const formattedQuestions = quiz.questions.map((question, index) => { // OLD CODE
+      //   // CORRECTED: savedResult.answers[index] directly gives the userAnswerIndex (number or null)
+      //   const userAnswerIndex = result.answers[index];
 
-        // Find the index of the correct option for this question
-        let correctOptIdx = -1;
-        if (question.options && Array.isArray(question.options)) {
-          correctOptIdx = question.options.findIndex((opt) => opt.isCorrect);
-        }
+      //   // Find the index of the correct option for this question
+      //   let correctOptIdx = -1;
+      //   if (question.options && Array.isArray(question.options)) {
+      //     correctOptIdx = question.options.findIndex((opt) => opt.isCorrect);
+      //   }
 
-        return {
-          originalQuestionId: question._id?.toString(),
-          questionText: question.questionText,
-          options: question.options,
-          userAnswerIndex: userAnswerIndex, // This is now number | null
-          userAnswerText: getChoiceText(question.options, userAnswerIndex),
-          correctAnswerIndex: correctOptIdx,
-          correctAnswerText: getChoiceText(question.options, correctOptIdx),
-          isCorrect:
-            correctOptIdx !== -1 &&
-            userAnswerIndex !== null &&
-            userAnswerIndex === correctOptIdx, // Added null check for userAnswerIndex
-          questionType: question.questionType,
-        };
-      });
+      //   return {
+      //     originalQuestionId: question._id?.toString(),
+      //     questionText: question.questionText,
+      //     options: question.options,
+      //     userAnswerIndex: userAnswerIndex, // This is now number | null
+      //     userAnswerText: getChoiceText(question.options, userAnswerIndex),
+      //     correctAnswerIndex: correctOptIdx,
+      //     correctAnswerText: getChoiceText(question.options, correctOptIdx),
+      //     isCorrect:
+      //       correctOptIdx !== -1 &&
+      //       userAnswerIndex !== null &&
+      //       userAnswerIndex === correctOptIdx, // Added null check for userAnswerIndex
+      //     questionType: question.questionType,
+      //   };
+      // });
+
+      // MODIFIED: The 'formattedQuestions' logic above is commented out because `quiz.questions`
+      // is no longer available on the IQuiz model. This function will no longer return question details.
+      // It needs redesign to fetch question details from QuizAttempt or QuestionModel using IDs if this functionality is still required.
+      const formattedQuestions: any[] = []; // Return empty array for now
 
       return {
         _id: result._id,
@@ -622,7 +636,7 @@ class QuizResultService {
         completedAt: result.completedAt,
         status: result.status.charAt(0).toUpperCase() + result.status.slice(1),
         retakeCount: result.retakeCount,
-        questions: formattedQuestions,
+        questions: formattedQuestions, // MODIFIED: Will be an empty array
       };
     } catch (error: any) {
       console.error("Error fetching detailed quiz result in service:", error);
