@@ -1,40 +1,16 @@
 import React from "react";
 import Button from "../common/Button"; // Import our styled Button
+import { ClientQuizResultForDisplay } from "../../types/quizTypes"; // IMPORTED
+// QuizDisplayQuestion and ClientQuizDataForDisplay are used by ClientQuizResultForDisplay
 
 // --- Interfaces ---
-// TODO: Move to shared types file
-interface Question {
-  _id?: string;
-  text: string;
-  choices: string[];
-  correctAnswer: number;
-  menuItemId: string;
-}
-
-interface QuizData {
-  _id?: string;
-  title: string;
-  menuItemIds: string[] | { _id: string; name: string }[];
-  questions: Question[];
-  restaurantId: string;
-  isAssigned?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface QuizResultDisplay {
-  score: number;
-  totalQuestions: number;
-  correctAnswers: (number | undefined)[];
-  userAnswers: (number | undefined)[];
-  quizData: QuizData;
-}
+// REMOVED local Question, QuizData, and QuizResultDisplay interface definitions
 
 // --- Component Props ---
 interface QuizResultsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  results: QuizResultDisplay | null;
+  results: ClientQuizResultForDisplay | null; // UPDATED type
 }
 
 // --- Component ---
@@ -122,7 +98,7 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
           <div className="space-y-4">
             {results.quizData.questions.map((q, index) => {
               const userAnswerIndex = results.userAnswers[index];
-              const correctAnswerIndex = q.correctAnswer; // Use q.correctAnswer directly
+              const correctAnswerIndex = q.correctAnswer; // Use q.correctAnswer directly from QuizDisplayQuestion
               const isCorrect = userAnswerIndex === correctAnswerIndex;
 
               return (

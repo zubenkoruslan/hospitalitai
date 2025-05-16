@@ -29,6 +29,11 @@ const QuestionBankSchema: Schema<IQuestionBank> = new Schema(
       type: [String],
       default: [],
     },
+    targetQuestionCount: {
+      type: Number,
+      min: [0, "Target question count cannot be negative"],
+      default: 0,
+    },
     questions: [
       {
         type: Schema.Types.ObjectId,
@@ -37,7 +42,7 @@ const QuestionBankSchema: Schema<IQuestionBank> = new Schema(
     ],
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Restaurant",
       required: true,
       index: true,
     },

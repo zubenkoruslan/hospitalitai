@@ -3,22 +3,19 @@ import LoadingSpinner from "../common/LoadingSpinner";
 import ErrorMessage from "../common/ErrorMessage";
 import Button from "../common/Button";
 import Modal from "../common/Modal";
+import { IMenuClient } from "../../types/menuTypes";
 
 // --- Interfaces ---
-// TODO: Move to a shared types file
-interface Menu {
-  _id: string;
-  name: string;
-}
+// REMOVED local Menu interface
 
 // --- Component Props ---
 interface CreateQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (title: string, menuIds: string[]) => void; // Pass title and menuIds back
-  menus: Menu[];
+  onGenerate: (title: string, menuIds: string[]) => void;
+  menus: IMenuClient[];
   isLoadingMenus: boolean;
-  isGenerating: boolean; // Generation state controlled by parent
+  isGenerating: boolean;
 }
 
 // --- Component ---

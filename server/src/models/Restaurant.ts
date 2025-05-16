@@ -4,7 +4,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IRestaurant extends Document {
   name: string;
   owner: mongoose.Types.ObjectId; // Reference to the User who owns/created the restaurant
-  staff: mongoose.Types.ObjectId[]; // Array of User IDs who are staff members
+  // staff: mongoose.Types.ObjectId[]; // REMOVED: Array of User IDs who are staff members
 }
 
 // Mongoose schema for Restaurant
@@ -23,12 +23,12 @@ const restaurantSchema = new Schema<IRestaurant>(
       required: [true, "Restaurant must have an owner"],
       index: true, // Index for quicker lookup by owner
     },
-    staff: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "User", // References User model for staff members
-      },
-    ],
+    // staff: [ // REMOVED
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "User", // References User model for staff members
+    //   },
+    // ],
   },
   {
     timestamps: true, // Add createdAt and updatedAt timestamps

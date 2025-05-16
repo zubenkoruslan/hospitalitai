@@ -2,6 +2,14 @@ import express, { Router } from "express";
 import * as menuController from "../controllers/menuController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import { uploadPdf } from "../middleware/uploadMiddleware"; // Assuming this is your correct multer middleware for PDF
+import {
+  handleValidationErrors,
+  validateCreateMenu,
+  validateObjectId,
+  validateMenuIdParam,
+  validateUpdateMenu,
+  validateCategoryNameParam,
+} from "../middleware/validationMiddleware";
 
 const router: Router = express.Router();
 
@@ -9,6 +17,8 @@ const router: Router = express.Router();
 router.get(
   "/restaurant/:restaurantId",
   protect,
+  validateObjectId("restaurantId"),
+  handleValidationErrors,
   menuController.getMenusByRestaurant
 );
 
@@ -16,6 +26,8 @@ router.get(
 router.get(
   "/:menuId",
   protect, // Ensure user is logged in
+  validateMenuIdParam,
+  handleValidationErrors,
   // Optional: Add role-based access if needed, e.g., only restaurant staff/admin
   // restrictTo(['restaurantAdmin', 'manager', 'staff']),
   menuController.getMenuByIdWithItems
@@ -27,6 +39,8 @@ router.post(
   "/",
   protect,
   restrictTo("restaurant"), // Example: Only restaurant admins can create a base menu
+  validateCreateMenu,
+  handleValidationErrors,
   menuController.createMenu
 );
 
@@ -35,6 +49,9 @@ router.put(
   "/:menuId",
   protect,
   restrictTo("restaurant"), // Example: Only restaurant admins can update menu details
+  validateMenuIdParam,
+  validateUpdateMenu,
+  handleValidationErrors,
   menuController.updateMenuDetails
 );
 
@@ -44,6 +61,8 @@ router.delete(
   "/:menuId",
   protect,
   restrictTo("restaurant"), // Example: Only restaurant admins can delete menus
+  validateMenuIdParam,
+  handleValidationErrors,
   menuController.deleteMenu
 );
 
@@ -53,6 +72,8 @@ router.post(
   protect,
   restrictTo("restaurant"), // Changed from "restaurantAdmin" to "restaurant"
   uploadPdf.single("menuPdf"),
+  validateObjectId("restaurantId"),
+  handleValidationErrors,
   menuController.uploadMenuPdf
 );
 
@@ -61,6 +82,9 @@ router.delete(
   "/:menuId/categories/:categoryName",
   protect,
   restrictTo("restaurant"), // Also ensure this is "restaurant" if intended for restaurant owners/managers
+  validateMenuIdParam,
+  validateCategoryNameParam,
+  handleValidationErrors,
   menuController.deleteCategoryAndReassignItems
 );
 

@@ -65,11 +65,4 @@ export const uploadPdf = multer({
   },
 });
 
-// It's good practice to ensure the 'uploads/' directory exists.
-// This could be done at application startup.
-// For example, in your main server.ts:
-// import fs from 'fs';
-// const uploadsDir = './uploads';
-// if (!fs.existsSync(uploadsDir)) {
-//   fs.mkdirSync(uploadsDir);
-// }
+// Comments about creating 'uploads/' directory removed as it's handled above.

@@ -1,12 +1,14 @@
 import express, { Request, Response, Router, NextFunction } from "express";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose"; // Removed Types import as it's part of mongoose default
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware";
-import QuizResult from "../models/QuizResult"; // Import the QuizResult model
-import User from "../models/User"; // Needed for service method auth checks
-import Quiz from "../models/Quiz"; // Needed for service method population
-import QuizResultService from "../services/quizResultService"; // Import the service
-import { AppError } from "../utils/errorHandler"; // Import AppError
+// QuizResult, User, Quiz models are used by QuizResultService, keep if service methods are used.
+// For now, assuming service methods called below (getMyResults, getStaffRankingData) handle their own model interactions.
+// If these routes were to directly use models, imports would be needed.
+import QuizResultService from "../services/quizResultService";
+import { AppError } from "../utils/errorHandler";
+// Removed: validateObjectId from here as the route using it is being removed.
+// import { handleValidationErrors, validateObjectId } from "../middleware/validationMiddleware";
 
 const router: Router = express.Router();
 
@@ -21,9 +23,10 @@ router.use(protect); // All results routes require login
 router.get(
   "/my-results",
   restrictTo("staff"),
-  ensureRestaurantAssociation,
+  ensureRestaurantAssociation, // Ensures restaurantId is on req.user
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user?.userId as mongoose.Types.ObjectId;
+    // ensureRestaurantAssociation and restrictTo should prevent userId from being null
 
     try {
       const results = await QuizResultService.getMyResults(userId);
@@ -42,16 +45,17 @@ router.get(
 router.get(
   "/staff-ranking",
   restrictTo("staff"),
-  ensureRestaurantAssociation,
+  ensureRestaurantAssociation, // Ensures restaurantId and userId are on req.user
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user?.userId as mongoose.Types.ObjectId;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
-    if (!userId || !restaurantId) {
-      return next(
-        new AppError("User ID or Restaurant ID missing in token", 403)
-      );
-    }
+    // Redundant check if ensureRestaurantAssociation and restrictTo work as expected
+    // if (!userId || !restaurantId) {
+    //   return next(
+    //     new AppError("User ID or Restaurant ID missing in token", 403)
+    //   );
+    // }
 
     try {
       const rankingData = await QuizResultService.getStaffRankingData(
@@ -60,60 +64,15 @@ router.get(
       );
       res.status(200).json(rankingData);
     } catch (error) {
-      console.error(
-        "Error in GET /api/quiz-results/staff-ranking route:",
-        error
-      );
+      // console.error(
+      //   "Error in GET /api/quiz-results/staff-ranking route:",
+      //   error
+      // ); // Keep if specific logging is needed, else global handler catches
       next(error);
     }
   }
 );
 
-/**
- * @route   GET /api/results/:resultId/detail
- * @desc    Get detailed quiz result with user answers and correct answers
- * @access  Private (Staff or Restaurant Role)
- */
-router.get(
-  "/:resultId/detail",
-  // No specific role restriction here, service handles authorization
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const { resultId } = req.params;
-    const userId = req.user?.userId;
-    const userRole = req.user?.role;
-    const restaurantId = req.user?.restaurantId; // Needed for owner check
-
-    // Basic validation checks
-    if (!userId || !userRole || !restaurantId) {
-      return next(
-        new AppError("User information incomplete in token payload", 400)
-      );
-    }
-    if (!mongoose.Types.ObjectId.isValid(resultId)) {
-      return next(new AppError("Invalid result ID format", 400));
-    }
-
-    try {
-      // Delegate logic and authorization check to the service
-      const detailedResult = await QuizResultService.getResultDetails(
-        resultId,
-        userId,
-        userRole,
-        restaurantId
-      );
-      res.status(200).json({ result: detailedResult });
-    } catch (error) {
-      // Service handles errors (not found, unauthorized, etc.)
-      next(error);
-    }
-  }
-);
-
-/**
- * @route   GET /api/quiz-results/:resultId
- * @desc    Get detailed results for a specific quiz attempt
- * @access  Private (Staff viewing own, Restaurant viewing own staff)
- */
-// Removed example route section
+// Removed GET /:resultId/detail route as it's redundant with GET /api/quiz/attempts/:attemptId
 
 export { router as quizResultRouter }; // Export with a unique name

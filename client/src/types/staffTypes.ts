@@ -22,11 +22,12 @@ export interface ClientQuizProgressSummary {
 }
 
 // Additional detail for incorrect answers within a quiz result
-export interface IncorrectQuestionDetail {
-  questionText: string;
-  userAnswer: string;
-  correctAnswer: string;
-}
+// REMOVED IncorrectQuestionDetail interface definition
+// export interface IncorrectQuestionDetail {
+//   questionText: string;
+//   userAnswer: string;
+//   correctAnswer: string;
+// }
 
 // This interface is used by ViewIncorrectAnswersModal and constructed by StaffDashboard
 // It needs to be exported and match the structure used.
@@ -114,6 +115,7 @@ export interface Filters {
 // Placeholder imports - replace with actual imports once types are centralized
 import { ClientUserMinimal } from "./user"; // Assuming ClientUserMinimal is in user.ts
 import { ClientIQuiz } from "./quizTypes"; // Assuming ClientIQuiz is in quizTypes.ts
+import { IncorrectQuestionDetail } from "./quizTypes"; // ADDED IMPORT
 
 // From api.ts: ClientStaffQuizProgress
 export interface ClientStaffQuizProgress {

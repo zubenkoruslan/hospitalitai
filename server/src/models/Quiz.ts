@@ -20,8 +20,8 @@ export interface IQuiz extends Document {
 
   numberOfQuestionsPerAttempt: number; // RENAMED from numberOfQuestions
 
-  restaurantId: Types.ObjectId; // Reference to the User (Restaurant) who owns the quiz
-  isAssigned: boolean; // Flag to indicate if the quiz has been assigned to any staff
+  restaurantId: Types.ObjectId; // Reference to the Restaurant model
+  // isAssigned: boolean; // REMOVED: Flag to indicate if the quiz has been assigned to any staff
   isAvailable: boolean; // Flag to control if staff can see/take this quiz
   totalUniqueQuestionsInSourceSnapshot?: number; // ADDED: Optional field
   // Timestamps added automatically
@@ -74,15 +74,15 @@ const QuizSchema: Schema<IQuiz> = new Schema(
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User", // Assuming restaurants are linked via the User model
+      ref: "Restaurant", // CHANGED: For consistency, points to the Restaurant model
       required: [true, "Restaurant ID is required"],
       index: true,
     },
-    isAssigned: {
-      type: Boolean,
-      required: [true, "isAssigned field is required"],
-      index: true, // Added index for filtering by assigned status
-    },
+    // isAssigned: { // REMOVED
+    //   type: Boolean,
+    //   required: [true, "isAssigned field is required"],
+    //   index: true, // Added index for filtering by assigned status
+    // },
     isAvailable: {
       type: Boolean,
       required: true,

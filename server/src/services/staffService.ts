@@ -1,6 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import User, { IUser } from "../models/User";
-import QuizResult from "../models/QuizResult";
+import QuizResult, { IQuizResult } from "../models/QuizResult";
 import Quiz, { IQuiz } from "../models/Quiz";
 import { IQuestion } from "../models/QuestionModel";
 import QuizResultService from "./quizResultService";
@@ -9,6 +9,7 @@ import StaffQuizProgress, {
   IStaffQuizProgress,
 } from "../models/StaffQuizProgress";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
+import { IQuizAttemptSummary } from "../types/quizTypes";
 
 // Define interfaces for return types to improve clarity
 
@@ -40,15 +41,14 @@ interface IncorrectQuestionDetail {
   correctAnswer: string;
 }
 
-interface QuizResultDetails {
-  _id: Types.ObjectId;
+// NEW: Interface for aggregated quiz performance summary
+interface AggregatedQuizPerformanceSummary {
   quizId: Types.ObjectId;
   quizTitle: string;
-  completedAt?: Date;
-  score: number;
-  totalQuestions: number;
-  retakeCount: number;
-  incorrectQuestions: IncorrectQuestionDetail[];
+  numberOfAttempts: number;
+  averageScorePercent: number | null;
+  lastCompletedAt?: Date;
+  attempts: IQuizAttemptSummary[];
 }
 
 interface StaffMemberDetails {
@@ -59,8 +59,8 @@ interface StaffMemberDetails {
   professionalRole?: string;
   restaurantId?: Types.ObjectId;
   role: string;
-  quizResults: QuizResultDetails[];
-  averageScore: number | null;
+  aggregatedQuizPerformance: AggregatedQuizPerformanceSummary[];
+  averageScore: number | null; // Overall average score across all quizzes
 }
 
 interface StaffUpdateResponse {
@@ -73,23 +73,6 @@ interface StaffUpdateResponse {
   createdAt?: Date;
   updatedAt?: Date;
 }
-
-// Helper within the service scope
-const getChoiceTextFromOptions = (
-  options: Array<{ text: string; isCorrect?: boolean }> | undefined,
-  index: number | null | undefined
-): string => {
-  if (
-    options &&
-    index !== null &&
-    index !== undefined &&
-    index >= 0 &&
-    index < options.length
-  ) {
-    return options[index]?.text || "N/A";
-  }
-  return "N/A";
-};
 
 class StaffService {
   /**
@@ -152,27 +135,6 @@ class StaffService {
             >
           >();
 
-        // LOGGING BEFORE FILTER
-        if (staff.name === "Misha Demenchak") {
-          console.log(
-            `[StaffService] Misha - BEFORE filter - All staffProgressRecords:`,
-            staffProgressRecords.map((p) => ({
-              quizTitle: p.quizId?.title,
-              quizIsAvailable: p.quizId?.isAvailable,
-              progressId: p._id,
-            }))
-          );
-          console.log(
-            `[StaffService] Misha - BEFORE filter - staffProgressRecords for test2:`,
-            staffProgressRecords
-              .filter((p) => p.quizId && p.quizId.title === "test2")
-              .map((p) => ({
-                title: p.quizId.title,
-                isAvailable: p.quizId.isAvailable,
-              }))
-          );
-        }
-
         // Filter out progress records for quizzes that are deleted or not available
         staffProgressRecords = staffProgressRecords.filter(
           (sp) =>
@@ -180,159 +142,69 @@ class StaffService {
             (sp.quizId as Pick<IQuiz, "isAvailable">).isAvailable === true
         );
 
-        // LOGGING AFTER FILTER
-        if (staff.name === "Misha Demenchak") {
-          console.log(
-            `[StaffService] Misha - AFTER filter - staffProgressRecords (should be empty for test2 if it was false):`,
-            staffProgressRecords
-              .filter((p) => p.quizId && p.quizId.title === "test2")
-              .map((p) => ({
-                title: p.quizId.title,
-                isAvailable: p.quizId.isAvailable,
-              }))
-          );
-        }
-
-        // Deduplicate and select the latest progress for each quiz
-        const latestProgressByQuiz: {
-          [key: string]: IStaffQuizProgress & {
-            quizId: Pick<
-              IQuiz,
-              | "_id"
-              | "title"
-              | "totalUniqueQuestionsInSourceSnapshot"
-              | "isAvailable"
-            > | null;
-          };
-        } = {};
-
-        for (const sp of staffProgressRecords) {
-          if (!sp.quizId?._id) continue;
-
-          const quizIdString = sp.quizId._id.toString();
-          const existingRecord = latestProgressByQuiz[quizIdString];
-
-          if (!existingRecord) {
-            latestProgressByQuiz[quizIdString] = sp;
-          } else {
-            // Prioritize records with a more recent lastAttemptTimestamp
-            const spHasTimestamp = !!sp.lastAttemptTimestamp;
-            const existingHasTimestamp = !!existingRecord.lastAttemptTimestamp;
-
-            if (spHasTimestamp && existingHasTimestamp) {
-              if (
-                sp.lastAttemptTimestamp! > existingRecord.lastAttemptTimestamp!
-              ) {
-                latestProgressByQuiz[quizIdString] = sp;
-              } else if (
-                sp.lastAttemptTimestamp!.getTime() ===
-                existingRecord.lastAttemptTimestamp!.getTime()
-              ) {
-                // Timestamps are identical, prefer completed over incomplete
-                if (
-                  sp.isCompletedOverall &&
-                  !existingRecord.isCompletedOverall
-                ) {
-                  latestProgressByQuiz[quizIdString] = sp;
-                }
-              }
-            } else if (spHasTimestamp && !existingHasTimestamp) {
-              // Current has timestamp, existing doesn't - prefer current
-              latestProgressByQuiz[quizIdString] = sp;
-            } else if (!spHasTimestamp && !existingHasTimestamp) {
-              // Neither has a timestamp, prefer completed over incomplete
-              if (sp.isCompletedOverall && !existingRecord.isCompletedOverall) {
-                latestProgressByQuiz[quizIdString] = sp;
-              }
-            }
-            // If one has timestamp and other doesn't, the one with timestamp is implicitly preferred
-            // by the structure of these conditions (e.g. if sp doesn't have timestamp but existing does, no change happens here).
+        const quizProgressSummaries: QuizProgressSummary[] = [];
+        for (const progressRecord of staffProgressRecords) {
+          // Iterate directly over filtered records
+          if (!progressRecord.quizId?._id || !progressRecord.quizId.title) {
+            // Should not happen if quizId is populated and filtered correctly
+            console.warn(
+              `[StaffService] Skipping progress record due to missing quizId or title for staff ${staffObjectId}`
+            );
+            continue;
           }
-        }
-        const uniqueStaffProgressRecords = Object.values(latestProgressByQuiz);
 
-        // LOGGING before generating summaries for Misha
-        if (staff.name === "Misha Demenchak") {
-          console.log(
-            `[StaffService] Misha - BEFORE generating summaries - uniqueStaffProgressRecords mapped:`,
-            uniqueStaffProgressRecords.map((p) => ({
-              title: p.quizId?.title,
-              isAvailable: p.quizId?.isAvailable,
-              progress_isCompletedOverall: p.isCompletedOverall,
-            }))
-          );
-        }
+          const totalSourceQuestions =
+            progressRecord.quizId.totalUniqueQuestionsInSourceSnapshot ?? 0;
+          const seenQuestionsCount =
+            progressRecord.seenQuestionIds?.length || 0;
 
-        // Map unique progress records to summaries, now including average score for each quiz
-        const quizProgressSummariesPromises = uniqueStaffProgressRecords.map(
-          async (sp) => {
-            // sp.quizId is guaranteed to be non-null and active here
-            const quizDoc = sp.quizId!; // Non-null assertion
-
-            const totalUnique =
-              quizDoc.totalUniqueQuestionsInSourceSnapshot || 0;
-            const seenCount = sp.seenQuestionIds?.length || 0;
-
-            const overallProgressPercentage =
-              totalUnique > 0 ? Math.round((seenCount / totalUnique) * 100) : 0;
-
-            // Calculate average score for this specific quiz (quizDoc._id) by this staff member (staffObjectId)
-            let averageScoreForQuiz: number | null = null;
-            const quizAttemptsForThisQuiz = await QuizAttempt.find({
-              staffUserId: staffObjectId,
-              quizId: quizDoc._id, // Use the specific quiz ID from quizDoc
-              restaurantId: restaurantId,
-            })
-              .select("score questionsPresented")
-              .lean<Pick<IQuizAttempt, "score" | "questionsPresented">[]>();
-
-            if (quizAttemptsForThisQuiz.length > 0) {
-              let totalPercentageSum = 0;
-              let validAttemptsCount = 0;
-              quizAttemptsForThisQuiz.forEach((attempt) => {
-                if (
-                  attempt.score !== undefined &&
-                  attempt.questionsPresented &&
-                  attempt.questionsPresented.length > 0
-                ) {
-                  totalPercentageSum +=
-                    attempt.score / attempt.questionsPresented.length;
-                  validAttemptsCount++;
-                }
-              });
-              if (validAttemptsCount > 0) {
-                averageScoreForQuiz = parseFloat(
-                  ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
-                );
-              }
-            }
-
-            return {
-              quizId: quizDoc._id as Types.ObjectId,
-              quizTitle: quizDoc.title || "[Deleted Quiz]",
-              overallProgressPercentage: overallProgressPercentage,
-              isCompletedOverall: sp.isCompletedOverall || false,
-              lastAttemptTimestamp: sp.lastAttemptTimestamp || null,
-              averageScoreForQuiz: averageScoreForQuiz,
-            };
-          }
-        );
-
-        const quizProgressSummaries = await Promise.all(
-          quizProgressSummariesPromises
-        );
-
-        quizProgressSummaries.sort((a, b) => {
-          if (a.lastAttemptTimestamp && b.lastAttemptTimestamp) {
-            return (
-              b.lastAttemptTimestamp.getTime() -
-              a.lastAttemptTimestamp.getTime()
+          let overallProgressPercentage = 0;
+          if (totalSourceQuestions > 0) {
+            overallProgressPercentage = Math.round(
+              (seenQuestionsCount / totalSourceQuestions) * 100
             );
           }
-          if (a.lastAttemptTimestamp) return -1;
-          if (b.lastAttemptTimestamp) return 1;
-          return a.quizTitle.localeCompare(b.quizTitle);
-        });
+
+          // Fetch attempts for this specific quiz to calculate average score
+          const attemptsForThisQuiz = await QuizAttempt.find({
+            staffUserId: staffObjectId,
+            quizId: progressRecord.quizId._id,
+            restaurantId: restaurantId,
+          })
+            .select("score questionsPresented")
+            .lean<Pick<IQuizAttempt, "score" | "questionsPresented">[]>();
+
+          let averageScoreForThisQuiz: number | null = null;
+          if (attemptsForThisQuiz.length > 0) {
+            let totalPercentageSum = 0;
+            let validAttemptsCount = 0;
+            attemptsForThisQuiz.forEach((attempt) => {
+              if (
+                attempt.score !== undefined &&
+                attempt.questionsPresented &&
+                attempt.questionsPresented.length > 0
+              ) {
+                totalPercentageSum +=
+                  attempt.score / attempt.questionsPresented.length;
+                validAttemptsCount++;
+              }
+            });
+            if (validAttemptsCount > 0) {
+              averageScoreForThisQuiz = parseFloat(
+                ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
+              );
+            }
+          }
+
+          quizProgressSummaries.push({
+            quizId: progressRecord.quizId._id,
+            quizTitle: progressRecord.quizId.title,
+            overallProgressPercentage: overallProgressPercentage,
+            isCompletedOverall: progressRecord.isCompletedOverall,
+            lastAttemptTimestamp: progressRecord.lastAttemptTimestamp || null,
+            averageScoreForQuiz: averageScoreForThisQuiz,
+          });
+        }
 
         return {
           _id: staffObjectId,
@@ -379,90 +251,124 @@ class StaffService {
     const staffObjectId =
       typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
 
-    try {
-      // 1. Fetch the staff member
-      const staffMember = await User.findOne(
-        {
-          _id: staffObjectId,
-          restaurantId: restaurantId,
-          role: "staff",
-        },
-        "name email createdAt professionalRole restaurantId role"
-      ).lean<IUser>();
-
-      if (!staffMember) {
-        throw new AppError(
-          "Staff member not found or does not belong to this restaurant.",
-          404
-        );
-      }
-
-      // 2. Fetch their quiz results, populating quiz details including isAvailable
-      let quizResults = await QuizResult.find({
-        userId: staffObjectId,
-        restaurantId: restaurantId,
-      })
-        .populate<{
-          quizId: Pick<IQuiz, "_id" | "title" | "isAvailable"> | null;
-        }>({
-          path: "quizId",
-          select: "title isAvailable",
-        })
-        .sort({ completedAt: -1 })
-        .lean();
-
-      // Filter out results for quizzes that are deleted or not available
-      quizResults = quizResults.filter(
-        (result) =>
-          result.quizId &&
-          (result.quizId as Pick<IQuiz, "isAvailable">).isAvailable === true
+    const user = await User.findById(staffObjectId).lean<IUser>();
+    if (!user || user.restaurantId?.toString() !== restaurantId.toString()) {
+      // It's possible a staff member might not have a restaurantId if the system allows it,
+      // but the query implies a restaurant context. Adjust if staff can exist without restaurantId.
+      throw new AppError(
+        "Staff member not found or does not belong to this restaurant.",
+        404
       );
-
-      // 3. Calculate average score (already considers active quizzes due to QuizResultService update)
-      const { averageScore } =
-        await QuizResultService.calculateAverageScoreForUser(
-          staffObjectId,
-          restaurantId
-        );
-
-      // 4. Process results to get incorrect answer details
-      const processedResults: QuizResultDetails[] = quizResults.map(
-        (result) => {
-          const incorrectQuestions: IncorrectQuestionDetail[] = [];
-          const quizData = result.quizId;
-
-          return {
-            _id: result._id as Types.ObjectId,
-            quizId: quizData?._id as Types.ObjectId,
-            quizTitle: quizData?.title || "[Deleted Quiz]",
-            completedAt: result.completedAt,
-            score: result.score ?? 0,
-            totalQuestions: result.totalQuestions ?? 0,
-            retakeCount: result.retakeCount ?? 0,
-            incorrectQuestions: incorrectQuestions,
-          };
-        }
-      );
-
-      return {
-        _id: staffMember._id as Types.ObjectId,
-        name: staffMember.name,
-        email: staffMember.email,
-        createdAt: staffMember.createdAt,
-        professionalRole: staffMember.professionalRole,
-        restaurantId: staffMember.restaurantId,
-        role: staffMember.role,
-        quizResults: processedResults,
-        averageScore: averageScore,
-      };
-    } catch (error: any) {
-      console.error("Error fetching staff member details in service:", error);
-      if (error instanceof AppError) throw error;
-      if (error.name === "CastError" && error.path === "_id") {
-        throw new AppError("Invalid Staff ID format.", 400);
-      }
-      throw new AppError("Failed to fetch staff member details.", 500);
     }
+
+    const { averageScore: overallAverageScore } =
+      await QuizResultService.calculateAverageScoreForUser(
+        staffObjectId,
+        restaurantId
+      );
+
+    const allUserAttempts = await QuizAttempt.find({
+      staffUserId: staffObjectId,
+      restaurantId: restaurantId,
+    })
+      .populate<{ quizId: Pick<IQuiz, "_id" | "title"> }>("quizId", "_id title")
+      .sort({ quizId: 1, attemptDate: -1 })
+      .lean<Array<IQuizAttempt & { quizId: Pick<IQuiz, "_id" | "title"> }>>();
+
+    const attemptsByQuiz = new Map<
+      string,
+      Array<IQuizAttempt & { quizId: Pick<IQuiz, "_id" | "title"> }>
+    >();
+    for (const attempt of allUserAttempts) {
+      if (attempt.quizId?._id) {
+        const quizIdStr = attempt.quizId._id.toString();
+        if (!attemptsByQuiz.has(quizIdStr)) {
+          attemptsByQuiz.set(quizIdStr, []);
+        }
+        // Ensure non-null assertion is safe or handle undefined explicitly
+        const attemptsList = attemptsByQuiz.get(quizIdStr);
+        if (attemptsList) {
+          attemptsList.push(attempt);
+        }
+      }
+    }
+
+    const aggregatedPerformanceList: AggregatedQuizPerformanceSummary[] = [];
+
+    for (const [quizIdStr, attemptsForQuiz] of attemptsByQuiz.entries()) {
+      if (attemptsForQuiz.length === 0) continue;
+
+      const currentQuizInfo = attemptsForQuiz[0].quizId;
+      const quizTitle = currentQuizInfo.title;
+      const numberOfAttempts = attemptsForQuiz.length;
+      const lastCompletedAt = attemptsForQuiz[0].attemptDate;
+
+      let totalPercentageSum = 0;
+      let validAttemptsForAverageCount = 0;
+      attemptsForQuiz.forEach((att) => {
+        if (
+          att.score !== undefined &&
+          att.questionsPresented &&
+          att.questionsPresented.length > 0
+        ) {
+          totalPercentageSum += att.score / att.questionsPresented.length;
+          validAttemptsForAverageCount++;
+        }
+      });
+
+      const averageScorePercent =
+        validAttemptsForAverageCount > 0
+          ? parseFloat(
+              (
+                (totalPercentageSum / validAttemptsForAverageCount) *
+                100
+              ).toFixed(1)
+            )
+          : null;
+
+      const attemptSummaries: IQuizAttemptSummary[] = attemptsForQuiz
+        .map((att) => {
+          const totalQuestions = att.questionsPresented?.length || 0;
+          return {
+            _id: att._id.toString(),
+            score: att.score,
+            totalQuestions: totalQuestions,
+            attemptDate: att.attemptDate,
+            hasIncorrectAnswers:
+              totalQuestions > 0 && att.score < totalQuestions,
+          };
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.attemptDate).getTime() -
+            new Date(a.attemptDate).getTime()
+        ); // Sort attempts newest first
+
+      aggregatedPerformanceList.push({
+        quizId: new Types.ObjectId(quizIdStr),
+        quizTitle: quizTitle,
+        numberOfAttempts: numberOfAttempts,
+        averageScorePercent: averageScorePercent,
+        lastCompletedAt: lastCompletedAt,
+        attempts: attemptSummaries,
+      });
+    }
+
+    aggregatedPerformanceList.sort((a, b) =>
+      a.quizTitle.localeCompare(b.quizTitle)
+    );
+
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      professionalRole: user.professionalRole,
+      restaurantId: user.restaurantId,
+      role: user.role,
+      aggregatedQuizPerformance: aggregatedPerformanceList,
+      averageScore: overallAverageScore,
+    };
   }
 
   /**
@@ -543,37 +449,69 @@ class StaffService {
    */
   static async deleteStaffMember(
     staffId: string | Types.ObjectId,
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId // restaurantId of the establishment, for authorization
   ): Promise<void> {
     const staffObjectId =
       typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
 
-    // In a real application, consider implications:
-    // - What happens to their QuizAttempts, StaffQuizProgress, QuizResults?
-    // - Should these be soft-deleted, anonymized, or hard-deleted?
-    // - For now, this is a hard delete of the User document only. Associated quiz data remains.
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
-      const result = await User.deleteOne({
+      // 1. Verify the staff member exists and belongs to the specified restaurant.
+      const staffMember = await User.findOne({
         _id: staffObjectId,
-        restaurantId: restaurantId,
+        restaurantId: restaurantId, // User's restaurantId must match the one provided for auth
         role: "staff",
-      });
+      }).session(session);
 
-      if (result.deletedCount === 0) {
+      if (!staffMember) {
         throw new AppError(
           "Staff member not found, not part of this restaurant, or not a staff role.",
           404
         );
       }
-      // No return value needed for a successful deletion
+
+      // 2. Delete associated data from other collections.
+      // Note: QuizResult uses `userId` for the staff member.
+      // All these operations should use the staffObjectId and also restaurantId for scoping where appropriate.
+      await QuizAttempt.deleteMany(
+        { staffUserId: staffObjectId, restaurantId: restaurantId },
+        { session }
+      );
+      await StaffQuizProgress.deleteMany(
+        { staffUserId: staffObjectId, restaurantId: restaurantId },
+        { session }
+      );
+      await QuizResult.deleteMany(
+        { userId: staffObjectId, restaurantId: restaurantId },
+        { session }
+      );
+
+      // 3. Delete the User document itself.
+      await User.deleteOne({
+        _id: staffObjectId,
+        restaurantId: restaurantId,
+        role: "staff",
+      }).session(session);
+
+      await session.commitTransaction();
     } catch (error: any) {
+      await session.abortTransaction();
       console.error("Error deleting staff member in service:", error);
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error; // Re-throw AppError directly
+      }
+      // Handle potential CastError if staffId is invalid format, though type check helps
       if (error.name === "CastError" && error.path === "_id") {
         throw new AppError("Invalid Staff ID format.", 400);
       }
-      throw new AppError("Failed to delete staff member.", 500);
+      throw new AppError(
+        "Failed to delete staff member and associated data.",
+        500
+      );
+    } finally {
+      session.endSession();
     }
   }
 }

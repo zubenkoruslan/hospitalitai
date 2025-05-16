@@ -1,24 +1,28 @@
 import React from "react";
 import Button from "../common/Button";
+import { QuizDisplayQuestion } from "../../types/quizTypes";
 
 // --- Interfaces ---
-// TODO: Move to shared types file
-interface Question {
-  _id?: string;
-  text: string;
-  choices: string[];
-  correctAnswer: number;
-  menuItemId: string;
-}
+// REMOVED local Question interface
+// interface Question {
+//   _id?: string;
+//   text: string;
+//   choices: string[];
+//   correctAnswer: number;
+//   menuItemId: string;
+// }
 
 // --- Component Props ---
 interface QuestionDisplayProps {
-  question: Question;
+  question: QuizDisplayQuestion;
   index: number;
   userAnswer: number | undefined;
   isEditing: boolean;
   onAnswerSelect: (questionIndex: number, choiceIndex: number) => void;
-  onQuestionChange: (index: number, updatedQuestion: Question) => void;
+  onQuestionChange: (
+    index: number,
+    updatedQuestion: QuizDisplayQuestion
+  ) => void;
   onQuestionDelete: (index: number) => void;
 }
 

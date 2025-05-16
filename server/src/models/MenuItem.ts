@@ -74,6 +74,19 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       required: [true, "Item category is required"],
       trim: true,
       index: true,
+      validate: {
+        validator: function (this: IMenuItem, value: string): boolean {
+          if (this.itemType === "food") {
+            return (FOOD_CATEGORIES as readonly string[]).includes(value);
+          }
+          if (this.itemType === "beverage") {
+            return (BEVERAGE_CATEGORIES as readonly string[]).includes(value);
+          }
+          return false; // Should not happen if itemType is validated
+        },
+        message: (props: { value: string }) =>
+          `'${props.value}' is not a valid category for the selected item type.`,
+      },
     },
     menuId: {
       type: Schema.Types.ObjectId,
@@ -83,7 +96,7 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User", // Assuming restaurant owner is a User
+      ref: "Restaurant",
       required: [true, "Restaurant ID is required"],
       index: true,
     },

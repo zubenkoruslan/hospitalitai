@@ -13,6 +13,7 @@ import {
   validateLoginRequest,
 } from "../middleware/validationMiddleware";
 import { AppError } from "../utils/errorHandler";
+import { AuthPayload, SignupData } from "../types/authTypes"; // Added import
 
 const router: Router = express.Router();
 
@@ -44,24 +45,8 @@ try {
 }
 // ------------------------------------------------------------------
 
-interface AuthPayload {
-  userId: mongoose.Types.ObjectId;
-  role: string; // Or specific 'restaurant' | 'staff'
-  name: string; // Add user name
-  restaurantId?: mongoose.Types.ObjectId;
-  restaurantName?: string; // Add restaurantName (optional)
-  professionalRole?: string; // Add professionalRole (optional)
-}
-
-interface SignupData {
-  email: string;
-  password?: string; // Password might not be needed if hashing is done elsewhere
-  role: "restaurant" | "staff";
-  name: string;
-  restaurantName?: string;
-  restaurantId?: string;
-  professionalRole?: string;
-}
+// Removed local AuthPayload interface
+// Removed local SignupData interface
 
 // --- Routes ---
 
@@ -75,17 +60,17 @@ router.post(
   validateSignupRequest,
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const signupData = req.body;
+    const signupData = req.body as SignupData; // Added type assertion
 
     try {
-      // 1. Check if user already exists (Keep this check here for immediate feedback)
-      const existingUser = await User.findOne({ email: signupData.email });
-      if (existingUser) {
-        throw new AppError("User with this email already exists", 409);
-      }
+      // 1. Check if user already exists - REMOVED (handled by AuthService within transaction)
+      // const existingUser = await User.findOne({ email: signupData.email });
+      // if (existingUser) {
+      //   throw new AppError("User with this email already exists", 409);
+      // }
 
-      let userResultData: any; // Use any for now, refine if needed
-      let restaurantResultData: any = null;
+      let userResultData: IUser; // More specific type
+      let restaurantResultData: IRestaurant | null = null; // More specific type
       let restaurantNameForJwt: string | undefined;
 
       // 2. Call appropriate AuthService method based on role
@@ -93,30 +78,27 @@ router.post(
         const { user, restaurant } = await AuthService.registerOwner(
           signupData
         );
-        userResultData = user.toObject(); // Get plain object
-        restaurantResultData = restaurant.toObject();
+        userResultData = user;
+        restaurantResultData = restaurant;
         restaurantNameForJwt = restaurantResultData.name;
       } else if (signupData.role === "staff") {
-        const { user } = await AuthService.registerStaff(signupData);
-        userResultData = user.toObject(); // Get plain object
-        // Fetch restaurant name if needed for JWT (could be optimized by returning from service)
-        if (userResultData.restaurantId) {
-          // Use the Restaurant model directly since it's imported
-          const restaurant = await Restaurant.findById(
-            userResultData.restaurantId
-          ).lean();
-          // Check if restaurant exists before accessing name
-          if (restaurant) {
-            restaurantNameForJwt = restaurant.name;
-          }
-        }
+        // Destructure restaurantName from the service response
+        const { user, restaurantName } = await AuthService.registerStaff(
+          signupData
+        );
+        userResultData = user;
+        restaurantNameForJwt = restaurantName; // Use directly from service
+        // Removed extra DB call for restaurant name
       } else {
         // Validation middleware should catch this, but handle defensively
         throw new AppError("Invalid user role specified", 400);
       }
 
       // 3. Prepare response (user data excluding password)
-      const { password: _, ...userResponse } = userResultData;
+      // The toObject() and spread for password exclusion can be done here if service returns Mongoose doc
+      const { password: _, ...userResponse } = userResultData.toObject
+        ? userResultData.toObject()
+        : userResultData;
 
       // 4. Generate JWT token
       const payload: AuthPayload = {

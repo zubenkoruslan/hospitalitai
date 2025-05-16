@@ -61,7 +61,7 @@ const QuizAttemptSchema: Schema<IQuizAttempt> = new Schema(
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User", // Assuming restaurant owner is a User
+      ref: "Restaurant", // CHANGED: For consistency, points to the Restaurant model
       required: [true, "Restaurant ID is required"],
       index: true,
     },

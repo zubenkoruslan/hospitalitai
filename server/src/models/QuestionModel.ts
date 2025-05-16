@@ -70,7 +70,7 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Restaurant",
       required: true,
       index: true,
     },

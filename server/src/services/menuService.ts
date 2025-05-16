@@ -184,6 +184,7 @@ class MenuService {
    *
    * @param data - The data for the new menu (name, optional description).
    * @param restaurantId - The ID of the restaurant creating the menu.
+   * @param session - Optional Mongoose client session for transaction.
    * @returns A promise resolving to the created menu document.
    * @throws {AppError} If a menu with the same name already exists for the restaurant (400),
    *                    if Mongoose validation fails (e.g., name length) (400),
@@ -191,17 +192,21 @@ class MenuService {
    */
   static async createMenu(
     data: MenuData,
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId,
+    session?: mongoose.ClientSession
   ): Promise<IMenu> {
     const { name, description } = data;
     const trimmedName = name.trim();
 
     try {
-      // Check for existing menu with the same name for this restaurant
-      const existingMenu = await Menu.findOne({
+      const existingMenuQuery = Menu.findOne({
         name: trimmedName,
         restaurantId: restaurantId,
       });
+      if (session) {
+        existingMenuQuery.session(session);
+      }
+      const existingMenu = await existingMenuQuery;
 
       if (existingMenu) {
         throw new AppError("A menu with this name already exists", 400);
@@ -214,12 +219,11 @@ class MenuService {
       if (description) newMenuData.description = description.trim();
 
       const menu = new Menu(newMenuData);
-      const savedMenu = await menu.save();
+      const savedMenu = await menu.save(session ? { session } : undefined);
       return savedMenu;
     } catch (error: any) {
       console.error("Error creating menu in service:", error);
       if (error instanceof AppError) throw error;
-      // Handle potential Mongoose validation errors more specifically if needed
       throw new AppError("Failed to create menu.", 500);
     }
   }
@@ -362,31 +366,57 @@ class MenuService {
   static async deleteMenu(
     menuId: string | Types.ObjectId,
     restaurantId: Types.ObjectId
-  ): Promise<{ deletedCount: number }> {
+  ): Promise<{ deletedMenuCount: number; deletedItemsCount: number }> {
     const menuObjectId =
       typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
 
-    try {
-      // Add logic here to handle associated MenuItems if necessary
-      // Example: await MenuItem.deleteMany({ menuId: menuObjectId, restaurantId });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-      const result = await Menu.deleteOne({
+    try {
+      // 1. Verify the menu exists and belongs to the restaurant.
+      const menu = await Menu.findOne({
         _id: menuObjectId,
         restaurantId: restaurantId,
-      });
+      }).session(session);
 
-      if (result.deletedCount === 0) {
-        throw new AppError("Menu not found or access denied", 404);
+      if (!menu) {
+        throw new AppError(
+          "Menu not found or does not belong to this restaurant.",
+          404
+        );
       }
-      return { deletedCount: result.deletedCount };
+
+      // 2. Delete associated MenuItems.
+      const itemDeletionResult = await MenuItem.deleteMany(
+        { menuId: menuObjectId, restaurantId: restaurantId },
+        { session }
+      );
+
+      // 3. Delete the Menu document itself.
+      const menuDeletionResult = await Menu.deleteOne({
+        _id: menuObjectId,
+        restaurantId: restaurantId,
+      }).session(session);
+
+      await session.commitTransaction();
+
+      return {
+        deletedMenuCount: menuDeletionResult.deletedCount || 0,
+        deletedItemsCount: itemDeletionResult.deletedCount || 0,
+      };
     } catch (error: any) {
-      console.error("Error deleting menu in service:", error);
-      if (error instanceof AppError) throw error;
-      // Handle potential CastError
-      if (error.name === "CastError") {
-        throw new AppError("Invalid menu ID format.", 400);
+      await session.abortTransaction();
+      console.error("Error deleting menu and its items in service:", error);
+      if (error instanceof AppError) {
+        throw error;
       }
-      throw new AppError("Failed to delete menu.", 500);
+      if (error.name === "CastError" && error.path === "_id") {
+        throw new AppError("Invalid Menu ID format.", 400);
+      }
+      throw new AppError("Failed to delete menu and associated items.", 500);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -414,6 +444,8 @@ class MenuService {
       `[MenuService] Resolved absolute file path: ${absoluteFilePath}`
     );
 
+    let session: mongoose.ClientSession | undefined = undefined; // Define session here to be accessible in finally
+
     try {
       if (!fs.existsSync(absoluteFilePath)) {
         console.error(
@@ -436,7 +468,7 @@ class MenuService {
         );
       }
 
-      // Initialize Gemini AI Client
+      // Initialize Gemini AI Client (this part remains outside transaction)
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         console.error(
@@ -451,7 +483,6 @@ class MenuService {
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash-latest",
         tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
-        // Optional: Configure safety settings if needed
         safetySettings: [
           {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -472,7 +503,6 @@ class MenuService {
         ],
       });
 
-      // --- Prompt Engineering ---
       const prompt = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.
 
 Input:
@@ -583,10 +613,9 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
       const result = await chat.sendMessage(prompt);
       const response = result.response;
 
-      // Check for function call in response
       const functionCalls = response.functionCalls();
       if (functionCalls && functionCalls.length > 0) {
-        const functionCall = functionCalls[0]; // Assuming one function call
+        const functionCall = functionCalls[0];
         if (functionCall.name === "extract_menu_data") {
           const extractedData = functionCall.args as ExtractedMenuAIResponse;
 
@@ -595,21 +624,26 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
             JSON.stringify(extractedData, null, 2)
           );
 
+          // --- Start Transaction ---
+          session = await mongoose.startSession();
+          session.startTransaction();
+
           const aiMenuName =
             extractedData.menuName ||
             (originalFileName
               ? path.parse(originalFileName).name.replace(/_/g, " ").trim()
               : "Imported Menu");
-          // Menu description is no longer explicitly extracted by AI per new schema
           const menuDataForCreate = {
             name: aiMenuName.substring(0, 100),
             description: `Menu parsed from ${
               originalFileName || "uploaded PDF"
             } by AI.`.substring(0, 500),
           };
+
           const createdMenu = await MenuService.createMenu(
             menuDataForCreate,
-            restaurantId
+            restaurantId,
+            session // Pass session to createMenu
           );
 
           if (
@@ -617,23 +651,18 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
             Array.isArray(extractedData.menuItems)
           ) {
             for (const item of extractedData.menuItems) {
-              // Directly use the category string provided by the AI.
-              // The ItemService.createItem method and MenuItem model are now configured to handle arbitrary strings for categories.
               const aiProvidedCategory: string = item.itemCategory;
-
               let resolvedItemType: ItemType;
-              // Primarily trust the itemType from AI, as the schema requires it to be 'food' or 'beverage'.
+
               if (
                 (ITEM_TYPES as ReadonlyArray<string>).includes(item.itemType)
               ) {
                 resolvedItemType = item.itemType as ItemType;
               } else {
-                // Fallback if AI provides an invalid itemType (not 'food' or 'beverage')
-                // This should ideally not happen if AI adheres to the schema.
                 console.warn(
-                  `[MenuService] AI provided invalid itemType '${item.itemType}' for item '${item.itemName}'. Defaulting to 'food'. This may indicate an issue with AI adherence to the schema.`
+                  `[MenuService] AI provided invalid itemType '${item.itemType}' for item '${item.itemName}'. Defaulting to 'food'.`
                 );
-                resolvedItemType = "food"; // Default to 'food' or handle as an error case.
+                resolvedItemType = "food";
               }
 
               const itemDataForService: Parameters<
@@ -642,28 +671,35 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
                 name: String(item.itemName || "Unnamed Item").substring(0, 100),
                 menuId: createdMenu._id as Types.ObjectId,
                 itemType: resolvedItemType,
-                category: aiProvidedCategory, // Use the direct string from AI
-                description: undefined, // itemDescription is no longer part of AI output
+                category: aiProvidedCategory,
+                description: undefined,
                 price:
                   typeof item.itemPrice === "number"
                     ? item.itemPrice
                     : undefined,
-                ingredients: item.itemIngredients || [], // Map from new AI field
+                ingredients: item.itemIngredients || [],
                 isGlutenFree: Boolean(item.isGlutenFree),
-                isDairyFree: undefined, // isDairyFree is no longer part of AI output
+                isDairyFree: undefined,
                 isVegetarian: Boolean(item.isVegetarian),
                 isVegan: Boolean(item.isVegan),
               };
               try {
-                await ItemService.createItem(itemDataForService, restaurantId);
+                await ItemService.createItem(
+                  itemDataForService,
+                  restaurantId,
+                  session
+                ); // Pass session
               } catch (itemError: any) {
+                // If individual item creation fails, we might want to log and continue,
+                // or abort the whole transaction. For now, let's rethrow to abort.
                 console.warn(
-                  `[MenuService] AI Skipping item "${item.itemName}" due to error: ${itemError.message}`
+                  `[MenuService] Error creating item "${item.itemName}" within transaction: ${itemError.message}. Aborting transaction.`
                 );
+                throw itemError; // This will be caught by the outer catch and abort the transaction
               }
             }
           }
-          fs.unlinkSync(absoluteFilePath);
+          await session.commitTransaction();
           return createdMenu;
         } else {
           console.error(
@@ -676,34 +712,31 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
           );
         }
       } else {
-        // If no function call, log the text response for debugging
         console.warn(
           "[MenuService] AI did not return a function call. Text response:",
           response.text()
         );
-        // Fallback: try to parse response.text() if it happens to be structured JSON, or just error out
         throw new AppError(
           "AI processing error: AI did not return structured menu data as expected.",
           500
         );
       }
     } catch (error: any) {
-      if (absoluteFilePath && fs.existsSync(absoluteFilePath)) {
-        fs.unlinkSync(absoluteFilePath);
+      if (session && session.inTransaction()) {
+        await session.abortTransaction();
       }
       console.error(
         "[MenuService] Error processing PDF menu upload with AI:",
         error
       );
+      // Specific error handling from before remains relevant
       if (error instanceof AppError) throw error;
       if (error.message && error.message.includes("GEMINI_API_KEY")) {
-        // More specific check for API key issue
         throw new AppError(
           "AI service configuration error. Please check API key.",
           500
         );
       }
-      // Check for safety settings block
       if (
         error.message &&
         (error.message.toLowerCase().includes("safety settings") ||
@@ -723,6 +756,23 @@ Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data'
         "Failed to process PDF menu with AI: " + error.message,
         500
       );
+    } finally {
+      if (session) {
+        session.endSession();
+      }
+      // Ensure file is deleted regardless of success or failure of the transaction/AI processing
+      if (absoluteFilePath && fs.existsSync(absoluteFilePath)) {
+        try {
+          fs.unlinkSync(absoluteFilePath);
+          console.log(
+            `[MenuService] Successfully deleted temp file: ${absoluteFilePath}`
+          );
+        } catch (unlinkError: any) {
+          console.error(
+            `[MenuService] Failed to delete temp file ${absoluteFilePath}: ${unlinkError.message}`
+          );
+        }
+      }
     }
   }
 }

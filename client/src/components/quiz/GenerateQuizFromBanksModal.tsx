@@ -7,7 +7,7 @@ import { IQuestionBank } from "../../types/questionBankTypes";
 import {
   GenerateQuizFromBanksClientData,
   ClientIQuiz,
-} from "../../services/api"; // Adjusted path
+} from "../../types/quizTypes"; // CORRECTED IMPORT PATH
 import Button from "../common/Button"; // For consistent button styling
 import LoadingSpinner from "../common/LoadingSpinner"; // For loading states
 import Modal from "../common/Modal"; // Import generic Modal

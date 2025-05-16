@@ -1,36 +1,16 @@
 import express, { Request, Response, Router, NextFunction } from "express";
-import MenuItem, {
-  IMenuItem,
-  ITEM_TYPES, // Import constants for validation
-  FOOD_CATEGORIES,
-  BEVERAGE_CATEGORIES,
-  ItemType,
-  ItemCategory,
-} from "../models/MenuItem";
-import Menu from "../models/Menu";
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import mongoose, { Types } from "mongoose";
-import ItemService from "../services/itemService"; // Import the new service
+import mongoose from "mongoose"; // For req.user.restaurantId type assertion
+import ItemService from "../services/itemService";
 import { AppError } from "../utils/errorHandler";
+import {
+  handleValidationErrors,
+  validateObjectId,
+  validateCreateItemBody,
+  validateUpdateItemBody,
+} from "../middleware/validationMiddleware";
 
 const router: Router = express.Router();
-
-// Helper function for category validation
-const isValidCategory = (
-  itemType: ItemType,
-  category: ItemCategory
-): boolean => {
-  if (itemType === "food" && FOOD_CATEGORIES.includes(category as any)) {
-    return true;
-  }
-  if (
-    itemType === "beverage" &&
-    BEVERAGE_CATEGORIES.includes(category as any)
-  ) {
-    return true;
-  }
-  return false;
-};
 
 // === Middleware ===
 router.use(protect);
@@ -45,22 +25,22 @@ router.use(protect);
 router.post(
   "/",
   restrictTo("restaurant"),
+  validateCreateItemBody,
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
-    // Basic check for restaurantId
     if (!restaurantId) {
+      // This specific check for restaurantId on user can remain
       return next(new AppError("Restaurant ID not found for user", 400));
     }
 
-    // Pass the whole body to the service, let it handle validation & extraction
     const itemData = req.body;
 
     try {
       const savedItem = await ItemService.createItem(itemData, restaurantId);
       res.status(201).json({ item: savedItem });
     } catch (error: any) {
-      // Service handles validation, not found, and other errors
       next(error);
     }
   }
@@ -68,11 +48,13 @@ router.post(
 
 /**
  * @route   GET /api/items
- * @desc    Get items (filtered by menuId)
+ * @desc    Get items (filtered by menuId if provided in query)
  * @access  Private (Restaurant or Staff)
  */
 router.get(
   "/",
+  // No specific validation for query params here, service handles undefined menuId
+  // If menuId query param needs validation (e.g. isMongoId if present), add here
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { menuId } = req.query;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
@@ -81,11 +63,9 @@ router.get(
       return next(new AppError("Restaurant ID not found for user", 400));
     }
 
-    // Prepare filter object
     const filter = { menuId: menuId as string | undefined };
 
     try {
-      // Delegate fetching to the service
       const items = await ItemService.getItems(filter, restaurantId);
       res.status(200).json({ items });
     } catch (error: any) {
@@ -102,19 +82,19 @@ router.get(
 router.put(
   "/:itemId",
   restrictTo("restaurant"),
+  validateObjectId("itemId"),
+  validateUpdateItemBody,
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { itemId } = req.params;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
-    // Basic checks
-    if (!mongoose.Types.ObjectId.isValid(itemId)) {
-      return next(new AppError("Invalid Item ID format", 400));
-    }
     if (!restaurantId) {
+      // This specific check for restaurantId on user can remain
       return next(new AppError("Restaurant ID not found for user", 400));
     }
+    // Removed manual mongoose.Types.ObjectId.isValid(itemId) check
 
-    // Pass the request body to the service for validation and processing
     const updateData = req.body;
 
     try {
@@ -123,7 +103,6 @@ router.put(
         updateData,
         restaurantId
       );
-      // Service handles validation, not found, etc.
       res.status(200).json({ item: updatedItem });
     } catch (error: any) {
       next(error);
@@ -139,22 +118,20 @@ router.put(
 router.delete(
   "/:itemId",
   restrictTo("restaurant"),
+  validateObjectId("itemId"),
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { itemId } = req.params;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
-    // Basic checks
-    if (!mongoose.Types.ObjectId.isValid(itemId)) {
-      return next(new AppError("Invalid Item ID format", 400));
-    }
     if (!restaurantId) {
+      // This specific check for restaurantId on user can remain
       return next(new AppError("Restaurant ID not found for user", 400));
     }
+    // Removed manual mongoose.Types.ObjectId.isValid(itemId) check
 
     try {
-      // Delegate deletion to the service
       await ItemService.deleteItem(itemId, restaurantId);
-      // Service handles not found error
       res.status(200).json({ message: "Menu item deleted successfully" });
     } catch (error: any) {
       next(error);

@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from "react";
 import Button from "../common/Button"; // Import our styled Button
+import { QuizDisplayQuestion } from "../../types/quizTypes"; // IMPORTED
 
 // --- Interfaces ---
-// TODO: Move to shared types file
-interface Question {
-  _id?: string;
-  text: string;
-  choices: string[];
-  correctAnswer: number;
-  menuItemId: string;
-}
+// REMOVED local Question interface definition
 
 // --- Component Props ---
 interface AddQuestionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (newQuestion: Question) => void;
-  initialMenuItemId: string; // Used to initialize the question
+  onSubmit: (newQuestion: QuizDisplayQuestion) => void; // UPDATED type
+  initialMenuItemId?: string; // Keep optional, as it's handled if undefined
 }
 
 // --- Component ---
@@ -26,24 +20,23 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
   onSubmit,
   initialMenuItemId,
 }) => {
-  const [newQuestion, setNewQuestion] = useState<Question>({
+  const getInitialQuestionState = (): QuizDisplayQuestion => ({
     text: "New Question",
     choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
     correctAnswer: 0,
-    menuItemId: initialMenuItemId || "",
+    menuItemId: initialMenuItemId || "", // Ensure menuItemId is always a string
   });
 
-  // Reset state when modal opens
+  const [newQuestion, setNewQuestion] = useState<QuizDisplayQuestion>(
+    getInitialQuestionState()
+  );
+
+  // Reset state when modal opens or initialMenuItemId changes
   useEffect(() => {
     if (isOpen) {
-      setNewQuestion({
-        text: "New Question",
-        choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
-        correctAnswer: 0,
-        menuItemId: initialMenuItemId || "",
-      });
+      setNewQuestion(getInitialQuestionState());
     }
-  }, [isOpen, initialMenuItemId]);
+  }, [isOpen, initialMenuItemId]); // Added initialMenuItemId to dependency array
 
   const handleSubmit = () => {
     // Basic validation could be added here

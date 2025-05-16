@@ -2,8 +2,16 @@ import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import MenuService from "../services/menuService";
 import { AppError } from "../utils/errorHandler";
-import { IMenu } from "../models/Menu"; // Assuming IMenu is exported from Menu model
-import MenuItem from "../models/MenuItem"; // Corrected import path and assuming default export
+import MenuItem from "../models/MenuItem"; // Used in getMenuByIdWithItems and deleteCategoryAndReassignItems
+import ItemService from "../services/itemService"; // Added import for ItemService
+import {
+  handleValidationErrors,
+  validateCreateMenu,
+  validateObjectId,
+  validateMenuIdParam,
+  validateUpdateMenu,
+  validateCategoryNameParam,
+} from "../middleware/validationMiddleware";
 
 // No need for AuthenticatedRequest if AuthPayload is globally declared via authMiddleware.ts
 
@@ -15,7 +23,6 @@ export const createMenu = async (
 ): Promise<void> => {
   try {
     const { name, description } = req.body;
-    // Assuming 'protect' middleware adds 'user' to req and 'user' has 'restaurantId'
     const restaurantId = req.user?.restaurantId;
 
     if (!restaurantId) {
@@ -26,9 +33,7 @@ export const createMenu = async (
         )
       );
     }
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      return next(new AppError("Menu name is required.", 400));
-    }
+    // Validation for name is now handled by validateCreateMenu
 
     const menuData = { name, description };
     const newMenu = await MenuService.createMenu(
@@ -49,11 +54,7 @@ export const getMenusByRestaurant = async (
 ): Promise<void> => {
   try {
     const { restaurantId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
-      return next(new AppError("Invalid Restaurant ID format", 400));
-    }
-    // Optional: Further authorization to ensure the logged-in user can access this restaurant's menus
-    // This might involve checking req.user.restaurantId against req.params.restaurantId
+    // Validation handled by validateObjectId("restaurantId") in routes file
 
     const menus = await MenuService.getAllMenus(
       new mongoose.Types.ObjectId(restaurantId)
@@ -72,11 +73,9 @@ export const getMenuByIdWithItems = async (
 ): Promise<void> => {
   try {
     const { menuId } = req.params;
-    const restaurantId = req.user?.restaurantId; // For authorization, if service needs it
+    const restaurantId = req.user?.restaurantId;
 
-    if (!mongoose.Types.ObjectId.isValid(menuId)) {
-      return next(new AppError("Invalid Menu ID format", 400));
-    }
+    // menuId validation handled by validateMenuIdParam in routes file
     if (!restaurantId) {
       return next(new AppError("User not associated with a restaurant.", 403));
     }
@@ -95,10 +94,8 @@ export const getMenuByIdWithItems = async (
       );
     }
 
-    // Fetch associated menu items
     const items = await MenuItem.find({ menuId: menu._id }).lean();
-
-    res.status(200).json({ success: true, data: { ...menu, items } }); // Spread menu to include items
+    res.status(200).json({ success: true, data: { ...menu, items } });
   } catch (error) {
     next(error);
   }
@@ -115,14 +112,10 @@ export const updateMenuDetails = async (
     const { name, description } = req.body;
     const restaurantId = req.user?.restaurantId;
 
-    if (!mongoose.Types.ObjectId.isValid(menuId)) {
-      return next(new AppError("Invalid Menu ID format", 400));
-    }
+    // menuId validation handled by validateMenuIdParam in routes file
+    // name/description validation handled by validateUpdateMenu in routes file
     if (!restaurantId) {
       return next(new AppError("User not associated with a restaurant.", 403));
-    }
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      return next(new AppError("Menu name cannot be empty for update.", 400));
     }
 
     const updateData = { name, description };
@@ -153,29 +146,22 @@ export const deleteMenu = async (
     const { menuId } = req.params;
     const restaurantId = req.user?.restaurantId;
 
-    if (!mongoose.Types.ObjectId.isValid(menuId)) {
-      return next(new AppError("Invalid Menu ID format", 400));
-    }
+    // menuId validation handled by validateMenuIdParam in routes file
     if (!restaurantId) {
       return next(new AppError("User not associated with a restaurant.", 403));
     }
 
-    // The service MenuService.deleteMenu should handle deletion of menu and its items (cascade or otherwise)
     const deleteResult = await MenuService.deleteMenu(
       menuId,
       new mongoose.Types.ObjectId(restaurantId)
     );
 
-    if (deleteResult.deletedCount === 0) {
+    if (deleteResult.deletedMenuCount === 0) {
       return next(
         new AppError("Menu not found or not authorized to delete.", 404)
       );
     }
-
-    // Also delete associated menu items explicitly if not handled by service/model middleware
-    // await MenuItem.deleteMany({ menuId: new mongoose.Types.ObjectId(menuId) });
-    // Note: Your MenuService.deleteMenu might already handle this. If so, the above line is redundant.
-    // Check your service logic. For now, I'm assuming the service handles item deletion.
+    // Removed commented-out MenuItem.deleteMany as service handles it.
 
     res.status(200).json({
       success: true,
@@ -191,74 +177,28 @@ export const uploadMenuPdf = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  console.log("[menuController] Entered uploadMenuPdf");
   try {
     const restaurantIdString = req.params.restaurantId;
-    console.log(
-      "[menuController] Restaurant ID string from params:",
-      restaurantIdString
-    );
-
-    if (!mongoose.Types.ObjectId.isValid(restaurantIdString)) {
-      console.error(
-        "[menuController] Invalid restaurant ID format:",
-        restaurantIdString
-      );
-      return next(new AppError("Invalid restaurant ID format", 400));
-    }
+    // restaurantIdString validation handled by validateObjectId("restaurantId") in routes file
     const restaurantId = new mongoose.Types.ObjectId(restaurantIdString);
-    console.log(
-      "[menuController] Parsed restaurant ID:",
-      restaurantId.toHexString()
-    );
-
-    // Ensure the logged-in user is authorized to upload for this restaurant
-    // This logic depends on your auth setup (e.g., req.user.restaurantId === restaurantId)
-    // Or if req.user.role === 'restaurant' and req.user._id corresponds to an owner of this restaurantId
-    // For simplicity, this example assumes restaurantId comes from params and ownership is verified by `restrictTo` or similar.
 
     if (!req.file) {
-      console.error(
-        "[menuController] No req.file found. Multer did not process a file."
-      );
       return next(new AppError("No PDF file uploaded.", 400));
     }
 
-    console.log(
-      "[menuController] req.file object from multer:",
-      JSON.stringify(req.file, null, 2)
-    );
-
     const filePath = req.file.path;
-    console.log("[menuController] File path from req.file.path:", filePath);
-
-    // It's important to pass the correct restaurantId.
-    // req.user should be available here if 'protect' middleware ran successfully.
-    // Ensure your AuthPayload has restaurantId for restaurant users.
-    // If not, you might need to fetch it based on req.user.userId if the user is a restaurant owner.
-
-    // For this example, we'll assume restaurantId from params is authoritative AFTER 'restrictTo' has validated access.
-    console.log("[menuController] Calling MenuService.processPdfMenuUpload...");
     const menu = await MenuService.processPdfMenuUpload(
       filePath,
       restaurantId,
       req.file.originalname
     );
-    console.log("[menuController] MenuService.processPdfMenuUpload completed.");
 
     res.status(201).json({
       message: "Menu PDF uploaded and processed successfully.",
       data: menu,
     });
   } catch (error) {
-    console.error(
-      "[menuController] Error in uploadMenuPdf catch block:",
-      error
-    );
-    // If the file was uploaded and an error occurred during processing,
-    // you might want to delete the uploaded file from the /uploads directory.
-    // import fs from 'fs';
-    // if (req.file) fs.unlinkSync(req.file.path);
+    // MenuService.processPdfMenuUpload handles file cleanup in its finally block
     next(error);
   }
 };
@@ -270,25 +210,14 @@ export const deleteCategoryAndReassignItems = async (
 ): Promise<void> => {
   try {
     const { menuId, categoryName: encodedCategoryName } = req.params;
+    const restaurantId = req.user?.restaurantId; // Get restaurantId from authenticated user
     const categoryName = decodeURIComponent(encodedCategoryName);
 
-    if (!mongoose.Types.ObjectId.isValid(menuId)) {
-      return next(new AppError("Invalid Menu ID format", 400));
+    if (!restaurantId) {
+      return next(new AppError("User not associated with a restaurant.", 403));
     }
 
-    if (
-      !categoryName ||
-      typeof categoryName !== "string" ||
-      categoryName.trim() === ""
-    ) {
-      return next(
-        new AppError(
-          "Category name is required and must be a non-empty string.",
-          400
-        )
-      );
-    }
-
+    // This check remains as it's specific business logic not covered by simple validation
     if (
       categoryName.toLowerCase() === "uncategorized" ||
       categoryName.toLowerCase() === "non assigned"
@@ -298,12 +227,15 @@ export const deleteCategoryAndReassignItems = async (
       );
     }
 
-    const result = await MenuItem.updateMany(
-      // Use the corrected model name
-      { menuId: new mongoose.Types.ObjectId(menuId), category: categoryName },
-      { $set: { category: "Non Assigned" } }
+    // Call the service method to handle the logic
+    const result = await ItemService.reassignItemsCategory(
+      menuId,
+      categoryName,
+      "Non Assigned", // The new category name is hardcoded here as per original logic
+      new mongoose.Types.ObjectId(restaurantId) // Pass restaurantId to the service
     );
 
+    // This logging can be useful for developers/admins
     if (result.matchedCount === 0 && result.modifiedCount === 0) {
       console.log(
         `No items found for category "${categoryName}" in menu "${menuId}", or category did not exist.`

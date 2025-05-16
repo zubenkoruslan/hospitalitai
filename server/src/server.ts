@@ -40,6 +40,11 @@ app.use(
 // Helmet for security headers
 app.use(helmet());
 
+// HTTP request logger (for development)
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+
 // Rate Limiting (Apply before routes)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -48,7 +53,7 @@ const limiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   message: "Too many requests from this IP, please try again after 15 minutes", // Custom message
 });
-// app.use(limiter); // Temporarily disabled rate limiting
+app.use(limiter); // Enabled rate limiting
 
 // Body Parsing
 app.use(express.json()); // For parsing application/json

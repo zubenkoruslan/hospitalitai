@@ -17,7 +17,5 @@ export const ensureRestaurantAssociation = (
     });
     return;
   }
-  // Optionally attach restaurantId directly to req for easier access later
-  // req.restaurantId = req.user.restaurantId;
   next();
 };

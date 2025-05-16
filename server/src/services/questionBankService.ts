@@ -14,7 +14,7 @@ export interface CreateQuestionBankData {
   name: string;
   description?: string;
   categories?: string[]; // Made categories optional
-  // targetQuestionCount?: number; // Removed targetQuestionCount, not relevant for bank creation
+  targetQuestionCount?: number; // Added targetQuestionCount
   restaurantId: mongoose.Types.ObjectId; // Assuming restaurantId will be passed by controller
 }
 
@@ -22,6 +22,7 @@ export interface CreateQuestionBankData {
 export interface UpdateQuestionBankData {
   name?: string;
   description?: string;
+  targetQuestionCount?: number; // Added targetQuestionCount
   // categories and questions will be handled by separate dedicated functions usually
 }
 
@@ -125,13 +126,14 @@ export const updateQuestionBankService = async (
       return null; // Or throw AppError
     }
 
+    // data will now include targetQuestionCount if provided by controller
     const updatedBank = await QuestionBankModel.findOneAndUpdate(
-      { _id: bankId, restaurantId: restaurantId }, // Query to find the document
-      { $set: data }, // The update operations to apply
-      { new: true, runValidators: true } // Options: return updated doc, run schema validators
+      { _id: bankId, restaurantId: restaurantId },
+      { $set: data },
+      { new: true, runValidators: true }
     );
 
-    return updatedBank; // Will be null if no document matched the query
+    return updatedBank;
   } catch (error) {
     console.error("Error updating question bank in service:", error);
     if (error instanceof mongoose.Error.ValidationError) {

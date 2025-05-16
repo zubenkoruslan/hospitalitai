@@ -1,5 +1,7 @@
 // Custom error class to handle operational errors (e.g., user input, not found)
 // Allows attaching a status code and marking errors as operational
+import { Request, Response, NextFunction } from "express";
+
 class AppError extends Error {
   statusCode: number;
   status: string;
@@ -21,7 +23,12 @@ class AppError extends Error {
 
 // Global error handling middleware (to be used in app.ts)
 // This is a basic structure; enhance as needed (e.g., different handling for dev/prod)
-const globalErrorHandler = (err: any, req: any, res: any, next: any) => {
+const globalErrorHandler = (
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   // Default to 500 if status code or operational flag isn't set
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";

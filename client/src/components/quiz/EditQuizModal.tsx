@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  getQuestionBanks,
-  updateQuizDetails,
-  // generateQuizFromQuestionBanks, // Will be replaced by an update function
-} from "../../services/api";
+import { getQuestionBanks, updateQuizDetails } from "../../services/api";
 import { IQuestionBank } from "../../types/questionBankTypes";
-import {
-  // GenerateQuizFromBanksClientData, // Will be replaced by an update data type
-  ClientIQuiz,
-} from "../../services/api";
+import { ClientIQuiz } from "../../types/quizTypes";
 import Button from "../common/Button";
 import LoadingSpinner from "../common/LoadingSpinner";
 import Modal from "../common/Modal"; // Using the generic Modal
@@ -17,8 +10,8 @@ import ErrorMessage from "../common/ErrorMessage"; // Import ErrorMessage
 interface EditQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onQuizUpdated: (updatedQuiz: ClientIQuiz) => void; // Callback for when quiz is successfully updated
-  initialQuizData: ClientIQuiz | null; // The quiz data to pre-fill the form
+  onQuizUpdated: (updatedQuiz: ClientIQuiz) => void;
+  initialQuizData: ClientIQuiz | null;
 }
 
 const EditQuizModal: React.FC<EditQuizModalProps> = ({
@@ -175,7 +168,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialQuizData ? "Edit Quiz" : "Edit Quiz Details"}
+      title="Edit Quiz"
       size="xl" // Consider lg or xl depending on content
       footerContent={footerContent}
     >

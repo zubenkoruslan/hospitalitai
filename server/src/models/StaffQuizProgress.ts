@@ -2,18 +2,17 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { IUser } from "./User"; // For staffUserId and restaurantId
 import { IQuiz } from "./Quiz"; // For quizId
 import { IQuestion } from "./QuestionModel"; // For seenQuestionIds
+import { IRestaurant } from "./Restaurant"; // For restaurantId
 
 export interface IStaffQuizProgress extends Document {
   _id: Types.ObjectId;
   staffUserId: Types.ObjectId | IUser;
   quizId: Types.ObjectId | IQuiz;
-  restaurantId: Types.ObjectId | IUser;
+  restaurantId: Types.ObjectId | IRestaurant;
   seenQuestionIds: Types.ObjectId[] | IQuestion[];
   totalUniqueQuestionsInSource: number;
   isCompletedOverall: boolean;
   lastAttemptTimestamp?: Date;
-  questionsAnsweredToday?: number; // Marked for re-evaluation in plan
-  lastActivityDateForDailyReset?: Date; // Marked for re-evaluation in plan
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -34,7 +33,7 @@ const StaffQuizProgressSchema: Schema<IStaffQuizProgress> = new Schema(
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
-      ref: "User", // Assuming restaurant admin/owner is a User
+      ref: "Restaurant",
       required: true,
       index: true,
     },
@@ -53,16 +52,6 @@ const StaffQuizProgressSchema: Schema<IStaffQuizProgress> = new Schema(
       default: false,
     },
     lastAttemptTimestamp: {
-      type: Date,
-    },
-    questionsAnsweredToday: {
-      // RE-EVALUATE/REMOVE in plan
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    lastActivityDateForDailyReset: {
-      // RE-EVALUATE/REMOVE in plan
       type: Date,
     },
   },

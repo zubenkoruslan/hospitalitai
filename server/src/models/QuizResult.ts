@@ -1,49 +1,58 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-// Interface for storing a single answer given by the user
-interface IUserAnswer {
-  questionId: mongoose.Types.ObjectId; // Reference to the specific Question subdocument in the Quiz
-  answerGiven: string; // The answer provided by the staff member
-  isCorrect: boolean; // Whether the given answer was correct
+// NEW: Interface for IncorrectQuestionDetail (matching frontend expectations)
+interface IIncorrectQuestionDetail {
+  questionText: string;
+  userAnswer: string;
+  correctAnswer: string;
+}
+
+// New interface for answer details within QuizResult.answers
+interface IAnswerDetailForResult {
+  questionId: Types.ObjectId;
+  answerGiven: any; // Keeping it flexible as per gradedQuestionsDetails
+  isCorrect: boolean;
 }
 
 // Interface for the QuizResult document
 export interface IQuizResult extends Document {
-  _id: Types.ObjectId; // Explicitly add _id type
-  quizId: Types.ObjectId; // Reference to the Quiz
-  userId: Types.ObjectId; // Reference to the User (Staff) who took the quiz
-  restaurantId: Types.ObjectId; // Reference to the Restaurant for easier querying
-  answers: number[]; // Array of indices representing the user's chosen answers
-  score: number; // Number of correct answers
-  totalQuestions: number; // Total questions in the quiz at time of submission
+  _id: Types.ObjectId;
+  quizId: Types.ObjectId;
+  userId: Types.ObjectId;
+  restaurantId: Types.ObjectId;
+  answers: IAnswerDetailForResult[]; // MODIFIED from number[]
+  score: number;
+  totalQuestions: number;
   startedAt?: Date;
   completedAt?: Date;
   status: "pending" | "in-progress" | "completed";
   retakeCount: number;
-  wasCancelled?: boolean; // Add optional wasCancelled field
+  wasCancelled?: boolean;
+  incorrectQuestions?: IIncorrectQuestionDetail[];
 }
 
-// Mongoose schema for embedded UserAnswer
-const userAnswerSchema = new Schema<IUserAnswer>(
+// NEW: Mongoose schema for embedded IncorrectQuestionDetail
+const incorrectQuestionDetailSchema = new Schema<IIncorrectQuestionDetail>(
+  {
+    questionText: { type: String, required: true },
+    userAnswer: { type: String, required: true },
+    correctAnswer: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+// New Mongoose schema for IAnswerDetailForResult
+const answerDetailForResultSchema = new Schema<IAnswerDetailForResult>(
   {
     questionId: {
       type: Schema.Types.ObjectId,
-      required: true,
-      // Note: No 'ref' here as it refers to an _id within an embedded array in Quiz,
-      // which Mongoose doesn't directly link via population.
-      // We store it for identification.
-    },
-    answerGiven: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    isCorrect: {
-      type: Boolean,
+      ref: "Question",
       required: true,
     },
+    answerGiven: { type: Schema.Types.Mixed },
+    isCorrect: { type: Boolean, required: true },
   },
-  { _id: false } // Don't need separate IDs for each answer log
+  { _id: false }
 );
 
 // Mongoose schema for QuizResult
@@ -68,9 +77,9 @@ const quizResultSchema = new Schema<IQuizResult>(
       index: true,
     },
     answers: {
-      type: [Number],
+      type: [answerDetailForResultSchema], // MODIFIED from [Number]
       required: [true, "Answers are required"],
-      // Optional validation: check if number of answers matches totalQuestions upon save?
+      default: [], // Added default empty array
     },
     score: {
       type: Number,
@@ -106,6 +115,10 @@ const quizResultSchema = new Schema<IQuizResult>(
       type: Boolean,
       default: false, // Default to false if not explicitly set
     },
+    incorrectQuestions: {
+      type: [incorrectQuestionDetailSchema],
+      default: [],
+    }, // NEW FIELD
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt fields

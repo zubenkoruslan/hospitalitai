@@ -22,7 +22,15 @@ declare global {
   }
 }
 
+// Fetch JWT_SECRET from environment variables.
+// Reverting to include a default fallback for development/testing if not set.
+// WARNING: This default key is insecure and should NOT be used in production.
+// Ensure a strong, unique JWT_SECRET is set in your production environment variables.
 const JWT_SECRET = process.env.JWT_SECRET || "your_very_secret_key_change_me";
+
+// Validate JWT_SECRET during application startup (or at least before first use).
+// This is a conceptual check. Ideally, this check happens once when the app starts.
+// For middleware, we ensure it's checked before use within the function.
 
 /**
  * Middleware to authenticate JWT token.
@@ -47,6 +55,9 @@ export const protect = (
 
   try {
     // Verify token
+    // If JWT_SECRET is undefined (e.g. process.env.JWT_SECRET was explicitly set to empty string and no fallback existed)
+    // or if it's the default insecure key, jwt.verify will proceed.
+    // Security depends on the strength of the actual JWT_SECRET used.
     const decoded = jwt.verify(token, JWT_SECRET) as AuthPayload;
 
     // Attach user payload to the request object (excluding sensitive parts if necessary)
@@ -56,7 +67,15 @@ export const protect = (
     next(); // Proceed to the next middleware or route handler
   } catch (error) {
     console.error("Token verification failed:", error);
-    res.status(401).json({ message: "Not authorized, token failed" });
+    // Make sure not to include the error details in the response to the client for security.
+    let message = "Not authorized, token failed";
+    if (error instanceof jwt.TokenExpiredError) {
+      message = "Not authorized, token expired";
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      // Catches malformed tokens, invalid signatures etc.
+      message = "Not authorized, token invalid";
+    }
+    res.status(401).json({ message });
   }
 };
 

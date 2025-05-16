@@ -70,6 +70,7 @@ class ItemService {
    *
    * @param data - The data for the new menu item.
    * @param restaurantId - The ID of the restaurant creating the item.
+   * @param session - Optional Mongoose session for atomic operations
    * @returns A promise resolving to the created menu item document.
    * @throws {AppError} If validation fails (e.g., invalid category, price, name length),
    *                    if the target menu is not found or doesn't belong to the restaurant,
@@ -77,7 +78,8 @@ class ItemService {
    */
   static async createItem(
     data: ItemData,
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId,
+    session?: mongoose.ClientSession
   ): Promise<IMenuItem> {
     const {
       name,
@@ -145,10 +147,15 @@ class ItemService {
 
     try {
       // Check if parent menu exists and belongs to the restaurant
-      const parentMenu = await Menu.findOne({
+      const parentMenuQuery = Menu.findOne({
         _id: menuObjectId,
         restaurantId: restaurantId,
       });
+      if (session) {
+        parentMenuQuery.session(session);
+      }
+      const parentMenu = await parentMenuQuery;
+
       if (!parentMenu) {
         throw new AppError("Target menu not found or access denied", 404);
       }
@@ -180,7 +187,7 @@ class ItemService {
       }
 
       const item = new MenuItem(newItemData);
-      const savedItem = await item.save(); // Mongoose validation happens here
+      const savedItem = await item.save(session ? { session } : undefined); // Mongoose validation happens here
       return savedItem;
     } catch (error: any) {
       console.error("Error creating menu item in service:", error);
@@ -460,6 +467,59 @@ class ItemService {
         throw new AppError("Invalid item ID format.", 400);
       }
       throw new AppError("Failed to delete menu item.", 500);
+    }
+  }
+
+  /**
+   * Reassigns all menu items from a specific category to a new category for a given menu and restaurant.
+   *
+   * @param menuId - The ID of the menu.
+   * @param oldCategoryName - The name of the category to reassign items from.
+   * @param newCategoryName - The name of the category to reassign items to.
+   * @param restaurantId - The ID of the restaurant (for scoping and authorization).
+   * @returns A promise resolving to an object with matchedCount and modifiedCount from the update operation.
+   * @throws {AppError} If an unexpected database error occurs.
+   */
+  static async reassignItemsCategory(
+    menuId: string | Types.ObjectId,
+    oldCategoryName: string,
+    newCategoryName: string,
+    restaurantId: Types.ObjectId // Added for scoping, though MenuItem model might not enforce restaurantId on category updates directly
+  ): Promise<{ matchedCount: number; modifiedCount: number }> {
+    const menuObjectId =
+      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
+
+    try {
+      // First, verify the menu belongs to the restaurant (optional, but good for authorization scope)
+      const menu = await Menu.findOne({
+        _id: menuObjectId,
+        restaurantId: restaurantId,
+      });
+      if (!menu) {
+        // Or handle as per your app's authorization logic for this operation
+        throw new AppError(
+          "Menu not found or not authorized for this restaurant.",
+          404
+        );
+      }
+
+      const result = await MenuItem.updateMany(
+        {
+          menuId: menuObjectId,
+          category: oldCategoryName,
+          restaurantId: restaurantId, // Ensure we only update items belonging to the correct restaurant
+        },
+        { $set: { category: newCategoryName } }
+      );
+      return {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+      };
+    } catch (error: any) {
+      console.error("Error reassigning item categories in service:", error);
+      if (error instanceof AppError) throw error;
+      // Consider specific error handling, e.g., for CastError on menuId if not validated before call
+      throw new AppError("Failed to reassign item categories.", 500);
     }
   }
 }

@@ -4,7 +4,9 @@ import {
   validationResult,
   ValidationChain,
   param,
+  // sanitizeParam, // Removed as it's not a standard export and was commented out
 } from "express-validator";
+import mongoose from "mongoose";
 
 // Middleware to handle validation errors
 export const handleValidationErrors = (
@@ -130,9 +132,21 @@ export const validateUpdateMenu: ValidationChain[] = [
   }),
 ];
 
-// Validation rules for /api/quiz
+// Generic validator for ObjectId in request params
+export const validateObjectId = (paramName: string): ValidationChain[] => [
+  param(paramName).custom((value) => {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
+      throw new Error(
+        `Invalid ${paramName} format, must be a MongoDB ObjectId`
+      );
+    }
+    return true;
+  }),
+];
+
+// === Specific Quiz Validators ===
 export const validateQuizIdParam: ValidationChain[] = [
-  param("quizId", "Invalid Quiz ID format").isMongoId(),
+  ...validateObjectId("quizId"),
 ];
 
 export const validateAutoGenerateQuiz: ValidationChain[] = [
@@ -175,34 +189,17 @@ export const validateQuizBody: ValidationChain[] = [
     .isMongoId(),
 ];
 
-export const validateSubmitAnswers: ValidationChain[] = [
-  param("quizId", "Invalid Quiz ID format").isMongoId(),
-  body("answers", "Answers must be an array")
-    .isArray({ min: 1 })
-    .withMessage("Answers array cannot be empty."),
-  body(
-    "answers.*",
-    "Each answer must be an integer between 0 and 3 or undefined/null"
-  )
-    .optional({ nullable: true })
-    .isInt({ min: 0, max: 3 })
-    .toInt(),
-  body("cancelled", "Cancelled flag must be a boolean")
-    .optional()
-    .isBoolean()
-    .toBoolean(),
-];
-
 export const validateAssignQuiz: ValidationChain[] = [
   body("quizId", "Invalid Quiz ID format").isMongoId(),
-  body("staffIds", "Staff IDs must be an array with at least one ID")
+  body("staffUserIds", "Staff user IDs must be an array of valid MongoIDs")
     .isArray({ min: 1 })
     .withMessage("At least one staff ID must be provided."),
-  body("staffIds.*", "Invalid Staff ID format provided").isMongoId(),
+  body("staffUserIds.*", "Invalid Staff ID format").isMongoId(),
 ];
 
-// --- New Validator for Status Updates ---
-export const validateQuizStatusUpdate = [
+// --- General Purpose Validators (Should be placed towards the end or grouped logically) ---
+
+export const validateQuizStatusUpdate: ValidationChain[] = [
   body("isAvailable")
     .optional()
     .isBoolean()
@@ -210,5 +207,447 @@ export const validateQuizStatusUpdate = [
   // Add validation for other status fields if needed in the future
 ];
 
-// === Staff Validation ===
-// ... existing code ...
+export const validateTargetQuestionCount: ValidationChain[] = [
+  body(
+    "targetQuestionCount",
+    "Target question count must be a positive integer"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+];
+
+// === Staff Validators ===
+export const validateStaffIdParam: ValidationChain[] = [
+  ...validateObjectId("id"), // Assuming staff ID comes from req.params.id
+];
+
+export const validateProfessionalRoleBody: ValidationChain[] = [
+  body(
+    "professionalRole",
+    "Professional role is required and must be a non-empty string"
+  )
+    .isString()
+    .trim()
+    .notEmpty()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Professional role must be between 2 and 50 characters"),
+];
+
+// === Menu Validators ===
+export const validateCategoryNameParam: ValidationChain[] = [
+  param("categoryName", "Category name parameter must be a non-empty string")
+    .isString()
+    .trim()
+    .notEmpty(),
+];
+
+// === Quiz Controller Validators ===
+export const validateGenerateQuizFromBanksBody: ValidationChain[] = [
+  body("title", "Title is required and must be a non-empty string")
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body(
+    "questionBankIds",
+    "questionBankIds must be a non-empty array of valid MongoIDs"
+  )
+    .isArray({ min: 1 })
+    .withMessage("At least one question bank ID must be provided."),
+  body(
+    "questionBankIds.*",
+    "Each question bank ID must be a valid MongoID"
+  ).isMongoId(),
+  body(
+    "numberOfQuestionsPerAttempt",
+    "Number of questions per attempt must be a positive integer"
+  )
+    .isInt({ min: 1 })
+    .toInt(),
+];
+
+export const validateSubmitQuizAttemptBody: ValidationChain[] = [
+  body("questions", "Questions array is required and must not be empty")
+    .isArray({ min: 1 })
+    .withMessage("At least one question must be submitted."),
+  body(
+    "questions.*.questionId",
+    "Each question must have a valid questionId (MongoID)"
+  ).isMongoId(),
+  body(
+    "questions.*.answerGiven",
+    "answerGiven is required for each question"
+  ).exists(), // .exists() checks for presence, not for being non-empty if it's a string. Adjust if specific types are expected.
+  body(
+    "durationInSeconds",
+    "Duration in seconds must be a non-negative integer"
+  )
+    .optional()
+    .isInt({ min: 0 })
+    .toInt(),
+];
+
+// === Question Controller Validators ===
+export const validateCreateQuestionBody: ValidationChain[] = [
+  body("questionText", "Question text is required")
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "questionType",
+    "Question type is required and must be a valid type (e.g., multiple-choice)"
+  )
+    .isString()
+    .trim()
+    .notEmpty(), // Add .isIn(['multiple-choice', 'true-false']) etc. if types are fixed
+  body(
+    "options",
+    "Options must be an array (e.g., for multiple-choice)"
+  ).isArray(), // Further validation based on questionType might be needed in service
+  // Example for multiple-choice options array elements:
+  // body("options.*.text", "Option text is required").if(body("questionType").equals("multiple-choice")).isString().trim().notEmpty(),
+  // body("options.*.isCorrect", "Option isCorrect flag must be a boolean").if(body("questionType").equals("multiple-choice")).isBoolean(),
+  body("categories", "Categories must be a non-empty array of strings")
+    .isArray({ min: 1 })
+    .withMessage("At least one category is required."),
+  body("categories.*", "Each category must be a non-empty string")
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "difficulty",
+    "Difficulty must be a valid string (e.g., easy, medium, hard)"
+  )
+    .optional()
+    .isString()
+    .trim(), // Add .isIn(['easy', 'medium', 'hard']) if difficulties are fixed
+];
+
+export const validateUpdateQuestionBody: ValidationChain[] = [
+  body().custom((value, { req }) => {
+    if (Object.keys(req.body).length === 0) {
+      throw new Error(
+        "No update data provided. At least one field to update is required."
+      );
+    }
+    return true;
+  }),
+  body("questionText", "Question text must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "questionType",
+    "Question type must be a valid type (e.g., multiple-choice)"
+  )
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(), // Add .isIn(['multiple-choice', 'true-false']) etc. if types are fixed
+  body("options", "Options must be an array (e.g., for multiple-choice)")
+    .optional()
+    .isArray(), // Further validation based on questionType might be needed in service
+  body("categories", "Categories must be a non-empty array of strings")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage(
+      "If provided, categories must be a non-empty array with at least one category."
+    ),
+  body("categories.*", "Each category must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "difficulty",
+    "Difficulty must be a valid string (e.g., easy, medium, hard)"
+  )
+    .optional()
+    .isString()
+    .trim(), // Add .isIn(['easy', 'medium', 'hard']) if difficulties are fixed
+];
+
+// === QuestionBank Controller Validators ===
+export const validateCreateQuestionBankBody: ValidationChain[] = [
+  body("name", "Question bank name is required").isString().trim().notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("categories", "Categories must be an array of strings")
+    .optional()
+    .isArray(),
+  body("categories.*", "Each category must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "targetQuestionCount",
+    "Target question count must be a positive integer"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+];
+
+export const validateUpdateQuestionBankBody: ValidationChain[] = [
+  body().custom((value, { req }) => {
+    if (Object.keys(req.body).length === 0) {
+      throw new Error(
+        "No update data provided. Provide name, description, or targetQuestionCount."
+      );
+    }
+    // Check that at least one of the allowed fields is present
+    if (
+      req.body.name === undefined &&
+      req.body.description === undefined &&
+      req.body.targetQuestionCount === undefined
+    ) {
+      throw new Error(
+        "No update data provided. Provide name, description, or targetQuestionCount."
+      );
+    }
+    return true;
+  }),
+  body("name", "Question bank name must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body(
+    "targetQuestionCount",
+    "Target question count must be a positive integer"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+];
+
+export const validateAddQuestionToBankBody: ValidationChain[] = [
+  body(
+    "questionId",
+    "questionId is required and must be a valid MongoID"
+  ).isMongoId(),
+];
+
+// === Item (MenuItem) Controller Validators ===
+export const validateCreateItemBody: ValidationChain[] = [
+  body("name", "Item name is required and must be a string")
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Item name must be between 2 and 100 characters"),
+  body("menuId", "Menu ID is required and must be a valid MongoID").isMongoId(),
+  body("itemType", "Item type is required").isString().trim().notEmpty(), // Could add .isIn(ITEM_TYPES) if ITEM_TYPES is accessible here
+  body("category", "Category is required and must be a non-empty string")
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("price", "Price must be a non-negative number")
+    .optional()
+    .isFloat({ min: 0, max: 10000 }) // Adjust max as needed
+    .withMessage("Price must be a number between 0 and 10000"),
+  body("ingredients", "Ingredients must be an array of strings")
+    .optional()
+    .isArray(),
+  body("ingredients.*", "Each ingredient must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("isGlutenFree", "isGlutenFree must be a boolean").optional().isBoolean(),
+  body("isDairyFree", "isDairyFree must be a boolean").optional().isBoolean(),
+  body("isVegetarian", "isVegetarian must be a boolean").optional().isBoolean(),
+  body("isVegan", "isVegan must be a boolean").optional().isBoolean(),
+];
+
+export const validateUpdateItemBody: ValidationChain[] = [
+  body().custom((value, { req }) => {
+    if (Object.keys(req.body).length === 0) {
+      throw new Error(
+        "No update data provided. At least one field to update is required."
+      );
+    }
+    return true;
+  }),
+  body("name", "Item name must be a string")
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Item name must be between 2 and 100 characters"),
+  body("menuId", "Menu ID must be a valid MongoID") // Usually not updated this way, but if allowed
+    .optional()
+    .isMongoId(),
+  body("itemType", "Item type must be a string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(), // Add .isIn(ITEM_TYPES) if needed and accessible
+  body("category", "Category must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("price", "Price must be a non-negative number")
+    .optional()
+    .isFloat({ min: 0, max: 10000 })
+    .withMessage("Price must be a number between 0 and 10000"),
+  body("ingredients", "Ingredients must be an array of strings")
+    .optional()
+    .isArray(),
+  body("ingredients.*", "Each ingredient must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("isGlutenFree", "isGlutenFree must be a boolean").optional().isBoolean(),
+  body("isDairyFree", "isDairyFree must be a boolean").optional().isBoolean(),
+  body("isVegetarian", "isVegetarian must be a boolean").optional().isBoolean(),
+  body("isVegan", "isVegan must be a boolean").optional().isBoolean(),
+];
+
+// === Quiz Validators (Updates) ===
+export const validateUpdateQuizBody: ValidationChain[] = [
+  body().custom((value, { req }) => {
+    if (
+      req.body.title === undefined &&
+      req.body.description === undefined &&
+      req.body.sourceQuestionBankIds === undefined &&
+      req.body.numberOfQuestionsPerAttempt === undefined &&
+      req.body.isAvailable === undefined
+    ) {
+      throw new Error(
+        "No update data provided. Provide title, description, sourceQuestionBankIds, numberOfQuestionsPerAttempt, or isAvailable."
+      );
+    }
+    return true;
+  }),
+  body("title", "Title must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body(
+    "sourceQuestionBankIds",
+    "sourceQuestionBankIds must be an array of valid MongoIDs"
+  )
+    .optional()
+    .isArray(), // Add .custom for each element if needed, or rely on service
+  body(
+    "sourceQuestionBankIds.*",
+    "Each sourceQuestionBankId must be a valid MongoID"
+  )
+    .if(body("sourceQuestionBankIds").exists())
+    .isMongoId(),
+  body(
+    "numberOfQuestionsPerAttempt",
+    "Number of questions per attempt must be a positive integer"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+  body("isAvailable", "isAvailable must be a boolean").optional().isBoolean(),
+];
+
+// === Question Controller Validators (AI Generation) ===
+export const validateGenerateAiQuestionsBody: ValidationChain[] = [
+  body("menuId", "Menu ID is required for AI question generation").isMongoId(),
+  body(
+    "bankId",
+    "Bank ID is required to save generated AI questions"
+  ).isMongoId(),
+  body("itemIds", "If provided, itemIds must be an array of valid MongoIDs")
+    .optional()
+    .isArray(),
+  body("itemIds.*", "Each itemId must be a valid MongoID")
+    .if(body("itemIds").exists())
+    .isMongoId(),
+  body(
+    "categoriesToFocus",
+    "If provided, categoriesToFocus must be an array of strings"
+  )
+    .optional()
+    .isArray(),
+  body("categoriesToFocus.*", "Each categoryToFocus must be a non-empty string")
+    .if(body("categoriesToFocus").exists())
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "numQuestionsPerItem",
+    "Number of questions per item must be a positive integer"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+];
+
+// === QuestionBank Controller Validators ===
+export const validateCreateQuestionBankFromMenuBody: ValidationChain[] = [
+  body("name", "Question bank name is required").isString().trim().notEmpty(),
+  body("menuId", "Menu ID is required for creating bank from menu").isMongoId(),
+  body(
+    "selectedCategoryNames",
+    "At least one selected category name is required"
+  )
+    .isArray({ min: 1 })
+    .withMessage("selectedCategoryNames must be a non-empty array."),
+  body(
+    "selectedCategoryNames.*",
+    "Each selected category name must be a non-empty string"
+  )
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("generateAiQuestions", "generateAiQuestions must be a boolean")
+    .optional()
+    .isBoolean(),
+  body(
+    "aiParams.targetQuestionCount",
+    "AI target question count must be a positive integer"
+  )
+    .if(body("generateAiQuestions").equals("true")) // Only if generating AI questions
+    .isInt({ min: 1 })
+    .toInt(),
+  // Add more validation for other aiParams if needed
+];
+
+export const validateCategoryNameBody: ValidationChain[] = [
+  body(
+    "categoryName",
+    "Category name is required and must be a non-empty string"
+  )
+    .isString()
+    .trim()
+    .notEmpty(),
+];
+
+// You might have other validators here...
+// Ensure the file ends correctly.

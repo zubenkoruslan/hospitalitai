@@ -1,15 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
-import * as QuizService from "../services/quizService"; // Assuming functions are exported from quizService
+import { QuizService, CreateQuizFromBanksData } from "../services/quizService"; // Import CreateQuizFromBanksData
 import { AppError } from "../utils/errorHandler"; // For error handling
+import {
+  GenerateQuizFromBanksRequestBody,
+  SubmitQuizAttemptRequestBody,
+} from "../types/quizTypes"; // Added import
 
-// Interface for expected request body (can be refined with validation library later)
-interface GenerateQuizFromBanksRequestBody {
-  title: string;
-  description?: string;
-  questionBankIds: string[];
-  numberOfQuestionsPerAttempt: number;
-}
+// Removed local GenerateQuizFromBanksRequestBody interface
+// Removed local SubmitQuizAttemptRequestBody interface
 
 export const generateQuizFromBanksController = async (
   req: Request,
@@ -21,49 +20,20 @@ export const generateQuizFromBanksController = async (
       req.body as GenerateQuizFromBanksRequestBody;
 
     if (!req.user || !req.user.restaurantId) {
-      // This check should ideally be covered by protect and ensureRestaurantAssociation middleware
       return next(
         new AppError("User not authenticated or restaurantId missing.", 401)
       );
     }
     const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
-    // const createdBy = new mongoose.Types.ObjectId(req.user._id); // If you add createdBy to QuizModel & service data
+    // Validation for body fields (title, questionBankIds, numberOfQuestionsPerAttempt)
+    // is assumed to be handled by validateGenerateQuizFromBanksBody in the routes file.
 
-    // Basic validation (more robust validation should be in dedicated middleware)
-    if (!title || title.trim() === "") {
-      return next(new AppError("Title is required.", 400));
-    }
-    if (
-      !questionBankIds ||
-      !Array.isArray(questionBankIds) ||
-      questionBankIds.length === 0
-    ) {
-      return next(
-        new AppError(
-          "questionBankIds must be a non-empty array of strings.",
-          400
-        )
-      );
-    }
-    if (
-      typeof numberOfQuestionsPerAttempt !== "number" ||
-      numberOfQuestionsPerAttempt <= 0
-    ) {
-      return next(
-        new AppError(
-          "numberOfQuestionsPerAttempt must be a positive number.",
-          400
-        )
-      );
-    }
-
-    const quizData: QuizService.CreateQuizFromBanksData = {
+    const quizData: CreateQuizFromBanksData = {
       title,
       description,
       restaurantId,
       questionBankIds,
       numberOfQuestionsPerAttempt,
-      // createdBy, // Pass if your service and model support it
     };
 
     const newQuiz = await QuizService.generateQuizFromBanksService(quizData);
@@ -96,9 +66,7 @@ export const startQuizAttemptController = async (
     if (!req.user || !req.user.userId) {
       return next(new AppError("User not authenticated.", 401));
     }
-    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
-      return next(new AppError("Valid Quiz ID is required.", 400));
-    }
+    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
 
     const staffUserId = new mongoose.Types.ObjectId(req.user.userId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
@@ -109,9 +77,6 @@ export const startQuizAttemptController = async (
     );
 
     if (questions.length === 0) {
-      // This could mean the quiz is completed or no questions available
-      // The service might throw an error for "completed" or return specific status.
-      // For now, sending a specific message if empty.
       res.status(200).json({
         status: "success",
         message: "No new questions available for this quiz, or quiz completed.",
@@ -133,14 +98,6 @@ export const startQuizAttemptController = async (
   }
 };
 
-interface SubmitQuizAttemptRequestBody {
-  questions: Array<{
-    questionId: string;
-    answerGiven: any;
-  }>;
-  durationInSeconds?: number;
-}
-
 export const submitQuizAttemptController = async (
   req: Request,
   res: Response,
@@ -153,19 +110,8 @@ export const submitQuizAttemptController = async (
     if (!req.user || !req.user.userId) {
       return next(new AppError("User not authenticated.", 401));
     }
-    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
-      return next(new AppError("Valid Quiz ID is required.", 400));
-    }
-    if (
-      !attemptData.questions ||
-      !Array.isArray(attemptData.questions) ||
-      attemptData.questions.length === 0
-    ) {
-      return next(
-        new AppError("Attempt data with questions is required.", 400)
-      );
-    }
-    // Further validation of each question in attemptData.questions can be added here
+    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
+    // attemptData validation is assumed to be handled by validateSubmitQuizAttemptBody in the routes file.
 
     const staffUserId = new mongoose.Types.ObjectId(req.user.userId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
@@ -199,9 +145,7 @@ export const getStaffQuizProgressController = async (
     if (!req.user || !req.user.userId) {
       return next(new AppError("User not authenticated.", 401));
     }
-    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
-      return next(new AppError("Valid Quiz ID is required.", 400));
-    }
+    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
 
     const staffUserId = new mongoose.Types.ObjectId(req.user.userId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
@@ -211,20 +155,55 @@ export const getStaffQuizProgressController = async (
       quizObjectId
     );
 
-    if (!progress) {
-      return next(
-        new AppError("No progress found for this staff and quiz.", 404)
-      );
-    }
+    // Note: Service now returns IStaffQuizProgressWithAttemptDetails | null
+    // which might need adjustment if we are moving to a list of attempts here.
+    // For now, this controller remains as is, focusing on adding the new one.
 
     res.status(200).json({
       status: "success",
-      data: progress,
+      data: progress, // Could be null if no progress found
     });
   } catch (error) {
     if (!(error instanceof AppError)) {
       console.error(
         "Unexpected error in getStaffQuizProgressController:",
+        error
+      );
+    }
+    next(error);
+  }
+};
+
+export const getQuizAttemptDetailsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { attemptId } = req.params;
+    const requestingUserId = req.user?.userId?.toString(); // req.user.userId should be string per AuthPayload
+
+    if (!requestingUserId) {
+      return next(
+        new AppError("User not authenticated or user ID missing.", 401)
+      );
+    }
+    // attemptId validation (e.g. isMongoId using validateObjectId('attemptId'))
+    // is assumed to be handled in the routes file.
+
+    const attemptDetails = await QuizService.getQuizAttemptDetails(
+      attemptId, // attemptId will be a string from req.params
+      requestingUserId
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: attemptDetails,
+    });
+  } catch (error) {
+    if (!(error instanceof AppError)) {
+      console.error(
+        "Unexpected error in getQuizAttemptDetailsController:",
         error
       );
     }
@@ -238,8 +217,8 @@ export const getRestaurantQuizStaffProgressController = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { quizId } = req.params; // restaurantId might not be in params depending on route
-    const restaurantIdFromParams = req.params.restaurantId;
+    const { quizId } = req.params;
+    const restaurantIdFromParams = req.params.restaurantId; // This is optional in some route definitions
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -252,16 +231,11 @@ export const getRestaurantQuizStaffProgressController = async (
 
     let restaurantObjectId: mongoose.Types.ObjectId;
 
+    // restaurantIdFromParams validation (isMongoId using validateObjectId('restaurantId'))
+    // is assumed to be handled in the routes file IF this param is mandatory for the route.
+    // If the route allows restaurantId to be optional in params, then this logic is fine.
     if (restaurantIdFromParams) {
-      if (!mongoose.Types.ObjectId.isValid(restaurantIdFromParams)) {
-        return next(
-          new AppError(
-            "Valid Restaurant ID in params is required if provided.",
-            400
-          )
-        );
-      }
-      // Ensure the requesting user (restaurant owner) is accessing their own restaurant's data
+      // Authorization check:
       if (req.user.restaurantId.toString() !== restaurantIdFromParams) {
         return next(
           new AppError(
@@ -273,14 +247,10 @@ export const getRestaurantQuizStaffProgressController = async (
       restaurantObjectId = new mongoose.Types.ObjectId(restaurantIdFromParams);
     } else {
       // If restaurantId is not in params, use the logged-in user's restaurantId.
-      // This relies on restrictTo('restaurant') middleware ensuring req.user.restaurantId is set and valid.
       restaurantObjectId = new mongoose.Types.ObjectId(req.user.restaurantId);
     }
 
-    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
-      return next(new AppError("Valid Quiz ID is required.", 400));
-    }
-
+    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
 
     const progressList = await QuizService.getRestaurantQuizStaffProgress(
@@ -318,13 +288,7 @@ export const resetQuizProgressController = async (
         )
       );
     }
-    // Only users with a role that can manage quizzes (e.g., admin, owner, manager) should be able to do this.
-    // This should be enforced by a role-checking middleware applied to the route.
-    // For now, we assume the route is protected appropriately.
-
-    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
-      return next(new AppError("Valid Quiz ID is required.", 400));
-    }
+    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
 
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
     const restaurantObjectId = new mongoose.Types.ObjectId(

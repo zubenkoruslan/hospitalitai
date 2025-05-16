@@ -1,12 +1,13 @@
 import express, { Request, Response, Router, NextFunction } from "express";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose"; // Keep for Types.ObjectId if still needed after service layer hides it
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import User from "../models/User"; // Staff and Restaurant are Users
-import QuizResult from "../models/QuizResult";
-import Quiz from "../models/Quiz";
-import QuizResultService from "../services/quizResultService"; // Import the service
 import StaffService from "../services/staffService"; // Import the new service
 import { AppError } from "../utils/errorHandler"; // Import AppError for consistency
+import {
+  handleValidationErrors,
+  validateStaffIdParam,
+  validateProfessionalRoleBody,
+} from "../middleware/validationMiddleware";
 
 const router: Router = express.Router();
 
@@ -49,20 +50,19 @@ router.get(
  */
 router.get(
   "/:id",
+  validateStaffIdParam, // Added validator
+  handleValidationErrors, // Added error handler
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
 
-    // Basic validation
     if (!restaurantId) {
+      // This check remains for now
       return next(new AppError("Restaurant ID not found for user.", 400));
     }
-    if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return next(new AppError("Invalid Staff ID format.", 400));
-    }
+    // Removed: mongoose.Types.ObjectId.isValid(staffId) check (handled by validateStaffIdParam)
 
     try {
-      // Delegate fetching and processing to the service
       const responseData = await StaffService.getStaffMemberDetails(
         staffId,
         restaurantId
@@ -81,25 +81,22 @@ router.get(
  */
 router.patch(
   "/:id",
+  validateStaffIdParam, // Added validator
+  validateProfessionalRoleBody, // Added validator
+  handleValidationErrors, // Added error handler
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
     const { professionalRole } = req.body;
 
-    // Basic validation
     if (!restaurantId) {
+      // This check remains for now
       return next(new AppError("Restaurant ID not found for user.", 400));
     }
-    if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return next(new AppError("Invalid Staff ID format.", 400));
-    }
-    // Basic check for presence, service handles more detail
-    if (professionalRole === undefined) {
-      return next(new AppError("Professional role is required.", 400));
-    }
+    // Removed: mongoose.Types.ObjectId.isValid(staffId) check (handled by validateStaffIdParam)
+    // Removed: professionalRole === undefined check (handled by validateProfessionalRoleBody)
 
     try {
-      // Delegate update logic to the service
       const staffResponse = await StaffService.updateStaffMemberRole(
         staffId,
         professionalRole,
@@ -122,20 +119,19 @@ router.patch(
  */
 router.delete(
   "/:id",
+  validateStaffIdParam, // Added validator
+  handleValidationErrors, // Added error handler
   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const restaurantId = req.user?.restaurantId;
     const { id: staffId } = req.params;
 
-    // Basic validation
     if (!restaurantId) {
+      // This check remains for now
       return next(new AppError("Restaurant ID not found for user.", 400));
     }
-    if (!mongoose.Types.ObjectId.isValid(staffId)) {
-      return next(new AppError("Invalid Staff ID format.", 400));
-    }
+    // Removed: mongoose.Types.ObjectId.isValid(staffId) check (handled by validateStaffIdParam)
 
     try {
-      // Delegate deletion logic to the service
       await StaffService.deleteStaffMember(staffId, restaurantId);
       res.status(200).json({ message: "Staff member deleted successfully." });
     } catch (error) {

@@ -12,9 +12,18 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error("ERROR STACK: ", err.stack);
-  console.error("ERROR MESSAGE: ", err.message);
-  console.error("ERROR FULL: ", err);
+  // Condition to skip logging for the specific "No progress found" 404 error
+  const isNoProgressError =
+    err instanceof AppError &&
+    err.statusCode === 404 &&
+    err.message === "No progress found for this staff and quiz.";
+
+  if (!isNoProgressError) {
+    // Log all other errors
+    console.error("ERROR STACK: ", err.stack);
+    console.error("ERROR MESSAGE: ", err.message);
+    console.error("ERROR FULL: ", err);
+  }
 
   let statusCode: number;
   let message: string;

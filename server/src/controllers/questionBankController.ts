@@ -18,35 +18,17 @@ export const createQuestionBank = async (
     const { name, description, categories, targetQuestionCount } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
-      // This should ideally be caught by protect middleware or a role check
-      // but an additional check here is good for robustness.
       return next(
         new AppError("User not authenticated or restaurantId missing", 401)
       );
     }
-
-    if (
-      !name // Categories are no longer required from client for bank creation
-      // !categories ||
-      // !Array.isArray(categories) ||
-      // categories.length === 0
-    ) {
-      return next(
-        new AppError(
-          // "Missing required fields: name and categories (must be a non-empty array).",
-          "Missing required field: name.",
-          400
-        )
-      );
-    }
-
-    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId; // Cast because we checked its existence
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
     const bankData: QuestionBankService.CreateQuestionBankData = {
       name,
       description,
-      categories: categories || [], // Default to empty array if not provided
-      // targetQuestionCount, // Removed, as it's not part of CreateQuestionBankData anymore
+      categories: categories || [],
+      targetQuestionCount,
       restaurantId,
     };
 
@@ -144,7 +126,7 @@ export const updateQuestionBank = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-    const { name, description } = req.body;
+    const { name, description, targetQuestionCount } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -153,19 +135,11 @@ export const updateQuestionBank = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    if (!mongoose.Types.ObjectId.isValid(bankId)) {
-      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
-    }
-
-    // Construct the update data object
-    // Only include fields that are actually provided in the request body
     const updateData: QuestionBankService.UpdateQuestionBankData = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
-
-    if (Object.keys(updateData).length === 0) {
-      return next(new AppError("No valid fields provided for update.", 400));
-    }
+    if (targetQuestionCount !== undefined)
+      updateData.targetQuestionCount = targetQuestionCount;
 
     const updatedBank = await QuestionBankService.updateQuestionBankService(
       bankId,
@@ -208,10 +182,6 @@ export const deleteQuestionBank = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    if (!mongoose.Types.ObjectId.isValid(bankId)) {
-      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
-    }
-
     const wasDeleted = await QuestionBankService.deleteQuestionBankService(
       bankId,
       restaurantId
@@ -226,7 +196,7 @@ export const deleteQuestionBank = async (
       );
     }
 
-    res.status(204).send(); // Send no content for 204 status
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
@@ -240,7 +210,7 @@ export const addQuestionToBank = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-    const { questionId } = req.body; // Assuming questionId is sent in the request body
+    const { questionId } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -249,23 +219,24 @@ export const addQuestionToBank = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    if (!questionId) {
-      return next(new AppError("Missing questionId in request body.", 400));
-    }
-
-    // Service function will validate bankId and questionId formats
     const updatedBank = await QuestionBankService.addQuestionToBankService(
       bankId,
       restaurantId,
       questionId
     );
 
-    // addQuestionToBankService throws specific AppErrors for not found, etc.
-    // So, if we get here, it means success or a non-null return from a no-op (like duplicate add).
+    if (!updatedBank) {
+      return next(
+        new AppError(
+          "Failed to add question to bank. Bank or question may not exist.",
+          404
+        )
+      );
+    }
 
     res.status(200).json({
       status: "success",
-      message: "Question added to bank successfully.", // Or a more nuanced message if it was a no-op
+      message: "Question added to bank successfully.",
       data: updatedBank,
     });
   } catch (error) {

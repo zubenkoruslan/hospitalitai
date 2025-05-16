@@ -1,5 +1,12 @@
-import { IncorrectQuestionDetail } from "./staffTypes"; // If needed for ClientQuizAttemptDetails
+// import { IncorrectQuestionDetail } from "./staffTypes"; // REMOVED IMPORT
 import { ClientUserMinimal } from "./user"; // Changed from userTypes.ts to user.ts
+
+// ADDED: Definition for IncorrectQuestionDetail
+export interface IncorrectQuestionDetail {
+  questionText: string;
+  userAnswer: string;
+  correctAnswer: string;
+}
 
 // From api.ts: ClientIQuiz (lines 326-339)
 export interface ClientIQuiz {
@@ -73,4 +80,49 @@ export interface ClientSubmitAttemptResponse {
   totalQuestionsAttempted: number;
   attemptId: string;
   questions: ClientGradedQuestion[];
+}
+
+// From client/src/components/quiz/QuestionDisplay.tsx
+// Represents a question format for display and interaction within quiz components.
+export interface QuizDisplayQuestion {
+  _id?: string; // Optional: might be an existing question from DB or a new one being built
+  text: string;
+  choices: string[];
+  correctAnswer: number; // Index of the correct choice in the choices array
+  menuItemId?: string; // Optional: if the question is related to a specific menu item
+  // This field was present in the original local type. Keeping it as optional.
+}
+
+// From client/src/components/quiz/QuizResultsModal.tsx
+// Represents the quiz structure with embedded questions for display in results.
+export interface ClientQuizDataForDisplay {
+  _id?: string;
+  title: string;
+  questions: QuizDisplayQuestion[]; // Uses the existing QuizDisplayQuestion
+  restaurantId?: string; // Kept optional as per original local type in modal
+}
+
+// From client/src/components/quiz/QuizResultsModal.tsx
+// Represents the overall quiz result structure for display.
+export interface ClientQuizResultForDisplay {
+  score: number;
+  totalQuestions: number;
+  userAnswers: (number | undefined)[]; // Array of selected choice indices by the user
+  quizData: ClientQuizDataForDisplay;
+}
+
+// From client/src/components/quiz/QuizEditorModal.tsx
+// Represents a quiz structure that is actively being edited, including its questions.
+export interface ClientQuizEditable {
+  _id?: string;
+  title: string;
+  // Based on QuizEditorModal's getInitialMenuItemIdForNewQuestion, this field is used.
+  // It can be an array of strings (IDs) or objects with _id and name.
+  menuItemIds?: string[] | { _id: string; name: string }[];
+  questions: QuizDisplayQuestion[];
+  restaurantId: string; // Aligning with ClientIQuiz, assuming it's essential.
+  isAvailable: boolean; // Non-optional as per original local type in modal
+  isAssigned?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }

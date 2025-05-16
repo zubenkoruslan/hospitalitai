@@ -19,21 +19,8 @@ export const createQuestion = async (
     }
     const restaurantId = req.user.restaurantId;
 
-    // Basic validation for required fields from the client
-    if (!questionText || !questionType || !options || !categories) {
-      return next(
-        new AppError(
-          "Missing required fields: questionText, questionType, options, categories.",
-          400
-        )
-      );
-    }
-    if (!Array.isArray(options) || options.length === 0) {
-      return next(new AppError("Options must be a non-empty array.", 400));
-    }
-    if (!Array.isArray(categories) || categories.length === 0) {
-      return next(new AppError("Categories must be a non-empty array.", 400));
-    }
+    // Validation for body fields (questionText, questionType, options, categories)
+    // is assumed to be handled by validateCreateQuestionBody in the routes file.
 
     const questionData: QuestionService.NewQuestionData = {
       questionText,
@@ -41,7 +28,7 @@ export const createQuestion = async (
       options,
       categories,
       restaurantId,
-      createdBy: "manual", // Questions created via this endpoint are manually created
+      createdBy: "manual",
       difficulty,
     };
 
@@ -143,6 +130,9 @@ export const updateQuestion = async (
     }
     const restaurantId = req.user.restaurantId;
 
+    // Validation for questionId is assumed to be handled by validateObjectId('questionId') in routes.
+    // Validation for body fields is assumed to be handled by validateUpdateQuestionBody in routes.
+
     const updateData: QuestionService.UpdateQuestionData = {};
     if (questionText !== undefined) updateData.questionText = questionText;
     if (questionType !== undefined) updateData.questionType = questionType;
@@ -150,33 +140,13 @@ export const updateQuestion = async (
     if (categories !== undefined) updateData.categories = categories;
     if (difficulty !== undefined) updateData.difficulty = difficulty;
 
-    if (Object.keys(updateData).length === 0) {
-      return next(new AppError("No fields provided for update.", 400));
-    }
-
-    // Validate options array structure if provided, before sending to service
-    if (updateData.options && !Array.isArray(updateData.options)) {
-      // Mongoose will validate content further
-      return next(new AppError("If provided, options must be an array.", 400));
-    }
-    if (
-      updateData.categories &&
-      (!Array.isArray(updateData.categories) ||
-        updateData.categories.length === 0)
-    ) {
-      return next(
-        new AppError("If provided, categories must be a non-empty array.", 400)
-      );
-    }
+    // The check for empty updateData is now part of validateUpdateQuestionBody.
 
     const updatedQuestion = await QuestionService.updateQuestionService(
       questionId,
       restaurantId,
       updateData
     );
-
-    // Service throws AppError if not found (which we check via existingQuestion fetch now)
-    // or if other pre-validations fail.
 
     res.status(200).json({
       status: "success",

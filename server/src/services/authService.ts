@@ -46,7 +46,9 @@ class AuthService {
       );
     }
 
-    // TODO: Consider wrapping in a transaction for atomicity
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       // 1. Create the User (owner)
       const newUser = new User({
@@ -55,30 +57,31 @@ class AuthService {
         role,
         name,
       });
-      await newUser.save(); // Potential validation errors caught here
+      await newUser.save({ session });
 
       // 2. Create the Restaurant
       const newRestaurant = new Restaurant({
         name: restaurantName,
         owner: newUser._id as mongoose.Types.ObjectId,
       });
-      await newRestaurant.save(); // Potential validation errors caught here
+      await newRestaurant.save({ session });
 
       // 3. Update the User with the Restaurant ID
       newUser.restaurantId = newRestaurant._id as mongoose.Types.ObjectId;
-      await newUser.save();
+      await newUser.save({ session });
 
+      await session.commitTransaction();
       return { user: newUser, restaurant: newRestaurant };
     } catch (error: any) {
-      // Clean up if partial creation occurred? Transaction would handle this.
-      // For now, re-throw a generic error if save fails
+      await session.abortTransaction();
       console.error("Error during owner/restaurant registration:", error);
       if (error instanceof AppError) throw error;
-      // Handle Mongoose validation errors more specifically if needed
       if (error.name === "ValidationError") {
         throw new AppError(`Validation failed: ${error.message}`, 400);
       }
       throw new AppError("Failed to register owner and restaurant.", 500);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -90,9 +93,11 @@ class AuthService {
    * @throws {AppError} If the role is invalid, restaurant ID is missing/invalid, restaurant not found,
    *                    user creation fails (e.g., duplicate email), or any other validation/database error occurs.
    */
-  static async registerStaff(
-    data: SignupData
-  ): Promise<{ user: IUser; restaurantId: mongoose.Types.ObjectId }> {
+  static async registerStaff(data: SignupData): Promise<{
+    user: IUser;
+    restaurantId: mongoose.Types.ObjectId;
+    restaurantName: string | undefined;
+  }> {
     const { email, password, role, name, restaurantId, professionalRole } =
       data;
 
@@ -100,31 +105,43 @@ class AuthService {
       throw new AppError("Invalid role for staff registration.", 400);
     }
     if (!restaurantId) {
-      // Should be caught by validation middleware, but good to double-check
       throw new AppError("Restaurant ID is required for staff role.", 400);
     }
 
-    // 1. Find the target restaurant
-    let targetRestaurant: IRestaurant | null;
-    try {
-      targetRestaurant = await Restaurant.findById(restaurantId);
-    } catch (findError: any) {
-      // Handle potential errors during findById (e.g., invalid ID format before query)
-      console.error("Error finding restaurant by ID:", findError);
-      throw new AppError(
-        "Invalid Restaurant ID format or error during lookup.",
-        400
-      );
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!targetRestaurant) {
-      // Use AppError for consistent handling
-      throw new AppError("Restaurant not found with the provided ID.", 404);
-    }
-    const finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId;
-
-    // TODO: Consider wrapping in a transaction
     try {
+      // 1. Find the target restaurant - this read operation can be outside or inside the transaction
+      // For simplicity and since it's a read, keeping it before trying to write.
+      // However, if strict serializability is needed or if the restaurant's existence is critical
+      // for the transaction's validity from the start, it could be moved inside.
+      let targetRestaurant: IRestaurant | null;
+      try {
+        // Finding restaurant can stay outside or be part of the transaction.
+        // If it's part of the transaction, it would use { session }.
+        // For now, assuming it's acceptable to validate restaurant existence before starting writes.
+        targetRestaurant = await Restaurant.findById(restaurantId).session(
+          session
+        ); // Added session here for consistency
+      } catch (findError: any) {
+        await session.abortTransaction(); // Abort if findById itself fails due to bad ID format before query
+        session.endSession();
+        console.error("Error finding restaurant by ID:", findError);
+        throw new AppError(
+          "Invalid Restaurant ID format or error during lookup.",
+          400
+        );
+      }
+
+      if (!targetRestaurant) {
+        await session.abortTransaction();
+        session.endSession();
+        throw new AppError("Restaurant not found with the provided ID.", 404);
+      }
+      const finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId;
+      const restaurantName = targetRestaurant.name;
+
       // 2. Create the staff user
       const newUser = new User({
         email,
@@ -134,28 +151,23 @@ class AuthService {
         restaurantId: finalRestaurantId,
         professionalRole,
       });
-      await newUser.save(); // Potential validation errors
+      await newUser.save({ session }); // Pass session here
 
-      // 3. Add staff to restaurant list (use $addToSet for idempotency)
-      await Restaurant.findByIdAndUpdate(finalRestaurantId, {
-        $addToSet: { staff: newUser._id },
-      });
-
-      return { user: newUser, restaurantId: finalRestaurantId };
+      await session.commitTransaction();
+      return { user: newUser, restaurantId: finalRestaurantId, restaurantName };
     } catch (error: any) {
-      // Clean up if partial creation? Transaction needed.
+      await session.abortTransaction();
       console.error("Error during staff registration:", error);
       if (error instanceof AppError) throw error;
       if (error.code === 11000) {
-        throw new AppError(
-          "User with this email already exists.", // Simplified message
-          409
-        );
+        throw new AppError("User with this email already exists.", 409);
       }
       if (error.name === "ValidationError") {
         throw new AppError(`Validation failed: ${error.message}`, 400);
       }
       throw new AppError("Failed to register staff member.", 500);
+    } finally {
+      session.endSession();
     }
   }
 
