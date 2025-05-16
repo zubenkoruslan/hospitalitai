@@ -21,6 +21,7 @@ import {
   getQuizAttemptDetailsController,
   getRestaurantQuizStaffProgressController,
   resetQuizProgressController,
+  updateQuizController,
 } from "../controllers/quizController";
 
 const router: Router = express.Router();
@@ -83,26 +84,7 @@ router.put(
   validateQuizIdParam,
   validateUpdateQuizBody,
   handleValidationErrors,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { quizId } = req.params;
-    const updateData = req.body;
-    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
-
-    try {
-      const updatedQuiz = await QuizService.updateQuiz(
-        new Types.ObjectId(quizId),
-        restaurantId,
-        updateData
-      );
-      res.status(200).json({
-        message: "Quiz updated successfully",
-        quiz: updatedQuiz,
-      });
-    } catch (error) {
-      console.error("Error in PUT /api/quiz/:quizId route:", error);
-      next(error);
-    }
-  }
+  updateQuizController
 );
 
 /**

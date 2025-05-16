@@ -1,5 +1,6 @@
 import mongoose, { Types } from "mongoose";
-import Quiz, { IQuiz } from "../models/Quiz";
+import QuizModel from "../models/QuizModel"; // Default import
+import { IQuiz } from "../models/QuizModel"; // Named import for interface
 import { IQuestion } from "../models/QuestionModel";
 import MenuItem from "../models/MenuItem"; // Removed IMenuItem
 import QuizResult from "../models/QuizResult"; // Removed IQuizResult
@@ -25,6 +26,7 @@ export interface CreateQuizFromBanksData {
   restaurantId: Types.ObjectId;
   questionBankIds: string[]; // or Types.ObjectId[] depending on what the service expects
   numberOfQuestionsPerAttempt: number;
+  targetRoles?: Types.ObjectId[]; // ADDED: For assigning roles during quiz creation
   // createdBy?: Types.ObjectId; // Optional
 }
 
@@ -246,168 +248,90 @@ export class QuizService {
     restaurantId: Types.ObjectId,
     updateData: Partial<IQuiz>
   ): Promise<IQuiz> {
-    const allowedUpdateKeys: (keyof IQuiz)[] = [
+    const allowedUpdateKeys: Array<keyof IQuiz> = [
       "title",
       "description",
       "sourceQuestionBankIds",
       "numberOfQuestionsPerAttempt",
       "isAvailable",
-      // "isAssigned", // REMOVED from allowed keys
-      // totalUniqueQuestionsInSourceSnapshot is calculated, not directly updated by client.
+      "targetRoles",
+      "totalUniqueQuestionsInSourceSnapshot",
     ];
 
-    const sanitizedUpdateData: Partial<IQuiz> = {};
-    for (const key of allowedUpdateKeys) {
-      if (updateData.hasOwnProperty(key)) {
-        (sanitizedUpdateData as any)[key] = (updateData as any)[key];
-      }
-    }
-
-    const quiz = await Quiz.findOne({
-      _id: quizId,
-      restaurantId: restaurantId,
-    });
-
-    if (!quiz) {
-      throw new AppError("Quiz not found or access denied.", 404);
-    }
-
-    const oldIsAvailable = quiz.isAvailable;
-
-    // Apply allowed updates
-    Object.assign(quiz, sanitizedUpdateData);
-
-    // If sourceQuestionBankIds or numberOfQuestionsPerAttempt are changing,
-    // we must recalculate totalUniqueQuestionsInSourceSnapshot.
-    if (
-      sanitizedUpdateData.sourceQuestionBankIds ||
-      sanitizedUpdateData.numberOfQuestionsPerAttempt
-    ) {
-      if (
-        !quiz.sourceQuestionBankIds ||
-        quiz.sourceQuestionBankIds.length === 0
-      ) {
-        // This case should ideally be prevented by validation if sourceQuestionBankIds becomes empty
-        quiz.totalUniqueQuestionsInSourceSnapshot = 0;
-      } else {
-        const banks = await QuestionBankModel.find({
-          _id: {
-            $in: quiz.sourceQuestionBankIds.map(
-              (id) => new mongoose.Types.ObjectId(id)
-            ),
-          },
-          restaurantId: quiz.restaurantId, // Ensure banks belong to the same restaurant
-        }).populate<{ questions: IQuestion[] }>("questions");
-
-        if (!banks) {
-          // This implies a DB error or an issue with bank IDs if they were just set.
-          // Or, if some sourceQuestionBankIds were invalid and resulted in no banks found.
-          throw new AppError(
-            "Error fetching question banks for snapshot recalculation during update.",
-            500
-          );
-        }
-
-        const uniqueQuestionIdSet = new Set<string>();
-        banks.forEach((bank) => {
-          if (bank.questions && Array.isArray(bank.questions)) {
-            (bank.questions as IQuestion[]).forEach((question) => {
-              // Assuming all questions in a bank are active for snapshot purposes
-              if (
-                question &&
-                question._id &&
-                !uniqueQuestionIdSet.has(question._id.toString())
-              ) {
-                uniqueQuestionIdSet.add(question._id.toString());
-              }
-            });
-          }
-        });
-        quiz.totalUniqueQuestionsInSourceSnapshot = uniqueQuestionIdSet.size;
-      }
-
-      // Validate again after recalculation
-      if (
-        quiz.numberOfQuestionsPerAttempt >
-        (quiz.totalUniqueQuestionsInSourceSnapshot ?? 0)
-      ) {
+    // Check for duplicate title for the same restaurant but different quiz
+    if (updateData.title) {
+      const existingQuizWithTitle = await QuizModel.findOne({
+        title: updateData.title,
+        restaurantId,
+        _id: { $ne: quizId },
+      });
+      if (existingQuizWithTitle) {
         throw new AppError(
-          `Update Error: Number of questions per attempt (${
-            quiz.numberOfQuestionsPerAttempt
-          }) cannot exceed the total number of unique active questions available in the selected banks (${
-            quiz.totalUniqueQuestionsInSourceSnapshot ?? 0
-          }).`,
-          400
-        );
-      }
-    }
-
-    // Mass assignment logic if quiz is becoming available
-    // This part needs careful review and likely complete rewrite due to StaffQuizProgress model and QuizResult deprecation plan.
-    // Commenting out the actual call for now.
-    // if (quiz.isAvailable && !oldIsAvailable) { // REMOVED Block for isAssigned logic
-    //   console.log(
-    //     `Quiz ${quizId} is being made available. Mass assignment logic would trigger here.`
-    //   );
-    //   // await _assignQuizToAllRestaurantStaff(quiz._id, quiz.restaurantId, quiz.title, quiz.numberOfQuestionsPerAttempt);
-    //   // quiz.isAssigned = true; // Potentially set based on assignment outcome
-    // }
-
-    // If the quiz is being DEACTIVATED (was available, now is not)
-    // Reset progress for all staff for this quiz.
-    if (oldIsAvailable === true && quiz.isAvailable === false) {
-      console.log(
-        `Quiz ${quizId} is being DEACTIVATED. Resetting progress for everyone.`
-      );
-      try {
-        // Assuming resetQuizProgressForEveryone handles its own transaction or can be called standalone.
-        await QuizService.resetQuizProgressForEveryone(
-          quiz._id,
-          quiz.restaurantId
-        );
-        console.log(
-          `Successfully reset progress for quiz ${quizId} during deactivation.`
-        );
-      } catch (resetError: any) {
-        // Log the error, but decide if this should prevent the quiz from being saved as deactivated.
-        // For now, we'll log and continue, as the primary action is deactivation.
-        // A more robust solution might involve transactions spanning both operations.
-        console.error(
-          `Error resetting progress for quiz ${quizId} during deactivation:`,
-          resetError
-        );
-        // Optionally, re-throw if progress reset is critical for deactivation to proceed
-        // throw new AppError(`Failed to reset quiz progress during deactivation: ${resetError.message}`, 500);
-      }
-    }
-
-    try {
-      await quiz.save();
-      return quiz;
-    } catch (error: any) {
-      console.error("Error updating quiz in service:", error);
-      if (error instanceof AppError) throw error; // Re-throw 404 or assignment error
-      if (error instanceof mongoose.Error.ValidationError) {
-        throw new AppError(`Validation failed: ${error.message}`, 400);
-      }
-      if ((error as any).code === 11000) {
-        throw new AppError(
-          "A quiz with this title already exists for the restaurant.",
+          "A quiz with this title already exists for your restaurant.",
           409
         );
       }
-      throw new AppError("Failed to update quiz.", 500);
     }
+
+    // If sourceQuestionBankIds or numberOfQuestionsPerAttempt is being updated,
+    // recalculate totalUniqueQuestionsInSourceSnapshot
+    if (
+      updateData.sourceQuestionBankIds ||
+      updateData.numberOfQuestionsPerAttempt
+    ) {
+      const currentQuiz = await QuizModel.findById(quizId).lean();
+      if (!currentQuiz) {
+        throw new AppError("Quiz not found to update snapshot.", 404);
+      }
+
+      const banksToQuery =
+        updateData.sourceQuestionBankIds || currentQuiz.sourceQuestionBankIds;
+      if (banksToQuery && banksToQuery.length > 0) {
+        const uniqueQuestionIds =
+          await getUniqueValidQuestionIdsFromQuestionBanks(
+            banksToQuery.map((id) =>
+              typeof id === "string" ? new Types.ObjectId(id) : id
+            ),
+            restaurantId
+          );
+        updateData.totalUniqueQuestionsInSourceSnapshot =
+          uniqueQuestionIds.length;
+      } else {
+        updateData.totalUniqueQuestionsInSourceSnapshot = 0;
+      }
+    }
+
+    // Filter updateData to only include allowed keys
+    const finalUpdateData: Partial<IQuiz> = {};
+    for (const key of allowedUpdateKeys) {
+      if (updateData.hasOwnProperty(key)) {
+        (finalUpdateData as any)[key] = (updateData as any)[key];
+      }
+    }
+
+    const quiz = await QuizModel.findOneAndUpdate(
+      { _id: quizId, restaurantId },
+      { $set: finalUpdateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!quiz) {
+      throw new AppError(
+        "Quiz not found or you do not have permission to update it.",
+        404
+      );
+    }
+    return quiz;
   }
 
   /**
-   * Deletes a quiz and all its associated results.
+   * Deletes a quiz and all associated progress and attempts.
    *
    * @param quizId - The ID of the quiz to delete.
    * @param restaurantId - The ID of the restaurant owning the quiz.
-   * @returns A promise resolving to an object indicating the counts of deleted quiz and result documents.
+   * @returns A promise resolving to an object with counts of deleted documents.
    * @throws {AppError} If the quiz is not found or doesn't belong to the restaurant (404),
-   *                    or if any database deletion operation fails (500).
+   *                    or if the database delete operation fails (500).
    */
   static async deleteQuiz(
     quizId: Types.ObjectId,
@@ -417,66 +341,89 @@ export class QuizService {
     deletedProgressCount: number;
     deletedAttemptsCount: number;
   }> {
-    const useTransactions = process.env.NODE_ENV !== "development";
-    let session: mongoose.ClientSession | null = null;
-
-    try {
-      if (useTransactions) {
-        session = await mongoose.startSession();
-        session.startTransaction();
-      }
-
-      const quizToDelete = await Quiz.findOne({
-        _id: quizId,
-        restaurantId: restaurantId,
-      }).session(session);
-
-      if (!quizToDelete) {
-        throw new AppError(
-          "Quiz not found or you do not have permission to delete it.",
-          404
-        );
-      }
-
-      // Delete associated StaffQuizProgress records
-      const progressDeletion = await StaffQuizProgress.deleteMany(
-        { quizId: quizId, restaurantId: restaurantId },
-        { session: session ?? undefined } // Pass session if it exists, else undefined
+    const quiz = await QuizModel.findOne({ _id: quizId, restaurantId });
+    if (!quiz) {
+      throw new AppError(
+        "Quiz not found or you do not have permission to delete it.",
+        404
       );
-
-      // Delete associated QuizAttempt records
-      const attemptsDeletion = await QuizAttempt.deleteMany(
-        { quizId: quizId, restaurantId: restaurantId },
-        { session: session ?? undefined } // Pass session if it exists, else undefined
-      );
-
-      // Delete the Quiz itself
-      const quizDeletionResult = await Quiz.deleteOne(
-        { _id: quizId, restaurantId: restaurantId },
-        { session: session ?? undefined } // Pass session if it exists, else undefined
-      );
-
-      if (session) {
-        await session.commitTransaction();
-      }
-
-      return {
-        deletedQuizCount: quizDeletionResult.deletedCount || 0,
-        deletedProgressCount: progressDeletion.deletedCount || 0,
-        deletedAttemptsCount: attemptsDeletion.deletedCount || 0,
-      };
-    } catch (error: any) {
-      if (session) {
-        await session.abortTransaction();
-      }
-      console.error("Error deleting quiz in service:", error);
-      if (error instanceof AppError) throw error;
-      throw new AppError("Failed to delete quiz and associated data.", 500);
-    } finally {
-      if (session) {
-        session.endSession();
-      }
     }
+
+    // Delete all staff quiz progress associated with this quiz
+    const progressDeletionResult = await StaffQuizProgress.deleteMany({
+      quizId,
+      restaurantId,
+    });
+
+    // Delete all quiz attempts associated with this quiz
+    const attemptsDeletionResult = await QuizAttempt.deleteMany({
+      quizId,
+      restaurantId,
+    });
+
+    // Delete the quiz itself
+    const quizDeletionResult = await QuizModel.deleteOne({
+      _id: quizId,
+      restaurantId,
+    });
+
+    if (quizDeletionResult.deletedCount === 0) {
+      // Should not happen if the findOne check passed, but as a safeguard
+      throw new AppError("Quiz deletion failed.", 500);
+    }
+
+    return {
+      deletedQuizCount: quizDeletionResult.deletedCount || 0,
+      deletedProgressCount: progressDeletionResult.deletedCount || 0,
+      deletedAttemptsCount: attemptsDeletionResult.deletedCount || 0,
+    };
+  }
+
+  /**
+   * Resets all progress for a specific quiz for all staff members in a restaurant.
+   * This includes clearing seen questions, completion status, and deleting all associated quiz attempts.
+   *
+   * @param quizId - The ID of the quiz to reset.
+   * @param restaurantId - The ID of the restaurant.
+   * @returns A promise resolving to an object with counts of updated/deleted documents.
+   * @throws {AppError} If the quiz is not found (404) or database operations fail (500).
+   */
+  static async resetQuizProgressForEveryone(
+    quizId: Types.ObjectId,
+    restaurantId: Types.ObjectId
+  ): Promise<{
+    updatedProgressCount: number;
+    deletedAttemptsCount: number;
+  }> {
+    // Verify the quiz exists and belongs to the restaurant
+    const quiz = await QuizModel.findOne({ _id: quizId, restaurantId }).lean();
+    if (!quiz) {
+      throw new AppError("Quiz not found for this restaurant.", 404);
+    }
+
+    // Reset StaffQuizProgress: clear seenQuestionIds, set isCompletedOverall to false
+    const progressUpdateResult = await StaffQuizProgress.updateMany(
+      { quizId, restaurantId },
+      {
+        $set: {
+          seenQuestionIds: [],
+          isCompletedOverall: false,
+          // lastAttemptTimestamp: undefined, // Optional: decide if this should be cleared
+        },
+        // $unset: { lastAttemptTimestamp: "" } // Alternative to set to undefined
+      }
+    );
+
+    // Delete all QuizAttempts for this quiz and restaurant
+    const attemptsDeletionResult = await QuizAttempt.deleteMany({
+      quizId,
+      restaurantId,
+    });
+
+    return {
+      updatedProgressCount: progressUpdateResult.modifiedCount || 0,
+      deletedAttemptsCount: attemptsDeletionResult.deletedCount || 0,
+    };
   }
 
   /**
@@ -493,7 +440,7 @@ export class QuizService {
     restaurantId: Types.ObjectId
   ): Promise<IQuiz> {
     try {
-      const quiz = await Quiz.findOne({
+      const quiz = await QuizModel.findOne({
         _id: quizId,
         restaurantId: restaurantId,
         isAvailable: true, // Staff should only be able to take available quizzes
@@ -528,7 +475,7 @@ export class QuizService {
     restaurantId: Types.ObjectId
   ): Promise<IQuiz[]> {
     try {
-      return await Quiz.find({ restaurantId }).lean(); // Use lean
+      return await QuizModel.find({ restaurantId }).lean(); // Use lean
     } catch (error) {
       console.error("Error fetching quizzes for restaurant:", error);
       throw new AppError("Failed to fetch quizzes.", 500);
@@ -547,1296 +494,71 @@ export class QuizService {
     staffUserId: Types.ObjectId
   ): Promise<AvailableQuizInfo[]> {
     try {
-      // 1. Fetch all quizzes for the restaurant that are marked isAvailable: true
-      const allAvailableQuizzesInRestaurant = await Quiz.find({
+      const staffUser = await User.findById(staffUserId)
+        .select("assignedRoleId")
+        .lean<Pick<IUser, "assignedRoleId">>();
+      if (!staffUser) {
+        // Or handle as an error, but returning empty might be safer if staff not found shouldn't halt all quiz display
+        console.warn(
+          `[QuizService] Staff user ${staffUserId} not found when fetching available quizzes.`
+        );
+        return [];
+      }
+
+      const staffAssignedRoleId = staffUser.assignedRoleId; // This could be ObjectId or undefined
+
+      const queryConditions: any = {
         restaurantId: restaurantId,
         isAvailable: true,
-      })
-        .select("_id title description createdAt numberOfQuestionsPerAttempt")
-        .lean<
-          Pick<
-            IQuiz,
-            | "_id"
-            | "title"
-            | "description"
-            | "createdAt"
-            | "numberOfQuestionsPerAttempt"
-          >[]
-        >();
+      };
 
-      if (!allAvailableQuizzesInRestaurant.length) {
-        return []; // No available quizzes in this restaurant
+      if (staffAssignedRoleId) {
+        queryConditions.$or = [
+          { targetRoles: { $exists: false } }, // For older quizzes without targetRoles field
+          { targetRoles: { $size: 0 } }, // Quiz is for everyone (empty array)
+          { targetRoles: staffAssignedRoleId }, // Quiz targets the role this staff member has (using $in implicitly due to array field)
+        ];
+      } else {
+        // If staff has no assigned role, they only see quizzes for everyone
+        queryConditions.$or = [
+          { targetRoles: { $exists: false } },
+          { targetRoles: { $size: 0 } },
+        ];
       }
 
-      // 2. For each available quiz, fetch the specific staff member's progress and calculate their average score.
-      const availableQuizzesWithStaffDataPromises =
-        allAvailableQuizzesInRestaurant.map(async (quizDef) => {
-          // Fetch staff progress for this specific quiz
-          const staffProgress = await StaffQuizProgress.findOne({
-            staffUserId: staffUserId,
-            quizId: quizDef._id,
-            restaurantId: restaurantId, // Ensure restaurant context for progress
-          }).lean<IStaffQuizProgress | null>();
+      const quizzes = await QuizModel.find(queryConditions)
+        .select("_id title description createdAt numberOfQuestionsPerAttempt") // Removed averageScore for now
+        .sort({ createdAt: -1 })
+        .lean<IQuiz[]>(); // Ensure it's an array of IQuiz
 
-          // Calculate average score for this staff member on this quiz
-          let averageScore: number | null = null;
-          if (staffProgress) {
-            // Only calculate if progress exists
-            const quizAttemptsForThisQuiz = await QuizAttempt.find({
-              staffUserId: staffUserId,
-              quizId: quizDef._id,
-              restaurantId: restaurantId,
-            })
-              .select("score questionsPresented attemptDate") // Ensure attemptDate is selected
-              .lean<
-                Pick<
-                  IQuizAttempt,
-                  "score" | "questionsPresented" | "attemptDate"
-                >[]
-              >();
-
-            if (quizAttemptsForThisQuiz.length > 0) {
-              let totalPercentageSum = 0;
-              let validAttemptsCount = 0;
-              quizAttemptsForThisQuiz.forEach((attempt) => {
-                // ADD LOGGING HERE
-                console.log(
-                  `[QuizService.getAvailableQuizzesForStaff] User: ${staffUserId}, Quiz: ${quizDef._id} - Averaging Attempt -- Score: ${attempt.score}, TotalQ: ${attempt.questionsPresented?.length}, Date: ${attempt.attemptDate}`
-                );
-
-                if (
-                  attempt.score !== undefined &&
-                  attempt.questionsPresented &&
-                  attempt.questionsPresented.length > 0
-                ) {
-                  totalPercentageSum +=
-                    attempt.score / attempt.questionsPresented.length;
-                  validAttemptsCount++;
-                }
-              });
-              if (validAttemptsCount > 0) {
-                averageScore = parseFloat(
-                  ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
-                );
-                console.log(
-                  `[QuizService.getAvailableQuizzesForStaff] User: ${staffUserId}, Quiz: ${quizDef._id} - Calculated Avg: ${averageScore}% from ${validAttemptsCount} attempts.`
-                );
-              }
-            }
-          }
-
-          return {
-            _id: quizDef._id.toString(),
-            title: quizDef.title,
-            description: quizDef.description,
-            createdAt: quizDef.createdAt,
-            numQuestions: quizDef.numberOfQuestionsPerAttempt,
-            averageScore: averageScore, // This will be null if no progress or no attempts
-            // Include progress-specific details if needed by the frontend, e.g.:
-            // isCompletedOverall: staffProgress?.isCompletedOverall || false,
-            // seenQuestionsCount: staffProgress?.seenQuestionIds?.length || 0,
-            // totalUniqueQuestionsInSource: staffProgress?.totalUniqueQuestionsInSource,
-          };
-        });
-
-      const availableQuizzesInfo = await Promise.all(
-        availableQuizzesWithStaffDataPromises
-      );
-
-      // Sort by creation date, newest first, or other criteria as needed
-      availableQuizzesInfo.sort((a, b) => {
-        if (a.createdAt && b.createdAt) {
-          return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        }
-        if (a.createdAt) return -1;
-        if (b.createdAt) return 1;
-        return 0;
-      });
-
-      return availableQuizzesInfo;
+      // Transform to AvailableQuizInfo
+      // Consider calculating averageScore here if needed, or ensure it's on IQuiz model
+      return quizzes.map((quiz) => ({
+        _id: quiz._id.toString(), // Convert ObjectId to string
+        title: quiz.title,
+        description: quiz.description,
+        createdAt: quiz.createdAt,
+        numQuestions: quiz.numberOfQuestionsPerAttempt, // Direct mapping from IQuiz
+        // averageScore: quiz.averageScore, // Assuming averageScore is part of IQuiz (if not, needs calculation or removal)
+      }));
     } catch (error: any) {
       console.error(
-        `Error fetching available quizzes for staff ${staffUserId} in restaurant ${restaurantId}:`,
+        "Error fetching available quizzes for staff in service:",
         error
       );
-      throw new AppError("Failed to fetch available quizzes for staff.", 500);
+      throw new AppError("Failed to fetch available quizzes.", 500);
     }
   }
 
   /**
-   * Counts the total number of quizzes associated with a specific restaurant.
+   * Generates a new quiz from specified question banks.
    *
-   * @param restaurantId - The ID of the restaurant.
-   * @returns A promise resolving to the total number of quizzes.
-   * @throws {AppError} If any database error occurs (500).
+   * @param data - Data for creating the quiz from banks.
+   * @returns A promise resolving to the new quiz document.
+   * @throws {AppError} If validation fails (e.g., question banks not found, question count mismatch)
+   *                    or if database save operation fails.
    */
-  static async countQuizzes(restaurantId: Types.ObjectId): Promise<number> {
-    try {
-      const count = await Quiz.countDocuments({
-        restaurantId,
-        isAvailable: true,
-      });
-      return count;
-    } catch (error: any) {
-      console.error("Error counting quizzes in service:", error);
-      throw new AppError("Failed to count quizzes.", 500);
-    }
-  }
-
-  /**
-   * Starts a quiz attempt for a staff member.
-   * Fetches or creates staff progress, checks daily attempt limits, selects questions.
-   * @param staffUserId - The ID of the staff user.
-   * @param quizId - The ID of the Quiz definition.
-   * @returns Promise<QuestionForQuizAttempt[]> Array of full question objects for the attempt.
-   * @throws {AppError} If quiz not found, user not found, daily limit reached, no questions available, etc.
-   */
-  static async startQuizAttempt(
-    staffUserId: Types.ObjectId,
-    quizId: Types.ObjectId
-  ): Promise<QuestionForQuizAttempt[]> {
-    let session: mongoose.ClientSession | null = null;
-    // Transaction only in production/staging, not development to simplify debugging
-    if (
-      process.env.NODE_ENV !== "development" &&
-      process.env.NODE_ENV !== "test"
-    ) {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    }
-
-    try {
-      // 1. Validate quiz and user
-      const quiz = await Quiz.findById(quizId).session(session).lean();
-      if (!quiz) {
-        throw new AppError("Quiz not found.", 404);
-      }
-      console.log(
-        `[QuizService.startQuizAttempt] Quiz ID: ${quizId}, numberOfQuestionsPerAttempt: ${quiz.numberOfQuestionsPerAttempt}, totalUniqueInSnapshot: ${quiz.totalUniqueQuestionsInSourceSnapshot}`
-      );
-      if (!quiz.isAvailable) {
-        throw new AppError("This quiz is currently not available.", 403);
-      }
-
-      const staffUser = await User.findById(staffUserId)
-        .session(session)
-        .lean();
-      if (
-        !staffUser ||
-        staffUser.restaurantId?.toString() !== quiz.restaurantId.toString()
-      ) {
-        throw new AppError(
-          "Staff member not found or not associated with this quiz's restaurant.",
-          404
-        );
-      }
-      if (staffUser.role !== "staff") {
-        throw new AppError("Only staff members can take quizzes.", 403);
-      }
-
-      // 2. Find or create StaffQuizProgress
-      let staffProgress = await StaffQuizProgress.findOne({
-        staffUserId,
-        quizId,
-        restaurantId: quiz.restaurantId,
-      }).session(session);
-
-      let isNewProgress = false;
-      let updated = false; // Flag to track if an existing progress document is modified
-
-      if (!staffProgress) {
-        isNewProgress = true;
-        staffProgress = new StaffQuizProgress({
-          staffUserId,
-          quizId,
-          restaurantId: quiz.restaurantId,
-          seenQuestionIds: [],
-          totalUniqueQuestionsInSource:
-            quiz.totalUniqueQuestionsInSourceSnapshot || 0,
-          isCompletedOverall: false,
-        });
-      } else {
-        console.log(
-          `[QuizService.startQuizAttempt] Existing progress found. isCompletedOverall: ${staffProgress.isCompletedOverall}`
-        );
-        // Sync totalUniqueQuestionsInSource from quiz model in case it changed
-        if (
-          quiz.totalUniqueQuestionsInSourceSnapshot !== undefined &&
-          quiz.totalUniqueQuestionsInSourceSnapshot !==
-            staffProgress.totalUniqueQuestionsInSource
-        ) {
-          staffProgress.totalUniqueQuestionsInSource =
-            quiz.totalUniqueQuestionsInSourceSnapshot;
-          updated = true; // Mark existing document as updated
-        }
-      }
-
-      if (staffProgress) {
-        console.log(
-          `[QuizService.startQuizAttempt] StaffProgress for User: ${staffUserId}, Quiz: ${quizId} - Seen IDs: ${staffProgress.seenQuestionIds?.join(
-            ", "
-          )}`
-        );
-      }
-
-      // 3. Fetch all unique, valid, active question IDs from the quiz's source banks
-      const allActiveQuestionIdsInBanks =
-        await getUniqueValidQuestionIdsFromQuestionBanks(
-          quiz.sourceQuestionBankIds as Types.ObjectId[], // Cast needed if sourceQuestionBankIds is not strictly ObjectId[]
-          quiz.restaurantId
-        );
-      console.log(
-        `[QuizService.startQuizAttempt] All Active Question IDs from Banks (${quiz.sourceQuestionBankIds?.join(
-          ", "
-        )}): ${allActiveQuestionIdsInBanks.join(", ")} (Count: ${
-          allActiveQuestionIdsInBanks.length
-        })`
-      );
-
-      if (allActiveQuestionIdsInBanks.length === 0) {
-        // This means the source banks are empty or questions were deleted.
-        // Update staff progress if necessary.
-        staffProgress.isCompletedOverall = true; // No questions to attempt
-        await staffProgress.save({ session });
-        if (session) {
-          await session.commitTransaction();
-        }
-        throw new AppError(
-          "No questions available for this quiz at the moment.",
-          404
-        );
-      }
-
-      // 4. Filter out already seen questions
-      const seenQuestionIdsSet = new Set(
-        (staffProgress.seenQuestionIds as Types.ObjectId[]).map((id) =>
-          id.toString()
-        )
-      );
-      const availableUnseenQuestionIds = allActiveQuestionIdsInBanks.filter(
-        (id) => !seenQuestionIdsSet.has(id.toString())
-      );
-      console.log(
-        `[QuizService.startQuizAttempt] Available (unseen) Question IDs: ${availableUnseenQuestionIds.join(
-          ", "
-        )} (Count: ${availableUnseenQuestionIds.length})`
-      );
-
-      // 5. Determine questions for the current attempt
-      let finalQuestionIdsForAttempt: Types.ObjectId[];
-      let questionsToAttemptCountActual: number;
-
-      if (availableUnseenQuestionIds.length > 0) {
-        // Scenario 1: Still unseen questions available
-        console.log("[QuizService.startQuizAttempt] Serving UNSEEN questions.");
-        _shuffleArray(availableUnseenQuestionIds);
-        questionsToAttemptCountActual = Math.min(
-          availableUnseenQuestionIds.length,
-          quiz.numberOfQuestionsPerAttempt
-        );
-        finalQuestionIdsForAttempt = availableUnseenQuestionIds.slice(
-          0,
-          questionsToAttemptCountActual
-        );
-      } else {
-        // Scenario 2: All unique questions have been seen at least once. Allow retake from full pool.
-        console.log(
-          "[QuizService.startQuizAttempt] All unique questions previously seen. Allowing retake from full active pool."
-        );
-        // REMOVED: Premature update of isCompletedOverall and 'updated' flag.
-        // This state will be handled by submitQuizAttempt.
-
-        if (allActiveQuestionIdsInBanks.length === 0) {
-          // This case should ideally be caught earlier if banks become empty.
-          // If somehow reached, it implies no questions to serve even for a retake.
-          if (session) {
-            await session.commitTransaction(); // Commit any pending staffProgress changes if any
-          }
-          throw new AppError(
-            "No questions available in the source banks for this quiz (retake attempt).",
-            404
-          );
-        }
-
-        // Select from the entire pool of active questions for the retake
-        _shuffleArray(allActiveQuestionIdsInBanks);
-        questionsToAttemptCountActual = Math.min(
-          allActiveQuestionIdsInBanks.length,
-          quiz.numberOfQuestionsPerAttempt
-        );
-        finalQuestionIdsForAttempt = allActiveQuestionIdsInBanks.slice(
-          0,
-          questionsToAttemptCountActual
-        );
-
-        if (
-          finalQuestionIdsForAttempt.length === 0 &&
-          quiz.numberOfQuestionsPerAttempt > 0
-        ) {
-          // This could happen if numberOfQuestionsPerAttempt is > 0 but allActiveQuestionIdsInBanks became empty just now.
-          // Or if allActiveQuestionIdsInBanks.length < quiz.numberOfQuestionsPerAttempt and slicing results in 0 (unlikely with Math.min)
-          if (session) {
-            await session.commitTransaction();
-          }
-          throw new AppError(
-            "Failed to select questions for retake attempt, pool might be empty.",
-            404
-          );
-        }
-      }
-
-      console.log(
-        `[QuizService.startQuizAttempt] Calculated actual questionsToAttemptCount: ${questionsToAttemptCountActual} (quizSetting: ${quiz.numberOfQuestionsPerAttempt})`
-      );
-      console.log(
-        `[QuizService.startQuizAttempt] Final Question IDs selected for attempt: ${finalQuestionIdsForAttempt.join(
-          ", "
-        )} (Count: ${finalQuestionIdsForAttempt.length})`
-      );
-
-      // 7. Fetch full question data for the selected IDs
-      const selectedQuestionsData = await QuestionModel.find({
-        _id: { $in: finalQuestionIdsForAttempt },
-        restaurantId: quiz.restaurantId, // Ensure questions belong to the same restaurant
-      })
-        .populate("categories") // If categories are ObjectIds referencing another model
-        .session(session)
-        .lean(); // Use lean for performance and easier manipulation
-
-      // Ensure the number of questions found matches the number of IDs
-      if (selectedQuestionsData.length !== finalQuestionIdsForAttempt.length) {
-        // This might indicate some selected question IDs were invalid or deleted recently
-        // Log this discrepancy for investigation
-        console.warn(
-          `Mismatch in fetched questions for quiz ${quizId}. Expected ${finalQuestionIdsForAttempt.length}, got ${selectedQuestionsData.length}`
-        );
-        // Proceed with fetched questions, or throw error if critical
-        if (
-          selectedQuestionsData.length === 0 &&
-          quiz.numberOfQuestionsPerAttempt > 0
-        ) {
-          staffProgress.isCompletedOverall = true;
-          await staffProgress.save({ session });
-          if (session) {
-            await session.commitTransaction();
-          }
-          throw new AppError(
-            "Could not retrieve questions for the attempt. Please try again later.",
-            500
-          );
-        }
-      }
-
-      // 8. Prepare questions for the client (strip sensitive data like isCorrect from options)
-      const questionsForClient: QuestionForQuizAttempt[] =
-        selectedQuestionsData.map((qDoc) => {
-          // qDoc is of type QuestionDocument (IQuestion) due to .lean() and model typing
-          // Mongoose subdocuments in arrays (like options) will have _id
-          const optionsForClient = qDoc.options.map((opt) => ({
-            _id: opt._id as Types.ObjectId, // opt._id is definitely an ObjectId here
-            text: opt.text,
-          }));
-
-          return {
-            _id: qDoc._id as Types.ObjectId,
-            questionText: qDoc.questionText,
-            questionType: qDoc.questionType,
-            options: optionsForClient,
-            categories: qDoc.categories?.map((c) =>
-              typeof c === "string" ? c : (c as any).name || String(c)
-            ), // Handle populated or string categories
-            difficulty: qDoc.difficulty,
-            // Add other fields as needed by client, e.g., question number/order for display
-          };
-        });
-
-      // Note: We are NOT creating a QuizAttempt record here.
-      // That happens in submitQuizAttemptService.
-      // We also don't add to seenQuestionIds here; that also happens upon submission.
-      // This service is only for fetching the questions for a new attempt.
-
-      // REMOVED: Block for section "9. Update seen questions in StaffQuizProgress"
-      // The logic to update staffProgress.seenQuestionIds and staffProgress.isCompletedOverall
-      // has been removed from startQuizAttempt. These updates will be handled by submitQuizAttempt.
-      // The 'updated' flag will now only be true if 'totalUniqueQuestionsInSource' was synced
-      // for an existing staffProgress record.
-
-      if (updated || isNewProgress) {
-        // Save if new, or if totalUniqueQuestionsInSource changed for an existing record
-        await staffProgress.save({ session });
-      }
-
-      if (session) {
-        await session.commitTransaction();
-      }
-      return questionsForClient;
-    } catch (error) {
-      if (session) {
-        await session.abortTransaction();
-      }
-      if (error instanceof AppError) throw error;
-      console.error("Error in startQuizAttemptService:", error);
-      throw new AppError("Failed to start quiz attempt.", 500);
-    } finally {
-      if (session) {
-        session.endSession();
-      }
-    }
-  }
-
-  /**
-   * Submits a staff member's quiz attempt, grades it, and updates progress.
-   * @param staffUserId - The ID of the staff user.
-   * @param quizId - The ID of the Quiz definition.
-   * @param attemptData - The data submitted for the attempt, including answers.
-   * @returns Promise<{ score: number; totalQuestionsAttempted: number; questions: Array<{ questionId: string; isCorrect: boolean; correctAnswer?: any }> }>
-   * @throws {AppError} If quiz/user invalid, or other processing errors.
-   */
-  static async submitQuizAttempt(
-    staffUserId: Types.ObjectId,
-    quizId: Types.ObjectId,
-    attemptData: QuizAttemptSubmitData
-  ): Promise<{
-    score: number;
-    totalQuestionsAttempted: number;
-    attemptId: Types.ObjectId;
-    questions: Array<{
-      questionId: string;
-      answerGiven: any;
-      isCorrect: boolean;
-      correctAnswer?: any; // Optionally return correct answer for review
-    }>;
-  }> {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    // Log the received staffUserId robustly
-    if (staffUserId && typeof staffUserId.toString === "function") {
-      console.log(
-        `[QuizService.submitQuizAttempt] Received staffUserId: ${staffUserId.toString()} (type: ObjectId) for quizId: ${quizId.toString()}`
-      );
-    } else {
-      console.error(
-        `[QuizService.submitQuizAttempt] Received staffUserId is problematic: ${staffUserId} (type: ${typeof staffUserId})`
-      );
-    }
-
-    let quiz: IQuiz | null = null; // To store fetched quiz
-    let actualQuestionsMap: Map<string, QuestionDocument> = new Map();
-
-    try {
-      // 1. Fetch Quiz and User
-      quiz = await Quiz.findById(quizId).session(session);
-      const staffUser = await User.findById(staffUserId).session(session);
-
-      if (!quiz) {
-        throw new AppError("Quiz not found.", 404);
-      }
-      if (
-        !staffUser ||
-        staffUser.role !== "staff" ||
-        staffUser.restaurantId?.toString() !== quiz.restaurantId.toString()
-      ) {
-        throw new AppError(
-          "Staff user not found or not authorized for this quiz.",
-          403
-        );
-      }
-
-      // 2. Fetch StaffQuizProgress (must exist if they started an attempt)
-      const staffProgress = await StaffQuizProgress.findOne({
-        staffUserId: staffUserId,
-        quizId: quizId,
-        restaurantId: quiz.restaurantId,
-      }).session(session);
-
-      if (!staffProgress) {
-        // This case should ideally be prevented by startQuizAttempt creating progress
-        // or by UI flow ensuring quiz is started.
-        console.error(
-          `[QuizService.submitQuizAttempt] CRITICAL: StaffQuizProgress not found for User: ${staffUserId}, Quiz: ${quizId}. An attempt was made without progress record.`
-        );
-        throw new AppError(
-          "Quiz progress not found. Please start the quiz first.",
-          404
-        );
-      }
-
-      // 3. Grade the attempt
-      let score = 0;
-      const gradedQuestionsDetails: any[] = [];
-      const questionIdsInAttempt = attemptData.questions.map(
-        (q) => new Types.ObjectId(q.questionId)
-      );
-
-      // Fetch actual questions from DB to get correct answers for grading
-      const actualQuestions = await QuestionModel.find({
-        _id: { $in: questionIdsInAttempt },
-      })
-        .session(session)
-        .lean();
-
-      actualQuestionsMap = new Map(
-        actualQuestions.map((q) => [q._id.toString(), q as QuestionDocument])
-      );
-
-      for (const attemptedQuestion of attemptData.questions) {
-        const questionDoc = actualQuestionsMap.get(
-          attemptedQuestion.questionId
-        );
-        let isCorrect = false;
-
-        if (questionDoc) {
-          console.log(
-            `[QuizService.submitQuizAttempt] Grading Q: ${questionDoc._id}, Type: ${questionDoc.questionType}, User: ${staffUserId}`
-          ); // Log question being graded
-
-          const correctAnswerDetails = {
-            optionId: undefined as string | undefined, // For single choice
-            optionIds: [] as string[], // For multiple choice
-            text: "", // For single choice text display
-            texts: [] as string[], // For multiple choice text display
-          };
-
-          if (
-            questionDoc.questionType === "multiple-choice-single" ||
-            questionDoc.questionType === "true-false"
-          ) {
-            const correctOption = questionDoc.options.find(
-              (opt) => opt.isCorrect
-            );
-            if (correctOption) {
-              console.log(
-                `[QuizService.submitQuizAttempt] Q: ${
-                  questionDoc._id
-                } (Single/TF) - Correct Opt ID: ${correctOption._id.toString()}, User Ans: ${
-                  attemptedQuestion.answerGiven
-                }`
-              );
-              isCorrect =
-                correctOption._id.toString() === attemptedQuestion.answerGiven;
-              correctAnswerDetails.optionId = correctOption._id.toString();
-              correctAnswerDetails.text = correctOption.text;
-            } else {
-              // No correct option defined by author, so user cannot be correct.
-              console.warn(
-                `[QuizService.submitQuizAttempt] Q: ${questionDoc._id} (Single/TF) - No correct option defined by author. Marking incorrect.`
-              );
-              isCorrect = false;
-              correctAnswerDetails.text = "No correct answer defined";
-            }
-          } else if (questionDoc.questionType === "multiple-choice-multiple") {
-            const correctOptionIds = new Set(
-              questionDoc.options
-                .filter((opt) => opt.isCorrect)
-                .map((opt) => opt._id.toString())
-            );
-            const userAnswerOptionIds = new Set(
-              attemptedQuestion.answerGiven as string[] // Assuming answerGiven is string[]
-            );
-
-            console.log(
-              `[QuizService.submitQuizAttempt] Q: ${
-                questionDoc._id
-              } (Multiple) - Correct Opt IDs: [${Array.from(
-                correctOptionIds
-              ).join(", ")}], User Ans IDs: [${Array.from(
-                userAnswerOptionIds
-              ).join(", ")}]`
-            );
-
-            // Strict equality: all correct options must be chosen, and no incorrect ones.
-            if (correctOptionIds.size === 0) {
-              // If there are no correct options defined by the author,
-              // the question is marked incorrect if the user selected anything.
-              // If the user also selected nothing, it was previously marked correct.
-              // Change: If no correct options, user must select nothing to be "correct" (or rather, not penalised).
-              // However, for simplicity and to encourage authoring, if no correct options are set, mark incorrect.
-              isCorrect = false;
-              console.warn(
-                `[QuizService.submitQuizAttempt] Q: ${questionDoc._id} (Multiple) - No correct options defined by author. Marking incorrect.`
-              );
-              correctAnswerDetails.texts = ["No correct answer defined"];
-            } else {
-              isCorrect =
-                userAnswerOptionIds.size === correctOptionIds.size &&
-                Array.from(userAnswerOptionIds).every((id) =>
-                  correctOptionIds.has(id)
-                );
-            }
-
-            questionDoc.options.forEach((opt) => {
-              if (opt.isCorrect) {
-                correctAnswerDetails.optionIds.push(opt._id.toString());
-                correctAnswerDetails.texts.push(opt.text);
-              }
-            });
-            if (correctAnswerDetails.texts.length === 0) {
-              // This case is handled by the size === 0 check above, but as fallback:
-              correctAnswerDetails.texts = ["No correct answer defined"];
-            }
-          } else if (questionDoc.questionType === "short-answer") {
-            const correctOption = questionDoc.options.find(
-              (opt) => opt.isCorrect
-            );
-            // Trim whitespace from the stored correct answer. Default to empty string if no correct option/text.
-            const correctAnswerText = correctOption
-              ? (correctOption.text || "").trim()
-              : "";
-
-            let userAnswerText = "";
-            if (typeof attemptedQuestion.answerGiven === "string") {
-              userAnswerText = attemptedQuestion.answerGiven.trim(); // Trim user's answer
-            }
-            // If attemptedQuestion.answerGiven is null or undefined, userAnswerText remains ""
-
-            // Logic for correctness:
-            if (correctAnswerText === "") {
-              // If the defined correct answer is an empty string,
-              // the user's answer must also be an empty string to be correct.
-              isCorrect = userAnswerText === "";
-            } else {
-              // If the defined correct answer is not empty,
-              // compare case-insensitively. An empty user answer will be incorrect here.
-              isCorrect =
-                userAnswerText.toLowerCase() ===
-                correctAnswerText.toLowerCase();
-            }
-
-            correctAnswerDetails.text = correctOption
-              ? correctOption.text
-              : "N/A"; // Store original correct text (untrimmed) for display
-            console.log(
-              `[QuizService.submitQuizAttempt] Q: ${questionDoc._id} (Short Ans) - Correct: "${correctAnswerText}" (trimmed), User: "${userAnswerText}" (trimmed), Match: ${isCorrect}`
-            );
-          }
-          // TODO: Add grading for other question types if they exist (e.g., fill-in-the-blanks)
-
-          if (isCorrect) {
-            score++;
-          }
-          gradedQuestionsDetails.push({
-            questionId: questionDoc._id,
-            answerGiven: attemptedQuestion.answerGiven, // Store raw answer
-            isCorrect: isCorrect,
-            correctAnswer: correctAnswerDetails, // Storing structured correct answer
-            questionText: questionDoc.questionText, // Store question text for QuizResult
-          });
-        } else {
-          console.warn(
-            `[QuizService.submitQuizAttempt] Question ID ${attemptedQuestion.questionId} from attempt not found in DB. Skipping grading for this question.`
-          );
-          gradedQuestionsDetails.push({
-            questionId: new Types.ObjectId(attemptedQuestion.questionId),
-            answerGiven: attemptedQuestion.answerGiven,
-            isCorrect: false, // Cannot be correct if not found
-            correctAnswer: { text: "Question not found" },
-            questionText: "Question data missing",
-          });
-        }
-      }
-
-      // 4. Create QuizAttempt document
-      const newQuizAttempt = new QuizAttempt({
-        quizId: quizId,
-        staffUserId: staffUserId,
-        restaurantId: quiz.restaurantId,
-
-        // Populate 'answers' array based on the error path "answers.0"
-        answers: gradedQuestionsDetails.map((q) => ({
-          questionId: q.questionId, // ObjectId
-          answerGiven: q.answerGiven, // Mixed
-          isCorrect: q.isCorrect, // Boolean
-        })),
-
-        // Populate 'questionsPresented' with an array of objects, each containing a questionId
-        questionsPresented: gradedQuestionsDetails.map((q) => ({
-          questionId: q.questionId,
-          answerGiven: q.answerGiven, // Store the answer given by the user
-          isCorrect: q.isCorrect, // Store whether the answer was correct
-          // sortOrder: q.sortOrder, // Optional: if you have sortOrder in gradedQuestionsDetails
-        })),
-
-        score: score,
-        attemptDate: new Date(),
-        durationInSeconds: attemptData.durationInSeconds,
-      });
-
-      console.log(
-        "[QuizService.submitQuizAttempt] Data for new QuizAttempt before save:",
-        {
-          staffUserId: staffUserId ? staffUserId.toString() : "MISSING/INVALID",
-          quizId: quizId ? quizId.toString() : "MISSING/INVALID",
-          restaurantId: quiz.restaurantId
-            ? quiz.restaurantId.toString()
-            : "MISSING/INVALID",
-
-          answers: gradedQuestionsDetails.map((q) => ({
-            // Log new 'answers' structure
-            questionId: q.questionId.toString(),
-            answerGiven: q.answerGiven,
-            isCorrect: q.isCorrect,
-          })),
-          // Log the actual questionsPresented array structure
-          questionsPresented: gradedQuestionsDetails.map((q) => ({
-            questionId: q.questionId.toString(),
-          })),
-          score: score,
-        }
-      );
-
-      await newQuizAttempt.save({ session });
-
-      // 5. Update StaffQuizProgress
-      staffProgress.seenQuestionIds = Array.from(
-        new Set([
-          ...staffProgress.seenQuestionIds.map((id) => id.toString()),
-          ...gradedQuestionsDetails.map((q) => q.questionId.toString()),
-        ])
-      ).map((id) => new Types.ObjectId(id));
-
-      staffProgress.lastAttemptTimestamp = newQuizAttempt.attemptDate;
-
-      // Update daily answered questions (re-evaluate if needed based on strict one-attempt-per-day)
-      // const currentDateStrForDailyReset = newQuizAttempt.attemptDate // REMOVED Logic Block
-      //   .toISOString()
-      //   .split("T")[0];
-      // if (
-      //   staffProgress.lastActivityDateForDailyReset
-      //     ?.toISOString()
-      //     .split("T")[0] === currentDateStrForDailyReset
-      // ) {
-      //   staffProgress.questionsAnsweredToday =
-      //     (staffProgress.questionsAnsweredToday ?? 0) +
-      //     gradedQuestionsDetails.length;
-      // } else {
-      //   staffProgress.questionsAnsweredToday = gradedQuestionsDetails.length;
-      // }
-      // staffProgress.lastActivityDateForDailyReset = newQuizAttempt.attemptDate; // REMOVED Logic Block
-
-      if (
-        staffProgress.totalUniqueQuestionsInSource > 0 &&
-        staffProgress.seenQuestionIds.length >=
-          staffProgress.totalUniqueQuestionsInSource
-      ) {
-        staffProgress.isCompletedOverall = true;
-      }
-      await staffProgress.save({ session });
-
-      // --- BEGIN ADDING/UPDATING QuizResult ---
-      console.log(
-        `[QuizService.submitQuizAttempt] About to upsert QuizResult for User: ${staffUserId}, Quiz: ${quizId}, Restaurant: ${quiz.restaurantId}`
-      );
-
-      // Construct incorrectQuestions array
-      const incorrectQuestionsList: {
-        questionText: string;
-        userAnswer: string;
-        correctAnswer: string;
-      }[] = [];
-      for (const detail of gradedQuestionsDetails) {
-        if (!detail.isCorrect) {
-          const questionDoc = actualQuestionsMap.get(
-            detail.questionId.toString()
-          );
-          if (questionDoc) {
-            let userAnswerText = "N/A";
-            // Determine user's answer text
-            if (
-              questionDoc.questionType === "multiple-choice-single" ||
-              questionDoc.questionType === "true-false"
-            ) {
-              const userAnswerOption = questionDoc.options.find(
-                // Ensure detail.answerGiven is treated as a string for comparison
-                (opt) => opt._id.toString() === String(detail.answerGiven)
-              );
-              userAnswerText = userAnswerOption
-                ? userAnswerOption.text
-                : detail.answerGiven !== undefined &&
-                  detail.answerGiven !== null &&
-                  String(detail.answerGiven).trim() !== ""
-                ? `Selected: ID "${String(detail.answerGiven)}"`
-                : "Not answered";
-            } else if (
-              questionDoc.questionType === "multiple-choice-multiple"
-            ) {
-              if (
-                Array.isArray(detail.answerGiven) &&
-                detail.answerGiven.length > 0
-              ) {
-                userAnswerText = detail.answerGiven
-                  .map((ansId: string) => {
-                    const opt = questionDoc.options.find(
-                      (o) => o._id.toString() === ansId
-                    );
-                    return opt ? opt.text : `ID "${ansId}"`;
-                  })
-                  .join(", ");
-              } else {
-                userAnswerText = "Not answered";
-              }
-            } else if (questionDoc.questionType === "short-answer") {
-              userAnswerText = detail.answerGiven
-                ? String(detail.answerGiven)
-                : "Not answered";
-            }
-
-            let correctAnswerText = "N/A";
-            if (
-              questionDoc.questionType === "multiple-choice-single" ||
-              questionDoc.questionType === "true-false"
-            ) {
-              const correctOpt = questionDoc.options.find(
-                (opt) => opt.isCorrect
-              );
-              correctAnswerText = correctOpt
-                ? correctOpt.text
-                : "Correct answer not set by author";
-            } else if (
-              questionDoc.questionType === "multiple-choice-multiple"
-            ) {
-              correctAnswerText = questionDoc.options
-                .filter((opt) => opt.isCorrect)
-                .map((opt) => opt.text)
-                .join(", ");
-              if (!correctAnswerText)
-                correctAnswerText = "Correct answer(s) not set by author";
-            } else if (questionDoc.questionType === "short-answer") {
-              const correctOpt = questionDoc.options.find(
-                (opt) => opt.isCorrect
-              );
-              correctAnswerText = correctOpt
-                ? correctOpt.text
-                : "Correct answer not set by author";
-            }
-
-            incorrectQuestionsList.push({
-              questionText: questionDoc.questionText,
-              userAnswer: userAnswerText,
-              correctAnswer: correctAnswerText,
-            });
-          }
-        }
-      }
-
-      const quizResultData = {
-        userId: staffUserId,
-        quizId: quizId,
-        restaurantId: quiz.restaurantId,
-        score: score,
-        totalQuestions: gradedQuestionsDetails.length,
-        answers: gradedQuestionsDetails.map((q) => ({
-          questionId: q.questionId,
-          answerGiven: q.answerGiven,
-          isCorrect: q.isCorrect,
-        })),
-        completedAt: newQuizAttempt.attemptDate,
-        status: "completed", // Mark as completed since an attempt was submitted
-        quizTitle: quiz.title, // Denormalize quiz title for easier lookup
-        incorrectQuestions: incorrectQuestionsList, // ADDED
-        attemptId: newQuizAttempt._id, // Link to the QuizAttempt document
-      };
-
-      // Upsert QuizResult: Update if exists for this user/quiz, otherwise insert.
-      // This replaces any previous result for this specific quiz by this user.
-      const updatedQuizResult = await QuizResult.findOneAndUpdate(
-        {
-          userId: staffUserId,
-          quizId: quizId,
-          restaurantId: quiz.restaurantId,
-        },
-        quizResultData,
-        {
-          new: true, // Return the modified document
-          upsert: true, // Create if it doesn't exist
-          session: session,
-          setDefaultsOnInsert: true, // Ensure schema defaults are applied on insert
-        }
-      );
-
-      console.log(
-        `[QuizService.submitQuizAttempt] Upserted QuizResult ID: ${updatedQuizResult?._id} for User: ${staffUserId}, Quiz: ${quizId}`
-      );
-
-      // --- END ADDING/UPDATING QuizResult ---
-
-      // Recalculate average score based on ALL attempts for this quiz
-      const allAttempts = await QuizAttempt.find({
-        userId: staffUserId,
-        quizId: quizId,
-      })
-        .select("score questionsPresented")
-        .lean();
-
-      let totalPercentageSum = 0;
-      let validAttemptsCount = 0;
-      allAttempts.forEach((attempt) => {
-        if (
-          attempt.score !== undefined &&
-          attempt.questionsPresented &&
-          attempt.questionsPresented.length > 0
-        ) {
-          totalPercentageSum +=
-            attempt.score / attempt.questionsPresented.length;
-          validAttemptsCount++;
-        }
-      });
-
-      if (validAttemptsCount > 0) {
-        const averageScorePercent =
-          (totalPercentageSum / validAttemptsCount) * 100;
-        // Optionally update staffProgress or another summary model with this average
-        // For now, it's calculated on demand or stored on QuizResult if needed for single latest display
-        console.log(
-          `[QuizService.submitQuizAttempt] Calculated average score for User ${staffUserId}, Quiz ${quizId} across ${validAttemptsCount} attempts: ${averageScorePercent.toFixed(
-            1
-          )}%`
-        );
-      }
-
-      await session.commitTransaction();
-      console.log(
-        `[QuizService.submitQuizAttempt] Transaction committed for User: ${staffUserId}, Quiz: ${quizId}`
-      );
-
-      return {
-        score: score,
-        totalQuestionsAttempted: gradedQuestionsDetails.length,
-        attemptId: newQuizAttempt._id,
-        questions: gradedQuestionsDetails.map((q) => ({
-          questionId: q.questionId.toString(),
-          answerGiven: q.answerGiven,
-          isCorrect: q.isCorrect,
-          correctAnswer: q.correctAnswer,
-        })),
-      };
-    } catch (error: any) {
-      await session.abortTransaction();
-      console.error(
-        `[QuizService.submitQuizAttempt] Transaction aborted for User: ${staffUserId}, Quiz: ${quizId}. Error: ${error.message}`,
-        error
-      );
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        `Failed to submit quiz attempt: ${error.message}`,
-        500
-      );
-    } finally {
-      session.endSession();
-    }
-  }
-
-  /**
-   * Retrieves a specific staff member's progress for a specific quiz,
-   * including a summary of all their attempts and overall average score.
-   * @param staffUserId The ID of the staff user.
-   * @param quizId The ID of the quiz.
-   * @returns Promise<IStaffQuizProgressWithAttempts | null>
-   */
-  static async getStaffQuizProgress(
-    staffUserId: Types.ObjectId,
-    quizId: Types.ObjectId
-  ): Promise<IStaffQuizProgressWithAttempts | null> {
-    try {
-      const progress = await StaffQuizProgress.findOne({
-        staffUserId: staffUserId,
-        quizId: quizId,
-      })
-        .populate<{ staffUserId: IUser }>(
-          "staffUserId",
-          "name email professionalRole _id"
-        )
-        .populate<{ quizId: IQuiz }>(
-          "quizId",
-          "title description numberOfQuestionsPerAttempt _id"
-        )
-        .lean<PlainIStaffQuizProgress>();
-
-      if (!progress) {
-        console.log(
-          `No StaffQuizProgress found for user ${staffUserId}, quiz ${quizId}`
-        );
-        return null;
-      }
-
-      // Safely access restaurantId from progress, considering it might be populated or just an ObjectId
-      let restaurantIdForQuery: Types.ObjectId;
-      if (progress.restaurantId && (progress.restaurantId as IUser)._id) {
-        // Check if populated IUser
-        restaurantIdForQuery = (progress.restaurantId as IUser)._id;
-      } else {
-        restaurantIdForQuery = progress.restaurantId as Types.ObjectId; // Assume it's an ObjectId
-      }
-
-      const allAttemptsFromDb = await QuizAttempt.find({
-        staffUserId: staffUserId,
-        quizId: quizId,
-        restaurantId: restaurantIdForQuery,
-      })
-        .select("_id score questionsPresented attemptDate")
-        .sort({ attemptDate: -1 })
-        .lean<
-          Pick<
-            IQuizAttempt,
-            "_id" | "score" | "questionsPresented" | "attemptDate"
-          >[]
-        >();
-
-      const attemptSummaries: IQuizAttemptSummary[] = allAttemptsFromDb.map(
-        (attempt) => {
-          const totalQuestions = attempt.questionsPresented?.length || 0;
-          return {
-            _id: attempt._id.toString(),
-            score: attempt.score,
-            totalQuestions: totalQuestions,
-            attemptDate: attempt.attemptDate,
-            hasIncorrectAnswers:
-              totalQuestions > 0 && attempt.score < totalQuestions,
-          };
-        }
-      );
-
-      let averageScore: number | null = null;
-      if (allAttemptsFromDb.length > 0) {
-        let totalPercentageSum = 0;
-        let validAttemptsCount = 0;
-        allAttemptsFromDb.forEach((attempt) => {
-          if (
-            attempt.score !== undefined &&
-            attempt.questionsPresented &&
-            attempt.questionsPresented.length > 0
-          ) {
-            totalPercentageSum +=
-              attempt.score / attempt.questionsPresented.length;
-            validAttemptsCount++;
-          }
-        });
-        if (validAttemptsCount > 0) {
-          averageScore = parseFloat(
-            ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
-          );
-        }
-      }
-
-      const populatedStaffUser = progress.staffUserId as IUser;
-      const populatedQuiz = progress.quizId as IQuiz;
-
-      const result: IStaffQuizProgressWithAttempts = {
-        ...(progress as Required<PlainIStaffQuizProgress>),
-        staffUserId: populatedStaffUser,
-        quizId: populatedQuiz,
-        averageScore: averageScore,
-        attempts: attemptSummaries,
-      };
-      return result;
-    } catch (error: any) {
-      console.error(
-        `Error fetching staff quiz progress for user ${staffUserId}, quiz ${quizId}:`,
-        error
-      );
-      if (error instanceof AppError) throw error;
-      throw new AppError("Failed to fetch staff quiz progress.", 500);
-    }
-  }
-
-  /**
-   * Retrieves full details for a single quiz attempt, including incorrect answers.
-   * @param attemptId The ID of the QuizAttempt.
-   * @param requestingUserId The ID of the user making the request (for authorization).
-   * @returns Promise<QuizAttemptDetailsWithIncorrects>
-   * @throws {AppError} If attempt not found, or user not authorized.
-   */
-  public static async getQuizAttemptDetails(
-    attemptId: string,
-    requestingUserId: string
-  ): Promise<QuizAttemptDetailsWithIncorrects> {
-    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
-      throw new AppError("Invalid attempt ID format.", 400);
-    }
-
-    const attemptObjectId = new mongoose.Types.ObjectId(attemptId);
-
-    const attempt = await QuizAttempt.findById(attemptObjectId)
-      .populate<{ quizId: IQuiz }>("quizId", "title") // Populate quiz title
-      .populate<{ staffUserId: IUser }>("staffUserId", "_id name restaurantId") // Populate staffUserId, including restaurantId for the staff member
-      .lean<
-        IQuizAttempt & {
-          quizId: Pick<IQuiz, "_id" | "title">;
-          staffUserId: Pick<IUser, "_id" | "name" | "restaurantId">; // Ensure restaurantId is picked for staffUser
-        }
-      >();
-
-    if (!attempt) {
-      throw new AppError("Quiz attempt not found.", 404);
-    }
-
-    // Authorization: Ensure the requesting user is the one who took the quiz
-    // or if the requesting user is a manager of the same restaurant
-    const requestingUserInfo = await User.findById(
-      requestingUserId
-    ).lean<IUser>();
-    if (!requestingUserInfo) {
-      throw new AppError("Requesting user not found.", 404);
-    }
-
-    if (!attempt.staffUserId || !attempt.staffUserId._id) {
-      throw new AppError("Staff user details missing for this attempt.", 500);
-    }
-
-    const isOwnerOfAttempt =
-      attempt.staffUserId._id.toString() === requestingUserId;
-    let isManagerOfSameRestaurant = false;
-
-    if (requestingUserInfo.role === "restaurant") {
-      // Find the restaurant owned by the requesting "restaurant" role user
-      const ownedRestaurant = await Restaurant.findOne({
-        owner: requestingUserInfo._id,
-      }).lean();
-      if (ownedRestaurant && attempt.restaurantId) {
-        // Ensure attempt.restaurantId exists
-        // attempt.restaurantId is already an ObjectId or a populated object with _id
-        const attemptRestaurantIdString =
-          typeof attempt.restaurantId === "string"
-            ? attempt.restaurantId
-            : (attempt.restaurantId as Types.ObjectId)?.toString() ||
-              (attempt.restaurantId as any)?._id?.toString();
-
-        if (ownedRestaurant._id.toString() === attemptRestaurantIdString) {
-          isManagerOfSameRestaurant = true;
-        }
-      }
-    }
-
-    if (!isOwnerOfAttempt && !isManagerOfSameRestaurant) {
-      throw new AppError(
-        "You are not authorized to view this quiz attempt.",
-        403
-      );
-    }
-
-    if (!attempt.quizId || typeof attempt.quizId.title !== "string") {
-      throw new AppError(
-        "Quiz details could not be retrieved for this attempt.",
-        500
-      );
-    }
-
-    const incorrectQuestions: IncorrectQuestionDetailForAttempt[] = [];
-    if (attempt.questionsPresented && attempt.questionsPresented.length > 0) {
-      const questionIds = attempt.questionsPresented.map((q) => q.questionId);
-      const questionsData = await QuestionModel.find({
-        _id: { $in: questionIds },
-      }).lean<QuestionDocument[]>();
-      const questionsMap = new Map(
-        questionsData.map((q: QuestionDocument) => [
-          (q._id as mongoose.Types.ObjectId).toString(),
-          q,
-        ])
-      ); // Cast q._id to ObjectId
-
-      for (const presentedQuestion of attempt.questionsPresented) {
-        if (!presentedQuestion.isCorrect) {
-          const fullQuestion = questionsMap.get(
-            presentedQuestion.questionId.toString()
-          );
-          if (fullQuestion) {
-            let userAnswerText = "N/A";
-            const givenAnswer = presentedQuestion.answerGiven;
-
-            if (
-              fullQuestion.questionType === "multiple-choice-single" ||
-              fullQuestion.questionType === "true-false"
-            ) {
-              const option = fullQuestion.options.find(
-                (opt) => opt._id?.toString() === givenAnswer
-              );
-              userAnswerText = option
-                ? option.text
-                : typeof givenAnswer === "string" && givenAnswer.trim() !== ""
-                ? `Selected: ID "${givenAnswer}"`
-                : "Not answered";
-            } else if (
-              fullQuestion.questionType === "multiple-choice-multiple"
-            ) {
-              if (Array.isArray(givenAnswer) && givenAnswer.length > 0) {
-                userAnswerText = givenAnswer
-                  .map((ansId) => {
-                    const option = fullQuestion.options.find(
-                      (opt) => opt._id?.toString() === ansId
-                    );
-                    return option ? option.text : `ID "${ansId}"`;
-                  })
-                  .join(", ");
-              } else {
-                userAnswerText = "Not answered";
-              }
-            } else if (fullQuestion.questionType === "short-answer") {
-              userAnswerText =
-                typeof givenAnswer === "string" && givenAnswer.trim() !== ""
-                  ? givenAnswer
-                  : "Not answered";
-            }
-            // Fallback for other types or if answerGiven is complex
-            else if (typeof givenAnswer === "object" && givenAnswer !== null) {
-              userAnswerText = JSON.stringify(givenAnswer);
-            } else if (givenAnswer !== undefined && givenAnswer !== null) {
-              userAnswerText = String(givenAnswer);
-            }
-
-            let correctAnswerText = "N/A";
-            if (
-              fullQuestion.questionType === "multiple-choice-single" ||
-              fullQuestion.questionType === "true-false"
-            ) {
-              const correctOption = fullQuestion.options.find(
-                (opt) => opt.isCorrect
-              );
-              correctAnswerText = correctOption
-                ? correctOption.text
-                : "Correct answer not set";
-            } else if (
-              fullQuestion.questionType === "multiple-choice-multiple"
-            ) {
-              correctAnswerText = fullQuestion.options
-                .filter((opt) => opt.isCorrect)
-                .map((opt) => opt.text)
-                .join(", ");
-              if (!correctAnswerText)
-                correctAnswerText = "Correct answer(s) not set";
-            } else if (fullQuestion.questionType === "short-answer") {
-              const correctOpt = fullQuestion.options.find(
-                (opt) => opt.isCorrect
-              );
-              correctAnswerText = correctOpt
-                ? correctOpt.text
-                : "Correct answer not set";
-            }
-
-            incorrectQuestions.push({
-              questionText: fullQuestion.questionText,
-              userAnswer: userAnswerText,
-              correctAnswer: correctAnswerText,
-            });
-          }
-        }
-      }
-    }
-
-    return {
-      _id: attempt._id.toString(),
-      quizId: attempt.quizId._id.toString(),
-      quizTitle: attempt.quizId.title,
-      staffUserId: attempt.staffUserId._id.toString(), // Changed from attempt.userId
-      score: attempt.score,
-      totalQuestions: attempt.questionsPresented?.length || 0,
-      attemptDate: attempt.attemptDate,
-      incorrectQuestions: incorrectQuestions,
-    };
-  }
-
-  public static async generateQuizFromBanksService(
+  static async generateQuizFromBanksService(
     data: CreateQuizFromBanksData
   ): Promise<IQuiz> {
     const {
@@ -1845,70 +567,61 @@ export class QuizService {
       restaurantId,
       questionBankIds,
       numberOfQuestionsPerAttempt,
+      targetRoles,
     } = data;
 
-    if (!title || title.trim() === "") {
-      throw new AppError("Quiz title is required.", 400);
-    }
-    if (!questionBankIds || questionBankIds.length === 0) {
-      throw new AppError("At least one question bank must be selected.", 400);
-    }
-    if (numberOfQuestionsPerAttempt <= 0) {
-      throw new AppError(
-        "Number of questions per attempt must be positive.",
-        400
-      );
-    }
-
-    const objectQuestionBankIds = questionBankIds.map(
-      (id) => new mongoose.Types.ObjectId(id)
-    );
-
-    // Fetch banks and validate they belong to the restaurant
+    // 1. Validate questionBankIds and fetch them to ensure they exist and belong to the restaurant
     const banks = await QuestionBankModel.find({
-      _id: { $in: objectQuestionBankIds },
+      _id: {
+        $in: questionBankIds.map((id) => new mongoose.Types.ObjectId(id)),
+      },
       restaurantId: restaurantId,
     }).populate<{ questions: QuestionDocument[] }>("questions");
 
-    if (banks.length !== objectQuestionBankIds.length) {
+    if (!banks || banks.length !== questionBankIds.length) {
       throw new AppError(
         "One or more question banks not found or do not belong to this restaurant.",
         404
       );
     }
 
-    const uniqueQuestionIdSet = new Set<string>();
-    banks.forEach((bank) => {
-      if (bank.questions && Array.isArray(bank.questions)) {
-        (bank.questions as QuestionDocument[]).forEach((question) => {
-          // Assuming all questions in a bank are active for snapshot purposes for now
-          // Add filter here if questions have an 'isActive' flag: e.g. if (question.isActive)
-          if (question && question._id) {
-            uniqueQuestionIdSet.add(question._id.toString());
-          }
-        });
-      }
-    });
+    // 2. Calculate totalUniqueQuestionsInSourceSnapshot
+    const uniqueQuestionIdsFromSource =
+      await getUniqueValidQuestionIdsFromQuestionBanks(
+        questionBankIds.map((id) => new mongoose.Types.ObjectId(id)),
+        restaurantId
+      );
+    const totalUniqueQuestionsInSourceSnapshot =
+      uniqueQuestionIdsFromSource.length;
 
-    const totalUniqueQuestionsInSourceSnapshot = uniqueQuestionIdSet.size;
-
+    // 3. Validate numberOfQuestionsPerAttempt against totalUniqueQuestionsInSourceSnapshot
     if (numberOfQuestionsPerAttempt > totalUniqueQuestionsInSourceSnapshot) {
       throw new AppError(
-        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total number of unique questions available in the selected banks (${totalUniqueQuestionsInSourceSnapshot}).`,
+        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total number of unique active questions available in the selected banks (${totalUniqueQuestionsInSourceSnapshot}).`,
+        400
+      );
+    }
+    if (numberOfQuestionsPerAttempt <= 0) {
+      throw new AppError(
+        "Number of questions per attempt must be greater than 0.",
         400
       );
     }
 
-    const newQuiz = new Quiz({
-      title: title.trim(),
-      description: description?.trim(),
+    // 4. Create the new quiz
+    const newQuiz = new QuizModel({
+      title,
+      description,
       restaurantId,
-      sourceQuestionBankIds: objectQuestionBankIds,
+      sourceQuestionBankIds: questionBankIds.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      ),
       numberOfQuestionsPerAttempt,
       totalUniqueQuestionsInSourceSnapshot,
-      isAvailable: false, // Default to not available
-      isAssigned: false, // Default to not assigned
-      // createdBy: data.createdBy, // If you add this field
+      isAvailable: true, // Default to available, can be changed via update
+      targetRoles: targetRoles
+        ? targetRoles.map((id) => new mongoose.Types.ObjectId(id))
+        : [], // Ensure targetRoles is an array
     });
 
     try {
@@ -1916,104 +629,414 @@ export class QuizService {
       return newQuiz;
     } catch (error: any) {
       if (error.code === 11000) {
-        // Duplicate key error (e.g. title + restaurantId unique index)
+        // Duplicate key error (e.g. if unique index on title + restaurantId)
         throw new AppError(
           "A quiz with this title already exists for your restaurant.",
           409
         );
       }
       if (error instanceof mongoose.Error.ValidationError) {
-        throw new AppError(`Validation failed: ${error.message}`, 400);
+        throw new AppError(`Validation Error: ${error.message}`, 400);
       }
-      console.error("Error saving new quiz from banks:", error);
+      console.error(
+        "Error saving new quiz in generateQuizFromBanksService:",
+        error
+      );
       throw new AppError("Failed to create quiz from question banks.", 500);
     }
   }
 
-  public static async getRestaurantQuizStaffProgress(
-    restaurantId: Types.ObjectId,
+  /**
+   * Starts a quiz attempt for a staff member.
+   * - Finds or creates staff quiz progress.
+   * - Selects a new set of questions for the attempt.
+   *
+   * @param staffUserId - The ID of the staff user.
+   * @param quizId - The ID of the quiz definition.
+   * @returns A promise resolving to an array of questions for the attempt (QuestionForQuizAttempt[]).
+   * @throws {AppError} If quiz not found, or other issues occur.
+   */
+  static async startQuizAttempt(
+    staffUserId: Types.ObjectId,
     quizId: Types.ObjectId
-  ): Promise<IStaffMemberQuizProgressDetails[]> {
-    // 1. Validate Quiz
-    const quiz = await Quiz.findOne({
-      _id: quizId,
-      restaurantId: restaurantId,
-    }).lean<IQuiz>();
+  ): Promise<QuestionForQuizAttempt[]> {
+    // 1. Fetch the Quiz definition
+    const quiz = await QuizModel.findById(quizId).lean();
+    if (!quiz || !quiz.isAvailable) {
+      throw new AppError("Quiz not found or is not currently available.", 404);
+    }
 
+    // 2. Find or create StaffQuizProgress
+    let staffProgress = await StaffQuizProgress.findOne({
+      staffUserId,
+      quizId,
+      restaurantId: quiz.restaurantId,
+    });
+
+    if (!staffProgress) {
+      staffProgress = await StaffQuizProgress.create({
+        staffUserId,
+        quizId,
+        restaurantId: quiz.restaurantId,
+        seenQuestionIds: [],
+        totalUniqueQuestionsInSource: quiz.totalUniqueQuestionsInSourceSnapshot,
+        isCompletedOverall: false,
+      });
+    }
+
+    // 3. If already completed, return empty array
+    if (staffProgress.isCompletedOverall) {
+      return []; // Or throw an error/return a specific status
+    }
+
+    // 4. Fetch all unique, active question IDs from the Quiz's source question banks
+    // This was already calculated and stored in quiz.totalUniqueQuestionsInSourceSnapshot
+    // We need the actual IDs from the banks to select new ones.
+    const allQuestionIdsInSource =
+      await getUniqueValidQuestionIdsFromQuestionBanks(
+        quiz.sourceQuestionBankIds,
+        quiz.restaurantId
+      );
+
+    // 5. Filter out seen questions
+    const seenQuestionIdsSet = new Set(
+      staffProgress.seenQuestionIds.map((id) => id.toString())
+    );
+    const availablePoolIds = allQuestionIdsInSource.filter(
+      (id) => !seenQuestionIdsSet.has(id.toString())
+    );
+
+    // 6. If availablePool is empty, mark as completed and return empty
+    if (availablePoolIds.length === 0) {
+      staffProgress.isCompletedOverall = true;
+      await staffProgress.save();
+      return [];
+    }
+
+    // 7. Randomly select N questions from availablePoolIds
+    _shuffleArray(availablePoolIds); // Shuffle in place
+    const questionsToPresentIds = availablePoolIds.slice(
+      0,
+      quiz.numberOfQuestionsPerAttempt
+    );
+
+    // 8. Fetch full question objects for these IDs
+    const questionsForAttempt = await QuestionModel.find({
+      _id: { $in: questionsToPresentIds },
+    })
+      .select("_id questionText questionType options categories difficulty")
+      .lean<QuestionForQuizAttempt[]>();
+
+    const orderedQuestions = questionsToPresentIds
+      .map((idToFind) =>
+        questionsForAttempt.find(
+          (q: QuestionForQuizAttempt) =>
+            q._id.toString() === idToFind.toString()
+        )
+      )
+      .filter((q) => q !== undefined) as QuestionForQuizAttempt[];
+
+    return orderedQuestions;
+  }
+
+  /**
+   * Submits a staff member's quiz attempt, grades it, and updates progress.
+   *
+   * @param staffUserId - The ID of the staff user.
+   * @param quizId - The ID of the quiz definition.
+   * @param attemptData - The data submitted for the attempt (questions and answers).
+   * @returns A promise resolving to the created QuizAttempt document.
+   * @throws {AppError} If quiz/staff progress not found, or other issues.
+   */
+  static async submitQuizAttempt(
+    staffUserId: Types.ObjectId,
+    quizId: Types.ObjectId,
+    attemptData: QuizAttemptSubmitData // Defined in QuizService or quizTypes.ts
+  ): Promise<IQuizAttempt> {
+    // Assuming IQuizAttempt is the return type
+    // 1. Fetch Quiz and StaffQuizProgress
+    const quiz = await QuizModel.findById(quizId).lean();
     if (!quiz) {
+      throw new AppError("Quiz definition not found.", 404);
+    }
+
+    const staffProgress = await StaffQuizProgress.findOne({
+      staffUserId,
+      quizId,
+      restaurantId: quiz.restaurantId,
+    });
+
+    if (!staffProgress) {
+      // This case should ideally not happen if startQuizAttempt was called first,
+      // but handle defensively.
       throw new AppError(
-        "Quiz not found or does not belong to this restaurant.",
+        "Staff quiz progress not found. Please start the quiz first.",
         404
       );
     }
 
-    // 2. Fetch all staff for the restaurant
-    const staffMembers = await User.find({
-      restaurantId: restaurantId,
-      role: "staff",
-    })
-      .select("_id name email professionalRole")
-      .lean<IUser[]>();
+    // 2. Grade the attempt (Simplified grading)
+    let score = 0;
+    const presentedQuestionIds = attemptData.questions.map(
+      (q) => new Types.ObjectId(q.questionId)
+    );
+    const presentedQuestionsFull = await QuestionModel.find({
+      _id: { $in: presentedQuestionIds },
+    }).lean<QuestionDocument[]>();
 
-    if (staffMembers.length === 0) {
-      return []; // No staff members in the restaurant
+    const attemptQuestionsProcessed: IQuizAttempt["questionsPresented"] = [];
+
+    for (const submittedQ of attemptData.questions) {
+      const fullQuestion = presentedQuestionsFull.find(
+        (q: QuestionDocument) => q._id.toString() === submittedQ.questionId
+      );
+      if (!fullQuestion) continue;
+
+      let isCorrect = false;
+      // Align grading with defined QuestionType values
+      if (
+        fullQuestion.questionType === "multiple-choice-single" ||
+        fullQuestion.questionType === "multiple-choice-multiple" ||
+        fullQuestion.questionType === "true-false"
+      ) {
+        // Find the correct option based on the stored isCorrect flag
+        const correctOption = fullQuestion.options.find(
+          (opt) => opt.isCorrect === true
+        );
+        const submittedAnswerText = submittedQ.answerGiven as string; // Assuming answerGiven is text of the option
+
+        if (fullQuestion.questionType === "true-false") {
+          // For true/false, answerGiven might be 'true'/'false' or the option text like 'True'/'False'
+          if (
+            correctOption &&
+            (submittedAnswerText.toLowerCase() ===
+              correctOption.text.toLowerCase() ||
+              (correctOption.text.toLowerCase() === "true" &&
+                submittedAnswerText.toLowerCase() === "true") ||
+              (correctOption.text.toLowerCase() === "false" &&
+                submittedAnswerText.toLowerCase() === "false"))
+          ) {
+            isCorrect = true;
+          }
+        } else if (fullQuestion.questionType === "multiple-choice-single") {
+          if (correctOption && submittedAnswerText === correctOption.text) {
+            isCorrect = true;
+          }
+        } else if (fullQuestion.questionType === "multiple-choice-multiple") {
+          // For multiple-choice-multiple, submittedQ.answerGiven should be an array of strings.
+          // This simplified grading only handles single string answers for now.
+          // TODO: Implement proper grading for multiple-choice-multiple if answers can be arrays.
+          if (correctOption && submittedAnswerText === correctOption.text) {
+            // This would only work if only one option is correct and selected.
+            // For true multi-select, need to compare arrays of answers.
+            // For now, this branch might not correctly grade multi-selects.
+            isCorrect = true;
+          }
+        }
+      }
+      // TODO: Add grading for other potential future question types
+
+      if (isCorrect) {
+        score++;
+      }
+      attemptQuestionsProcessed.push({
+        questionId: fullQuestion._id as Types.ObjectId, // Explicit cast
+        answerGiven: submittedQ.answerGiven,
+        isCorrect,
+      });
     }
 
-    const results: IStaffMemberQuizProgressDetails[] = [];
+    // 3. Create QuizAttempt document
+    const newAttempt = await QuizAttempt.create({
+      staffUserId,
+      quizId,
+      restaurantId: quiz.restaurantId,
+      questionsPresented: attemptQuestionsProcessed,
+      score,
+      attemptDate: new Date(),
+      durationInSeconds: attemptData.durationInSeconds,
+    });
 
-    for (const staff of staffMembers) {
-      const staffObjectId = staff._id as Types.ObjectId;
+    // 4. Update StaffQuizProgress
+    staffProgress.seenQuestionIds = [
+      ...new Set([
+        ...staffProgress.seenQuestionIds.map((id) => id.toString()),
+        ...presentedQuestionIds.map((id) => id.toString()),
+      ]),
+    ].map((idStr) => new Types.ObjectId(idStr)); // Add to set and convert back to ObjectIds
 
-      // 3. Fetch StaffQuizProgress for this staff member and quiz
+    staffProgress.lastAttemptTimestamp = new Date();
+
+    if (
+      staffProgress.seenQuestionIds.length >=
+      staffProgress.totalUniqueQuestionsInSource
+    ) {
+      staffProgress.isCompletedOverall = true;
+    }
+
+    await staffProgress.save();
+
+    // 5. Return the attempt result
+    return newAttempt;
+  }
+
+  /**
+   * Retrieves a staff member's progress for a specific quiz, including attempts and average score.
+   *
+   * @param staffUserId - The ID of the staff user.
+   * @param quizId - The ID of the quiz.
+   * @returns A promise resolving to staff quiz progress with attempts details, or null if not found.
+   * @throws {AppError} If database errors occur.
+   */
+  static async getStaffQuizProgress(
+    staffUserId: Types.ObjectId,
+    quizId: Types.ObjectId
+  ): Promise<IStaffQuizProgressWithAttempts | null> {
+    const staffProgress = await StaffQuizProgress.findOne({
+      staffUserId,
+      quizId,
+    })
+      .populate<{ staffUserId: IUser }>({
+        path: "staffUserId",
+        select: "name email professionalRole",
+      })
+      .populate<{ quizId: IQuiz }>({
+        path: "quizId",
+        select: "title description numberOfQuestionsPerAttempt",
+      })
+      .lean<PlainIStaffQuizProgress | null>(); // Use PlainIStaffQuizProgress for lean base type
+
+    if (!staffProgress) {
+      return null;
+    }
+
+    const attempts = await QuizAttempt.find({
+      staffUserId,
+      quizId,
+      restaurantId: (staffProgress.quizId as IQuiz).restaurantId, // Get restaurantId from populated quiz
+    })
+      .select("_id score questionsPresented attemptDate") // Select fields for IQuizAttemptSummary
+      .sort({ attemptDate: -1 })
+      .lean<IQuizAttempt[]>();
+
+    let averageScore: number | null = null;
+    const attemptSummaries: IQuizAttemptSummary[] = [];
+
+    if (attempts.length > 0) {
+      let totalPercentageSum = 0;
+      let validAttemptsCount = 0;
+      attempts.forEach((attempt) => {
+        const totalQuestionsInAttempt = attempt.questionsPresented?.length || 0;
+        if (totalQuestionsInAttempt > 0) {
+          totalPercentageSum += attempt.score / totalQuestionsInAttempt;
+          validAttemptsCount++;
+        }
+        attemptSummaries.push({
+          _id: (attempt._id as Types.ObjectId).toString(),
+          score: attempt.score,
+          totalQuestions: totalQuestionsInAttempt,
+          attemptDate: attempt.attemptDate,
+          hasIncorrectAnswers:
+            totalQuestionsInAttempt > 0 &&
+            attempt.score < totalQuestionsInAttempt,
+        });
+      });
+      if (validAttemptsCount > 0) {
+        averageScore = parseFloat(
+          ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
+        );
+      }
+    }
+
+    // Assertions for populated fields after lean
+    const populatedStaffProgress =
+      staffProgress as unknown as IStaffQuizProgressWithAttempts;
+    populatedStaffProgress.staffUserId = staffProgress.staffUserId as IUser;
+    populatedStaffProgress.quizId = staffProgress.quizId as IQuiz;
+
+    return {
+      ...populatedStaffProgress,
+      attempts: attemptSummaries,
+      averageScore,
+    };
+  }
+
+  /**
+   * Retrieves progress for all staff members in a restaurant for a specific quiz.
+   *
+   * @param restaurantId - The ID of the restaurant.
+   * @param quizId - The ID of the quiz.
+   * @returns A promise resolving to an array of staff quiz progress details.
+   * @throws {AppError} If database errors occur.
+   */
+  static async getRestaurantQuizStaffProgress(
+    restaurantId: Types.ObjectId,
+    quizId: Types.ObjectId
+  ): Promise<IStaffMemberQuizProgressDetails[]> {
+    // 1. Fetch the quiz to get its title
+    const quiz = await QuizModel.findById(quizId)
+      .select("title")
+      .lean<Pick<IQuiz, "title"> | null>();
+    if (!quiz) {
+      throw new AppError("Quiz not found.", 404);
+    }
+    const quizTitle = quiz.title;
+
+    // 2. Fetch all staff members for the restaurant
+    const staffInRestaurant = await User.find({
+      restaurantId,
+      role: "staff", // Ensure we only get staff members
+    })
+      .select("_id name email professionalRole")
+      .lean<Pick<IUser, "_id" | "name" | "email" | "professionalRole">[]>();
+
+    if (!staffInRestaurant || staffInRestaurant.length === 0) {
+      return []; // No staff in restaurant, so no progress to show
+    }
+
+    // 3. For each staff member, fetch their progress and attempts for this quiz
+    const allStaffProgressDetails: IStaffMemberQuizProgressDetails[] = [];
+
+    for (const staff of staffInRestaurant) {
       const staffProgressDoc = await StaffQuizProgress.findOne({
-        staffUserId: staffObjectId,
-        quizId: quizId,
-        restaurantId: restaurantId, // Ensure restaurant context
+        staffUserId: staff._id,
+        quizId,
+        restaurantId,
       }).lean<PlainIStaffQuizProgress | null>();
 
-      // 4. Fetch all QuizAttempts for this staff member and quiz
-      const allAttemptsFromDb = await QuizAttempt.find({
-        staffUserId: staffObjectId,
-        quizId: quizId,
-        restaurantId: restaurantId,
+      const attempts = await QuizAttempt.find({
+        staffUserId: staff._id,
+        quizId,
+        restaurantId,
       })
         .select("_id score questionsPresented attemptDate")
         .sort({ attemptDate: -1 })
-        .lean<
-          Pick<
-            IQuizAttempt,
-            "_id" | "score" | "questionsPresented" | "attemptDate"
-          >[]
-        >();
-
-      const attemptSummaries: IQuizAttemptSummary[] = allAttemptsFromDb.map(
-        (attempt) => {
-          const totalQuestions = attempt.questionsPresented?.length || 0;
-          return {
-            _id: attempt._id.toString(),
-            score: attempt.score,
-            totalQuestions: totalQuestions,
-            attemptDate: attempt.attemptDate,
-            hasIncorrectAnswers:
-              totalQuestions > 0 && attempt.score < totalQuestions,
-          };
-        }
-      );
+        .lean<IQuizAttempt[]>();
 
       let averageScoreForQuiz: number | null = null;
-      if (allAttemptsFromDb.length > 0) {
+      const attemptSummaries: IQuizAttemptSummary[] = [];
+      let numberOfAttempts = 0;
+
+      if (attempts.length > 0) {
+        numberOfAttempts = attempts.length;
         let totalPercentageSum = 0;
         let validAttemptsCount = 0;
-        allAttemptsFromDb.forEach((attempt) => {
-          if (
-            attempt.score !== undefined &&
-            attempt.questionsPresented &&
-            attempt.questionsPresented.length > 0
-          ) {
-            totalPercentageSum +=
-              attempt.score / attempt.questionsPresented.length;
+        attempts.forEach((attempt) => {
+          const totalQuestionsInAttempt =
+            attempt.questionsPresented?.length || 0;
+          if (totalQuestionsInAttempt > 0) {
+            totalPercentageSum += attempt.score / totalQuestionsInAttempt;
             validAttemptsCount++;
           }
+          attemptSummaries.push({
+            _id: (attempt._id as Types.ObjectId).toString(),
+            score: attempt.score,
+            totalQuestions: totalQuestionsInAttempt,
+            attemptDate: attempt.attemptDate,
+            hasIncorrectAnswers:
+              totalQuestionsInAttempt > 0 &&
+              attempt.score < totalQuestionsInAttempt,
+          });
         });
         if (validAttemptsCount > 0) {
           averageScoreForQuiz = parseFloat(
@@ -2022,100 +1045,159 @@ export class QuizService {
         }
       }
 
-      results.push({
+      const progressDetails: Pick<
+        PlainIStaffQuizProgress,
+        | "isCompletedOverall"
+        | "seenQuestionIds"
+        | "totalUniqueQuestionsInSource"
+        | "lastAttemptTimestamp"
+      > | null = staffProgressDoc
+        ? {
+            isCompletedOverall: staffProgressDoc.isCompletedOverall,
+            seenQuestionIds: staffProgressDoc.seenQuestionIds,
+            totalUniqueQuestionsInSource:
+              staffProgressDoc.totalUniqueQuestionsInSource,
+            lastAttemptTimestamp: staffProgressDoc.lastAttemptTimestamp,
+          }
+        : null;
+
+      allStaffProgressDetails.push({
         staffMember: {
-          _id: staffObjectId,
+          _id: staff._id as Types.ObjectId, // Cast as IUser already has ObjectId _id
           name: staff.name,
           email: staff.email,
           professionalRole: staff.professionalRole,
         },
-        quizTitle: quiz.title,
-        progress: staffProgressDoc
-          ? {
-              isCompletedOverall: staffProgressDoc.isCompletedOverall,
-              seenQuestionIds: staffProgressDoc.seenQuestionIds,
-              totalUniqueQuestionsInSource:
-                staffProgressDoc.totalUniqueQuestionsInSource,
-              lastAttemptTimestamp: staffProgressDoc.lastAttemptTimestamp,
-            }
-          : null,
-        averageScoreForQuiz: averageScoreForQuiz,
+        quizTitle,
+        progress: progressDetails,
+        averageScoreForQuiz,
         attempts: attemptSummaries,
-        numberOfAttempts: allAttemptsFromDb.length,
+        numberOfAttempts,
       });
     }
-    return results;
+    return allStaffProgressDetails;
   }
 
-  public static async resetQuizProgressForEveryone(
-    quizId: Types.ObjectId,
-    restaurantId: Types.ObjectId
-  ): Promise<{ resetAttemptsCount: number; resetProgressCount: number }> {
-    // 1. Validate Quiz
-    const quiz = await Quiz.findOne({
-      _id: quizId,
-      restaurantId: restaurantId,
-    }).lean<Pick<IQuiz, "totalUniqueQuestionsInSourceSnapshot">>(); // Only need snapshot for reset
+  /**
+   * Retrieves details of a specific quiz attempt, including incorrect questions and answers.
+   *
+   * @param attemptId - The ID of the quiz attempt.
+   * @param requestingUserIdString - The ID of the user requesting the details (string).
+   * @returns A promise resolving to the quiz attempt details, or null if not found/authorized.
+   * @throws {AppError} If database errors occur.
+   */
+  static async getQuizAttemptDetails(
+    attemptId: string,
+    requestingUserIdString: string
+  ): Promise<QuizAttemptDetailsWithIncorrects | null> {
+    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
+      throw new AppError("Invalid attempt ID format.", 400);
+    }
+    const attemptObjectId = new Types.ObjectId(attemptId);
+    const requestingUserId = new Types.ObjectId(requestingUserIdString);
 
-    if (!quiz) {
+    const attempt = await QuizAttempt.findById(attemptObjectId)
+      .populate<{ quizId: Pick<IQuiz, "_id" | "title" | "restaurantId"> }>({
+        path: "quizId",
+        select: "_id title restaurantId",
+      })
+      .lean<IQuizAttempt | null>();
+
+    if (!attempt) {
+      return null; // Or throw 404
+    }
+
+    // Authorization check: User must be the one who took the attempt or a restaurant admin of that restaurant
+    const restaurantIdOfAttempt = (
+      attempt.quizId as Pick<IQuiz, "restaurantId">
+    ).restaurantId;
+    const requestingUser = await User.findById(requestingUserId)
+      .select("role restaurantId")
+      .lean<Pick<IUser, "role" | "restaurantId"> | null>();
+
+    if (!requestingUser) {
+      throw new AppError("Requesting user not found.", 404);
+    }
+
+    const isOwnerOfAttempt =
+      attempt.staffUserId.toString() === requestingUserIdString;
+    const isAdminOfRestaurant =
+      requestingUser.role === "restaurant" &&
+      requestingUser.restaurantId?.toString() ===
+        restaurantIdOfAttempt.toString();
+
+    if (!isOwnerOfAttempt && !isAdminOfRestaurant) {
       throw new AppError(
-        "Quiz not found or does not belong to this restaurant.",
-        404
+        "You are not authorized to view this quiz attempt.",
+        403
       );
     }
 
-    let session: mongoose.ClientSession | null = null;
+    const incorrectQuestionsDetails: IncorrectQuestionDetailForAttempt[] = [];
+    if (attempt.questionsPresented) {
+      for (const presentedQ of attempt.questionsPresented) {
+        if (!presentedQ.isCorrect) {
+          const questionDoc = await QuestionModel.findById(
+            presentedQ.questionId
+          )
+            .select("questionText options questionType") // Include questionType for context
+            .lean<Pick<
+              IQuestion,
+              "questionText" | "options" | "questionType"
+            > | null>();
+          if (questionDoc) {
+            let correctAnswerText = "N/A";
+            // Attempt to find the text of the correct answer
+            const correctOption = questionDoc.options.find(
+              (opt) => opt.isCorrect
+            );
+            if (correctOption) {
+              correctAnswerText = correctOption.text;
+            } else if (
+              questionDoc.questionType === "true-false" &&
+              questionDoc.options.length === 2
+            ) {
+              // For true/false, if no explicit correct, try to infer (e.g. if options are 'True' and 'False')
+              // This part is heuristic and depends on how true/false questions are structured
+              // For now, we rely on isCorrect flag from options
+            }
+
+            incorrectQuestionsDetails.push({
+              questionText: questionDoc.questionText,
+              userAnswer: String(presentedQ.answerGiven), // Ensure string representation
+              correctAnswer: correctAnswerText,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      _id: (attempt._id as Types.ObjectId).toString(),
+      quizId: (attempt.quizId as { _id: Types.ObjectId })._id.toString(),
+      quizTitle: (attempt.quizId as { title: string }).title,
+      staffUserId: attempt.staffUserId.toString(),
+      score: attempt.score,
+      totalQuestions: attempt.questionsPresented?.length || 0,
+      attemptDate: attempt.attemptDate,
+      incorrectQuestions: incorrectQuestionsDetails,
+    };
+  }
+
+  /**
+   * Counts the total number of quizzes for a specific restaurant.
+   *
+   * @param restaurantId - The ID of the restaurant.
+   * @returns A promise resolving to the total count of quizzes.
+   * @throws {AppError} If any database error occurs.
+   */
+  static async countQuizzes(restaurantId: Types.ObjectId): Promise<number> {
     try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-
-      // 2. Delete all QuizAttempts for this quiz and restaurant
-      const attemptDeletionResult = await QuizAttempt.deleteMany(
-        { quizId: quizId, restaurantId: restaurantId },
-        { session }
-      );
-      const resetAttemptsCount = attemptDeletionResult.deletedCount || 0;
-
-      // 3. Reset StaffQuizProgress for this quiz and restaurant
-      // Fetch totalUniqueQuestionsInSource from the quiz definition for reset
-      const totalUniqueInSource =
-        quiz.totalUniqueQuestionsInSourceSnapshot || 0;
-
-      const progressUpdateResult = await StaffQuizProgress.updateMany(
-        { quizId: quizId, restaurantId: restaurantId },
-        {
-          $set: {
-            seenQuestionIds: [],
-            isCompletedOverall: false,
-            totalUniqueQuestionsInSource: totalUniqueInSource, // Resync with quiz definition
-            // questionsAnsweredToday: 0, // REMOVED
-          },
-          $unset: {
-            lastAttemptTimestamp: "",
-            // lastActivityDateForDailyReset: "", // REMOVED
-          },
-        },
-        { session }
-      );
-      const resetProgressCount = progressUpdateResult.modifiedCount || 0;
-      // Note: updateMany returns matchedCount and modifiedCount.
-      // modifiedCount is more relevant for "reset" operations.
-
-      await session.commitTransaction();
-      return { resetAttemptsCount, resetProgressCount };
+      const count = await QuizModel.countDocuments({ restaurantId });
+      return count;
     } catch (error: any) {
-      if (session) {
-        await session.abortTransaction();
-      }
-      console.error(
-        `Error resetting quiz progress for quiz ${quizId}, restaurant ${restaurantId}:`,
-        error
-      );
-      throw new AppError("Failed to reset quiz progress.", 500);
-    } finally {
-      if (session) {
-        session.endSession();
-      }
+      console.error("Error counting quizzes for restaurant:", error);
+      throw new AppError("Failed to count quizzes.", 500);
     }
   }
 }

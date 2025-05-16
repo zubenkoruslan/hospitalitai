@@ -70,6 +70,7 @@ export interface StaffMemberWithData {
   email: string;
   createdAt: string;
   professionalRole?: string;
+  assignedRoleId?: string;
   quizProgressSummaries: ClientQuizProgressSummary[];
   averageScore: number | null;
   quizzesTaken: number;
@@ -115,12 +116,12 @@ export interface Filters {
 // Placeholder imports - replace with actual imports once types are centralized
 import { ClientUserMinimal } from "./user"; // Assuming ClientUserMinimal is in user.ts
 import { ClientIQuiz } from "./quizTypes"; // Assuming ClientIQuiz is in quizTypes.ts
-import { IncorrectQuestionDetail } from "./quizTypes"; // ADDED IMPORT
+import { IncorrectQuestionDetail } from "./quizTypes"; // REMOVED ClientIQuizAttemptSummary from this import
 
 // From api.ts: ClientStaffQuizProgress
 export interface ClientStaffQuizProgress {
   _id: string;
-  staffUserId: string;
+  staffUserId: ClientUserMinimal;
   quizId: string;
   restaurantId: string;
   seenQuestionIds: string[];
@@ -132,6 +133,22 @@ export interface ClientStaffQuizProgress {
   createdAt?: string;
   updatedAt?: string;
   averageScore?: number | null;
+}
+
+// ADDED: Client-side representation of the detailed progress data from the backend for the restaurant view
+export interface ClientStaffMemberQuizProgressDetails {
+  _id?: string; // Represents the unique ID for this progress entry, could be StaffQuizProgress._id or staffUser._id if used as key
+  staffMember: ClientUserMinimal;
+  // quizTitle: string; // Quiz title is usually passed as a separate prop to the modal
+  progress?: {
+    isCompletedOverall: boolean;
+    seenQuestionIds: string[];
+    totalUniqueQuestionsInSource: number;
+    lastAttemptTimestamp?: string; // ISO string
+  } | null;
+  averageScoreForQuiz: number | null;
+  attempts: ClientQuizAttemptSummary[]; // This will now correctly refer to the interface above
+  numberOfAttempts: number;
 }
 
 // From api.ts: ClientStaffQuizProgressWithAttempts

@@ -1,7 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import User, { IUser } from "../models/User";
 import QuizResult from "../models/QuizResult";
-import { IQuiz } from "../models/Quiz";
+import { IQuiz } from "../models/QuizModel";
 import QuizResultService from "./quizResultService";
 import { AppError } from "../utils/errorHandler";
 import StaffQuizProgress, {
@@ -9,6 +9,7 @@ import StaffQuizProgress, {
 } from "../models/StaffQuizProgress";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 import { IQuizAttemptSummary } from "../types/quizTypes";
+import RoleModel from "../models/RoleModel";
 
 // Define interfaces for return types to improve clarity
 
@@ -29,6 +30,7 @@ interface StaffMemberWithQuizProgress {
   email: string;
   createdAt?: Date;
   professionalRole?: string;
+  assignedRoleId?: Types.ObjectId;
   averageScore: number | null; // Overall average score from QuizResultService.calculateAverageScoreForUser
   quizzesTaken: number; // Count of unique quizzes with attempts by this staff member
   quizProgressSummaries: QuizProgressSummary[]; // REPLACES resultsSummary
@@ -66,11 +68,12 @@ interface StaffUpdateResponse {
   _id: Types.ObjectId;
   name: string;
   email: string;
-  role: string;
+  role: string; // This 'role' is the general user role (e.g., 'staff', 'admin'), not the professional role.
   professionalRole?: string;
   restaurantId?: Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
+  assignedRoleId?: Types.ObjectId; // Changed from roles: Types.ObjectId[]
 }
 
 class StaffService {
@@ -89,12 +92,23 @@ class StaffService {
       // 1. Fetch all staff members (lean for performance)
       const staffList = await User.find(
         { restaurantId: restaurantId, role: "staff" },
-        "_id name email createdAt professionalRole"
-      ).lean<IUser[]>();
+        "_id name email createdAt professionalRole assignedRoleId"
+      ).lean<Array<IUser & { assignedRoleId?: Types.ObjectId }>>();
 
-      // 2. For each staff member, calculate overall average and fetch detailed quiz progress
-      const staffWithDataPromises = staffList.map(async (staff) => {
-        const staffObjectId = staff._id as Types.ObjectId;
+      // 2. For each staff member, process roles and calculate quiz progress
+      const staffWithDataPromises = staffList.map(async (staffMember) => {
+        let currentProfessionalRole = staffMember.professionalRole;
+        // If a formal role is assigned, its name should take precedence for display
+        if (staffMember.assignedRoleId) {
+          const roleDoc = await RoleModel.findById(staffMember.assignedRoleId)
+            .select("name")
+            .lean();
+          if (roleDoc && roleDoc.name) {
+            currentProfessionalRole = roleDoc.name;
+          }
+        }
+
+        const staffObjectId = staffMember._id as Types.ObjectId;
 
         // Calculate overall average score (this now uses QuizAttempts and filters by active quizzes)
         const { averageScore, quizzesTaken } =
@@ -207,10 +221,11 @@ class StaffService {
 
         return {
           _id: staffObjectId,
-          name: staff.name,
-          email: staff.email,
-          createdAt: staff.createdAt,
-          professionalRole: staff.professionalRole,
+          name: staffMember.name,
+          email: staffMember.email,
+          createdAt: staffMember.createdAt,
+          professionalRole: currentProfessionalRole,
+          assignedRoleId: staffMember.assignedRoleId,
           averageScore: averageScore,
           quizzesTaken: quizzesTaken,
           quizProgressSummaries: quizProgressSummaries,
@@ -247,192 +262,266 @@ class StaffService {
     staffId: string | Types.ObjectId,
     restaurantId: Types.ObjectId
   ): Promise<StaffMemberDetails> {
-    const staffObjectId =
-      typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
+    if (!mongoose.Types.ObjectId.isValid(staffId)) {
+      throw new AppError("Invalid staff ID format", 400);
+    }
 
-    const user = await User.findById(staffObjectId).lean<IUser>();
-    if (!user || user.restaurantId?.toString() !== restaurantId.toString()) {
-      // It's possible a staff member might not have a restaurantId if the system allows it,
-      // but the query implies a restaurant context. Adjust if staff can exist without restaurantId.
+    const staffObjectId = new Types.ObjectId(staffId);
+
+    // 1. Fetch staff member basic details
+    const staffMember = await User.findOne(
+      {
+        _id: staffObjectId,
+        restaurantId: restaurantId,
+        // role: 'staff' // Assuming we only fetch 'staff' role users here. Or make it flexible.
+      },
+      "_id name email createdAt professionalRole restaurantId role" // Added 'role'
+    ).lean<
+      Pick<
+        IUser,
+        | "_id"
+        | "name"
+        | "email"
+        | "createdAt"
+        | "professionalRole"
+        | "restaurantId"
+        | "role"
+      > & { assignedRoleId?: Types.ObjectId } // ensure assignedRoleId is available if needed later
+    >();
+
+    if (!staffMember) {
       throw new AppError(
-        "Staff member not found or does not belong to this restaurant.",
+        "Staff member not found or not part of the restaurant.",
         404
       );
     }
 
-    const { averageScore: overallAverageScore } =
+    // 2. Fetch all quiz attempts for the staff member
+    // We need to populate quiz titles for the summary
+    const quizAttempts = await QuizAttempt.find({
+      staffUserId: staffObjectId,
+      restaurantId: restaurantId,
+      // isCompleted: true, // Filter for completed attempts if 'isCompleted' field exists and is relevant.
+      // IQuizAttempt does not have isCompleted, attemptDate signifies completion.
+    })
+      .populate<{ quizId: Pick<IQuiz, "_id" | "title"> }>({
+        path: "quizId",
+        select: "_id title", // Select only necessary fields from Quiz
+      })
+      .sort({ attemptDate: -1 }) // Changed from completedAt to attemptDate
+      .lean<Array<IQuizAttempt & { quizId: Pick<IQuiz, "_id" | "title"> }>>();
+
+    // 3. Aggregate quiz performance
+    const aggregatedPerformance: Record<
+      string,
+      AggregatedQuizPerformanceSummary
+    > = {};
+
+    for (const attempt of quizAttempts) {
+      if (!attempt.quizId || !attempt.quizId._id) continue; // Skip if quizId is not populated
+
+      const quizIdStr = attempt.quizId._id.toString();
+
+      if (!aggregatedPerformance[quizIdStr]) {
+        aggregatedPerformance[quizIdStr] = {
+          quizId: attempt.quizId._id,
+          quizTitle: attempt.quizId.title || "Untitled Quiz",
+          numberOfAttempts: 0,
+          averageScorePercent: 0, // Initialize with 0, will be updated
+          attempts: [],
+          lastCompletedAt: undefined, // Will be updated with the latest attemptDate
+        };
+      }
+
+      const perfSummary = aggregatedPerformance[quizIdStr];
+      perfSummary.numberOfAttempts++;
+
+      const questionsPresentedCount = attempt.questionsPresented?.length ?? 0;
+      const attemptScorePercent =
+        questionsPresentedCount > 0
+          ? (attempt.score / questionsPresentedCount) * 100
+          : 0;
+
+      // Sum of percentages to calculate average later
+      // Handle potential null by using 0 if it's the first attempt in summary
+      perfSummary.averageScorePercent =
+        ((perfSummary.averageScorePercent || 0) *
+          (perfSummary.numberOfAttempts - 1) + // Coalesce null to 0
+          attemptScorePercent) /
+        perfSummary.numberOfAttempts;
+
+      // Update lastCompletedAt with the most recent attemptDate for this quiz
+      if (attempt.attemptDate) {
+        // Check if attemptDate exists
+        if (
+          !perfSummary.lastCompletedAt ||
+          attempt.attemptDate > perfSummary.lastCompletedAt
+        ) {
+          perfSummary.lastCompletedAt = attempt.attemptDate; // Use attemptDate
+        }
+      }
+
+      // Ensure this matches IQuizAttemptSummary from server/src/types/quizTypes.ts
+      const hasIncorrectAnswers =
+        questionsPresentedCount > 0 && attempt.score < questionsPresentedCount;
+      perfSummary.attempts.push({
+        _id: attempt._id.toString(), // Changed from attemptId
+        score: attempt.score,
+        totalQuestions: questionsPresentedCount,
+        attemptDate: attempt.attemptDate, // Changed from completedAt
+        hasIncorrectAnswers: hasIncorrectAnswers, // Added required field
+        // percentageScore and questions: [] were removed as they are not in IQuizAttemptSummary
+      });
+    }
+
+    // Convert record to array and round average scores
+    const aggregatedQuizPerformanceArray = Object.values(
+      aggregatedPerformance
+    ).map((summary) => ({
+      ...summary,
+      averageScorePercent: summary.averageScorePercent
+        ? parseFloat(summary.averageScorePercent.toFixed(1))
+        : null,
+    }));
+
+    // 4. Calculate overall average score
+    const { averageScore } =
       await QuizResultService.calculateAverageScoreForUser(
         staffObjectId,
         restaurantId
       );
 
-    const allUserAttempts = await QuizAttempt.find({
-      staffUserId: staffObjectId,
-      restaurantId: restaurantId,
-    })
-      .populate<{ quizId: Pick<IQuiz, "_id" | "title"> }>("quizId", "_id title")
-      .sort({ quizId: 1, attemptDate: -1 })
-      .lean<Array<IQuizAttempt & { quizId: Pick<IQuiz, "_id" | "title"> }>>();
-
-    const attemptsByQuiz = new Map<
-      string,
-      Array<IQuizAttempt & { quizId: Pick<IQuiz, "_id" | "title"> }>
-    >();
-    for (const attempt of allUserAttempts) {
-      if (attempt.quizId?._id) {
-        const quizIdStr = attempt.quizId._id.toString();
-        if (!attemptsByQuiz.has(quizIdStr)) {
-          attemptsByQuiz.set(quizIdStr, []);
-        }
-        // Ensure non-null assertion is safe or handle undefined explicitly
-        const attemptsList = attemptsByQuiz.get(quizIdStr);
-        if (attemptsList) {
-          attemptsList.push(attempt);
-        }
-      }
-    }
-
-    const aggregatedPerformanceList: AggregatedQuizPerformanceSummary[] = [];
-
-    for (const [quizIdStr, attemptsForQuiz] of attemptsByQuiz.entries()) {
-      if (attemptsForQuiz.length === 0) continue;
-
-      const currentQuizInfo = attemptsForQuiz[0].quizId;
-      const quizTitle = currentQuizInfo.title;
-      const numberOfAttempts = attemptsForQuiz.length;
-      const lastCompletedAt = attemptsForQuiz[0].attemptDate;
-
-      let totalPercentageSum = 0;
-      let validAttemptsForAverageCount = 0;
-      attemptsForQuiz.forEach((att) => {
-        if (
-          att.score !== undefined &&
-          att.questionsPresented &&
-          att.questionsPresented.length > 0
-        ) {
-          totalPercentageSum += att.score / att.questionsPresented.length;
-          validAttemptsForAverageCount++;
-        }
-      });
-
-      const averageScorePercent =
-        validAttemptsForAverageCount > 0
-          ? parseFloat(
-              (
-                (totalPercentageSum / validAttemptsForAverageCount) *
-                100
-              ).toFixed(1)
-            )
-          : null;
-
-      const attemptSummaries: IQuizAttemptSummary[] = attemptsForQuiz
-        .map((att) => {
-          const totalQuestions = att.questionsPresented?.length || 0;
-          return {
-            _id: att._id.toString(),
-            score: att.score,
-            totalQuestions: totalQuestions,
-            attemptDate: att.attemptDate,
-            hasIncorrectAnswers:
-              totalQuestions > 0 && att.score < totalQuestions,
-          };
-        })
-        .sort(
-          (a, b) =>
-            new Date(b.attemptDate).getTime() -
-            new Date(a.attemptDate).getTime()
-        ); // Sort attempts newest first
-
-      aggregatedPerformanceList.push({
-        quizId: new Types.ObjectId(quizIdStr),
-        quizTitle: quizTitle,
-        numberOfAttempts: numberOfAttempts,
-        averageScorePercent: averageScorePercent,
-        lastCompletedAt: lastCompletedAt,
-        attempts: attemptSummaries,
-      });
-    }
-
-    aggregatedPerformanceList.sort((a, b) =>
-      a.quizTitle.localeCompare(b.quizTitle)
-    );
-
     return {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      createdAt: user.createdAt,
-      professionalRole: user.professionalRole,
-      restaurantId: user.restaurantId,
-      role: user.role,
-      aggregatedQuizPerformance: aggregatedPerformanceList,
-      averageScore: overallAverageScore,
+      _id: staffMember._id,
+      name: staffMember.name,
+      email: staffMember.email,
+      createdAt: staffMember.createdAt,
+      professionalRole: staffMember.professionalRole,
+      restaurantId: staffMember.restaurantId,
+      role: staffMember.role, // Include the general role
+      aggregatedQuizPerformance: aggregatedQuizPerformanceArray,
+      averageScore: averageScore,
     };
   }
 
   /**
-   * Updates the professional role designation for a specific staff member.
+   * Updates a staff member's professional role ONLY.
+   * For assigning a formal Role entity, use updateStaffAssignedRole.
    *
-   * @param staffId - The ID of the staff member to update.
+   * @param staffId - The ID of the staff member.
    * @param professionalRole - The new professional role string.
-   * @param restaurantId - The ID of the restaurant (used for authorization scope).
-   * @returns A promise resolving to the updated staff member's data (excluding password).
-   * @throws {AppError} If the professionalRole is empty (400),
-   *                    if the staff member is not found or doesn't belong to the restaurant (404),
-   *                    if Mongoose validation fails (400),
-   *                    if the staffId format is invalid (400),
-   *                    or if any unexpected database error occurs (500).
+   * @param restaurantId - The ID of the restaurant for authorization.
+   * @returns A promise resolving to the updated staff member object.
+   * @throws {AppError} If staff member not found (404) or on database error (500).
    */
   static async updateStaffMemberRole(
     staffId: string | Types.ObjectId,
     professionalRole: string,
     restaurantId: Types.ObjectId
   ): Promise<StaffUpdateResponse> {
-    const staffObjectId =
-      typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
-
-    if (!professionalRole || professionalRole.trim() === "") {
-      throw new AppError("Professional role cannot be empty.", 400);
-    }
+    // Ensure staffId is an ObjectId
+    const staffObjectId = new Types.ObjectId(staffId);
 
     try {
       const updatedStaff = await User.findOneAndUpdate(
         {
           _id: staffObjectId,
           restaurantId: restaurantId,
-          role: "staff",
+          // role: 'staff' // Consider if this check is strictly needed here
         },
-        { $set: { professionalRole: professionalRole.trim() } },
+        { $set: { professionalRole: professionalRole } },
         { new: true, runValidators: true }
-      ).lean<IUser>();
+      ).select("-password"); // Exclude password
 
       if (!updatedStaff) {
         throw new AppError(
-          "Staff member not found, not part of this restaurant, or not a staff role.",
+          "Staff member not found or not part of the restaurant.",
           404
         );
       }
-
+      // Map to StaffUpdateResponse, ensuring all fields are present or undefined
       return {
-        _id: updatedStaff._id as Types.ObjectId,
+        _id: updatedStaff._id,
         name: updatedStaff.name,
         email: updatedStaff.email,
-        role: updatedStaff.role,
+        role: updatedStaff.role, // general user role
         professionalRole: updatedStaff.professionalRole,
         restaurantId: updatedStaff.restaurantId,
         createdAt: updatedStaff.createdAt,
         updatedAt: updatedStaff.updatedAt,
+        assignedRoleId: updatedStaff.assignedRoleId, // Include assignedRoleId
       };
-    } catch (error: any) {
-      console.error("Error updating staff member role in service:", error);
+    } catch (error) {
       if (error instanceof AppError) throw error;
-      if (error instanceof mongoose.Error.ValidationError) {
-        throw new AppError(`Validation failed: ${error.message}`, 400);
+      console.error(`Error updating staff member role: ${error}`);
+      throw new AppError(`Error updating staff member role: ${error}`, 500);
+    }
+  }
+
+  /**
+   * Assigns or unassigns a specific Role to a staff member.
+   * If assignedRoleId is null, the role is unassigned.
+   *
+   * @param staffId - The ID of the staff member.
+   * @param assignedRoleId - The ObjectId of the Role to assign, or null to unassign.
+   * @param restaurantId - The ID of the restaurant for authorization.
+   * @returns A promise resolving to the updated staff member object (excluding password).
+   * @throws {AppError} If staff member not found (404) or on database error (500).
+   */
+  static async updateStaffAssignedRole(
+    staffId: string | Types.ObjectId,
+    assignedRoleId: Types.ObjectId | null,
+    restaurantId: Types.ObjectId
+  ): Promise<Omit<IUser, "password"> | null> {
+    const staffObjectId = new Types.ObjectId(staffId);
+
+    try {
+      let professionalRoleToSet: string | null = null;
+      if (assignedRoleId) {
+        const roleDoc = await RoleModel.findById(assignedRoleId).lean();
+        if (roleDoc) {
+          professionalRoleToSet = roleDoc.name;
+        } else {
+          // Role not found, maybe throw an error or set professionalRole to a default/null
+          // For now, if role ID is given but role not found, we won't set professional role.
+          // This scenario should ideally be prevented by frontend validation or by ensuring role exists.
+          console.warn(
+            `Role with ID ${assignedRoleId} not found when trying to set professionalRole.`
+          );
+        }
       }
-      if (error.name === "CastError" && error.path === "_id") {
-        throw new AppError("Invalid Staff ID format.", 400);
+
+      const updateOperation: any = {};
+      if (assignedRoleId) {
+        updateOperation.$set = {
+          assignedRoleId: assignedRoleId,
+          professionalRole: professionalRoleToSet, // Set professionalRole based on assigned role name
+        };
+      } else {
+        updateOperation.$unset = { assignedRoleId: "" };
+        updateOperation.$set = { professionalRole: null }; // Clear professionalRole when unassigning
       }
-      throw new AppError("Failed to update staff member role.", 500);
+
+      const updatedStaff = await User.findOneAndUpdate(
+        {
+          _id: staffObjectId,
+          restaurantId: restaurantId,
+        },
+        updateOperation,
+        { new: true, runValidators: true }
+      ).select("-password");
+
+      if (!updatedStaff) {
+        throw new AppError(
+          "Staff member not found or not part of the restaurant.",
+          404
+        );
+      }
+      return updatedStaff;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      console.error(`Error updating staff assigned role: ${error}`);
+      throw new AppError(`Error updating staff assigned role: ${error}`, 500);
     }
   }
 

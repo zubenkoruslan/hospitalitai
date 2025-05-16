@@ -15,6 +15,17 @@ export interface GenerateQuizFromBanksRequestBody {
   description?: string;
   questionBankIds: string[];
   numberOfQuestionsPerAttempt: number;
+  targetRoles?: string[];
+}
+
+// Interface for request body when updating a quiz
+export interface UpdateQuizRequestBody {
+  title?: string;
+  description?: string;
+  questionBankIds?: string[];
+  numberOfQuestionsPerAttempt?: number;
+  isAvailable?: boolean;
+  targetRoles?: string[]; // Optional: array of role IDs, empty array means for all
 }
 
 // Interface for request body when submitting a quiz attempt

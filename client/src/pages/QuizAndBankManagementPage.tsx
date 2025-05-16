@@ -307,7 +307,7 @@ const QuizAndBankManagementPage: React.FC = () => {
   };
 
   const handleManageBankQuestions = (bankId: string) => {
-    navigate(`/question-banks/${bankId}/edit`);
+    navigate(`/question-banks/${bankId}`);
   };
 
   const _handleOpenEditQuizModal = (quiz: ClientIQuiz) => {

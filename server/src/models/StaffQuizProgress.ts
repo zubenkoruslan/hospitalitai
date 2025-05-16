@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { IUser } from "./User"; // For staffUserId and restaurantId
-import { IQuiz } from "./Quiz"; // For quizId
+import { IQuiz } from "./QuizModel"; // UPDATED: For quizId
 import { IQuestion } from "./QuestionModel"; // For seenQuestionIds
 import { IRestaurant } from "./Restaurant"; // For restaurantId
 

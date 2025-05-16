@@ -116,6 +116,7 @@ import {
   StaffMemberWithData,
   StaffDetailsData,
   Filters as StaffFilters, // Added alias if Filters is too generic
+  ClientStaffMemberQuizProgressDetails, // ADDED IMPORT
 } from "../types/staffTypes";
 
 // Import User types (assuming a simple one for now)
@@ -142,6 +143,9 @@ import {
   LoginCredentials,
   SignupDataClient,
 } from "../types/authTypes";
+
+// Import Role types
+import { IRole } from "../types/roleTypes";
 
 // Auth Types (to be moved to ../types/authTypes.ts eventually)
 // For now, keeping them here to break down the change, will move next.
@@ -486,10 +490,37 @@ export const getMyQuizProgress = async (
 export const getRestaurantQuizStaffProgress = async (
   quizId: string
 ): Promise<ClientStaffQuizProgress[]> => {
-  const response = await api.get<{ data: ClientStaffQuizProgress[] }>(
-    `/quizzes/${quizId}/restaurant-progress`
-  );
-  return response.data.data; // Backend returns { data: IStaffQuizProgress[] }
+  const response = await api.get<{
+    data: ClientStaffMemberQuizProgressDetails[];
+  }>(`/quizzes/${quizId}/restaurant-progress`);
+  // Backend returns IStaffMemberQuizProgressDetails[], map to ClientStaffQuizProgress[]
+  const backendData: ClientStaffMemberQuizProgressDetails[] =
+    response.data.data;
+
+  if (!backendData) {
+    return []; // Handle null or undefined gracefully
+  }
+
+  return backendData.map((item) => {
+    // The _id for ClientStaffQuizProgress should be unique for the list key.
+    // Using staffMember._id as it's guaranteed to be unique per staff entry.
+    // If StaffQuizProgress document _id is needed for other operations, backend should provide it.
+    const staffProgressEntry: ClientStaffQuizProgress = {
+      _id: item.staffMember._id, // Use staff member's ID as the unique key for this mapped object
+      staffUserId: item.staffMember, // This is ClientUserMinimal, includes name, email
+      quizId: quizId, // Add quizId to each item for context if needed by modal logic
+      restaurantId: item.staffMember.restaurantId || "", // Get restaurantId from staffMember if available
+      seenQuestionIds: item.progress?.seenQuestionIds || [],
+      totalUniqueQuestionsInSource:
+        item.progress?.totalUniqueQuestionsInSource || 0,
+      isCompletedOverall: item.progress?.isCompletedOverall || false,
+      lastAttemptTimestamp: item.progress?.lastAttemptTimestamp,
+      averageScore: item.averageScoreForQuiz,
+      // numberOfAttempts: item.numberOfAttempts, // Add if modal needs it
+      // attempts: item.attempts, // Add if modal needs it
+    };
+    return staffProgressEntry;
+  });
 };
 
 /**
@@ -588,9 +619,24 @@ export const updateStaffRole = async (
   const response = await api.patch<{
     message: string;
     staff: StaffMemberWithData;
-  }>(`/staff/${staffId}`, {
-    professionalRole,
-  });
+  }>(`/staff/${staffId}`, { professionalRole });
+  return response.data;
+};
+
+/**
+ * Updates the assigned role for a specific staff member.
+ * @param staffId - The ID of the staff member.
+ * @param assignedRoleId - The ID of the role to assign, or null to unassign.
+ * @returns A promise resolving to the success message and updated staff member data.
+ */
+export const updateStaffAssignedRole = async (
+  staffId: string,
+  assignedRoleId: string | null
+): Promise<{ message: string; staff: StaffMemberWithData }> => {
+  const response = await api.patch<{
+    message: string;
+    staff: StaffMemberWithData; // Assuming backend returns a compatible staff object
+  }>(`/staff/${staffId}/assigned-role`, { assignedRoleId });
   return response.data;
 };
 
@@ -719,6 +765,74 @@ export const processPdfMenuUpload = async (
     },
   });
   return response.data.data;
+};
+
+// Role Endpoints
+/**
+ * Fetches all roles for the current restaurant.
+ * @param restaurantId - The ID of the restaurant to fetch roles for.
+ */
+export const getRoles = async (restaurantId: string): Promise<IRole[]> => {
+  try {
+    const response = await api.get<{
+      status?: string;
+      results?: number;
+      data: { roles: IRole[] }; // Corrected: roles array is nested under 'roles' key
+    }>(`/roles?restaurantId=${restaurantId}`);
+
+    // Updated access path to response.data.data.roles
+    if (
+      response &&
+      response.data &&
+      response.data.data &&
+      Array.isArray(response.data.data.roles)
+    ) {
+      return response.data.data.roles;
+    } else {
+      console.error(
+        "getRoles API call: response.data.data.roles was not an array or path is invalid. Response:",
+        response
+      );
+      return [];
+    }
+  } catch (error) {
+    console.error("Error in getRoles API call execution:", error);
+    return [];
+  }
+};
+
+/**
+ * Creates a new role.
+ * @param roleData - The data for the new role.
+ */
+export const createRole = async (roleData: {
+  name: string;
+  description?: string;
+  restaurantId: string; // Ensure restaurantId is part of the payload if needed by backend
+}): Promise<IRole> => {
+  const response = await api.post<{ data: IRole }>(`/roles`, roleData);
+  return response.data.data;
+};
+
+/**
+ * Updates an existing role.
+ * @param roleId - The ID of the role to update.
+ * @param roleData - The data to update the role with.
+ */
+export const updateRole = async (
+  roleId: string,
+  roleData: { name?: string; description?: string }
+): Promise<IRole> => {
+  const response = await api.put<{ data: IRole }>(`/roles/${roleId}`, roleData);
+  return response.data.data;
+};
+
+/**
+ * Deletes a role by its ID.
+ * @param roleId - The ID of the role to delete.
+ */
+export const deleteRole = async (roleId: string): Promise<void> => {
+  await api.delete(`/roles/${roleId}`);
 };
 
 // Default export

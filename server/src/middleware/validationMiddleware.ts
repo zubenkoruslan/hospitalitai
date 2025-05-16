@@ -248,26 +248,40 @@ export const validateGenerateQuizFromBanksBody: ValidationChain[] = [
     .isString()
     .trim()
     .notEmpty(),
-  body("description", "Description must be a string")
+  body("description", "Description must be a non-empty string")
     .optional()
     .isString()
-    .trim(),
+    .trim()
+    .notEmpty(), // If provided, it cannot be empty
   body(
     "questionBankIds",
-    "questionBankIds must be a non-empty array of valid MongoIDs"
+    "questionBankIds must be an array of at least one valid MongoDB ObjectId string"
   )
     .isArray({ min: 1 })
-    .withMessage("At least one question bank ID must be provided."),
+    .withMessage(
+      "At least one question bank ID must be provided in the array."
+    ),
   body(
     "questionBankIds.*",
-    "Each question bank ID must be a valid MongoID"
+    "Each questionBankId must be a valid MongoDB ObjectId string"
   ).isMongoId(),
   body(
     "numberOfQuestionsPerAttempt",
-    "Number of questions per attempt must be a positive integer"
+    "numberOfQuestionsPerAttempt is required and must be a positive integer"
   )
     .isInt({ min: 1 })
     .toInt(),
+  // Added validation for targetRoles during quiz generation from banks
+  body("targetRoles")
+    .optional()
+    .isArray()
+    .withMessage("targetRoles must be an array of role IDs"),
+  body("targetRoles.*")
+    // .optional() // Not needed here, if targetRoles is present, its elements are validated
+    .isMongoId()
+    .withMessage(
+      "Each targetRole ID in targetRoles must be a valid MongoDB ObjectId string"
+    ),
 ];
 
 export const validateSubmitQuizAttemptBody: ValidationChain[] = [
@@ -527,49 +541,68 @@ export const validateUpdateItemBody: ValidationChain[] = [
 
 // === Quiz Validators (Updates) ===
 export const validateUpdateQuizBody: ValidationChain[] = [
-  body().custom((value, { req }) => {
-    if (
-      req.body.title === undefined &&
-      req.body.description === undefined &&
-      req.body.sourceQuestionBankIds === undefined &&
-      req.body.numberOfQuestionsPerAttempt === undefined &&
-      req.body.isAvailable === undefined
-    ) {
-      throw new Error(
-        "No update data provided. Provide title, description, sourceQuestionBankIds, numberOfQuestionsPerAttempt, or isAvailable."
-      );
-    }
-    return true;
-  }),
   body("title", "Title must be a non-empty string")
     .optional()
     .isString()
     .trim()
     .notEmpty(),
-  body("description", "Description must be a string")
+  body("description", "Description must be a non-empty string")
     .optional()
     .isString()
-    .trim(),
+    .trim()
+    .notEmpty(), // If provided, it cannot be empty
   body(
-    "sourceQuestionBankIds",
-    "sourceQuestionBankIds must be an array of valid MongoIDs"
+    "questionBankIds",
+    "questionBankIds must be an array of MongoDB ObjectId strings"
   )
     .optional()
-    .isArray(), // Add .custom for each element if needed, or rely on service
+    .isArray(),
   body(
-    "sourceQuestionBankIds.*",
-    "Each sourceQuestionBankId must be a valid MongoID"
-  )
-    .if(body("sourceQuestionBankIds").exists())
-    .isMongoId(),
+    "questionBankIds.*",
+    "Each questionBankId in questionBankIds must be a valid MongoDB ObjectId string"
+  ).isMongoId(),
   body(
     "numberOfQuestionsPerAttempt",
-    "Number of questions per attempt must be a positive integer"
+    "numberOfQuestionsPerAttempt must be a positive integer"
   )
     .optional()
     .isInt({ min: 1 })
     .toInt(),
-  body("isAvailable", "isAvailable must be a boolean").optional().isBoolean(),
+  body("isAvailable")
+    .optional()
+    .isBoolean()
+    .withMessage("isAvailable must be a boolean"),
+  // Added validation for targetRoles during quiz update
+  body("targetRoles")
+    .optional()
+    .isArray()
+    .withMessage("targetRoles must be an array of role IDs"),
+  body("targetRoles.*")
+    // .optional() // Not needed here, if targetRoles is present, its elements are validated
+    .isMongoId()
+    .withMessage(
+      "Each targetRole ID in targetRoles must be a valid MongoDB ObjectId string"
+    ),
+  // Ensure at least one field is provided for update
+  body().custom((value, { req }) => {
+    const updateFields = [
+      "title",
+      "description",
+      "questionBankIds",
+      "numberOfQuestionsPerAttempt",
+      "isAvailable",
+      "targetRoles",
+    ];
+    const hasUpdate = updateFields.some(
+      (field) => req.body[field] !== undefined
+    );
+    if (!hasUpdate) {
+      throw new Error(
+        "No update data provided. Please provide at least one field to update."
+      );
+    }
+    return true;
+  }),
 ];
 
 // === Question Controller Validators (AI Generation) ===

@@ -439,12 +439,14 @@ const QuestionBankDetailPage: React.FC = () => {
             onClose={() => setShowGenerateAiQuestionsModal(false)}
             title="Generate Questions with AI"
           >
-            <GenerateAiQuestionsForm
-              bankId={bankId}
-              bankCategories={currentQuestionBank?.categories || []}
-              onAiQuestionsGenerated={handleAiQuestionsGenerated}
-              onCloseRequest={() => setShowGenerateAiQuestionsModal(false)}
-            />
+            {bankId && (
+              <GenerateAiQuestionsForm
+                bankId={bankId}
+                bankCategories={currentQuestionBank?.categories || []}
+                onAiQuestionsGenerated={handleAiQuestionsGenerated}
+                onCloseRequest={() => setShowGenerateAiQuestionsModal(false)}
+              />
+            )}
           </Modal>
         )}
 

@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { IUser } from "./User";
-import { IQuiz } from "./Quiz";
+import { IQuiz } from "./QuizModel";
 import { IQuestion } from "./QuestionModel"; // For questionId ref in questionsPresented
 
 // Interface for the details of each question presented in an attempt

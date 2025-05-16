@@ -11,6 +11,7 @@ export interface IUser extends Document {
   professionalRole?: string; // Added professional role
   restaurantId?: mongoose.Types.ObjectId; // Optional here, but conditionally required by schema
   comparePassword(candidatePassword: string): Promise<boolean>; // Method signature
+  assignedRoleId?: Types.ObjectId; // CHANGED: Single assigned Role ID
 
   // Add optional timestamp fields managed by Mongoose
   createdAt?: Date;
@@ -68,6 +69,12 @@ const userSchema = new Schema<IUser>(
       },
       index: true, // Added index for restaurant lookups
     },
+    assignedRoleId: {
+      type: Schema.Types.ObjectId,
+      ref: "Role", // Reference to the Role model
+      default: null, // Explicitly null if not assigned
+      // Not making it required, as a staff might not have an operational role immediately
+    }, // CHANGED: Field definition for single role
   },
   {
     timestamps: true, // Add createdAt and updatedAt timestamps

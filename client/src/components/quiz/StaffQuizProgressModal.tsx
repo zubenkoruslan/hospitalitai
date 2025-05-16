@@ -93,13 +93,8 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
             <tbody className="bg-white divide-y divide-slate-200">
               {progressData.map((item: ClientStaffQuizProgress) => {
                 let staffName = "Unknown Staff";
-                if (typeof item.staffUserId === "string") {
-                  staffName = `Staff ID: ${item.staffUserId}`;
-                } else if (
-                  typeof item.staffUserId === "object" &&
-                  item.staffUserId !== null
-                ) {
-                  const user = item.staffUserId as any;
+                if (item.staffUserId && typeof item.staffUserId === "object") {
+                  const user = item.staffUserId;
                   if (user.name && user.name.trim() !== "") {
                     staffName = user.name.trim();
                   } else if (user.email) {
@@ -107,6 +102,8 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                   } else if (user._id) {
                     staffName = `Staff ID: ${user._id}`;
                   }
+                } else if (typeof item.staffUserId === "string") {
+                  staffName = `Staff ID: ${item.staffUserId}`;
                 }
 
                 const seenIds = Array.isArray(item.seenQuestionIds)

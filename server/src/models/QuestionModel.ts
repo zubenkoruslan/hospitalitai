@@ -20,6 +20,7 @@ const OptionSchema: Schema<IOption> = new Schema(
 );
 
 export interface IQuestion extends Document {
+  _id: Types.ObjectId;
   questionText: string;
   questionType: QuestionType;
   options: Types.Array<IOption>;

@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
-import Quiz, { IQuiz } from "../models/Quiz";
+import QuizModel, { IQuiz } from "../models/QuizModel";
 import User from "../models/User";
 import { AppError } from "../utils/errorHandler";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
@@ -40,7 +40,7 @@ class QuizResultService {
     restaurantId: Types.ObjectId
   ): Promise<StaffQuizViewItem[]> {
     try {
-      const availableQuizzes = await Quiz.find(
+      const availableQuizzes = await QuizModel.find(
         { restaurantId, isAvailable: true },
         "_id title description createdAt numberOfQuestionsPerAttempt"
       )
@@ -198,13 +198,16 @@ class QuizResultService {
         >;
       } = {};
       activeUserAttempts.forEach((attempt) => {
-        if (attempt.quizId) {
-          // Ensure quizId is not null
-          const quizIdStr = attempt.quizId._id.toString();
+        const populatedQuizId = attempt.quizId as Pick<
+          IQuiz,
+          "_id" | "isAvailable" | "title"
+        >;
+        if (populatedQuizId) {
+          // Check if populatedQuizId (the cast result) is truthy
+          const quizIdStr = populatedQuizId._id.toString();
           if (!attemptsByQuiz[quizIdStr]) {
             attemptsByQuiz[quizIdStr] = [];
           }
-          // Cast attempt to ensure the quizId has the title for later use in logging
           attemptsByQuiz[quizIdStr].push(
             attempt as IQuizAttempt & {
               quizId: Pick<IQuiz, "_id" | "isAvailable" | "title">;

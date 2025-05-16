@@ -1,3 +1,4 @@
+import { IRole } from "./roleTypes"; // Added import
 // import { IncorrectQuestionDetail } from "./staffTypes"; // REMOVED IMPORT
 // import { ClientUserMinimal } from "./user"; // Changed from userTypes.ts to user.ts - THIS WILL BE REMOVED
 
@@ -21,6 +22,7 @@ export interface ClientIQuiz {
   createdAt?: string;
   updatedAt?: string;
   averageScore?: number | null;
+  targetRoles?: IRole[]; // Added targetRoles
 }
 
 // From api.ts: GenerateQuizFromBanksClientData (lines 342-347)

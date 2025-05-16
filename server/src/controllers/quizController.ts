@@ -5,7 +5,9 @@ import { AppError } from "../utils/errorHandler"; // For error handling
 import {
   GenerateQuizFromBanksRequestBody,
   SubmitQuizAttemptRequestBody,
+  UpdateQuizRequestBody, // Added UpdateQuizRequestBody import
 } from "../types/quizTypes"; // Added import
+import { IQuiz } from "../models/QuizModel"; // Added IQuiz import
 
 // Removed local GenerateQuizFromBanksRequestBody interface
 // Removed local SubmitQuizAttemptRequestBody interface
@@ -16,8 +18,13 @@ export const generateQuizFromBanksController = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { title, description, questionBankIds, numberOfQuestionsPerAttempt } =
-      req.body as GenerateQuizFromBanksRequestBody;
+    const {
+      title,
+      description,
+      questionBankIds,
+      numberOfQuestionsPerAttempt,
+      targetRoles,
+    } = req.body as GenerateQuizFromBanksRequestBody;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -34,6 +41,9 @@ export const generateQuizFromBanksController = async (
       restaurantId,
       questionBankIds,
       numberOfQuestionsPerAttempt,
+      targetRoles: targetRoles
+        ? targetRoles.map((id) => new mongoose.Types.ObjectId(id))
+        : undefined,
     };
 
     const newQuiz = await QuizService.generateQuizFromBanksService(quizData);
@@ -282,32 +292,91 @@ export const resetQuizProgressController = async (
     const { quizId } = req.params;
     if (!req.user || !req.user.restaurantId) {
       return next(
-        new AppError(
-          "User not authenticated or restaurant association missing for this action.",
-          401
-        )
+        new AppError("User not authenticated or restaurantId missing.", 401)
       );
     }
-    // quizId validation is assumed to be handled by validateQuizIdParam in the routes file.
-
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
-    const restaurantObjectId = new mongoose.Types.ObjectId(
-      req.user.restaurantId
-    );
 
     const result = await QuizService.resetQuizProgressForEveryone(
       quizObjectId,
-      restaurantObjectId
+      restaurantId
     );
 
     res.status(200).json({
       status: "success",
-      message: `Progress for quiz ${quizId} has been reset for all staff. ${result.resetProgressCount} progress records and ${result.resetAttemptsCount} attempts were cleared.`,
-      data: result,
+      message: "Quiz progress reset successfully for all staff.",
+      data: {
+        updatedProgressCount: result.updatedProgressCount,
+        deletedAttemptsCount: result.deletedAttemptsCount,
+      },
     });
   } catch (error) {
     if (!(error instanceof AppError)) {
       console.error("Unexpected error in resetQuizProgressController:", error);
+    }
+    next(error);
+  }
+};
+
+export const updateQuizController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { quizId } = req.params;
+    const {
+      title,
+      description,
+      questionBankIds,
+      numberOfQuestionsPerAttempt,
+      isAvailable,
+      targetRoles,
+    } = req.body as UpdateQuizRequestBody;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing.", 401)
+      );
+    }
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
+    const quizObjectId = new mongoose.Types.ObjectId(quizId);
+
+    const serviceUpdateData: Partial<IQuiz> = {};
+
+    if (title !== undefined) serviceUpdateData.title = title;
+    if (description !== undefined) serviceUpdateData.description = description;
+    if (numberOfQuestionsPerAttempt !== undefined)
+      serviceUpdateData.numberOfQuestionsPerAttempt =
+        numberOfQuestionsPerAttempt;
+    if (isAvailable !== undefined) serviceUpdateData.isAvailable = isAvailable;
+
+    if (targetRoles) {
+      serviceUpdateData.targetRoles = targetRoles.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
+    }
+    if (questionBankIds) {
+      serviceUpdateData.sourceQuestionBankIds = questionBankIds.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
+    }
+
+    const updatedQuiz = await QuizService.updateQuiz(
+      quizObjectId,
+      restaurantId,
+      serviceUpdateData
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Quiz updated successfully.",
+      data: updatedQuiz,
+    });
+  } catch (error) {
+    if (!(error instanceof AppError)) {
+      console.error("Unexpected error in updateQuizController:", error);
     }
     next(error);
   }

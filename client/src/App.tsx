@@ -152,6 +152,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* REMOVED: Route for /question-banks/:bankId/edit */}
+            {/*
             <Route
               path="/question-banks/:bankId/edit"
               element={
@@ -160,6 +162,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            */}
             {/* REMOVED: Route for generating quiz from question banks (now a modal) */}
             {/*
             <Route

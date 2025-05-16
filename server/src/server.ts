@@ -16,6 +16,7 @@ import staffRoutes from "./routes/staff";
 import questionBankRoutes from "./routes/questionBankRoutes";
 import questionRoutes from "./routes/questionRoutes";
 import { errorHandler } from "./middleware/errorHandler";
+import { roleRouter } from "./routes/roleRoutes";
 
 dotenv.config();
 
@@ -51,7 +52,7 @@ const limiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   message: "Too many requests from this IP, please try again after 15 minutes", // Custom message
 });
-app.use(limiter); // Enabled rate limiting
+// app.use(limiter); // Rate limiting disabled for development
 
 // Body Parsing
 app.use(express.json()); // For parsing application/json
@@ -85,6 +86,7 @@ app.use("/api/quiz-results", quizResultRouter);
 app.use("/api/staff", staffRoutes);
 app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/questions", questionRoutes);
+app.use("/api/roles", roleRouter);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

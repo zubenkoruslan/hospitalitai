@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import User, { IUser } from "../models/User";
 import Restaurant, { IRestaurant } from "../models/Restaurant";
 import { AppError } from "../utils/errorHandler";
+import { Types } from "mongoose";
 
 // Interface for data passed to signup methods
 interface SignupData {
@@ -12,6 +13,7 @@ interface SignupData {
   restaurantName?: string;
   restaurantId?: string; // For staff role
   professionalRole?: string; // For staff role
+  assignedRoleId?: string; // CHANGED: For single role assignment
 }
 
 // Interface for the return value of loginUser
@@ -97,8 +99,15 @@ class AuthService {
     restaurantId: mongoose.Types.ObjectId;
     restaurantName: string | undefined;
   }> {
-    const { email, password, role, name, restaurantId, professionalRole } =
-      data;
+    const {
+      email,
+      password,
+      role,
+      name,
+      restaurantId,
+      professionalRole,
+      assignedRoleId,
+    } = data;
 
     if (role !== "staff") {
       throw new AppError("Invalid role for staff registration.", 400);
@@ -149,6 +158,9 @@ class AuthService {
         name,
         restaurantId: finalRestaurantId,
         professionalRole,
+        assignedRoleId: assignedRoleId
+          ? new Types.ObjectId(assignedRoleId)
+          : null,
       });
       await newUser.save({ session }); // Pass session here
 

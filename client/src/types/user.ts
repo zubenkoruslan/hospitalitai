@@ -1,3 +1,5 @@
+import { IRole } from "./roleTypes";
+
 // Defines user-related types
 
 export enum UserRole {
@@ -16,4 +18,5 @@ export interface ClientUserMinimal {
   professionalRole?: string;
   role?: UserRole;
   restaurantId?: string;
+  assignedRoleId?: string;
 }
