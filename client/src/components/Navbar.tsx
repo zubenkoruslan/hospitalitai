@@ -68,11 +68,10 @@ const Navbar: React.FC<NavbarProps> = ({
   ];
 
   // Styling constants
-  const activeStyle = "text-blue-600 border-b-2 border-blue-600 font-semibold";
+  const activeStyle = "text-sky-600 border-b-2 border-sky-500 font-semibold";
   const inactiveStyle =
-    "text-gray-500 hover:text-gray-800 hover:border-gray-300 border-b-2 border-transparent";
-  const baseStyle =
-    "inline-flex items-center px-1 pt-1 text-sm font-medium transition duration-150 ease-in-out";
+    "text-slate-600 hover:text-sky-600 hover:border-sky-500 border-b-2 border-transparent transition-colors duration-200 ease-in-out";
+  const baseStyle = "inline-flex items-center px-3 py-2 text-sm font-medium";
 
   // --- Navigation Handler ---
   const handleNavigationClick = (event: React.MouseEvent, to: string) => {
@@ -99,7 +98,7 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="flex-none flex items-center">
             <Link
               to={baseLinks[0].path}
-              className="text-xl font-bold text-blue-600 hover:opacity-80 transition-opacity"
+              className="text-2xl font-bold text-slate-700 hover:text-sky-600 transition-colors duration-150 ease-in-out"
               onClick={(e) => handleNavigationClick(e, baseLinks[0].path)}
             >
               Savvy
@@ -132,11 +131,11 @@ const Navbar: React.FC<NavbarProps> = ({
               <button
                 ref={dropdownButtonRef}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center focus:outline-none"
+                className="flex items-center p-1.5 rounded-full hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-150 ease-in-out"
               >
                 {/* User profile icon */}
-                <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                  {user?.name?.charAt(0) || "U"}
+                <div className="h-9 w-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-sm shadow-sm">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
                 </div>
               </button>
 
@@ -144,12 +143,18 @@ const Navbar: React.FC<NavbarProps> = ({
               {isDropdownOpen && (
                 <div
                   ref={dropdownMenuRef}
-                  className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-2xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
+                  className="origin-top-right absolute right-0 mt-2 w-56 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none py-2"
                 >
-                  <div className="py-1">
+                  <div className="px-1 py-1">
+                    <div className="px-4 py-3">
+                      <p className="text-sm font-medium text-slate-800 truncate">
+                        {user?.name || "User Name"}
+                      </p>
+                    </div>
+                    <div className="border-t border-slate-100 my-1"></div>
                     <NavLink
                       to={baseLinks[0].path}
-                      className="text-sm text-gray-700 hover:bg-gray-100 block px-4 py-2"
+                      className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out"
                       onClick={(e) => {
                         if (
                           isBlockingNavigation &&
@@ -180,7 +185,7 @@ const Navbar: React.FC<NavbarProps> = ({
                         logout();
                         setIsDropdownOpen(false);
                       }}
-                      className="text-sm text-gray-700 hover:bg-gray-100 block w-full text-left px-4 py-2"
+                      className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors duration-150 ease-in-out"
                     >
                       Logout
                     </button>
@@ -194,7 +199,7 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="-mr-2 flex items-center sm:hidden">
             <button
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              className="inline-flex items-center justify-center p-2 rounded-md text-slate-500 hover:text-sky-600 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500"
               aria-controls="mobile-menu"
               aria-expanded={isMobileMenuOpen}
               aria-label="Toggle mobile menu"
@@ -209,13 +214,14 @@ const Navbar: React.FC<NavbarProps> = ({
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
+                strokeWidth="1.5"
                 stroke="currentColor"
                 aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth="2"
+                  strokeWidth="1.5"
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
@@ -225,13 +231,14 @@ const Navbar: React.FC<NavbarProps> = ({
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
+                strokeWidth="1.5"
                 stroke="currentColor"
                 aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth="2"
+                  strokeWidth="1.5"
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
@@ -254,10 +261,10 @@ const Navbar: React.FC<NavbarProps> = ({
               to={link.path}
               onClick={(e) => handleNavigationClick(e, link.path)}
               className={({ isActive }) =>
-                `block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                `block pl-4 pr-4 py-3 border-l-4 text-base font-medium transition-colors duration-150 ease-in-out ${
                   isActive
-                    ? "bg-blue-50 border-blue-500 text-blue-700"
-                    : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                    ? "bg-sky-50 border-sky-500 text-sky-700"
+                    : "border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-800"
                 }`
               }
               aria-label={`Navigate to ${link.name}`}
@@ -267,7 +274,7 @@ const Navbar: React.FC<NavbarProps> = ({
           ))}
         </div>
         {/* Logout Button for Mobile */}
-        <div className="pt-4 pb-3 border-t border-gray-200">
+        <div className="pt-4 pb-3 border-t border-slate-200">
           <div className="px-2 space-y-1">
             <button
               onClick={() => {
@@ -280,7 +287,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 logout();
                 setIsMobileMenuOpen(false);
               }}
-              className="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-800"
+              className="block w-full text-left pl-4 pr-4 py-3 border-l-4 border-transparent text-base font-medium text-red-600 hover:bg-red-100 hover:border-red-500 hover:text-red-700 transition-colors duration-150 ease-in-out"
             >
               Logout
             </button>

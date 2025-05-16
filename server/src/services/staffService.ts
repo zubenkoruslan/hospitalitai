@@ -5,17 +5,33 @@ import Quiz, { IQuiz } from "../models/Quiz";
 import { IQuestion } from "../models/QuestionModel";
 import QuizResultService from "./quizResultService";
 import { AppError } from "../utils/errorHandler";
+import StaffQuizProgress, {
+  IStaffQuizProgress,
+} from "../models/StaffQuizProgress";
+import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 
 // Define interfaces for return types to improve clarity
-interface StaffMemberWithAverage {
+
+// NEW interface for individual quiz progress summary
+interface QuizProgressSummary {
+  quizId: Types.ObjectId;
+  quizTitle: string;
+  overallProgressPercentage: number;
+  isCompletedOverall: boolean;
+  lastAttemptTimestamp?: Date | null;
+  averageScoreForQuiz?: number | null;
+}
+
+// MODIFIED: This interface now reflects the new data structure
+interface StaffMemberWithQuizProgress {
   _id: Types.ObjectId;
   name: string;
   email: string;
   createdAt?: Date;
   professionalRole?: string;
-  averageScore: number | null;
-  quizzesTaken: number;
-  resultsSummary: any[]; // Make resultsSummary required
+  averageScore: number | null; // Overall average score from QuizResultService.calculateAverageScoreForUser
+  quizzesTaken: number; // Count of unique quizzes with attempts by this staff member
+  quizProgressSummaries: QuizProgressSummary[]; // REPLACES resultsSummary
 }
 
 interface IncorrectQuestionDetail {
@@ -78,15 +94,15 @@ const getChoiceTextFromOptions = (
 class StaffService {
   /**
    * Retrieves a list of staff members for a specific restaurant,
-   * including their calculated average quiz score and number of quizzes taken.
+   * including their overall average quiz score and detailed progress on each quiz.
    *
    * @param restaurantId - The ID of the restaurant.
-   * @returns A promise resolving to an array of staff member objects with average scores.
+   * @returns A promise resolving to an array of staff member objects with detailed quiz progress.
    * @throws {AppError} If any database error occurs (500).
    */
   static async getStaffListWithAverages(
     restaurantId: Types.ObjectId
-  ): Promise<StaffMemberWithAverage[]> {
+  ): Promise<StaffMemberWithQuizProgress[]> {
     try {
       // 1. Fetch all staff members (lean for performance)
       const staffList = await User.find(
@@ -94,65 +110,254 @@ class StaffService {
         "_id name email createdAt professionalRole"
       ).lean<IUser[]>();
 
-      // 2. Calculate average score and fetch summary for each staff member
-      const staffWithData = await Promise.all(
-        staffList.map(async (staff) => {
-          const staffObjectId = staff._id as Types.ObjectId;
+      // 2. For each staff member, calculate overall average and fetch detailed quiz progress
+      const staffWithDataPromises = staffList.map(async (staff) => {
+        const staffObjectId = staff._id as Types.ObjectId;
 
-          // Call the QuizResultService to calculate the average score
-          const { averageScore, quizzesTaken } =
-            await QuizResultService.calculateAverageScoreForUser(
-              staffObjectId,
-              restaurantId
-            );
+        // Calculate overall average score (this now uses QuizAttempts and filters by active quizzes)
+        const { averageScore, quizzesTaken } =
+          await QuizResultService.calculateAverageScoreForUser(
+            staffObjectId,
+            restaurantId
+          );
 
-          // Fetch the results summary
-          const resultsSummary = await QuizResult.find(
-            { userId: staffObjectId, restaurantId: restaurantId },
-            "_id quizId score totalQuestions completedAt status retakeCount"
-          )
-            .populate<{ quizId: { title: string } | null }>({
-              path: "quizId",
-              select: "title",
+        // Fetch all StaffQuizProgress records for this staff member, populating quiz active status
+        let staffProgressRecords = await StaffQuizProgress.find({
+          staffUserId: staffObjectId,
+          restaurantId: restaurantId,
+        })
+          .populate<{
+            quizId: Pick<
+              IQuiz,
+              | "_id"
+              | "title"
+              | "totalUniqueQuestionsInSourceSnapshot"
+              | "isAvailable"
+            > | null;
+          }>({
+            path: "quizId",
+            select: "title totalUniqueQuestionsInSourceSnapshot isAvailable",
+          })
+          .lean<
+            Array<
+              IStaffQuizProgress & {
+                quizId: Pick<
+                  IQuiz,
+                  | "_id"
+                  | "title"
+                  | "totalUniqueQuestionsInSourceSnapshot"
+                  | "isAvailable"
+                > | null;
+              }
+            >
+          >();
+
+        // LOGGING BEFORE FILTER
+        if (staff.name === "Misha Demenchak") {
+          console.log(
+            `[StaffService] Misha - BEFORE filter - All staffProgressRecords:`,
+            staffProgressRecords.map((p) => ({
+              quizTitle: p.quizId?.title,
+              quizIsAvailable: p.quizId?.isAvailable,
+              progressId: p._id,
+            }))
+          );
+          console.log(
+            `[StaffService] Misha - BEFORE filter - staffProgressRecords for test2:`,
+            staffProgressRecords
+              .filter((p) => p.quizId && p.quizId.title === "test2")
+              .map((p) => ({
+                title: p.quizId.title,
+                isAvailable: p.quizId.isAvailable,
+              }))
+          );
+        }
+
+        // Filter out progress records for quizzes that are deleted or not available
+        staffProgressRecords = staffProgressRecords.filter(
+          (sp) =>
+            sp.quizId &&
+            (sp.quizId as Pick<IQuiz, "isAvailable">).isAvailable === true
+        );
+
+        // LOGGING AFTER FILTER
+        if (staff.name === "Misha Demenchak") {
+          console.log(
+            `[StaffService] Misha - AFTER filter - staffProgressRecords (should be empty for test2 if it was false):`,
+            staffProgressRecords
+              .filter((p) => p.quizId && p.quizId.title === "test2")
+              .map((p) => ({
+                title: p.quizId.title,
+                isAvailable: p.quizId.isAvailable,
+              }))
+          );
+        }
+
+        // Deduplicate and select the latest progress for each quiz
+        const latestProgressByQuiz: {
+          [key: string]: IStaffQuizProgress & {
+            quizId: Pick<
+              IQuiz,
+              | "_id"
+              | "title"
+              | "totalUniqueQuestionsInSourceSnapshot"
+              | "isAvailable"
+            > | null;
+          };
+        } = {};
+
+        for (const sp of staffProgressRecords) {
+          if (!sp.quizId?._id) continue;
+
+          const quizIdString = sp.quizId._id.toString();
+          const existingRecord = latestProgressByQuiz[quizIdString];
+
+          if (!existingRecord) {
+            latestProgressByQuiz[quizIdString] = sp;
+          } else {
+            // Prioritize records with a more recent lastAttemptTimestamp
+            const spHasTimestamp = !!sp.lastAttemptTimestamp;
+            const existingHasTimestamp = !!existingRecord.lastAttemptTimestamp;
+
+            if (spHasTimestamp && existingHasTimestamp) {
+              if (
+                sp.lastAttemptTimestamp! > existingRecord.lastAttemptTimestamp!
+              ) {
+                latestProgressByQuiz[quizIdString] = sp;
+              } else if (
+                sp.lastAttemptTimestamp!.getTime() ===
+                existingRecord.lastAttemptTimestamp!.getTime()
+              ) {
+                // Timestamps are identical, prefer completed over incomplete
+                if (
+                  sp.isCompletedOverall &&
+                  !existingRecord.isCompletedOverall
+                ) {
+                  latestProgressByQuiz[quizIdString] = sp;
+                }
+              }
+            } else if (spHasTimestamp && !existingHasTimestamp) {
+              // Current has timestamp, existing doesn't - prefer current
+              latestProgressByQuiz[quizIdString] = sp;
+            } else if (!spHasTimestamp && !existingHasTimestamp) {
+              // Neither has a timestamp, prefer completed over incomplete
+              if (sp.isCompletedOverall && !existingRecord.isCompletedOverall) {
+                latestProgressByQuiz[quizIdString] = sp;
+              }
+            }
+            // If one has timestamp and other doesn't, the one with timestamp is implicitly preferred
+            // by the structure of these conditions (e.g. if sp doesn't have timestamp but existing does, no change happens here).
+          }
+        }
+        const uniqueStaffProgressRecords = Object.values(latestProgressByQuiz);
+
+        // LOGGING before generating summaries for Misha
+        if (staff.name === "Misha Demenchak") {
+          console.log(
+            `[StaffService] Misha - BEFORE generating summaries - uniqueStaffProgressRecords mapped:`,
+            uniqueStaffProgressRecords.map((p) => ({
+              title: p.quizId?.title,
+              isAvailable: p.quizId?.isAvailable,
+              progress_isCompletedOverall: p.isCompletedOverall,
+            }))
+          );
+        }
+
+        // Map unique progress records to summaries, now including average score for each quiz
+        const quizProgressSummariesPromises = uniqueStaffProgressRecords.map(
+          async (sp) => {
+            // sp.quizId is guaranteed to be non-null and active here
+            const quizDoc = sp.quizId!; // Non-null assertion
+
+            const totalUnique =
+              quizDoc.totalUniqueQuestionsInSourceSnapshot || 0;
+            const seenCount = sp.seenQuestionIds?.length || 0;
+
+            const overallProgressPercentage =
+              totalUnique > 0 ? Math.round((seenCount / totalUnique) * 100) : 0;
+
+            // Calculate average score for this specific quiz (quizDoc._id) by this staff member (staffObjectId)
+            let averageScoreForQuiz: number | null = null;
+            const quizAttemptsForThisQuiz = await QuizAttempt.find({
+              staffUserId: staffObjectId,
+              quizId: quizDoc._id, // Use the specific quiz ID from quizDoc
+              restaurantId: restaurantId,
             })
-            .sort({ completedAt: -1 })
-            .lean();
+              .select("score questionsPresented")
+              .lean<Pick<IQuizAttempt, "score" | "questionsPresented">[]>();
 
-          // Map results to include the populated title
-          const processedSummary = resultsSummary.map((result) => {
-            // Keep original quizId (ObjectId)
-            const originalQuizId = result.quizId;
-            // Get title from the populated object
-            const quizTitle = (result.quizId as any)?.title ?? "[Deleted Quiz]";
+            if (quizAttemptsForThisQuiz.length > 0) {
+              let totalPercentageSum = 0;
+              let validAttemptsCount = 0;
+              quizAttemptsForThisQuiz.forEach((attempt) => {
+                if (
+                  attempt.score !== undefined &&
+                  attempt.questionsPresented &&
+                  attempt.questionsPresented.length > 0
+                ) {
+                  totalPercentageSum +=
+                    attempt.score / attempt.questionsPresented.length;
+                  validAttemptsCount++;
+                }
+              });
+              if (validAttemptsCount > 0) {
+                averageScoreForQuiz = parseFloat(
+                  ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
+                );
+              }
+            }
 
             return {
-              ...result,
-              quizId: originalQuizId, // Ensure quizId remains the ObjectId/string
-              quizTitle: quizTitle, // Add the populated title
+              quizId: quizDoc._id as Types.ObjectId,
+              quizTitle: quizDoc.title || "[Deleted Quiz]",
+              overallProgressPercentage: overallProgressPercentage,
+              isCompletedOverall: sp.isCompletedOverall || false,
+              lastAttemptTimestamp: sp.lastAttemptTimestamp || null,
+              averageScoreForQuiz: averageScoreForQuiz,
             };
-          });
+          }
+        );
 
-          // Construct the return object explicitly matching the interface
-          return {
-            _id: staffObjectId,
-            name: staff.name,
-            email: staff.email,
-            createdAt: staff.createdAt,
-            professionalRole: staff.professionalRole,
-            averageScore: averageScore,
-            quizzesTaken: quizzesTaken,
-            resultsSummary: processedSummary,
-          } as StaffMemberWithAverage;
-        })
-      );
+        const quizProgressSummaries = await Promise.all(
+          quizProgressSummariesPromises
+        );
+
+        quizProgressSummaries.sort((a, b) => {
+          if (a.lastAttemptTimestamp && b.lastAttemptTimestamp) {
+            return (
+              b.lastAttemptTimestamp.getTime() -
+              a.lastAttemptTimestamp.getTime()
+            );
+          }
+          if (a.lastAttemptTimestamp) return -1;
+          if (b.lastAttemptTimestamp) return 1;
+          return a.quizTitle.localeCompare(b.quizTitle);
+        });
+
+        return {
+          _id: staffObjectId,
+          name: staff.name,
+          email: staff.email,
+          createdAt: staff.createdAt,
+          professionalRole: staff.professionalRole,
+          averageScore: averageScore,
+          quizzesTaken: quizzesTaken,
+          quizProgressSummaries: quizProgressSummaries,
+        } as StaffMemberWithQuizProgress;
+      });
+
+      const staffWithData = await Promise.all(staffWithDataPromises);
 
       return staffWithData;
     } catch (error: any) {
       console.error(
-        "Error fetching staff list with averages in service:",
+        "Error fetching staff list with detailed quiz progress in service:",
         error
       );
-      throw new AppError("Failed to retrieve staff list.", 500);
+      throw new AppError(
+        "Failed to retrieve staff list with detailed progress.",
+        500
+      );
     }
   }
 
@@ -192,88 +397,54 @@ class StaffService {
         );
       }
 
-      // 2. Fetch their quiz results, populating quiz questions for analysis
-      const quizResults = await QuizResult.find({
+      // 2. Fetch their quiz results, populating quiz details including isAvailable
+      let quizResults = await QuizResult.find({
         userId: staffObjectId,
         restaurantId: restaurantId,
       })
         .populate<{
-          quizId: Pick<IQuiz, "_id" | "title"> | null;
+          quizId: Pick<IQuiz, "_id" | "title" | "isAvailable"> | null;
         }>({
           path: "quizId",
-          select: "title",
+          select: "title isAvailable",
         })
         .sort({ completedAt: -1 })
         .lean();
 
-      // 3. Calculate average score
-      const {
-        averageScore,
-      } = // quizzesTaken not needed for detail view
+      // Filter out results for quizzes that are deleted or not available
+      quizResults = quizResults.filter(
+        (result) =>
+          result.quizId &&
+          (result.quizId as Pick<IQuiz, "isAvailable">).isAvailable === true
+      );
+
+      // 3. Calculate average score (already considers active quizzes due to QuizResultService update)
+      const { averageScore } =
         await QuizResultService.calculateAverageScoreForUser(
           staffObjectId,
           restaurantId
         );
 
       // 4. Process results to get incorrect answer details
-      const processedResults: QuizResultDetails[] = quizResults
-        .filter((result) => result.quizId)
-        .map((result) => {
+      const processedResults: QuizResultDetails[] = quizResults.map(
+        (result) => {
           const incorrectQuestions: IncorrectQuestionDetail[] = [];
           const quizData = result.quizId;
-
-          // MODIFIED: The block below is commented out as quizData.questions is no longer available.
-          // This means 'incorrectQuestions' will remain empty.
-          // if (quizData && quizData.questions && Array.isArray(result.answers)) {
-          //   quizData.questions.forEach((question: IQuestion, index: number) => {
-          //     const userAnswerIndex = result.answers[index];
-
-          //     // Find the correct answer's index from the options array
-          //     const correctOptionIndex = question.options?.findIndex(
-          //       (opt) => opt.isCorrect
-          //     );
-
-          //     // Check if the user's answer is incorrect
-          //     let isIncorrect = false;
-          //     if (userAnswerIndex !== null && userAnswerIndex !== undefined) {
-          //       if (
-          //         correctOptionIndex === undefined ||
-          //         userAnswerIndex !== correctOptionIndex
-          //       ) {
-          //         isIncorrect = true;
-          //       }
-          //     }
-
-          //     if (isIncorrect) {
-          //       incorrectQuestions.push({
-          //         questionText: question.questionText,
-          //         userAnswer: getChoiceTextFromOptions(
-          //           question.options,
-          //           userAnswerIndex
-          //         ),
-          //         correctAnswer: getChoiceTextFromOptions(
-          //           question.options,
-          //           correctOptionIndex
-          //         ),
-          //       });
-          //     }
-          //   });
-          // }
 
           return {
             _id: result._id as Types.ObjectId,
             quizId: quizData?._id as Types.ObjectId,
-            quizTitle: quizData?.title ?? "[Deleted Quiz]",
+            quizTitle: quizData?.title || "[Deleted Quiz]",
             completedAt: result.completedAt,
             score: result.score ?? 0,
             totalQuestions: result.totalQuestions ?? 0,
             retakeCount: result.retakeCount ?? 0,
             incorrectQuestions: incorrectQuestions,
           };
-        });
+        }
+      );
 
-      // 5. Combine into final response object
-      const responseData: StaffMemberDetails = {
+      return {
         _id: staffMember._id as Types.ObjectId,
         name: staffMember.name,
         email: staffMember.email,
@@ -284,17 +455,13 @@ class StaffService {
         quizResults: processedResults,
         averageScore: averageScore,
       };
-      return responseData;
     } catch (error: any) {
-      console.error(
-        `Error fetching staff details for ID ${staffId} in service:`,
-        error
-      );
+      console.error("Error fetching staff member details in service:", error);
       if (error instanceof AppError) throw error;
-      if (error.name === "CastError") {
+      if (error.name === "CastError" && error.path === "_id") {
         throw new AppError("Invalid Staff ID format.", 400);
       }
-      throw new AppError("Failed to retrieve staff details.", 500);
+      throw new AppError("Failed to fetch staff member details.", 500);
     }
   }
 
@@ -319,35 +486,30 @@ class StaffService {
     const staffObjectId =
       typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
 
-    if (
-      !professionalRole ||
-      typeof professionalRole !== "string" ||
-      professionalRole.trim().length === 0
-    ) {
+    if (!professionalRole || professionalRole.trim() === "") {
       throw new AppError("Professional role cannot be empty.", 400);
     }
 
     try {
-      // Use findOne and save() to ensure middleware/hooks run
-      const staffMember = await User.findOne({
-        _id: staffObjectId,
-        restaurantId: restaurantId,
-        role: "staff",
-      });
+      const updatedStaff = await User.findOneAndUpdate(
+        {
+          _id: staffObjectId,
+          restaurantId: restaurantId,
+          role: "staff",
+        },
+        { $set: { professionalRole: professionalRole.trim() } },
+        { new: true, runValidators: true }
+      ).lean<IUser>();
 
-      if (!staffMember) {
+      if (!updatedStaff) {
         throw new AppError(
-          "Staff member not found or you do not have permission to edit.",
+          "Staff member not found, not part of this restaurant, or not a staff role.",
           404
         );
       }
 
-      staffMember.professionalRole = professionalRole.trim();
-      const updatedStaff = await staffMember.save(); // Validation is run by save()
-
-      // Prepare response using the new interface
-      const staffResponse: StaffUpdateResponse = {
-        _id: updatedStaff._id,
+      return {
+        _id: updatedStaff._id as Types.ObjectId,
         name: updatedStaff.name,
         email: updatedStaff.email,
         role: updatedStaff.role,
@@ -356,17 +518,13 @@ class StaffService {
         createdAt: updatedStaff.createdAt,
         updatedAt: updatedStaff.updatedAt,
       };
-      return staffResponse;
     } catch (error: any) {
-      console.error(
-        `Error updating staff role for ID ${staffId} in service:`,
-        error
-      );
+      console.error("Error updating staff member role in service:", error);
       if (error instanceof AppError) throw error;
-      if (error.name === "ValidationError") {
+      if (error instanceof mongoose.Error.ValidationError) {
         throw new AppError(`Validation failed: ${error.message}`, 400);
       }
-      if (error.name === "CastError") {
+      if (error.name === "CastError" && error.path === "_id") {
         throw new AppError("Invalid Staff ID format.", 400);
       }
       throw new AppError("Failed to update staff member role.", 500);
@@ -390,47 +548,29 @@ class StaffService {
     const staffObjectId =
       typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
 
-    // TODO: Consider transaction
-    try {
-      // 1. Verify the staff member exists and belongs to the restaurant
-      const staffMember = await User.findOne(
-        { _id: staffObjectId, restaurantId: restaurantId, role: "staff" },
-        "_id" // Only need ID for verification
-      );
+    // In a real application, consider implications:
+    // - What happens to their QuizAttempts, StaffQuizProgress, QuizResults?
+    // - Should these be soft-deleted, anonymized, or hard-deleted?
+    // - For now, this is a hard delete of the User document only. Associated quiz data remains.
 
-      if (!staffMember) {
+    try {
+      const result = await User.deleteOne({
+        _id: staffObjectId,
+        restaurantId: restaurantId,
+        role: "staff",
+      });
+
+      if (result.deletedCount === 0) {
         throw new AppError(
-          "Staff member not found or does not belong to this restaurant.",
+          "Staff member not found, not part of this restaurant, or not a staff role.",
           404
         );
       }
-
-      // 2. Delete associated quiz results
-      await QuizResult.deleteMany({
-        userId: staffObjectId,
-        restaurantId: restaurantId, // Ensure correct restaurant scope
-      });
-
-      // 3. Delete the staff user itself
-      const deleteUserResult = await User.deleteOne({ _id: staffObjectId });
-
-      if (deleteUserResult.deletedCount === 0) {
-        // This should ideally not happen if findOne succeeded, but acts as a safeguard
-        console.warn(
-          `Staff member ${staffObjectId} found but deletion failed.`
-        );
-        throw new AppError("Failed to delete staff member user record.", 500);
-      }
-
-      // Optional: Remove staff member ID from restaurant's staff array
-      // await Restaurant.findByIdAndUpdate(restaurantId, { $pull: { staff: staffObjectId } });
+      // No return value needed for a successful deletion
     } catch (error: any) {
-      console.error(
-        `Error deleting staff member ${staffId} in service:`,
-        error
-      );
+      console.error("Error deleting staff member in service:", error);
       if (error instanceof AppError) throw error;
-      if (error.name === "CastError") {
+      if (error.name === "CastError" && error.path === "_id") {
         throw new AppError("Invalid Staff ID format.", 400);
       }
       throw new AppError("Failed to delete staff member.", 500);

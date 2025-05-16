@@ -27,63 +27,65 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
   }
 
   return (
-    <div className="divide-y divide-gray-200">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {items.map((item) => (
         <div
           key={item._id}
-          className="py-4 flex flex-col sm:flex-row sm:justify-between sm:items-start"
+          className="bg-white border border-gray-200 shadow-sm rounded-lg p-3 flex flex-col justify-between h-full hover:shadow-lg transition-shadow duration-200"
         >
-          <div className="flex-grow mb-3 sm:mb-0 sm:mr-4">
+          <div className="flex-grow mb-2">
             <h3
-              className="text-lg font-semibold text-gray-800 mb-1"
+              className="text-md font-semibold text-gray-700 mb-1 truncate"
               title={item.name}
             >
               {item.name}
             </h3>
             {item.description && (
-              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+              <p className="text-xs text-gray-500 mb-1 line-clamp-2">
+                {item.description}
+              </p>
             )}
-            <div className="flex items-center text-sm mb-2">
-              <span className="text-xl font-bold text-green-600">
+            <div className="flex items-center text-xs mb-1">
+              <span className="text-lg font-bold text-green-700">
                 ${item.price?.toFixed(2) ?? "N/A"}
               </span>
             </div>
-            <div className="flex flex-wrap gap-1 text-xs">
+            <div className="flex flex-wrap gap-1 text-xs mb-2">
               {item.isGlutenFree && (
-                <span className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
+                <span className="bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded-full text-xxs">
                   GF
                 </span>
               )}
               {item.isDairyFree && (
-                <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full">
+                <span className="bg-purple-100 text-purple-800 px-1 py-0.5 rounded-full text-xxs">
                   DF
                 </span>
               )}
               {item.isVegetarian && (
-                <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                <span className="bg-green-100 text-green-800 px-1 py-0.5 rounded-full text-xxs">
                   V
                 </span>
               )}
               {item.isVegan && (
-                <span className="bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-full">
+                <span className="bg-teal-100 text-teal-800 px-1 py-0.5 rounded-full text-xxs">
                   VG
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex-shrink-0 flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
+          <div className="flex-shrink-0 flex flex-row space-x-2 justify-end">
             <Button
               variant="secondary"
               onClick={() => onEdit(item)}
-              className="w-full sm:w-auto text-sm"
+              className="text-xs px-2 py-1"
             >
               Edit
             </Button>
             <Button
               variant="destructive"
               onClick={() => onDelete(item)}
-              className="w-full sm:w-auto text-sm"
+              className="text-xs px-2 py-1"
             >
               Delete
             </Button>

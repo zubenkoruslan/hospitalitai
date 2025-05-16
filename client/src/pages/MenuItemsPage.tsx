@@ -9,6 +9,7 @@ import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button"; // Import Button
 import { TrashIcon } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // ADDED: Icons for collapsibles
 // Import shared types
 import {
   MenuItem,
@@ -33,6 +34,7 @@ import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal"; // Im
 import { useMenuData } from "../hooks/useMenuData";
 import MenuDetailsEditModal from "../components/menu/MenuDetailsEditModal"; // Import the new menu details modal
 import DeleteCategoryModal from "../components/category/DeleteCategoryModal"; // Import DeleteCategoryModal
+import Card from "../components/common/Card"; // ADDED: Import Card component
 
 // --- Error Formatting Helper ---
 const formatApiError = (err: any, context: string): string => {
@@ -70,7 +72,8 @@ const MenuItemsPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Use the custom hook for menu details, items, loading, and error
-  const { menuDetails, items, loading, error, fetchData } = useMenuData(menuId);
+  const { menuDetails, items, loading, error, fetchData, clearError } =
+    useMenuData(menuId);
 
   // Remove state managed by the hook
   // const [menuDetails, setMenuDetails] = useState<Menu | null>(null); // Handled by hook
@@ -377,236 +380,278 @@ const MenuItemsPage: React.FC = () => {
   }, [categoryToDelete, menuId, fetchData, closeDeleteCategoryModal]);
 
   // --- Render Logic ---
-  if (!menuId && !loading) {
-    return <ErrorMessage message="Menu ID is missing from the URL." />;
-  }
-
-  if (loading) {
+  if (loading && !menuDetails) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner message="Loading menu items..." />
+      <div className="min-h-screen flex flex-col bg-gray-100">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Loading menu items..." />
+        </main>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Header: Menu Title, Description, and Actions */}
-          {menuDetails && (
-            <div className="mb-6 pb-4 border-b border-gray-200">
-              {" "}
-              {/* Outer container for spacing and border */}
-              {/* Back to Menus Link - Positioned on top */}
-              <div className="mb-4">
-                <Link
-                  to={`/menu`}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  &larr; Back to Menus
-                </Link>
-              </div>
-              {/* Container for Title/Description and Action Buttons */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-start">
-                {/* Left: Title & Description */}
-                <div className="flex-grow mb-4 sm:mb-0 sm:mr-4">
-                  <h1 className="text-3xl font-bold text-gray-800 break-words">
-                    {menuDetails.name}
-                  </h1>
-                  {menuDetails.description && (
-                    <p className="text-gray-600 mt-2 text-sm">
-                      {menuDetails.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Right: Action Buttons (Edit, Add New) */}
-                <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                  <Button
-                    onClick={openMenuDetailsModal}
-                    variant="secondary"
-                    className="w-full sm:w-auto"
-                  >
-                    Edit Details
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={openAddModal}
-                    className="w-full sm:w-auto"
-                  >
-                    Add New Item
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Notifications */}
-          {error && (!menuDetails || items.length === 0) && (
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-100">
+        <Navbar />
+        <main className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
             <ErrorMessage message={error} />
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/menu")}
+              className="mt-6"
+            >
+              &larr; Back to Menus
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!menuDetails) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-100">
+        <Navbar />
+        <main className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-700 mb-4">
+              Menu Not Found
+            </h1>
+            <p className="text-gray-600">
+              The requested menu could not be found.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/menu")}
+              className="mt-6"
+            >
+              &larr; Back to Menus
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Render categorized items
+  const renderCategorizedItems = () => {
+    if (!items || items.length === 0) {
+      return (
+        <Card className="bg-white shadow-lg rounded-xl p-6 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0l-3-3m-10 3l-3-3m10 0l-4 4m-2 0l-4-4"
+            />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            No items in this menu yet.
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Get started by adding a new item.
+          </p>
+          <Button variant="primary" onClick={openAddModal} className="mt-6">
+            Add Menu Item
+          </Button>
+        </Card>
+      );
+    }
+
+    const categorized = items.reduce((acc, item) => {
+      const category = item.category || "Uncategorized";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(item);
+      return acc;
+    }, {} as Record<string, MenuItem[]>);
+
+    // Ensure uniqueCategories are up-to-date for rendering order
+    const displayCategoriesOrder =
+      uniqueCategories.length > 0
+        ? uniqueCategories
+        : Object.keys(categorized).sort();
+    if (displayCategoriesOrder.length === 0 && categorized["Uncategorized"]) {
+      displayCategoriesOrder.push("Uncategorized"); // Ensure "Uncategorized" is shown if it's the only one
+    }
+
+    return displayCategoriesOrder.map((category) => (
+      <Card
+        key={category}
+        className="bg-white shadow-lg rounded-xl mb-6 overflow-hidden" // Added overflow-hidden for clean collapse
+      >
+        <div
+          className="flex justify-between items-center p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors duration-150"
+          onClick={() => toggleCategory(category)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") toggleCategory(category);
+          }}
+          aria-expanded={!!expandedCategories[category]}
+          aria-controls={`category-items-${category}`}
+        >
+          <h3 className="text-xl font-semibold text-gray-700 flex items-center">
+            {toTitleCase(category)}
+            {expandedCategories[category] ? (
+              <ChevronUpIcon className="h-5 w-5 ml-2 text-gray-500" />
+            ) : (
+              <ChevronDownIcon className="h-5 w-5 ml-2 text-gray-500" />
+            )}
+          </h3>
+          {category !== "Uncategorized" && (
+            <Button
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent toggleCategory when clicking delete
+                openDeleteCategoryModal(category);
+              }}
+              className="text-xs px-2 py-1 z-10 relative" // Ensure button is clickable over the div
+              aria-label={`Delete ${category} category`}
+            >
+              <TrashIcon className="h-4 w-4 mr-1 inline-block" /> Delete
+            </Button>
           )}
-          {successMessage && (
+        </div>
+        {expandedCategories[category] && (
+          <div
+            id={`category-items-${category}`}
+            className="p-4 sm:p-6 border-t border-gray-200"
+          >
+            <MenuItemList
+              items={categorized[category]}
+              onEdit={openEditModal}
+              onDelete={openDeleteModal}
+            />
+          </div>
+        )}
+      </Card>
+    ));
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-100">
+      <Navbar />
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        {/* Back to Menus Link */}
+        <div className="mb-4">
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/menu")}
+            className="text-sm"
+          >
+            &larr; Back to All Menus
+          </Button>
+        </div>
+
+        {/* Page Title Header */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <div className="flex flex-col md:flex-row justify-between md:items-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 truncate">
+              {menuDetails.name}
+            </h1>
+            <div className="mt-4 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+              <Button variant="secondary" onClick={openMenuDetailsModal}>
+                Edit Menu Details
+              </Button>
+              <Button variant="primary" onClick={openAddModal}>
+                Add New Item
+              </Button>
+            </div>
+          </div>
+          {menuDetails.description && (
+            <p className="mt-2 text-sm text-gray-600">
+              {menuDetails.description}
+            </p>
+          )}
+        </div>
+
+        {/* Success and Error Messages */}
+        {successMessage && (
+          <div className="mb-4">
             <SuccessNotification
               message={successMessage}
               onDismiss={() => setSuccessMessage(null)}
             />
-          )}
-
-          {/* Loading State */}
-          {loading && <LoadingSpinner />}
-
-          {/* Item List / Grid Area */}
-          {!loading && !error && (
-            <>
-              {Object.keys(groupedItems).length > 0 ? (
-                Object.entries(groupedItems).map(([category, itemList]) => (
-                  <div key={category} className="mb-6">
-                    <div // Changed from button to div to contain multiple interactive elements
-                      className="w-full text-left px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-t-md focus:outline-none flex justify-between items-center"
-                    >
-                      <button // Button for expanding/collapsing
-                        onClick={() => toggleCategory(category)}
-                        className="flex-grow flex items-center focus:outline-none"
-                      >
-                        <h2 className="text-xl font-semibold text-gray-700 flex items-center">
-                          {toTitleCase(category)}
-                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">
-                            {itemList.length}
-                          </span>
-                        </h2>
-                      </button>
-
-                      <div className="flex items-center">
-                        {" "}
-                        {/* Container for action icons */}
-                        {category.toLowerCase() !== "uncategorized" &&
-                          category.toLowerCase() !== "non assigned" && (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent card from toggling
-                                openDeleteCategoryModal(category);
-                              }}
-                              aria-label={`Delete category ${category}`}
-                              className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 mr-2" // Adjusted for icon button appearance
-                              type="button" // Explicitly type button
-                            >
-                              <TrashIcon className="h-5 w-5" />
-                            </Button>
-                          )}
-                        <button // Chevron button remains for expand/collapse visual cue, though outer click also works
-                          onClick={() => toggleCategory(category)}
-                          className="focus:outline-none"
-                          aria-label={
-                            expandedCategories[category]
-                              ? "Collapse category"
-                              : "Expand category"
-                          }
-                        >
-                          {expandedCategories[category] ? (
-                            <svg
-                              className="w-5 h-5 text-gray-600"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M5 15l7-7 7 7"
-                              ></path>
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-5 h-5 text-gray-600"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M19 9l-7 7-7-7"
-                              ></path>
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    {expandedCategories[category] && (
-                      <div className="border border-t-0 border-gray-200 rounded-b-md p-4">
-                        <MenuItemList
-                          items={itemList}
-                          onEdit={openEditModal}
-                          onDelete={openDeleteModal}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500 py-8">
-                  No menu items found. Click "Add New Item" to get started.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* --- Modals --- */}
-
-        {/* Add/Edit Modal - Use the new component */}
-        {isAddEditModalOpen && (
-          <AddEditMenuItemModal
-            isOpen={isAddEditModalOpen}
-            onClose={closeModal}
-            onSubmit={handleMenuItemFormSubmit}
-            currentItem={currentItem}
-            isSubmitting={isSubmittingItem}
-            menuId={menuId ?? ""}
-            allItemsInMenu={items}
-            restaurantId={restaurantId ?? ""}
-            availableCategories={uniqueCategories}
-          />
+          </div>
+        )}
+        {/* Display hook's error if not in loading state and menuDetails exist (to avoid showing during initial load error) */}
+        {error && !loading && menuDetails && (
+          <div className="mb-4">
+            <ErrorMessage message={error} onDismiss={clearError} />
+          </div>
         )}
 
-        {/* Delete Confirmation Modal (Use the new component) */}
-        {isDeleteModalOpen && currentItem && (
-          <DeleteMenuItemModal
-            isOpen={isDeleteModalOpen}
-            onClose={closeModal}
-            onConfirm={handleDeleteMenuItemConfirm}
-            itemName={currentItem.name}
-            isSubmitting={isSubmittingItem}
-          />
+        {/* Loading state for items if menuDetails are already loaded */}
+        {loading && menuDetails && (
+          <div className="text-center py-10">
+            <LoadingSpinner message="Loading items..." />
+          </div>
         )}
 
-        {menuDetails && (
-          <MenuDetailsEditModal
-            isOpen={isMenuDetailsModalOpen}
-            onClose={closeMenuDetailsModal}
-            onSubmit={handleSaveMenuDetails}
-            initialName={menuDetails.name} // Pass current name
-            initialDescription={menuDetails.description || ""} // Pass current description
-            isSaving={isSavingMenuDetails}
-            error={menuDetailsError}
-          />
-        )}
-
-        {/* Delete Category Modal */}
-        <DeleteCategoryModal
-          isOpen={isDeleteCategoryModalOpen}
-          onClose={closeDeleteCategoryModal}
-          onConfirm={handleConfirmDeleteCategory}
-          categoryName={categoryToDelete}
-          isDeleting={isDeletingCategory}
-        />
+        {/* Render categorized items or placeholder */}
+        {!loading && renderCategorizedItems()}
       </main>
+
+      {/* Modals */}
+      {isAddEditModalOpen && (
+        <AddEditMenuItemModal
+          isOpen={isAddEditModalOpen}
+          onClose={closeModal}
+          onSubmit={handleMenuItemFormSubmit}
+          currentItem={currentItem}
+          isSubmitting={isSubmittingItem}
+          menuId={menuId ?? ""}
+          allItemsInMenu={items}
+          restaurantId={restaurantId ?? ""}
+          availableCategories={uniqueCategories}
+        />
+      )}
+
+      {/* Delete Confirmation Modal (Use the new component) */}
+      {isDeleteModalOpen && currentItem && (
+        <DeleteMenuItemModal
+          isOpen={isDeleteModalOpen}
+          onClose={closeModal}
+          onConfirm={handleDeleteMenuItemConfirm}
+          itemName={currentItem.name}
+          isSubmitting={isSubmittingItem}
+        />
+      )}
+
+      {menuDetails && (
+        <MenuDetailsEditModal
+          isOpen={isMenuDetailsModalOpen}
+          onClose={closeMenuDetailsModal}
+          onSubmit={handleSaveMenuDetails}
+          initialName={menuDetails.name} // Pass current name
+          initialDescription={menuDetails.description || ""} // Pass current description
+          isSaving={isSavingMenuDetails}
+          error={menuDetailsError}
+        />
+      )}
+
+      {/* Delete Category Modal */}
+      <DeleteCategoryModal
+        isOpen={isDeleteCategoryModalOpen}
+        onClose={closeDeleteCategoryModal}
+        onConfirm={handleConfirmDeleteCategory}
+        categoryName={categoryToDelete}
+        isDeleting={isDeletingCategory}
+      />
     </div>
   );
 };

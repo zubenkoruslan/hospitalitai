@@ -21,6 +21,8 @@ import {
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
+import Card from "../components/common/Card";
+import ErrorMessage from "../components/common/ErrorMessage";
 
 // Simple component to display a single question - to be expanded
 const QuestionListItem: React.FC<{
@@ -28,33 +30,49 @@ const QuestionListItem: React.FC<{
   onRemove: (questionId: string) => void;
   onEdit: (question: IQuestion) => void;
 }> = ({ question, onRemove, onEdit }) => {
+  // Helper function to format question type
+  const formatQuestionType = (type: string) => {
+    if (!type) return "N/A";
+    return type
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
   return (
-    <div className="p-3 border rounded-md mb-3 bg-white shadow-sm">
-      <p className="font-medium text-gray-800">{question.questionText}</p>
-      <p className="text-xs text-gray-500">
-        Type: {question.questionType} | Difficulty:{" "}
-        {question.difficulty || "N/A"}
+    <Card className="bg-white shadow-lg rounded-xl p-4 mb-3 hover:shadow-xl transition-shadow duration-300">
+      <p className="font-semibold text-gray-800 mb-2">
+        {question.questionText}
       </p>
-      <p className="text-xs text-gray-500">
-        Categories: {question.categories.join(", ")}
-      </p>
-      <div className="mt-2 flex justify-end space-x-2">
+      <div className="text-xs text-gray-600 space-y-1 mb-3">
+        <p>
+          Type: {formatQuestionType(question.questionType)}
+          {question.difficulty && ` | Difficulty: ${question.difficulty}`}
+        </p>
+        <p>
+          Category:{" "}
+          {question.categories && question.categories.length > 0
+            ? question.categories.join(", ")
+            : "N/A"}
+        </p>
+      </div>
+      <div className="mt-3 flex justify-end space-x-2">
         <Button
           variant="secondary"
           onClick={() => onEdit(question)}
-          className="text-xs px-2 py-1"
+          className="text-xs px-3 py-1"
         >
-          Edit Question
+          Edit
         </Button>
         <Button
           variant="destructive"
           onClick={() => onRemove(question._id)}
-          className="text-xs px-2 py-1"
+          className="text-xs px-3 py-1"
         >
-          Remove from Bank
+          Remove
         </Button>
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -235,215 +253,255 @@ const QuestionBankDetailPage: React.FC = () => {
 
   if (isLoading && !currentQuestionBank) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner />
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Loading question bank details..." />
+        </main>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-red-500 p-4 text-center">
-        <p>Error loading question bank: {getErrorMessage(error)}</p>
-        <Link to="/question-banks">
-          <Button variant="secondary" className="mt-2">
-            Back to List
-          </Button>
-        </Link>
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 className="text-2xl font-bold text-red-600">Error</h1>
+          </div>
+          <Card className="p-6">
+            <ErrorMessage message={getErrorMessage(error)} />
+            <div className="mt-4">
+              <Button
+                variant="secondary"
+                onClick={() => navigate("/quiz-management")}
+              >
+                &larr; Back to Quiz & Bank Management
+              </Button>
+            </div>
+          </Card>
+        </main>
       </div>
     );
   }
 
   if (!currentQuestionBank) {
     return (
-      <div className="text-center p-10">
-        <p className="text-xl text-gray-600">Question bank not found.</p>
-        <Link to="/question-banks">
-          <Button variant="primary" className="mt-4">
-            Back to Question Banks
-          </Button>
-        </Link>
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 className="text-2xl font-bold text-gray-700">Not Found</h1>
+          </div>
+          <Card className="p-6">
+            <ErrorMessage message="Question bank not found." />
+            <div className="mt-4">
+              <Button
+                variant="secondary"
+                onClick={() => navigate("/quiz-management")}
+              >
+                &larr; Back to Quiz & Bank Management
+              </Button>
+            </div>
+          </Card>
+        </main>
       </div>
     );
   }
 
-  // Ensure questions are IQuestion objects
-  const questions = (currentQuestionBank.questions as IQuestion[]).filter(
-    (q) => typeof q === "object" && q._id
-  );
-
+  // Main content rendering if bank is loaded
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar />
-      <main className="py-8">
-        {/* Content when bank is loaded */}
-        {!isLoading && !error && currentQuestionBank && (
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            {pageError && (
-              <div
-                className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded-md relative"
-                role="alert"
-              >
-                {pageError}
-                <button
-                  onClick={() => setPageError(null)}
-                  className="absolute top-0 bottom-0 right-0 px-3 py-2 text-red-500 hover:text-red-700"
-                  aria-label="Dismiss error"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        {/* Back Link - Placed above title */}
+        <div className="mb-4">
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/quiz-management")}
+            className="text-sm"
+          >
+            &larr; Back to Quiz & Bank Management
+          </Button>
+        </div>
 
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <Button
-                  onClick={() => navigate("/question-banks")}
-                  variant="secondary"
-                  className="mb-2 text-sm"
-                >
-                  &larr; Back to Question Banks List
-                </Button>
-                <header className="mb-4">
-                  <h1 className="text-3xl font-bold leading-tight text-gray-900">
-                    {currentQuestionBank.name}
-                  </h1>
-                  {currentQuestionBank.description && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      {currentQuestionBank.description}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Bank ID: {currentQuestionBank._id}
-                  </p>
-                </header>
-              </div>
-              <Button
-                variant="primary"
-                onClick={handleOpenEditBankModal}
-                className="text-sm whitespace-nowrap"
-              >
-                Edit Details
-              </Button>
-            </div>
-
-            <div className="bg-white shadow rounded-lg p-6 mb-8">
-              <p className="text-sm text-gray-600">
-                Total Questions: {questions.length}
-              </p>
-              {currentQuestionBank.categories &&
-                currentQuestionBank.categories.length > 0 && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Bank Categories: {currentQuestionBank.categories.join(", ")}
-                  </p>
-                )}
-            </div>
-
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                Questions in this Bank
-              </h2>
-              <div className="flex space-x-2 mb-4">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowAddManualQuestionModal(true)}
-                >
-                  Add Question Manually
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => setShowGenerateAiQuestionsModal(true)}
-                >
-                  Generate Questions (AI)
-                </Button>
-              </div>
-
-              {questions.length === 0 ? (
-                <p className="text-gray-600">
-                  No questions have been added to this bank yet.
+        {/* Updated Page Title Header */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                {currentQuestionBank.name}
+              </h1>
+              {currentQuestionBank.description && (
+                <p className="mt-2 text-sm text-gray-600">
+                  {currentQuestionBank.description}
                 </p>
-              ) : (
-                <div className="space-y-3">
-                  {questions.map((question) => (
-                    <QuestionListItem
-                      key={question._id}
-                      question={question}
-                      onRemove={requestRemoveQuestion}
-                      onEdit={handleOpenEditQuestionModal}
-                    />
-                  ))}
-                </div>
               )}
             </div>
+            <Button
+              variant="secondary"
+              onClick={handleOpenEditBankModal}
+              className="mt-4 sm:mt-0"
+            >
+              Edit Details
+            </Button>
+          </div>
+        </div>
 
-            {showAddManualQuestionModal && (
-              <AddManualQuestionForm
-                onQuestionAdded={handleManualQuestionSubmit}
-                onClose={() => setShowAddManualQuestionModal(false)}
-                initialBankCategories={currentQuestionBank?.categories || []}
-              />
-            )}
-            {showGenerateAiQuestionsModal && (
-              <GenerateAiQuestionsForm
-                bankCategories={currentQuestionBank.categories || []}
-                bankId={currentQuestionBank._id}
-                onAiQuestionsGenerated={handleAiQuestionsGenerated}
-                onClose={() => setShowGenerateAiQuestionsModal(false)}
-              />
-            )}
+        {pageError && (
+          <div className="mb-4">
+            <ErrorMessage
+              message={pageError}
+              onDismiss={() => setPageError(null)}
+            />
           </div>
         )}
-      </main>
-      {currentQuestionBank && (
-        <Modal
-          isOpen={isEditBankModalOpen}
-          onClose={handleCloseEditBankModal}
-          title={`Edit Bank: ${currentQuestionBank.name}`}
-        >
-          <EditQuestionBankForm
-            bankToEdit={currentQuestionBank}
-            onBankUpdated={handleBankDetailsUpdated}
-            onCancel={handleCloseEditBankModal}
-          />
-        </Modal>
-      )}
-      {isConfirmRemoveModalOpen &&
-        questionToRemoveId &&
-        currentQuestionBank && (
+
+        {/* Updated Action Buttons Card for Questions */}
+        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Manage Questions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              variant="primary"
+              onClick={() => setShowAddManualQuestionModal(true)}
+              className="w-full"
+            >
+              Add Manual Question
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowGenerateAiQuestionsModal(true)}
+              className="w-full"
+            >
+              Generate AI Questions
+            </Button>
+          </div>
+        </Card>
+
+        {/* Updated Questions List Card */}
+        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Questions in this Bank ({currentQuestionBank.questions?.length || 0}
+            )
+          </h2>
+          {isLoading && <LoadingSpinner message="Updating questions..." />}
+          {(!currentQuestionBank.questions ||
+            currentQuestionBank.questions.length === 0) &&
+            !isLoading && (
+              <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded-lg">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  No questions yet
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Add questions manually or generate them using AI.
+                </p>
+              </div>
+            )}
+          <div>
+            {(currentQuestionBank.questions as IQuestion[])?.map((q) => (
+              <QuestionListItem
+                key={q._id}
+                question={q}
+                onRemove={() => requestRemoveQuestion(q._id)}
+                onEdit={() => handleOpenEditQuestionModal(q)}
+              />
+            ))}
+          </div>
+        </Card>
+
+        {/* Modals */}
+        {showAddManualQuestionModal && (
+          <Modal
+            isOpen={showAddManualQuestionModal}
+            onClose={() => setShowAddManualQuestionModal(false)}
+            title="Add New Question Manually"
+          >
+            <AddManualQuestionForm
+              onQuestionAdded={handleManualQuestionSubmit}
+              onClose={() => setShowAddManualQuestionModal(false)}
+              initialBankCategories={currentQuestionBank?.categories || []}
+            />
+          </Modal>
+        )}
+
+        {showGenerateAiQuestionsModal && (
+          <Modal
+            isOpen={showGenerateAiQuestionsModal}
+            onClose={() => setShowGenerateAiQuestionsModal(false)}
+            title="Generate Questions with AI"
+          >
+            <GenerateAiQuestionsForm
+              bankId={currentQuestionBank._id}
+              bankCategories={currentQuestionBank.categories || []}
+              onAiQuestionsGenerated={handleAiQuestionsGenerated}
+              onClose={() => setShowGenerateAiQuestionsModal(false)}
+            />
+          </Modal>
+        )}
+
+        {isEditBankModalOpen && currentQuestionBank && (
+          <Modal
+            isOpen={isEditBankModalOpen}
+            onClose={handleCloseEditBankModal}
+            title={`Edit Bank: ${currentQuestionBank.name}`}
+          >
+            <EditQuestionBankForm
+              bankToEdit={currentQuestionBank}
+              onBankUpdated={handleBankDetailsUpdated}
+              onCancel={handleCloseEditBankModal}
+            />
+          </Modal>
+        )}
+
+        {isConfirmRemoveModalOpen && questionToRemoveId && (
           <Modal
             isOpen={isConfirmRemoveModalOpen}
             onClose={handleCancelRemoveQuestion}
-            title="Confirm Remove Question"
+            title="Confirm Removal"
           >
             <ConfirmationModalContent
-              message={`Are you sure you want to remove this question from the bank? Question: "${
-                questions.find((q) => q._id === questionToRemoveId)
-                  ?.questionText || "this question"
-              }"`}
+              title="Confirm Remove Question"
+              message="Are you sure you want to remove this question from the bank? This action cannot be undone."
               onConfirm={executeRemoveQuestion}
               onCancel={handleCancelRemoveQuestion}
-              confirmText="Remove"
+              confirmText="Remove Question"
               confirmButtonVariant="destructive"
             />
           </Modal>
         )}
-      {editingQuestion && (
-        <Modal
-          isOpen={isEditQuestionModalOpen}
-          onClose={handleCloseEditQuestionModal}
-          title={`Edit Question: ${editingQuestion.questionText.substring(
-            0,
-            30
-          )}...`}
-          size="xl"
-        >
-          <EditQuestionForm
-            questionToEdit={editingQuestion}
-            onQuestionUpdated={handleQuestionUpdatedInModal}
+
+        {isEditQuestionModalOpen && editingQuestion && (
+          <Modal
+            isOpen={isEditQuestionModalOpen}
             onClose={handleCloseEditQuestionModal}
-          />
-        </Modal>
-      )}
+            title="Edit Question"
+          >
+            <EditQuestionForm
+              questionToEdit={editingQuestion}
+              onQuestionUpdated={handleQuestionUpdatedInModal}
+              onClose={handleCloseEditQuestionModal}
+            />
+          </Modal>
+        )}
+      </main>
     </div>
   );
 };

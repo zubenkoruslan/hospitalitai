@@ -11,6 +11,16 @@ export interface ResultSummary {
   status: string;
 }
 
+// NEW: Interface for individual quiz progress summary from backend
+export interface ClientQuizProgressSummary {
+  quizId: string;
+  quizTitle: string;
+  overallProgressPercentage: number;
+  isCompletedOverall: boolean;
+  lastAttemptTimestamp?: string | null; // Dates are often strings from JSON
+  averageScoreForQuiz?: number | null; // ADDED: Average score for this specific quiz
+}
+
 // Additional detail for incorrect answers within a quiz result
 export interface IncorrectQuestionDetail {
   questionText: string;
@@ -46,9 +56,10 @@ export interface StaffMemberWithData {
   email: string;
   createdAt: string;
   professionalRole?: string;
-  resultsSummary: ResultSummary[];
+  // resultsSummary: ResultSummary[]; // <-- This will be replaced
+  quizProgressSummaries: ClientQuizProgressSummary[]; // <-- New field
   averageScore: number | null;
-  quizzesTaken: number;
+  quizzesTaken: number; // This might now be derivable from quizProgressSummaries.length if it means unique quizzes with progress
 }
 
 // Detailed interface for a staff member including full quiz result details

@@ -130,44 +130,69 @@ const StaffDetails: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
-      <main className="max-w-4xl mx-auto py-6 px-4">
-        {/* Back Link */}
-        <button
-          onClick={() => navigate(-1)} // Go back one step in history
-          className="mb-4 text-sm text-blue-600 hover:underline"
-        >
-          &larr; Back to Staff List
-        </button>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        <div className="mb-4">
+          <Button
+            variant="secondary"
+            onClick={() => navigate(-1)}
+            className="text-sm"
+          >
+            &larr; Back
+          </Button>
+        </div>
 
         {/* Notifications Area */}
-        <div className="mb-4">
-          {successMessage && (
+        {successMessage && (
+          <div className="mb-4">
             <SuccessNotification
               message={successMessage}
               onDismiss={() => setSuccessMessage(null)}
             />
-          )}
+          </div>
+        )}
+        {roleError && isEditingRole && (
+          <div className="mb-4">
+            <ErrorMessage
+              message={roleError}
+              onDismiss={() => setRoleError(null)}
+            />
+          </div>
+        )}
+
+        {/* Updated Page Title Header for staff name */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+            {staffDetails.name}
+          </h1>
+          {/* Optional: Subtitle for role, if desired in this prominent header */}
+          {/* <p className="mt-1 text-lg text-gray-600">{staffDetails.professionalRole || "Role not set"}</p> */}
         </div>
 
-        {/* Staff Header - Use Card */}
-        <Card className="mb-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                {staffDetails.name}
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {staffDetails.email} &middot; Joined:{" "}
+        {/* Updated Staff Details Card */}
+        <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-start">
+            {/* Left side: Email & Joined Date */}
+            <div className="mb-4 sm:mb-0">
+              <h2 className="text-xl font-semibold text-gray-700 mb-3">
+                Contact & Employment
+              </h2>
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Email:</span> {staffDetails.email}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="font-medium">Joined:</span>{" "}
                 {formatDate(staffDetails.createdAt)}
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 sm:ml-4">
-              {/* Container for Role and Average Score */}
-              <div className="flex flex-col items-start sm:items-end space-y-2">
-                {/* Role Editing/Display */}
+
+            {/* Right side: Role & Average Score */}
+            <div className="sm:ml-4 flex flex-col items-start sm:items-end space-y-3">
+              <div>
+                <h3 className="text-md font-semibold text-gray-700 mb-1">
+                  Professional Role
+                </h3>
                 {isEditingRole ? (
                   <div className="flex items-center space-x-2">
-                    {/* Role Input, Save, Cancel Buttons */}
                     <input
                       type="text"
                       value={editedRole}
@@ -177,69 +202,68 @@ const StaffDetails: React.FC = () => {
                       aria-label="Professional Role"
                     />
                     <Button
-                      variant="success"
+                      variant="primary"
                       onClick={handleSaveRole}
-                      disabled={isSavingRole}
-                      className="text-xs py-1.5 whitespace-nowrap"
+                      isLoading={isSavingRole}
+                      disabled={
+                        isSavingRole ||
+                        editedRole === (staffDetails?.professionalRole || "")
+                      }
+                      className="text-sm whitespace-nowrap"
                     >
-                      {isSavingRole ? "Saving..." : "Save"}
+                      Save Role
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={handleEditRoleToggle}
                       disabled={isSavingRole}
-                      className="text-xs py-1.5 whitespace-nowrap"
+                      className="text-sm whitespace-nowrap"
                     >
                       Cancel
                     </Button>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
-                      Role: {staffDetails.professionalRole || "Not Set"}
-                    </span>
+                    <p className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md">
+                      {staffDetails.professionalRole || "Not Set"}
+                    </p>
                     <Button
                       variant="secondary"
                       onClick={handleEditRoleToggle}
-                      className="text-xs py-1 px-2 whitespace-nowrap"
+                      className="text-xs px-2 py-1 whitespace-nowrap"
                     >
                       Edit Role
                     </Button>
                   </div>
                 )}
-                {roleError && (
-                  <p className="text-xs text-red-600 mt-1 text-right">
-                    {roleError}
-                  </p>
-                )}
-
-                {/* Average Score Display - Add Styling */}
-                <div className="text-sm text-gray-600">
-                  Average Score:{" "}
-                  {staffDetails.averageScore != null ? (
-                    <span
-                      className={`font-semibold ${
-                        staffDetails.averageScore >= 70
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {`${staffDetails.averageScore.toFixed(1)}%`}
-                    </span>
-                  ) : (
-                    <span className="font-semibold text-gray-500">N/A</span>
-                  )}
-                </div>
+              </div>
+              <div>
+                <h3 className="text-md font-semibold text-gray-700 mb-1">
+                  Overall Average Score
+                </h3>
+                <p
+                  className={`text-2xl font-bold ${
+                    staffDetails.averageScore === null
+                      ? "text-gray-500"
+                      : staffDetails.averageScore >= 70
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {staffDetails.averageScore !== null
+                    ? `${staffDetails.averageScore.toFixed(1)}%`
+                    : "N/A"}
+                </p>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Quiz Results Table - Use Card */}
-        <Card className="p-0 overflow-hidden">
-          <h3 className="text-lg font-semibold text-gray-800 p-4 border-b">
-            Tests Taken
-          </h3>
+        {/* Updated Quiz Results & Performance Card */}
+        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Quiz Results & Performance
+          </h2>
           {staffDetails.quizResults && staffDetails.quizResults.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">

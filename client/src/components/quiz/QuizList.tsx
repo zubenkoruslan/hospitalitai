@@ -8,6 +8,7 @@ interface QuizListProps {
   isLoading: boolean;
   onPreview: (quiz: ClientIQuiz) => void;
   onActivate: (quizId: string) => void;
+  onDeactivate: (quizId: string) => void;
   onDelete: (quiz: ClientIQuiz) => void;
   onViewProgress: (quizId: string) => void;
   isDeletingQuizId: string | null;
@@ -20,6 +21,7 @@ const QuizList: React.FC<QuizListProps> = ({
   isLoading,
   onPreview,
   onActivate,
+  onDeactivate,
   onDelete,
   onViewProgress,
   isDeletingQuizId,
@@ -90,6 +92,16 @@ const QuizList: React.FC<QuizListProps> = ({
                     >
                       Edit / Preview
                     </button>
+                    {quiz.isAvailable === true && (
+                      <button
+                        onClick={() => onDeactivate(quiz._id!)}
+                        className="w-full sm:w-auto text-sm font-medium text-yellow-600 hover:text-yellow-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-yellow-50 transition-colors duration-150"
+                        disabled={isDeletingQuizId === quiz._id}
+                        aria-label={`Deactivate quiz ${quiz.title}`}
+                      >
+                        Deactivate
+                      </button>
+                    )}
                     {quiz.isAvailable === false && (
                       <button
                         onClick={() => onActivate(quiz._id!)}

@@ -1,12 +1,15 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import {
-  ResultSummary,
+  // ResultSummary, // No longer directly used here
   StaffMemberWithData,
-  SortField,
-  SortDirection,
-} from "../../types/staffTypes"; // Corrected import path
-import { formatDate, isCompletedQuiz } from "../../utils/helpers";
-import Button from "../common/Button"; // Import Button
+  // SortField, // Not used in this component directly
+  // SortDirection, // Not used in this component directly
+  ClientQuizProgressSummary, // Import the new type
+} from "../../types/staffTypes";
+// import { formatDate, isCompletedQuiz } from "../../utils/helpers"; // isCompletedQuiz no longer needed
+import { formatDate } from "../../utils/helpers"; // Only formatDate needed
+import Button from "../common/Button";
 
 // Interfaces (Copied - consider shared types)
 // // Removed local definitions
@@ -70,21 +73,21 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {staff.map((staffMember) => {
             const isExpanded = expandedStaffId === staffMember._id;
-            const completedQuizzes = Array.isArray(staffMember.resultsSummary)
-              ? staffMember.resultsSummary.filter(isCompletedQuiz)
-              : [];
+            const quizzesWithProgress = staffMember.quizProgressSummaries || []; // Use new field
+
             const averageScore = staffMember.averageScore;
 
             return (
               <React.Fragment key={staffMember._id}>
                 <tr className={isExpanded ? "bg-blue-50" : "hover:bg-gray-50"}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                    <Link
+                      to={`/staff/${staffMember._id}`}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      aria-label={`View details for ${staffMember.name}`}
+                    >
                       {staffMember.name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {staffMember.email}
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {staffMember.professionalRole || "N/A"}
@@ -113,7 +116,6 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                       variant="secondary"
                       onClick={() => onToggleExpand(staffMember._id)}
                       className={`text-xs py-1 ${
-                        // Adjust padding/size
                         isExpanded
                           ? "!bg-blue-200 !text-blue-800 hover:!bg-blue-300 focus:!ring-blue-500"
                           : "bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-indigo-500"
@@ -138,34 +140,53 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                         <h4 className="font-semibold mb-2 text-gray-700">
                           Quiz Details:
                         </h4>
-                        {completedQuizzes.length > 0 ? (
+                        {quizzesWithProgress.length > 0 ? (
                           <ul className="space-y-2">
-                            {completedQuizzes.map((result) => {
-                              return (
-                                <li
-                                  key={result._id}
-                                  className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
-                                >
-                                  <span className="font-medium">
-                                    {result.quizTitle}
-                                  </span>
-                                  : {result.score}/{result.totalQuestions} (
-                                  {(
-                                    (result.score / result.totalQuestions) *
-                                    100
-                                  ).toFixed(0)}
-                                  %)
-                                  <span className="text-xs text-gray-500 ml-2">
-                                    (Completed:{" "}
-                                    {formatDate(result.completedAt, true)})
-                                  </span>
-                                </li>
-                              );
-                            })}
+                            {quizzesWithProgress.map(
+                              (summary: ClientQuizProgressSummary) => {
+                                return (
+                                  <li
+                                    key={summary.quizId} // Use quizId from summary
+                                    className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0"
+                                  >
+                                    <span className="font-medium">
+                                      {summary.quizTitle}
+                                    </span>
+                                    {typeof summary.averageScoreForQuiz ===
+                                      "number" && (
+                                      <span className="font-semibold ml-2">
+                                        Avg Score:{" "}
+                                        {summary.averageScoreForQuiz.toFixed(1)}
+                                        %
+                                      </span>
+                                    )}
+                                    <span className="ml-2">
+                                      (Overall Progress:{" "}
+                                      {summary.overallProgressPercentage}%
+                                    </span>
+                                    <span className="ml-0.5">)</span>{" "}
+                                    {/* Closing parenthesis for overall progress block */}
+                                    {summary.isCompletedOverall &&
+                                      summary.lastAttemptTimestamp && (
+                                        <span className="text-xs text-gray-500 ml-2">
+                                          -{" "}
+                                          {new Date(
+                                            summary.lastAttemptTimestamp
+                                          ).toLocaleDateString("en-GB", {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                          })}
+                                        </span>
+                                      )}
+                                  </li>
+                                );
+                              }
+                            )}
                           </ul>
                         ) : (
                           <p className="text-gray-500 italic">
-                            No quizzes completed yet.
+                            No quiz progress available for this staff member.
                           </p>
                         )}
                       </div>

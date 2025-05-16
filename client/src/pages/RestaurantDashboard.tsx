@@ -184,7 +184,7 @@ const RestaurantDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <LoadingSpinner message="Loading dashboard data..." />
       </div>
     );
@@ -193,7 +193,7 @@ const RestaurantDashboard: React.FC = () => {
   // Handle access denied specifically if it came from the hook
   if (!isLoading && staffError?.startsWith("Access denied")) {
     return (
-      <div className="p-8 flex flex-col items-center">
+      <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
         <ErrorMessage message={staffError} />
         <Button
           variant="primary"
@@ -222,176 +222,237 @@ const RestaurantDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-100">
       <Navbar />
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div>
-          <div className="bg-white shadow rounded-lg p-6 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">
-              {user!.restaurantName} Dashboard
-            </h1>
+        {/* Page Title and Restaurant ID section */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                {user?.restaurantName
+                  ? `${user.restaurantName} Dashboard`
+                  : user?.name
+                  ? `${user.name}'s Dashboard`
+                  : "Restaurant Dashboard"}
+              </h1>
+              {user?.restaurantId && (
+                <div className="mt-2 flex items-center">
+                  <span className="text-sm font-medium text-gray-500 mr-2">
+                    Restaurant ID:
+                  </span>
+                  <span className="text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                    {user.restaurantId}
+                  </span>
+                  <button
+                    onClick={handleCopyId}
+                    className="ml-2 p-1.5 bg-gray-200 hover:bg-gray-300 rounded text-xs text-gray-700 transition-colors"
+                    aria-label="Copy Restaurant ID"
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Optional: Add a primary action button here if needed for Soft UI style */}
           </div>
+        </div>
 
-          <div className="bg-white shadow rounded-lg p-6 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-              Dashboard Summary
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Total Staff
-                </h3>
-                <p className="text-3xl font-semibold text-blue-600 mt-1">
-                  {staffData.length}
-                </p>
-                <Link
-                  to="/staff"
-                  className="text-sm text-blue-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Staff
-                </Link>
-              </Card>
+        {displayError && (
+          <div className="mb-6">
+            <ErrorMessage message={displayError} />
+          </div>
+        )}
 
-              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Menu Management
-                </h3>
-                <p className="text-3xl font-semibold text-green-600 mt-1">
-                  {menus.length}
-                </p>
-                <Link
-                  to="/menu"
-                  className="text-sm text-green-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Menus
-                </Link>
-              </Card>
-
-              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Available Quizzes
-                </h3>
-                <p className="text-3xl font-semibold text-purple-600 mt-1">
-                  {totalQuizzes}
-                </p>
-                <Link
-                  to="/quiz-management"
-                  className="text-sm text-purple-500 hover:underline mt-2 inline-block"
-                >
-                  Manage Quizzes
-                </Link>
-              </Card>
-
-              <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                <h3 className="text-lg font-medium text-gray-700">
-                  Avg. Staff Score
-                </h3>
-                <p
-                  className={`text-3xl font-semibold mt-1 ${
-                    staffData.length === 0
-                      ? "text-gray-500"
-                      : parseFloat(overallAveragePerformance) >= 70
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {staffData.length > 0
-                    ? `${overallAveragePerformance}%`
-                    : "N/A"}
-                </p>
-                <Link
-                  to="/staff-results"
-                  className="text-sm text-amber-500 hover:underline mt-2 inline-block"
-                >
-                  View Quiz Results
-                </Link>
-              </Card>
-
-              <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 mt-6 pt-6 border-t border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="text-left p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                    <h3 className="text-lg font-medium text-gray-700 mb-2">
-                      Upload New Menu (PDF)
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Upload your menu in PDF format.
-                    </p>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleFileChange}
-                      ref={fileInputRef}
-                      style={{ display: "none" }}
-                      id="menuPdfUpload"
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {/* Total Staff Card - Link to /staff-results */}
+          <Link to="/staff-results" className="block hover:no-underline">
+            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                  <svg
+                    className="h-6 w-6 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 016-6h6a6 6 0 016 6v1h-3"
                     />
-                    <Button
-                      variant="secondary"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="mb-2 w-full text-sm py-2 truncate"
-                    >
-                      {selectedFile ? selectedFile.name : "Select PDF File"}
-                    </Button>
-                    {selectedFile && (
-                      <Button
-                        variant="primary"
-                        onClick={handleFileUpload}
-                        disabled={isUploading || !selectedFile}
-                        className="w-full text-sm py-2"
-                      >
-                        {isUploading ? <LoadingSpinner /> : "Upload Menu"}
-                      </Button>
-                    )}
-                    {uploadMessage && (
-                      <p
-                        className={`mt-3 text-xs ${
-                          uploadMessage.includes("success")
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {uploadMessage}
-                      </p>
-                    )}
-                  </Card>
-
-                  <Card className="flex flex-col justify-between p-6 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-700">
-                        Restaurant Invitation Code
-                      </h3>
-                      <div className="mb-1 text-sm text-gray-600">
-                        <span className="font-medium">Your Restaurant ID:</span>
-                        <div className="mt-1 flex items-center space-x-2 bg-gray-50 p-2 rounded border border-gray-200">
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-800 flex-grow truncate">
-                            {user?.restaurantId}
-                          </code>
-                          <Button
-                            variant="secondary"
-                            onClick={handleCopyId}
-                            className={`text-xs px-2 py-1 ${
-                              copied
-                                ? "bg-green-100 !text-green-700 hover:bg-green-200 focus:ring-green-500"
-                                : ""
-                            }`}
-                            aria-label="Copy restaurant ID"
-                          >
-                            {copied ? "Copied!" : "Copy"}
-                          </Button>
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Share this ID with your staff to register.
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Total Staff
+                  </dt>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {staffData.length}
+                  </dd>
                 </div>
               </div>
-            </div>
-          </div>
+              <p className="text-xs text-blue-500 mt-3 text-right">
+                View Details &rarr;
+              </p>
+            </Card>
+          </Link>
 
-          <Card className="overflow-x-auto p-6 bg-white shadow rounded-lg">
+          {/* Quizzes Active Card - Link to /quiz-management */}
+          <Link to="/quiz-management" className="block hover:no-underline">
+            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                  <svg
+                    className="h-6 w-6 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Quizzes Active
+                  </dt>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {totalQuizzes}
+                  </dd>
+                </div>
+              </div>
+              <p className="text-xs text-green-500 mt-3 text-right">
+                Manage Quizzes &rarr;
+              </p>
+            </Card>
+          </Link>
+
+          {/* Menus Active Card - Link to /menu */}
+          <Link to="/menu" className="block hover:no-underline">
+            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                  <svg
+                    className="h-6 w-6 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Menus Active
+                  </dt>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {menus.length}
+                  </dd>
+                </div>
+              </div>
+              <p className="text-xs text-yellow-600 mt-3 text-right">
+                Manage Menus &rarr;
+              </p>
+            </Card>
+          </Link>
+
+          {/* Overall Average Performance Card - Link to /staff-results */}
+          <Link to="/staff-results" className="block hover:no-underline">
+            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                  <svg
+                    className="h-6 w-6 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Avg. Performance
+                  </dt>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {overallAveragePerformance}%
+                  </dd>
+                </div>
+              </div>
+              <p className="text-xs text-purple-500 mt-3 text-right">
+                View Staff Results &rarr;
+              </p>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Menu Upload Section - Moved here */}
+        <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Upload New Menu (PDF)
+          </h2>
+          <div className="space-y-4">
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              id="menuPdfUpload"
+            />
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="mb-2 w-full text-sm py-2 truncate"
+            >
+              {selectedFile ? selectedFile.name : "Select PDF File"}
+            </Button>
+            {selectedFile && (
+              <Button
+                variant="primary"
+                onClick={handleFileUpload}
+                disabled={isUploading || !selectedFile}
+                className="w-full text-sm py-2"
+              >
+                {isUploading ? <LoadingSpinner /> : "Upload Menu"}
+              </Button>
+            )}
+            {uploadMessage && (
+              <p
+                className={`mt-3 text-xs ${
+                  uploadMessage.includes("success")
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {uploadMessage}
+              </p>
+            )}
+          </div>
+        </Card>
+
+        {/* Staff List Section */}
+        <Card className="bg-white shadow-lg rounded-xl mb-8">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Staff Overview
+            </h2>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-              <h2 className="text-2xl font-semibold text-gray-800">
-                Staff Overview
-              </h2>
               <div className="relative w-full sm:w-64">
                 <input
                   type="text"
@@ -485,8 +546,8 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
               </Card>
             )}
-          </Card>
-        </div>
+          </div>
+        </Card>
       </main>
     </div>
   );

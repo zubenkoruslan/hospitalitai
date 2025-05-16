@@ -26,6 +26,7 @@ import {
   submitQuizAttemptController,
   getStaffQuizProgressController,
   getRestaurantQuizStaffProgressController,
+  resetQuizProgressController,
 } from "../controllers/quizController";
 
 const router: Router = express.Router();
@@ -287,10 +288,18 @@ router.get(
   restrictTo("staff"),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+    const staffUserId = req.user?.userId as mongoose.Types.ObjectId;
+
+    if (!restaurantId || !staffUserId) {
+      return next(
+        new AppError("User restaurant or ID not found in token", 401)
+      );
+    }
 
     try {
       const quizzes = await QuizService.getAvailableQuizzesForStaff(
-        restaurantId
+        restaurantId,
+        staffUserId
       );
       res.status(200).json({ quizzes });
     } catch (error) {
@@ -440,11 +449,18 @@ router.get(
   getRestaurantQuizStaffProgressController // Controller will use req.user.restaurantId
 );
 
-// The `generateQuizFromBanksController` is already imported.
-// The route `POST /` using it is added above.
-
-// TODO: Review all middleware, especially ensureRestaurantAssociation vs restrictTo for staff routes.
-// For staff routes like start-attempt, submit-attempt, my-progress, ensureRestaurantAssociation is good.
-// protect is already applied globally at the top of this router.
+// New route for resetting quiz progress
+/**
+ * @route   PATCH /api/quizzes/:quizId/reset-progress
+ * @desc    Reset all staff progress and attempts for a specific quiz
+ * @access  Private (Admin, Owner, Manager roles)
+ */
+router.patch(
+  "/:quizId/reset-progress",
+  restrictTo("restaurant", "admin", "owner", "manager"), // ADDED "restaurant" role
+  validateQuizIdParam, // Re-use existing validator for quizId
+  handleValidationErrors,
+  resetQuizProgressController
+);
 
 export default router;

@@ -209,7 +209,7 @@ const QuestionBankEditPage: React.FC = () => {
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow flex items-center justify-center">
-          <LoadingSpinner />
+          <LoadingSpinner message="Loading question bank..." />
         </main>
       </div>
     );
@@ -219,15 +219,23 @@ const QuestionBankEditPage: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <ErrorMessage message={error} onDismiss={() => setError(null)} />
-          <Button
-            onClick={() => navigate(-1)}
-            variant="secondary"
-            className="mt-4"
-          >
-            Go Back
-          </Button>
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 className="text-2xl font-bold text-red-600">
+              Error Loading Bank
+            </h1>
+          </div>
+          <Card className="p-6">
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+            <div className="mt-6">
+              <Button
+                onClick={() => navigate("/quiz-management")}
+                variant="secondary"
+              >
+                &larr; Back to Quiz & Bank Management
+              </Button>
+            </div>
+          </Card>
         </main>
       </div>
     );
@@ -237,166 +245,144 @@ const QuestionBankEditPage: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <p>Question bank not found.</p>
-          <Button
-            onClick={() => navigate(-1)}
-            variant="secondary"
-            className="mt-4"
-          >
-            Go Back
-          </Button>
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h1 className="text-2xl font-bold text-gray-700">
+              Question Bank Not Found
+            </h1>
+          </div>
+          <Card className="p-6">
+            <p>The requested question bank could not be found.</p>
+            <div className="mt-6">
+              <Button
+                onClick={() => navigate("/quiz-management")}
+                variant="secondary"
+              >
+                &larr; Back to Quiz & Bank Management
+              </Button>
+            </div>
+          </Card>
         </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <Button
-          onClick={() => navigate("/quiz-management")}
-          variant="secondary"
-          className="mb-6"
-        >
-          &larr; Back to Management
-        </Button>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        <div className="mb-4">
+          <Button
+            variant="secondary"
+            onClick={() => navigate(`/question-banks/${bankId}`)}
+            className="text-sm"
+          >
+            &larr; Back to Bank Details
+          </Button>
+        </div>
 
-        <Card className="mb-8 p-6">
-          {isEditingDetails ? (
-            <EditQuestionBankDetailsForm
-              bank={bank}
-              onBankUpdated={handleBankDetailsUpdated}
-              onCancel={() => {
-                setIsEditingDetails(false);
-                setError(null);
-              }}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+            Edit Question Bank: {bank.name}
+          </h1>
+        </div>
+
+        {successMessage && (
+          <div className="mb-4">
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={() => setSuccessMessage(null)}
             />
-          ) : (
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  {bank.name}
-                </h1>
-                <p className="text-gray-600 mb-1">
-                  <strong>Description:</strong> {bank.description || "N/A"}
-                </p>
-                <p className="text-sm text-gray-500 mb-1">
-                  <strong>Categories:</strong>{" "}
-                  {bank.categories?.join(", ") || "N/A"}
-                </p>
-                <p className="text-sm text-gray-500">
-                  <strong>Questions:</strong>{" "}
-                  {Array.isArray(bank.questions)
-                    ? bank.questions.length
-                    : bank.questionCount || 0}
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                onClick={() => setIsEditingDetails(true)}
-              >
-                Edit Details
-              </Button>
-            </div>
-          )}
+          </div>
+        )}
+        {error && !questionManagementError && (
+          <div className="mb-4">
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+          </div>
+        )}
+
+        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-8">
+          <EditQuestionBankDetailsForm
+            bank={bank}
+            onBankUpdated={handleBankDetailsUpdated}
+            onCancel={() => setIsEditingDetails(false)}
+          />
         </Card>
 
-        {error && (
-          <ErrorMessage message={error} onDismiss={() => setError(null)} />
-        )}
-        {successMessage && (
-          <SuccessNotification
-            message={successMessage}
-            onDismiss={() => setSuccessMessage(null)}
-          />
-        )}
-
-        <section>
+        <Card className="p-4 sm:p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-700">
+            <h2 className="text-2xl font-semibold text-gray-800">
               Manage Questions
             </h2>
-            <Button
-              variant="primary"
-              onClick={openAddManualQuestionModal}
-              disabled={isProcessingAddQuestion || !bank}
-            >
-              Add Manual Question
+            <Button variant="primary" onClick={openAddManualQuestionModal}>
+              Add New Question to Bank
             </Button>
           </div>
 
           {questionManagementError && (
-            <ErrorMessage
-              message={questionManagementError}
-              onDismiss={() => setQuestionManagementError(null)}
-            />
-          )}
-          {isProcessingAddQuestion && (
-            <LoadingSpinner message="Adding question to bank..." />
+            <div className="mb-4">
+              <ErrorMessage
+                message={questionManagementError}
+                onDismiss={() => setQuestionManagementError(null)}
+              />
+            </div>
           )}
 
-          <Card className="p-6 bg-white rounded-lg shadow">
-            {isLoading && bank && <LoadingSpinner />}
-            {!isLoading &&
-            bank &&
-            bank.questions &&
-            Array.isArray(bank.questions) &&
-            bank.questions.length > 0 ? (
-              <ul className="space-y-3">
-                {(bank.questions as IQuestion[]).map((q, index) => (
-                  <li
-                    key={q._id || index}
-                    className="p-3 border rounded-md shadow-sm bg-gray-50 flex justify-between items-center"
-                  >
-                    <p className="font-medium text-gray-800">
-                      {index + 1}. {q.questionText} (Type: {q.questionType})
-                    </p>
-                    <div className="space-x-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => openEditQuestionModal(q)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => openRemoveConfirmModal(q)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              !isLoading && (
-                <p className="text-center text-gray-500">
-                  This question bank currently has no questions.
-                </p>
-              )
-            )}
-          </Card>
-        </section>
+          {bank.questions && bank.questions.length > 0 ? (
+            <ul className="space-y-3">
+              {(bank.questions as IQuestion[]).map((q) => (
+                <li
+                  key={q._id}
+                  className="bg-white shadow-md rounded-lg p-3 flex justify-between items-center hover:shadow-lg transition-shadow duration-200"
+                >
+                  <span className="text-gray-700 flex-grow mr-4 truncate">
+                    {q.questionText}
+                  </span>
+                  <div className="flex space-x-2 flex-shrink-0">
+                    <Button
+                      variant="secondary"
+                      onClick={() => openEditQuestionModal(q)}
+                      className="text-xs px-2 py-1"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => openRemoveConfirmModal(q)}
+                      className="text-xs px-2 py-1"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-center text-gray-500 py-10 border-2 border-dashed border-gray-200 rounded-lg">
+              No questions in this bank yet. Add some!
+            </p>
+          )}
+        </Card>
 
-        {isAddManualModalOpen && bank && (
-          <AddManualQuestionForm
-            initialBankCategories={bank.categories || []}
-            onQuestionAdded={handleManualQuestionCreatedAndAddToBank}
+        {isAddManualModalOpen && (
+          <Modal
+            isOpen={isAddManualModalOpen}
             onClose={closeAddManualQuestionModal}
-          />
+            title="Add New Question to Bank"
+          >
+            <AddManualQuestionForm
+              onQuestionAdded={handleManualQuestionCreatedAndAddToBank}
+              onClose={closeAddManualQuestionModal}
+              initialBankCategories={bank.categories}
+            />
+          </Modal>
         )}
 
         {isEditQuestionModalOpen && questionToEdit && (
           <Modal
             isOpen={isEditQuestionModalOpen}
             onClose={closeEditQuestionModal}
-            title={`Edit Question: ${questionToEdit.questionText.substring(
-              0,
-              30
-            )}...`}
-            size="xl"
+            title="Edit Question"
           >
             <EditQuestionForm
               questionToEdit={questionToEdit}
@@ -406,19 +392,21 @@ const QuestionBankEditPage: React.FC = () => {
           </Modal>
         )}
 
-        {isRemoveConfirmModalOpen && questionToRemove && bank && (
+        {isRemoveConfirmModalOpen && questionToRemove && (
           <Modal
             isOpen={isRemoveConfirmModalOpen}
             onClose={closeRemoveConfirmModal}
             title="Confirm Remove Question"
           >
             <ConfirmationModalContent
-              message={`Are you sure you want to remove the question "${questionToRemove.questionText}" from the bank "${bank.name}"?`}
+              title="Confirm Remove Question"
+              message={`Are you sure you want to remove the question: "${questionToRemove.questionText}"? This action cannot be undone.`}
               onConfirm={confirmRemoveQuestionFromBank}
               onCancel={closeRemoveConfirmModal}
-              confirmText="Remove Question"
-              confirmButtonVariant="destructive"
+              confirmText="Remove"
+              cancelText="Cancel"
               isLoadingConfirm={isProcessingRemove}
+              confirmButtonVariant="destructive"
             />
           </Modal>
         )}

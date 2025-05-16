@@ -321,6 +321,7 @@ export interface ClientIQuiz {
   createdAt?: string;
   updatedAt?: string;
   isAssigned?: boolean;
+  averageScore?: number | null; // ADDED for staff's average score on this quiz
 }
 
 // Data structure for creating a quiz from question banks via the API
@@ -368,14 +369,29 @@ export const updateQuizDetails = async (
   quizId: string,
   quizData: Partial<ClientIQuiz>
 ): Promise<ClientIQuiz> => {
-  // MODIFIED: Changed from api.patch to api.put
-  // The PUT route on the backend is designed to handle these fields.
+  // Changed to PUT as the backend PUT route handles comprehensive updates
   const response = await api.put<{ message: string; quiz: ClientIQuiz }>(
     `/quizzes/${quizId}`,
     quizData
   );
-  // The PUT route returns { message: string, quiz: ClientIQuiz }, so we extract quiz
-  return response.data.quiz;
+  return response.data.quiz; // Return the updated quiz data
+};
+
+/**
+ * Resets all staff progress and attempts for a specific quiz.
+ * @param quizId The ID of the quiz to reset progress for.
+ */
+export const resetQuizProgress = async (
+  quizId: string
+): Promise<{
+  message: string;
+  data: { resetProgressCount: number; resetAttemptsCount: number };
+}> => {
+  const response = await api.patch<{
+    message: string;
+    data: { resetProgressCount: number; resetAttemptsCount: number };
+  }>(`/quizzes/${quizId}/reset-progress`);
+  return response.data; // The backend sends { status, message, data: {counts} }
 };
 
 // New types and services for staff dashboard
@@ -406,6 +422,7 @@ export interface ClientStaffQuizProgress {
   lastActivityDateForDailyReset?: string;
   createdAt?: string;
   updatedAt?: string;
+  averageScore?: number | null; // ADDED: Average score for this quiz
 }
 
 /**

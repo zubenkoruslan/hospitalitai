@@ -54,8 +54,8 @@ const QuizTakingPage: React.FC = () => {
   // const location = useLocation(); // Potentially for quizTitle
 
   // const [quizData, setQuizData] = useState<QuizForTaking | null>(null); // Old
-  const [quizTitle, setQuizTitle] = useState<string>(""); // To store quiz title if needed from somewhere, or pass via route state
-  const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]); // New state for questions
+  const [quizTitle, setQuizTitle] = useState<string>("Quiz Attempt"); // Default title
+  const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,17 +100,28 @@ const QuizTakingPage: React.FC = () => {
     setQuestions([]);
     setUserAnswers({});
     setSubmissionResult(null);
-    setCurrentQuestionIndex(0); // Reset index
+    setCurrentQuestionIndex(0);
     startTimeRef.current = Date.now();
-
-    // const { quizTitleFromState } = (location.state as { quizTitleFromState?: string }) || {};
-    // if (quizTitleFromState) setQuizTitle(quizTitleFromState);
-    // else { /* Fetch quiz title if needed via another API call using quizId */ }
+    // Reset title to default before fetching new questions
+    setQuizTitle("Quiz Attempt");
 
     try {
       const fetchedQuestions = await startQuizAttempt(quizId);
       if (fetchedQuestions && fetchedQuestions.length > 0) {
         setQuestions(fetchedQuestions);
+        // Derive quizTitle from the first question's category
+        if (
+          fetchedQuestions[0].categories &&
+          fetchedQuestions[0].categories.length > 0
+        ) {
+          setQuizTitle(`${fetchedQuestions[0].categories[0]} Quiz`);
+        } else {
+          // Fallback if no category, or fetch quiz details separately for a more generic title
+          // For now, "Quiz Attempt" is fine if no specific category, or could try fetching quiz title
+          // If you have an endpoint like /api/quizzes/:quizId/details, you could fetch it here.
+          // const quizDetails = await api.get(`/quizzes/${quizId}/details`);
+          // if(quizDetails.data.title) setQuizTitle(quizDetails.data.title)
+        }
       } else {
         setError("No questions available for this quiz attempt.");
       }
@@ -300,122 +311,197 @@ const QuizTakingPage: React.FC = () => {
   // Determine if quiz is actively in progress for blocking purposes
   const isQuizInProgress = !submissionResult && !isSubmitting && !isCancelling;
 
-  // --- Render Logic ---
-  if (isLoading && !questions.length && !submissionResult)
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar
-          isBlockingNavigation={isQuizInProgress}
-          onAttemptBlockedNavigation={confirmNavigation}
-        />
-        <div className="flex-grow flex items-center justify-center">
-          <LoadingSpinner message="Loading quiz..." />
-        </div>
-      </div>
-    );
-  if (isLoading && submissionResult === undefined)
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar
-          isBlockingNavigation={isQuizInProgress}
-          onAttemptBlockedNavigation={confirmNavigation}
-        />
-        <div className="flex-grow flex items-center justify-center">
-          <LoadingSpinner message="Submitting answers..." />
-        </div>
-      </div>
-    );
-  if (error && !questions.length) return <ErrorMessage message={error} />;
+  // --- Helper function to determine if an option is selected ---
+  const isSelected = (
+    questionId: string,
+    optionId: string,
+    questionType: string
+  ): boolean => {
+    const currentAnswer = userAnswers[questionId];
+    if (questionType === "multiple-choice-multiple") {
+      return (currentAnswer as string[])?.includes(optionId) || false;
+    }
+    return currentAnswer === optionId;
+  };
 
-  if (submissionResult) {
+  // --- Helper function to render answer text for review screen ---
+  const renderAnswer = (
+    answerData: any,
+    options: ClientQuestionOption[],
+    isCorrectAnswerDisplay = false // Flag to indicate if we are displaying the correct answer
+  ): string => {
+    if (answerData === null || answerData === undefined) {
+      return isCorrectAnswerDisplay ? "Not specified" : "Not answered";
+    }
+    if (Array.isArray(answerData)) {
+      // For multiple-choice-multiple
+      if (answerData.length === 0)
+        return isCorrectAnswerDisplay ? "None" : "No selection";
+      return answerData
+        .map((id) => options.find((opt) => opt._id === id)?.text || id)
+        .join(", ");
+    }
+    // For single-choice (MC-single, True/False)
     return (
-      <div className="min-h-screen flex flex-col bg-gray-100">
+      options.find((opt) => opt._id === answerData)?.text || String(answerData)
+    );
+  };
+
+  // --- Main Render ---
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center">
-          <Card className="w-full max-w-xl text-center p-6 md:p-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">
-              Quiz Completed!
+        <main className="flex-grow flex items-center justify-center max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          <LoadingSpinner message="Loading quiz questions..." />
+        </main>
+      </div>
+    );
+  }
+
+  // Error state after loading
+  if (error && !submissionResult) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Error Loading Quiz
             </h1>
-            <p className="text-xl text-gray-700 mb-2">
-              Your Score: {submissionResult.score} /{" "}
-              {submissionResult.totalQuestionsAttempted}
-            </p>
-            <p className="text-lg text-gray-600 mb-6">
-              Thank you for completing the quiz.
-            </p>
-            {/* Detailed results can be shown here by mapping submissionResult.questions */}
-            {submissionResult.questions &&
-              submissionResult.questions.length > 0 && (
-                <div className="mt-6 text-left">
-                  <h3 className="text-xl font-semibold mb-3">
-                    Review Your Answers:
-                  </h3>
-                  <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                    {submissionResult.questions.map((gradedQ, index) => {
-                      const originalQuestion = questions.find(
-                        (q) => q._id === gradedQ.questionId
-                      );
-                      return (
-                        <li
-                          key={gradedQ.questionId}
-                          className={`p-3 rounded-md border ${
-                            gradedQ.isCorrect
-                              ? "bg-green-50 border-green-300"
-                              : "bg-red-50 border-red-300"
-                          }`}
-                        >
-                          <p className="font-semibold">
-                            {index + 1}.{" "}
-                            {originalQuestion?.questionText ||
-                              "Question not found"}
-                          </p>
-                          <p className="text-sm">
-                            Your answer:{" "}
-                            {gradedQ.answerGiven === null ? (
-                              <em className="text-gray-500">Not answered</em>
-                            ) : (
-                              JSON.stringify(gradedQ.answerGiven)
-                            )}
-                          </p>
-                          {!gradedQ.isCorrect &&
-                            gradedQ.correctAnswer !== undefined && (
-                              <p className="text-sm text-green-700 font-medium">
-                                Correct answer:{" "}
-                                {JSON.stringify(gradedQ.correctAnswer)}
-                              </p>
-                            )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            <Button
-              variant="primary"
-              onClick={() => navigate("/staff/dashboard")}
-              className="mt-8"
-            >
-              Back to Dashboard
-            </Button>
+          </div>
+          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+            <div className="mt-8 text-center">
+              <Button
+                onClick={() => navigate("/staff/dashboard")}
+                variant="secondary"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
           </Card>
         </main>
       </div>
     );
   }
 
-  // Add early return if questions are null
-  if (!questions.length) {
+  // --- Submission Result Screen ---
+  if (submissionResult) {
+    const {
+      score,
+      totalQuestionsAttempted,
+      questions: gradedQuestions,
+    } = submissionResult;
+    const percentage =
+      totalQuestionsAttempted > 0 ? (score / totalQuestionsAttempted) * 100 : 0;
+
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-100 flex flex-col">
         <Navbar />
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 flex justify-center items-start">
-          <ErrorMessage message="Quiz data could not be loaded." />
-        </div>
+        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-green-600">
+              Quiz Completed!
+            </h1>
+            <p className="mt-2 text-xl text-gray-700">
+              Your Score: {score} / {totalQuestionsAttempted} (
+              {percentage.toFixed(1)}%)
+            </p>
+          </div>
+
+          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
+              Review Your Answers
+            </h2>
+            {gradedQuestions && gradedQuestions.length > 0 ? (
+              <div className="space-y-4">
+                {gradedQuestions.map((q, index) => (
+                  <div
+                    key={q.questionId}
+                    className={`p-4 rounded-lg shadow-sm ${
+                      q.isCorrect
+                        ? "bg-green-50 border-l-4 border-green-400"
+                        : "bg-red-50 border-l-4 border-red-400"
+                    }`}
+                  >
+                    <p className="font-semibold text-gray-800 mb-1">
+                      Question {index + 1}:{" "}
+                      {questions.find((origQ) => origQ._id === q.questionId)
+                        ?.questionText || "Question text not found"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Your answer:{" "}
+                      {renderAnswer(
+                        q.answerGiven,
+                        questions.find((origQ) => origQ._id === q.questionId)
+                          ?.options || []
+                      )}
+                    </p>
+                    {!q.isCorrect && (
+                      <p className="text-sm text-red-600 font-medium">
+                        Correct answer:{" "}
+                        {renderAnswer(
+                          q.correctAnswer,
+                          questions.find((origQ) => origQ._id === q.questionId)
+                            ?.options || [],
+                          true
+                        )}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500">
+                No graded questions to display.
+              </p>
+            )}
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <Button
+                onClick={() => navigate("/staff/dashboard")}
+                variant="primary"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </Card>
+        </main>
       </div>
     );
   }
 
+  // --- Current Question Display ---
   const currentQuestion = questions[currentQuestionIndex];
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Loading Question...
+            </h1>
+          </div>
+          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8 text-center">
+            <LoadingSpinner message="Preparing question..." />
+            <p className="mt-4 text-gray-600">
+              If this persists, please try returning to the dashboard.
+            </p>
+            <div className="mt-8 text-center">
+              <Button
+                onClick={() => navigate("/staff/dashboard")}
+                variant="secondary"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   const totalQuestions = questions.length;
   const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
@@ -423,144 +509,139 @@ const QuizTakingPage: React.FC = () => {
     (ans) => ans !== undefined && ans !== null
   );
 
-  if (!currentQuestion) {
-    if (isLoading)
-      return <LoadingSpinner message="Loading current question..." />;
-    if (error) return <ErrorMessage message={error} />;
-    return <ErrorMessage message="Could not load current question." />;
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar
         isBlockingNavigation={isQuizInProgress}
         onAttemptBlockedNavigation={confirmNavigation}
       />
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0 flex justify-center">
-          <Card className="shadow-xl w-full max-w-2xl overflow-hidden flex flex-col p-0">
-            <div className="px-6 py-4 border-b">
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-1">
-                  {currentQuestion.questionText}
-                </h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Question Type: {currentQuestion.questionType}
-                </p>
-              </div>
+      <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
+        {/* Page Title Header */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                {quizTitle}
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </p>
             </div>
-            <div className="px-6 py-4 flex-1 space-y-3">
-              {currentQuestion.options.map(
-                (option: ClientQuestionOption, index: number) => {
-                  const isSelected =
-                    userAnswers[currentQuestion._id] === option.text;
-                  return (
-                    <div
-                      key={option._id}
-                      className={`flex items-center p-3 border rounded-md hover:bg-gray-100 cursor-pointer transition duration-150 ease-in-out ${
-                        isSelected
-                          ? "bg-blue-50 border-blue-300 ring-2 ring-blue-200"
-                          : "border-gray-300"
-                      }`}
-                      onClick={() =>
-                        handleAnswerSelect(
-                          currentQuestion._id,
-                          option.text,
-                          currentQuestion.questionType
-                        )
-                      }
-                    >
-                      <input
-                        type={
-                          currentQuestion.questionType ===
-                          "multiple-choice-multiple"
-                            ? "checkbox"
-                            : "radio"
-                        }
-                        name={`question-${currentQuestion._id}${
-                          currentQuestion.questionType !==
-                          "multiple-choice-multiple"
-                            ? ""
-                            : "-" + option._id
-                        }`}
-                        value={option.text}
-                        checked={isSelected}
-                        onChange={() =>
-                          handleAnswerSelect(
-                            currentQuestion._id,
-                            option.text,
-                            currentQuestion.questionType
-                          )
-                        }
-                        className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-0 disabled:opacity-50 mr-3"
-                        disabled={isSubmitting || !!submissionResult}
-                      />
-                      <span className="text-gray-700 flex-grow">
-                        {option.text}
-                      </span>
-                    </div>
-                  );
-                }
-              )}
+            <div>
+              <Button
+                onClick={handleCancelQuiz}
+                variant="secondary"
+                className="text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-300"
+                disabled={isCancelling || isSubmitting}
+              >
+                {isCancelling ? "Cancelling..." : "Cancel & Exit"}
+              </Button>
             </div>
-            {submitError && (
-              <div className="px-6 pb-4">
-                <ErrorMessage
-                  message={submitError}
-                  onDismiss={() => setSubmitError(null)}
-                />
-              </div>
-            )}
-            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={goToPreviousQuestion}
-                  disabled={currentQuestionIndex === 0}
-                >
-                  Previous
-                </Button>
-
-                <span className="text-sm text-gray-500">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
-                </span>
-
-                {isLastQuestion ? (
-                  <Button
-                    variant="success"
-                    onClick={handleSubmit}
-                    isLoading={isSubmitting}
-                    disabled={!!submissionResult || isSubmitting}
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit Quiz"}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    onClick={goToNextQuestion}
-                    disabled={isLastQuestion}
-                  >
-                    Next
-                  </Button>
-                )}
-              </div>
-              <div className="text-right">
-                <Button
-                  variant="destructive"
-                  onClick={handleCancelQuiz}
-                  disabled={isCancelling}
-                  className="mb-1"
-                >
-                  {isCancelling ? "Cancelling..." : "Cancel Quiz"}
-                </Button>
-                <p className="text-xs text-gray-500">
-                  (Cancelling saves attempt as is)
-                </p>
-              </div>
-            </div>
-          </Card>
+          </div>
         </div>
+
+        {/* Main Quiz Content Card */}
+        <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
+          {submitError && (
+            <div className="mb-6">
+              <ErrorMessage
+                message={submitError}
+                onDismiss={() => setSubmitError(null)}
+              />
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+              {currentQuestion.questionText}
+            </h2>
+            <div className="space-y-4 mb-8">
+              {currentQuestion.options.map((option) => (
+                <label
+                  key={option._id}
+                  className={`flex items-center p-4 rounded-lg border transition-all duration-150 cursor-pointer 
+                              ${
+                                isSelected(
+                                  currentQuestion._id,
+                                  option._id,
+                                  currentQuestion.questionType
+                                )
+                                  ? "bg-blue-50 border-blue-500 ring-2 ring-blue-400 shadow-md"
+                                  : "bg-gray-50 border-gray-300 hover:border-gray-400 hover:bg-gray-100"
+                              }`}
+                >
+                  <input
+                    type={
+                      currentQuestion.questionType ===
+                      "multiple-choice-multiple"
+                        ? "checkbox"
+                        : "radio"
+                    }
+                    name={`question-${currentQuestion._id}`}
+                    value={option._id}
+                    checked={isSelected(
+                      currentQuestion._id,
+                      option._id,
+                      currentQuestion.questionType
+                    )}
+                    onChange={() =>
+                      handleAnswerSelect(
+                        currentQuestion._id,
+                        option._id,
+                        currentQuestion.questionType
+                      )
+                    }
+                    className={`form-radio h-5 w-5 text-blue-600 mr-4 focus:ring-blue-500 focus:ring-offset-2 ${
+                      isSelected(
+                        currentQuestion._id,
+                        option._id,
+                        currentQuestion.questionType
+                      )
+                        ? "border-blue-500"
+                        : "border-gray-400"
+                    }`}
+                  />
+                  <span className="text-gray-800 text-md">{option.text}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="mt-8 pt-6 border-t border-gray-300 flex justify-between items-center">
+            <Button
+              onClick={goToPreviousQuestion}
+              disabled={currentQuestionIndex === 0 || isSubmitting}
+              variant="secondary"
+              className="py-2 px-4 text-sm"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </span>
+            {currentQuestionIndex === questions.length - 1 ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                variant="primary"
+                className="py-2 px-4 text-sm"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Answers"}
+              </Button>
+            ) : (
+              <Button
+                onClick={goToNextQuestion}
+                disabled={isSubmitting}
+                variant="primary"
+                className="py-2 px-4 text-sm"
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </Card>
       </main>
     </div>
   );

@@ -8,6 +8,7 @@ interface UseMenuDataReturn {
   loading: boolean;
   error: string | null;
   fetchData: () => void;
+  clearError: () => void;
 }
 
 // Define the expected response structure from the single API call
@@ -74,5 +75,9 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
     fetchData();
   }, [fetchData]); // Re-fetch if menuId changes (fetchData dependency includes menuId)
 
-  return { menuDetails, items, loading, error, fetchData };
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return { menuDetails, items, loading, error, fetchData, clearError };
 }

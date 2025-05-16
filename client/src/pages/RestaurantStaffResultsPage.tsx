@@ -163,20 +163,22 @@ const RestaurantStaffResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       <Navbar />
-      <main className="flex-1 p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
-            Staff Quiz Results
-          </h1>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        <div>
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+              Staff Quiz Results
+            </h1>
+          </div>
+
           {loading && <LoadingSpinner message="Loading staff results..." />}
           {error && <ErrorMessage message={error} />}
           {!loading && !error && (
             <>
-              {/* Chart Toggle */}
-              <div className="mb-4">
+              <div className="mb-4 flex justify-end">
                 <button
                   onClick={() => setShowChart(!showChart)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                 >
                   {showChart
                     ? "Hide Performance Chart"
@@ -184,40 +186,31 @@ const RestaurantStaffResultsPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Performance Chart */}
               {showChart && (
                 <ScoreDistributionChart
-                  staffData={staffData} // Use staffData from hook
+                  staffData={staffData}
                   selectedCategory={selectedPerformanceCategory}
                   onSelectCategory={setSelectedPerformanceCategory}
                 />
               )}
 
-              {/* Filters */}
-              <StaffResultsFilter
-                filters={filters}
-                staffData={staffData}
-                selectedCategory={selectedPerformanceCategory}
-                onFilterChange={handleFilterChange}
-                onCategoryChange={setSelectedPerformanceCategory}
-                onResetFilters={resetFilters}
-              />
-
-              {/* Use Card to wrap the table container */}
-              <Card className="p-0 overflow-hidden">
-                {filteredAndSortedStaff.length > 0 ? (
-                  <StaffResultsTable
-                    staff={filteredAndSortedStaff} // Uses derived data
-                    expandedStaffId={expandedStaffId}
-                    onToggleExpand={toggleExpand}
-                  />
-                ) : (
-                  <p className="text-center text-gray-500 py-6 px-4">
-                    {filters.name || filters.role || selectedPerformanceCategory
-                      ? "No staff members match the selected filters."
-                      : "No staff members found."}
-                  </p>
-                )}
+              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mt-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                  Detailed Staff Performance
+                </h2>
+                <StaffResultsFilter
+                  filters={filters}
+                  staffData={staffData}
+                  selectedCategory={selectedPerformanceCategory}
+                  onFilterChange={handleFilterChange}
+                  onCategoryChange={setSelectedPerformanceCategory}
+                  onResetFilters={resetFilters}
+                />
+                <StaffResultsTable
+                  staff={filteredAndSortedStaff}
+                  expandedStaffId={expandedStaffId}
+                  onToggleExpand={toggleExpand}
+                />
               </Card>
             </>
           )}

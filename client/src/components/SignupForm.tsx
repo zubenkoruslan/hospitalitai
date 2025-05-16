@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Button from "./common/Button";
 import ErrorMessage from "./common/ErrorMessage";
+import { FaSpinner } from "react-icons/fa";
 // import { useAuth } from '../context/AuthContext'; // Import if login on signup is needed
 
 const SignupForm: React.FC = () => {
@@ -89,14 +90,14 @@ const SignupForm: React.FC = () => {
 
   // Style constants for reuse (adjust as needed)
   const inputClasses =
-    "appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
-  const labelClasses = "block text-sm font-medium text-gray-700";
+    "appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out";
+  const labelClasses = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 shadow-md rounded-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg w-full space-y-8 bg-white p-10 shadow-xl rounded-2xl">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-700">
             Create your account
           </h2>
         </div>
@@ -106,8 +107,8 @@ const SignupForm: React.FC = () => {
           {/* Role Selection */}
           <div className="space-y-2">
             <label className={labelClasses}>I am a:</label>
-            <div className="flex items-center justify-around space-x-4 bg-gray-50 p-2 rounded-md">
-              <label className="flex items-center cursor-pointer">
+            <div className="flex items-center justify-around space-x-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <label className="flex items-center cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
                 <input
                   type="radio"
                   name="role"
@@ -115,11 +116,11 @@ const SignupForm: React.FC = () => {
                   checked={role === "staff"}
                   onChange={() => setRole("staff")}
                   disabled={isLoading}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-1"
                 />
-                <span className="ml-2 text-sm text-gray-700">Staff</span>
+                <span className="ml-2 text-sm text-gray-700">Staff Member</span>
               </label>
-              <label className="flex items-center cursor-pointer">
+              <label className="flex items-center cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
                 <input
                   type="radio"
                   name="role"
@@ -127,10 +128,10 @@ const SignupForm: React.FC = () => {
                   checked={role === "restaurant"}
                   onChange={() => setRole("restaurant")}
                   disabled={isLoading}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-1"
                 />
                 <span className="ml-2 text-sm text-gray-700">
-                  Owner/Manager
+                  Restaurant Owner/Manager
                 </span>
               </label>
             </div>
@@ -141,66 +142,74 @@ const SignupForm: React.FC = () => {
             <label htmlFor="name" className={labelClasses}>
               Full Name
             </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              required
-              className={inputClasses}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="mt-1">
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                className={inputClasses}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="email" className={labelClasses}>
               Email address
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className={inputClasses}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="mt-1">
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className={inputClasses}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="password" className={labelClasses}>
               Password (min. 6 characters)
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={6}
-              className={inputClasses}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="mt-1">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                className={inputClasses}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="confirmPassword" className={labelClasses}>
               Confirm Password
             </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              className={inputClasses}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="mt-1">
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                className={inputClasses}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
           {/* Conditional Fields */}
@@ -209,50 +218,62 @@ const SignupForm: React.FC = () => {
               <label htmlFor="restaurantName" className={labelClasses}>
                 Restaurant Name
               </label>
-              <input
-                id="restaurantName"
-                name="restaurantName"
-                type="text"
-                required={role === "restaurant"}
-                className={inputClasses}
-                value={restaurantName}
-                onChange={(e) => setRestaurantName(e.target.value)}
-                disabled={isLoading}
-              />
+              <div className="mt-1">
+                <input
+                  id="restaurantName"
+                  name="restaurantName"
+                  type="text"
+                  required={role === "restaurant"}
+                  className={`${inputClasses} ${
+                    role !== "restaurant" ? "bg-gray-100" : ""
+                  }`}
+                  value={restaurantName}
+                  onChange={(e) => setRestaurantName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           )}
           {role === "staff" && (
             <>
               <div>
                 <label htmlFor="restaurantId" className={labelClasses}>
-                  Restaurant ID (Provided by Manager)
+                  Restaurant ID (provided by your manager)
                 </label>
-                <input
-                  id="restaurantId"
-                  name="restaurantId"
-                  type="text"
-                  required={role === "staff"}
-                  className={inputClasses}
-                  value={restaurantId}
-                  onChange={(e) => setRestaurantId(e.target.value)}
-                  disabled={isLoading}
-                />
+                <div className="mt-1">
+                  <input
+                    id="restaurantId"
+                    name="restaurantId"
+                    type="text"
+                    required={role === "staff"}
+                    className={`${inputClasses} ${
+                      role !== "staff" ? "bg-gray-100" : ""
+                    }`}
+                    value={restaurantId}
+                    onChange={(e) => setRestaurantId(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="professionalRole" className={labelClasses}>
-                  Your Professional Role
+                  Your Professional Role (e.g., Chef, Waiter)
                 </label>
-                <input
-                  id="professionalRole"
-                  name="professionalRole"
-                  type="text"
-                  required={role === "staff"}
-                  placeholder="E.g., Waiter, Chef, Supervisor"
-                  className={inputClasses}
-                  value={professionalRole}
-                  onChange={(e) => setProfessionalRole(e.target.value)}
-                  disabled={isLoading}
-                />
+                <div className="mt-1">
+                  <input
+                    id="professionalRole"
+                    name="professionalRole"
+                    type="text"
+                    required={role === "staff"}
+                    placeholder="E.g., Waiter, Chef, Supervisor"
+                    className={`${inputClasses} ${
+                      role !== "staff" ? "bg-gray-100" : ""
+                    }`}
+                    value={professionalRole}
+                    onChange={(e) => setProfessionalRole(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             </>
           )}
@@ -261,10 +282,14 @@ const SignupForm: React.FC = () => {
             <Button
               type="submit"
               variant="primary"
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50"
               disabled={isLoading}
-              className="w-full flex justify-center"
             >
-              {isLoading ? "Signing up..." : "Sign Up"}
+              {isLoading ? (
+                <FaSpinner className="animate-spin h-5 w-5 mr-3" />
+              ) : (
+                "Create Account"
+              )}
             </Button>
           </div>
         </form>

@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
+import Card from "../components/common/Card";
 
 // --- Interfaces ---
 interface StaffMemberSummary {
@@ -108,19 +109,11 @@ const StaffManagement: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
             Staff Management
           </h1>
-          {/* Add New Staff Button Removed */}
-          {/* <button
-            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:opacity-50"
-            disabled
-            aria-label="Add New Staff (disabled)"
-          >
-            + Add New Staff
-          </button> */}
         </div>
 
         {error && <ErrorMessage message={error} />}
@@ -130,7 +123,7 @@ const StaffManagement: React.FC = () => {
             <LoadingSpinner message="Refreshing staff list..." />
           </div>
         ) : (
-          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
             {staffList.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -204,11 +197,11 @@ const StaffManagement: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-6 px-4">
-                No staff members found.
+              <p className="text-center text-gray-500 py-10">
+                {error ? "Could not load staff." : "No staff members found."}
               </p>
             )}
-          </div>
+          </Card>
         )}
       </main>
     </div>

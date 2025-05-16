@@ -302,3 +302,49 @@ export const getRestaurantQuizStaffProgressController = async (
     next(error);
   }
 };
+
+export const resetQuizProgressController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { quizId } = req.params;
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError(
+          "User not authenticated or restaurant association missing for this action.",
+          401
+        )
+      );
+    }
+    // Only users with a role that can manage quizzes (e.g., admin, owner, manager) should be able to do this.
+    // This should be enforced by a role-checking middleware applied to the route.
+    // For now, we assume the route is protected appropriately.
+
+    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
+      return next(new AppError("Valid Quiz ID is required.", 400));
+    }
+
+    const quizObjectId = new mongoose.Types.ObjectId(quizId);
+    const restaurantObjectId = new mongoose.Types.ObjectId(
+      req.user.restaurantId
+    );
+
+    const result = await QuizService.resetQuizProgressForEveryone(
+      quizObjectId,
+      restaurantObjectId
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: `Progress for quiz ${quizId} has been reset for all staff. ${result.resetProgressCount} progress records and ${result.resetAttemptsCount} attempts were cleared.`,
+      data: result,
+    });
+  } catch (error) {
+    if (!(error instanceof AppError)) {
+      console.error("Unexpected error in resetQuizProgressController:", error);
+    }
+    next(error);
+  }
+};

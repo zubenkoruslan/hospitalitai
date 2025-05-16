@@ -31,6 +31,7 @@ interface QuizListItem {
 // New interface for combining Quiz definition with its progress
 interface StaffQuizDisplayItem extends ClientIQuiz {
   progress?: ClientStaffQuizProgress | null;
+  averageScore?: number | null;
 }
 
 // Interface for Ranking Data
@@ -68,13 +69,22 @@ interface QuizItemProps {
 }
 
 const QuizItem: React.FC<QuizItemProps> = ({ quizDisplayItem, formatDate }) => {
-  const { title, description, numberOfQuestionsPerAttempt, progress } =
-    quizDisplayItem;
+  const { title, description, progress, averageScore } = quizDisplayItem;
+
+  // ADDED: Log quizId and title
+  useEffect(() => {
+    if (quizDisplayItem && quizDisplayItem._id && quizDisplayItem.title) {
+      console.log(
+        `QUIZ INFO: ID = ${quizDisplayItem._id}, Title = "${quizDisplayItem.title}", AvgScore = ${averageScore}%`
+      );
+    }
+  }, [quizDisplayItem, averageScore]);
+
   const isCompletedOverall = progress?.isCompletedOverall || false;
-  const questionsAnsweredToday = progress?.questionsAnsweredToday || 0;
   const seenQuestionsCount = progress?.seenQuestionIds?.length || 0;
   const totalUniqueInSource =
-    progress?.totalUniqueQuestionsInSource || numberOfQuestionsPerAttempt; // Fallback for display
+    progress?.totalUniqueQuestionsInSource ||
+    quizDisplayItem.numberOfQuestionsPerAttempt; // Fallback for display, use quizDisplayItem.numberOfQuestionsPerAttempt
 
   // Overall Progress calculation
   const overallProgressPercentage =
@@ -82,61 +92,74 @@ const QuizItem: React.FC<QuizItemProps> = ({ quizDisplayItem, formatDate }) => {
       ? Math.round((seenQuestionsCount / totalUniqueInSource) * 100)
       : 0;
 
-  // Daily Progress calculation (example)
-  const dailyProgressDisplay = `${questionsAnsweredToday} / ${numberOfQuestionsPerAttempt}`;
-
-  const commonClasses =
-    "px-4 py-4 sm:px-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-colors duration-150";
-  const clickableClasses = "hover:bg-gray-50";
-
   return (
-    <li
+    <div
       key={quizDisplayItem._id}
-      className={`${commonClasses} ${clickableClasses}`}
+      className="bg-white border border-gray-200 shadow-sm rounded-lg p-4 flex flex-col justify-between hover:shadow-lg transition-shadow duration-200 h-full"
     >
       {/* Quiz Info Section */}
-      <div className="flex-1 min-w-0 mb-3 sm:mb-0 sm:mr-4">
-        <h3 className="text-lg font-semibold text-gray-900 truncate">
+      <div className="flex-grow">
+        <h3
+          className="text-md font-semibold text-gray-800 mb-1 truncate"
+          title={title}
+        >
           {title}
         </h3>
         {description && (
-          <p className="text-sm text-gray-600 mt-1 truncate">{description}</p>
+          <p className="text-xs text-gray-600 mt-1 mb-2 line-clamp-2">
+            {description}
+          </p>
         )}
-        <p className="text-sm text-gray-500 mt-1">
-          Overall Progress: {seenQuestionsCount} / {totalUniqueInSource} (
-          {overallProgressPercentage}%)
-          {isCompletedOverall && (
-            <span className="ml-2 text-green-600 font-semibold">
-              (Completed)
+        <div className="mt-2 mb-3">
+          <div className="flex justify-between mb-1">
+            <span className="text-xs font-medium text-blue-700">
+              Overall Progress
             </span>
-          )}
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Questions per Attempt: {numberOfQuestionsPerAttempt}
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Answered Today: {dailyProgressDisplay}
-        </p>
+            <span className="text-xs font-medium text-blue-700">
+              {overallProgressPercentage}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${overallProgressPercentage}%` }}
+            ></div>
+          </div>
+          {/* {isCompletedOverall && (
+            <span className="block text-xxs text-green-600 font-semibold mt-1">
+              (Completed Overall)
+            </span>
+          )} */}
+        </div>
+
+        {averageScore !== null && averageScore !== undefined && (
+          <p className="text-xs text-gray-500 mt-1 mb-2">
+            Your Average Score:{" "}
+            <span
+              className={`font-semibold ${
+                averageScore >= 70 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {averageScore.toFixed(1)}%
+            </span>
+          </p>
+        )}
       </div>
 
-      {/* Action/Score Section */}
-      <div className="flex-shrink-0 flex flex-col items-stretch sm:items-end space-y-2 w-full sm:w-auto">
+      {/* Action Section */}
+      <div className="flex-shrink-0 mt-auto pt-3">
         {!isCompletedOverall ? (
           <Link
             to={`/staff/quiz/${quizDisplayItem._id}/take`}
-            className="w-full sm:w-auto"
+            className="w-full block"
           >
-            <Button variant="primary" className="w-full">
+            <Button variant="primary" className="w-full text-sm py-1.5">
               Take Quiz
             </Button>
           </Link>
-        ) : (
-          <Button variant="secondary" className="w-full" disabled>
-            Quiz Completed
-          </Button>
-        )}
+        ) : null}
       </div>
-    </li>
+    </div>
   );
 };
 
@@ -147,13 +170,16 @@ const StaffDashboard: React.FC = () => {
   // Log the user object to inspect its contents
   useEffect(() => {
     console.log("Auth User Object in StaffDashboard:", user);
+    if (user && user.userId) {
+      console.log("STAFF USER ID (Misha's UserID):", user.userId);
+    }
   }, [user]);
 
   // State for quizzes
   const [quizzes, setQuizzes] = useState<StaffQuizDisplayItem[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState<boolean>(true);
   const [quizError, setQuizError] = useState<string | null>(null);
-  const [isCompletedVisible, setIsCompletedVisible] = useState<boolean>(false); // State for collapsible section
+  // const [isCompletedVisible, setIsCompletedVisible] = useState<boolean>(false); // State for collapsible section - REMOVED FOR NOW, simplify
 
   // State for ranking
   const [rankingData, setRankingData] = useState<RankingData | null>(null);
@@ -161,13 +187,15 @@ const StaffDashboard: React.FC = () => {
   const [rankingError, setRankingError] = useState<string | null>(null);
 
   // State for Quiz Detail Modal
-  const [selectedResultIdForModal, setSelectedResultIdForModal] = useState<
-    string | null
-  >(null);
-  const [isQuizDetailModalOpen, setIsQuizDetailModalOpen] =
-    useState<boolean>(false);
+  // const [selectedResultIdForModal, setSelectedResultIdForModal] = useState<
+  //   string | null
+  // >(null);
+  // const [isQuizDetailModalOpen, setIsQuizDetailModalOpen] =
+  //   useState<boolean>(false);
 
-  // Fetch quizzes and ranking data
+  // Combined loading state
+  const isLoading = authIsLoading || loadingQuizzes || loadingRanking;
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user || user.role !== "staff") {
@@ -241,13 +269,13 @@ const StaffDashboard: React.FC = () => {
 
   // --- Modal Handlers ---
   const handleOpenQuizDetailModal = (resultId: string) => {
-    setSelectedResultIdForModal(resultId);
-    setIsQuizDetailModalOpen(true);
+    // setSelectedResultIdForModal(resultId);
+    // setIsQuizDetailModalOpen(true);
   };
 
   const handleCloseQuizDetailModal = () => {
-    setIsQuizDetailModalOpen(false);
-    setSelectedResultIdForModal(null);
+    // setIsQuizDetailModalOpen(false);
+    // setSelectedResultIdForModal(null);
   };
 
   // Show loading spinner if auth context is loading
@@ -275,108 +303,13 @@ const StaffDashboard: React.FC = () => {
     );
   }
 
-  // Display Quiz List - Modified
-  const renderQuizList = () => {
-    if (loadingQuizzes && !quizzes.length) {
-      return <LoadingSpinner />;
-    }
-    if (!quizzes.length && !quizError && !loadingQuizzes) {
-      return (
-        <Card>
-          <p className="text-center text-gray-500 py-8">
-            No quizzes available at the moment.
-          </p>
-        </Card>
-      );
-    }
-
-    const pendingQuizzes = quizzes.filter(
-      (quiz) => !quiz.progress?.isCompletedOverall
-    );
-    const completedQuizzes = quizzes.filter(
-      (quiz) => quiz.progress?.isCompletedOverall
-    );
-
-    return (
-      <div className="space-y-8">
-        {/* Pending Quizzes */}
-        <Card className="p-0 overflow-hidden">
-          <h3 className="text-md font-semibold text-gray-700 px-4 py-3 border-b bg-gray-50">
-            Pending Quizzes ({pendingQuizzes.length})
-          </h3>
-          {pendingQuizzes.length > 0 ? (
-            <ul className="divide-y divide-gray-200">
-              {pendingQuizzes.map((quiz) => (
-                <QuizItem
-                  key={quiz._id}
-                  quizDisplayItem={quiz}
-                  formatDate={formatDate}
-                />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-500 px-4 py-4">
-              No pending quizzes.
-            </p>
-          )}
-        </Card>
-
-        {/* Completed Quizzes (Collapsible) */}
-        {completedQuizzes.length > 0 && (
-          <Card className="p-0 overflow-hidden">
-            {completedQuizzes.length > 5 ? (
-              <button
-                onClick={() => setIsCompletedVisible(!isCompletedVisible)}
-                className="w-full px-4 py-3 border-b bg-gray-50 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                aria-expanded={isCompletedVisible}
-                aria-controls="completed-quizzes-list"
-              >
-                <h3 className="text-md font-semibold text-gray-700">
-                  Completed Quizzes ({completedQuizzes.length})
-                </h3>
-                {/* Chevron Icon */}
-                <svg
-                  className={`h-5 w-5 text-gray-500 transform transition-transform duration-150 ${
-                    isCompletedVisible ? "rotate-180" : ""
-                  }`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-            ) : (
-              <div className="w-full px-4 py-3 border-b bg-gray-50 text-left">
-                <h3 className="text-md font-semibold text-gray-700">
-                  Completed Quizzes ({completedQuizzes.length})
-                </h3>
-              </div>
-            )}
-            {/* Show list if 5 or less, OR if more than 5 AND isCompletedVisible is true */}
-            {(completedQuizzes.length <= 5 || isCompletedVisible) && (
-              <ul
-                id="completed-quizzes-list"
-                className="divide-y divide-gray-200 animate-fade-in-short"
-              >
-                {completedQuizzes.map((quiz) => (
-                  <QuizItem
-                    key={quiz._id}
-                    quizDisplayItem={quiz}
-                    formatDate={formatDate}
-                  />
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
-      </div>
-    );
-  };
+  // Calculate pending and completed quizzes
+  const pendingQuizzes = quizzes.filter(
+    (quiz) => !quiz.progress?.isCompletedOverall
+  );
+  const completedQuizzes = quizzes.filter(
+    (quiz) => quiz.progress?.isCompletedOverall
+  );
 
   // Display Ranking Info - Modified to remove Rank display
   const renderRankingInfo = () => {
@@ -420,57 +353,140 @@ const StaffDashboard: React.FC = () => {
     );
   };
 
+  // --- Main Render ---
+
+  if (isLoading && !user) {
+    // Show main loader if auth is still loading
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <LoadingSpinner message="Loading dashboard..." />
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar />
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        {/* Page Title Header */}
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+            Welcome, {user?.name || "Staff Member"}!
+          </h1>
+          <p className="mt-1 text-md text-gray-600">
+            Here are your available quizzes and performance summary.
+          </p>
+        </div>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0">
-          <div className="mb-6 pb-4 border-b border-gray-300">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Hello {user?.name?.split(" ")[0] || "User"}!
-            </h1>
-            {/* Display role and restaurant name */}
-            {user?.professionalRole && user?.restaurantName && (
-              <p className="text-md text-gray-500 italic">
-                {user.professionalRole} at {user.restaurantName}
-              </p>
-            )}
-            {/* Fallback if only one exists (optional) */}
-            {/* {user?.professionalRole && !user?.restaurantName && (
-              <p className="text-md text-gray-500 italic">{user.professionalRole}</p>
-            )}
-            {!user?.professionalRole && user?.restaurantName && (
-               <p className="text-lg text-gray-600">{user.restaurantName}</p> // Keep original style if only name exists
-            )} */}
-          </div>
+        {/* Combined Error Display for major errors */}
+        {(quizError && !rankingError) ||
+        (rankingError && !quizError) ||
+        (quizError && rankingError) ? (
+          <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
+            <ErrorMessage
+              message={
+                quizError && rankingError
+                  ? "Failed to load quiz and ranking data. Please try again later."
+                  : quizError || rankingError || "An unexpected error occurred."
+              }
+            />
+          </Card>
+        ) : null}
 
-          {/* Layout Container (e.g., Grid) - Reordered Sections */}
-          <div className="grid grid-cols-1 gap-6">
-            {/* Performance Summary Section (Top) */}
-            <section>
-              {/* Optional: Add a heading if desired */}
-              {/* <h2 className="text-xl font-semibold text-gray-800 mb-4">Summary</h2> */}
-              {renderRankingInfo()}
-            </section>
-
-            {/* Quiz List Section (Bottom) */}
-            <section>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                My Quizzes
+        {/* Main content layout: Performance Summary on top, then Quizzes */}
+        <div className="space-y-6">
+          {/* Performance Summary Section */}
+          <div>
+            {" "}
+            {/* Wrapper div for consistent spacing if needed, can be Card directly */}
+            <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                Your Performance Summary
               </h2>
-              {renderQuizList()}
-            </section>
+              {loadingRanking ? (
+                <div className="text-center py-10">
+                  <LoadingSpinner message="Loading performance data..." />
+                </div>
+              ) : rankingError ? (
+                <ErrorMessage message={rankingError} />
+              ) : (
+                renderRankingInfo()
+              )}
+            </Card>
           </div>
+
+          {/* Quizzes Section - Restructured into two cards */}
+          {loadingQuizzes && quizzes.length === 0 ? (
+            <div className="text-center py-10">
+              <LoadingSpinner message="Loading quizzes..." />
+            </div>
+          ) : !loadingQuizzes && quizzes.length === 0 && !quizError ? (
+            <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+              <p className="text-center text-gray-500 py-10">
+                No quizzes are currently assigned to you.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Pending Quizzes Card */}
+              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                  Pending Quizzes ({pendingQuizzes.length})
+                </h2>
+                {pendingQuizzes.length > 0 ? (
+                  <div className="space-y-4">
+                    {pendingQuizzes.map((quiz) => (
+                      <QuizItem
+                        key={quiz._id}
+                        quizDisplayItem={quiz}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-4">
+                    No pending quizzes. Great job!
+                  </p>
+                )}
+              </Card>
+
+              {/* Completed Quizzes Card */}
+              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                  Completed Quizzes ({completedQuizzes.length})
+                </h2>
+                {completedQuizzes.length > 0 ? (
+                  <div className="space-y-4">
+                    {completedQuizzes.map((quiz) => (
+                      <QuizItem
+                        key={quiz._id}
+                        quizDisplayItem={quiz}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-4">
+                    No quizzes completed yet. Keep learning!
+                  </p>
+                )}
+              </Card>
+            </div>
+          )}
         </div>
       </main>
-
-      {/* Quiz Detail Modal */}
-      <QuizResultDetailModal
-        resultId={selectedResultIdForModal}
-        isOpen={isQuizDetailModalOpen}
-        onClose={handleCloseQuizDetailModal}
-      />
+      {/* Removed QuizDetailModal for now to simplify, can be re-added if needed 
+      {selectedResultIdForModal && (
+        <QuizResultDetailModal
+          isOpen={isQuizDetailModalOpen}
+          onClose={handleCloseQuizDetailModal}
+          resultId={selectedResultIdForModal}
+        />
+      )}
+      */}
     </div>
   );
 };

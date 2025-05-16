@@ -14,6 +14,7 @@ import api, {
   ClientStaffQuizProgress,
   getQuestionBankById,
   updateQuizDetails,
+  resetQuizProgress,
 } from "../services/api";
 
 import {
@@ -215,6 +216,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
     setSelectedQuizForProgress(quiz);
     setIsStaffProgressModalOpen(true);
+    console.log("isStaffProgressModalOpen set to true");
     setIsLoadingStaffProgress(true);
     setStaffProgressError(null);
     setStaffProgressData(null);
@@ -241,6 +243,8 @@ const QuizAndBankManagementPage: React.FC = () => {
       return;
     }
 
+    const wasPreviouslyInactive = quizToActivate.isAvailable === false;
+
     try {
       const updatedQuiz = await updateQuizDetails(quizId, {
         isAvailable: true,
@@ -248,9 +252,27 @@ const QuizAndBankManagementPage: React.FC = () => {
       setQuizzes((prevQuizzes) =>
         prevQuizzes.map((q) => (q._id === quizId ? updatedQuiz : q))
       );
-      setSuccessMessage(
-        `Quiz "${updatedQuiz.title}" is now active and available to staff.`
-      );
+
+      let currentSuccessMessage = `Quiz "${updatedQuiz.title}" is now active and available to staff.`;
+
+      if (wasPreviouslyInactive) {
+        try {
+          // If quiz was inactive and is now active, reset its progress
+          const resetResult = await resetQuizProgress(quizId);
+          console.log("Quiz progress reset result:", resetResult);
+          currentSuccessMessage += ` All previous staff progress has been reset.`;
+        } catch (resetError: any) {
+          console.error(
+            "Failed to reset quiz progress after activation:",
+            resetError
+          );
+          // Append a warning to the success message, but don't block activation success
+          currentSuccessMessage += ` (Warning: an issue occurred trying to reset staff progress: ${
+            resetError.response?.data?.message || resetError.message
+          }).`;
+        }
+      }
+      setSuccessMessage(currentSuccessMessage);
     } catch (err: any) {
       console.error("Failed to activate quiz:", err);
       setError(
@@ -260,9 +282,39 @@ const QuizAndBankManagementPage: React.FC = () => {
     }
   };
 
-  const handleNavigateToManageQuestions = (bankId: string) => {
-    setIsNavigatingToBankEdit(bankId);
-    navigate(`/question-banks/${bankId}/edit`);
+  const handleDeactivateQuiz = async (quizId: string) => {
+    setError(null);
+    setSuccessMessage(null);
+    const quizToDeactivate = quizzes.find((q) => q._id === quizId);
+    if (!quizToDeactivate) {
+      setError("Quiz not found for deactivation.");
+      return;
+    }
+
+    try {
+      const updatedQuiz = await updateQuizDetails(quizId, {
+        isAvailable: false,
+      });
+      setQuizzes((prevQuizzes) =>
+        prevQuizzes.map((q) => (q._id === quizId ? updatedQuiz : q))
+      );
+      setSuccessMessage(
+        `Quiz "${updatedQuiz.title}" is now inactive and hidden from staff.`
+      );
+      // TODO: Add logic to reset progress if quiz is deactivated and then reactivated
+    } catch (err: any) {
+      console.error("Failed to deactivate quiz:", err);
+      setError(
+        err.response?.data?.message ||
+          `Failed to deactivate quiz "${quizToDeactivate.title}".`
+      );
+    }
+  };
+
+  const handleManageBankQuestions = (bankId: string) => {
+    // Instead of navigating to a separate edit page for questions,
+    // navigate to the bank detail page, which handles question management.
+    navigate(`/question-banks/${bankId}`);
   };
 
   // Renamed original onPreview to handleOpenEditQuizModal
@@ -277,10 +329,8 @@ const QuizAndBankManagementPage: React.FC = () => {
     if (isLoadingBanks && !questionBanks.length) return <LoadingSpinner />;
     if (!questionBanks.length && !error && !isLoadingBanks)
       return (
-        <Card className="p-4">
-          <p className="text-center text-gray-500">
-            No question banks found. Create one to get started!
-          </p>
+        <Card className="p-4 text-center text-gray-500">
+          No question banks found. Create one to get started!
         </Card>
       );
     return (
@@ -293,7 +343,7 @@ const QuizAndBankManagementPage: React.FC = () => {
         {questionBanks.map((bank) => (
           <Card
             key={bank._id}
-            className="p-4 md:p-5 hover:shadow-lg transition-shadow duration-200 ease-in-out"
+            className="bg-white shadow-lg rounded-xl p-4 md:p-5 hover:shadow-xl transition-shadow duration-300"
           >
             <div className="flex flex-col md:flex-row justify-between md:items-start gap-3 md:gap-4">
               <div className="flex-grow">
@@ -335,7 +385,7 @@ const QuizAndBankManagementPage: React.FC = () => {
               <div className="flex-shrink-0 flex flex-row sm:flex-row md:flex-col gap-2 mt-3 md:mt-0 w-full md:w-auto">
                 <Button
                   variant="secondary"
-                  onClick={() => handleNavigateToManageQuestions(bank._id)}
+                  onClick={() => handleManageBankQuestions(bank._id)}
                   isLoading={isNavigatingToBankEdit === bank._id}
                   disabled={
                     !!isNavigatingToBankEdit &&
@@ -362,11 +412,11 @@ const QuizAndBankManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="bg-white shadow rounded-lg p-6 mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
             Quiz & Question Bank Management
           </h1>
         </div>
@@ -379,7 +429,7 @@ const QuizAndBankManagementPage: React.FC = () => {
           />
         )}
 
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4 md:mb-6">
             <h2 className="text-2xl font-semibold text-gray-800">
               Question Banks
@@ -395,7 +445,7 @@ const QuizAndBankManagementPage: React.FC = () => {
           {renderQuestionBankList()}
         </div>
 
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4 md:mb-6">
             <h2 className="text-2xl font-semibold text-gray-800">Quizzes</h2>
             <Button
@@ -408,8 +458,8 @@ const QuizAndBankManagementPage: React.FC = () => {
           </div>
           {isLoadingQuizzes && quizzes.length === 0 && <LoadingSpinner />}
           {!isLoadingQuizzes && quizzes.length === 0 && !error && (
-            <Card>
-              <p>No quizzes found. Create one from your question banks!</p>
+            <Card className="p-4 text-center text-gray-500">
+              No quizzes found. Create one from your question banks!
             </Card>
           )}
           {!isLoadingQuizzes && quizzes.length > 0 && (
@@ -418,6 +468,7 @@ const QuizAndBankManagementPage: React.FC = () => {
               isLoading={isLoadingQuizzes}
               onPreview={handleOpenEditQuizModal}
               onActivate={handleActivateQuiz}
+              onDeactivate={handleDeactivateQuiz}
               onDelete={(quiz) => setQuizToDelete(quiz)}
               onViewProgress={handleViewQuizProgress}
               isDeletingQuizId={isDeletingQuizId}

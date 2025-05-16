@@ -70,29 +70,35 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Seen / Total
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
                     Last Attempt
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Avg. Score
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {progressData.map((item) => {
-                  const staffName = (item.staffUserId as any)?.firstName
-                    ? `${(item.staffUserId as any).firstName} ${
-                        (item.staffUserId as any).lastName
-                      }`
-                    : (item.staffUserId as string) || "Unknown Staff";
+                  let staffName = "Unknown Staff";
+                  if (
+                    item.staffUserId &&
+                    typeof item.staffUserId === "object"
+                  ) {
+                    const user = item.staffUserId as any; // Cast to access potential properties
+                    if (user.name && user.name.trim() !== "") {
+                      staffName = user.name.trim();
+                    } else if (user._id) {
+                      // Fallback to ID if no name parts or name is whitespace, skip email
+                      staffName = `Staff ID: ${user._id}`;
+                    }
+                  } else if (typeof item.staffUserId === "string") {
+                    // This case should ideally not happen if backend always populates
+                    staffName = `Staff ID: ${item.staffUserId}`;
+                  }
+
                   const percentage = calculatePercentage(
                     item.seenQuestionIds.length,
                     item.totalUniqueQuestionsInSource
@@ -115,26 +121,16 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                         </div>
                         <span className="ml-2 text-xs">{percentage}%</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {item.isCompletedOverall ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            Completed
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            In Progress
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.seenQuestionIds.length} /{" "}
-                        {item.totalUniqueQuestionsInSource}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.lastAttemptTimestamp
                           ? new Date(
                               item.lastAttemptTimestamp
                             ).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {typeof item.averageScore === "number"
+                          ? `${item.averageScore.toFixed(0)}%`
                           : "N/A"}
                       </td>
                     </tr>
