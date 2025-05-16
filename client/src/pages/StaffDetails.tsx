@@ -29,18 +29,14 @@ const StaffDetails: React.FC = () => {
     useState<QuizResultDetails | null>(null);
   const [_loadingModalDetails, _setLoadingModalDetails] = useState(false);
   const [_modalError, _setModalError] = useState<string | null>(null);
-  const [isEditingRole, setIsEditingRole] = useState(false);
-  const [editedRole, setEditedRole] = useState<string>("");
-  const [isSavingRole, setIsSavingRole] = useState(false);
-  const [roleErrorText, setRoleErrorText] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Update editedRole when staffDetails load or change (if not already editing)
   useEffect(() => {
-    if (staffDetails && !isEditingRole) {
-      setEditedRole(staffDetails.professionalRole || "");
+    if (staffDetails) {
+      // setEditedRole(staffDetails.professionalRole || ""); // Removed
     }
-  }, [staffDetails, isEditingRole]);
+  }, [staffDetails]);
 
   // --- Handlers ---
   const handleOpenAttemptModal = useCallback(
@@ -83,44 +79,6 @@ const StaffDetails: React.FC = () => {
     setModalDataForIncorrectAnswers(null);
     _setModalError(null);
   }, [_setModalError]);
-
-  const handleEditRoleToggle = useCallback(() => {
-    if (isEditingRole) {
-      setEditedRole(staffDetails?.professionalRole || "");
-      setRoleErrorText(null);
-    }
-    setIsEditingRole((prev) => !prev);
-  }, [isEditingRole, staffDetails?.professionalRole]);
-
-  const handleRoleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setEditedRole(e.target.value);
-      setRoleErrorText(null);
-    },
-    []
-  );
-
-  const handleSaveRole = useCallback(async () => {
-    if (!staffId) return;
-    if (editedRole === (staffDetails?.professionalRole || "")) {
-      setIsEditingRole(false);
-      return;
-    }
-    setIsSavingRole(true);
-    setRoleErrorText(null);
-    setSuccessMessage(null);
-    try {
-      await updateStaffRole(staffId, editedRole);
-      fetchStaffDetails();
-      setIsEditingRole(false);
-      setSuccessMessage("Role updated successfully.");
-    } catch (err: any) {
-      console.error("Error saving role:", err);
-      setRoleErrorText(err.response?.data?.message || "Failed to update role.");
-    } finally {
-      setIsSavingRole(false);
-    }
-  }, [staffId, editedRole, staffDetails?.professionalRole, fetchStaffDetails]);
 
   // --- Render Logic ---
   if (loading) {
@@ -181,14 +139,14 @@ const StaffDetails: React.FC = () => {
             />
           </div>
         )}
-        {roleErrorText && isEditingRole && (
+        {/* roleErrorText && isEditingRole && ( // Removed role error display
           <div className="mb-4">
             <ErrorMessage
               message={roleErrorText}
               onDismiss={() => setRoleErrorText(null)}
             />
           </div>
-        )}
+        )*/}
 
         {/* Updated Page Title Header for staff name */}
         <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
@@ -201,90 +159,56 @@ const StaffDetails: React.FC = () => {
 
         {/* Updated Staff Details Card */}
         <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-start">
-            {/* Left side: Email & Joined Date */}
-            <div className="mb-4 sm:mb-0">
-              <h2 className="text-xl font-semibold text-gray-700 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            {/* Column 1: Contact & Employment */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 Contact & Employment
               </h2>
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Email:</span> {staffDetails.email}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                <span className="font-medium">Joined:</span>{" "}
-                {formatDate(staffDetails.createdAt)}
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-gray-700">Email:</span>{" "}
+                  {staffDetails.email}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-gray-700">Joined:</span>{" "}
+                  {formatDate(staffDetails.createdAt)}
+                </p>
+              </div>
             </div>
 
-            {/* Right side: Role & Average Score */}
-            <div className="sm:ml-4 flex flex-col items-start sm:items-end space-y-3">
-              <div>
-                <h3 className="text-md font-semibold text-gray-700 mb-1">
-                  Professional Role
-                </h3>
-                {isEditingRole ? (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={editedRole}
-                      onChange={handleRoleChange}
-                      disabled={isSavingRole}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-                      aria-label="Professional Role"
-                    />
-                    <Button
-                      variant="primary"
-                      onClick={handleSaveRole}
-                      isLoading={isSavingRole}
-                      disabled={
-                        isSavingRole ||
-                        editedRole === (staffDetails?.professionalRole || "")
-                      }
-                      className="text-sm whitespace-nowrap"
-                    >
-                      Save Role
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={handleEditRoleToggle}
-                      disabled={isSavingRole}
-                      className="text-sm whitespace-nowrap"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md">
-                      {staffDetails.professionalRole || "Not Set"}
-                    </p>
-                    <Button
-                      variant="secondary"
-                      onClick={handleEditRoleToggle}
-                      className="text-xs px-2 py-1 whitespace-nowrap"
-                    >
-                      Edit Role
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <div>
-                <h3 className="text-md font-semibold text-gray-700 mb-1">
-                  Overall Average Score
-                </h3>
-                <p
-                  className={`text-2xl font-bold ${
-                    staffDetails.averageScore === null
-                      ? "text-gray-500"
-                      : staffDetails.averageScore >= 70
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {staffDetails.averageScore !== null
-                    ? `${staffDetails.averageScore.toFixed(1)}%`
-                    : "N/A"}
-                </p>
+            {/* Column 2: Role & Performance Summary */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                Role & Performance Summary
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-base font-medium text-gray-700 mb-1">
+                    Professional Role
+                  </h3>
+                  <p className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md inline-block">
+                    {staffDetails.professionalRole || "Not Set"}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-base font-medium text-gray-700 mb-1">
+                    Overall Average Score
+                  </h3>
+                  <p
+                    className={`text-2xl font-bold ${
+                      staffDetails.averageScore === null
+                        ? "text-gray-500"
+                        : staffDetails.averageScore >= 70
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {staffDetails.averageScore !== null
+                      ? `${staffDetails.averageScore.toFixed(1)}%`
+                      : "N/A"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
