@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+// import api from "../services/api"; // To be replaced by specific service import
+import { getStaffList } from "../services/api"; // Import the specific service function
 import { StaffMemberWithData } from "../types/staffTypes";
 import { useAuth } from "../context/AuthContext";
 
@@ -28,10 +29,12 @@ export function useStaffSummary(): UseStaffSummaryReturn {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ staff: StaffMemberWithData[] }>(
-        "/staff"
-      );
-      setStaffData(response.data.staff || []);
+      // const response = await api.get<{ staff: StaffMemberWithData[] }>(
+      //   "/staff"
+      // );
+      // setStaffData(response.data.staff || []);
+      const fetchedStaff = await getStaffList(); // Use the service function
+      setStaffData(fetchedStaff || []); // Set data from service function response
     } catch (err: any) {
       console.error("Error fetching staff summary data:", err);
       setError(err.response?.data?.message || "Failed to fetch staff data.");

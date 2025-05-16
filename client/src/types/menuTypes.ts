@@ -1,4 +1,5 @@
 // client/src/types/menuTypes.ts
+import { MenuItem } from "./menuItemTypes"; // Import MenuItem
 
 // Basic details of a Menu, as returned in a list
 export interface IMenuClient {
@@ -10,41 +11,21 @@ export interface IMenuClient {
   updatedAt: string;
 }
 
-// Represents a single menu item on the client
-// Mirrors server/src/models/MenuItem.ts IMenuItem
-export type ItemTypeClient = "food" | "beverage";
-export type ItemCategoryClient = string; // Can be more specific if using enums like on backend
-
-export interface IMenuItemClient {
-  _id: string;
-  name: string;
-  description?: string;
-  price?: number;
-  ingredients?: string[];
-  itemType: ItemTypeClient;
-  category: ItemCategoryClient;
-  menuId: string;
-  restaurantId: string;
-  isGlutenFree: boolean;
-  isDairyFree: boolean;
-  isVegetarian: boolean;
-  isVegan: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+// ItemTypeClient, ItemCategoryClient, and IMenuItemClient are removed as they are redundant
+// with types in menuItemTypes.ts
 
 // Represents a Menu with its full list of items
 export interface IMenuWithItemsClient extends IMenuClient {
-  items: IMenuItemClient[];
+  items: MenuItem[]; // Use imported MenuItem
 }
 
-// For creating a new menu (if needed by UI in future)
+// For creating a new menu
 export interface CreateMenuDataClient {
   name: string;
   description?: string;
 }
 
-// For updating a menu (if needed by UI in future)
+// For updating a menu
 export interface UpdateMenuDataClient {
   name?: string;
   description?: string;

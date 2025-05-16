@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import api, {
-  ClientIQuiz,
-  GenerateQuizFromBanksClientData,
   getQuestionBanks,
   createQuestionBank,
   updateQuestionBank,
@@ -11,11 +9,17 @@ import api, {
   getQuizzes,
   generateQuizFromQuestionBanks,
   getRestaurantQuizStaffProgress,
-  ClientStaffQuizProgress,
   getQuestionBankById,
   updateQuizDetails,
   resetQuizProgress,
+  deleteQuiz,
 } from "../services/api";
+
+import {
+  ClientIQuiz,
+  GenerateQuizFromBanksClientData,
+} from "../types/quizTypes";
+import { ClientStaffQuizProgress } from "../types/staffTypes";
 
 import {
   IQuestionBank,
@@ -35,7 +39,7 @@ import Modal from "../components/common/Modal"; // A generic Modal component wil
 
 // Question Bank Components (Modals/Forms)
 import CreateQuestionBankForm from "../components/questionBank/CreateQuestionBankForm";
-import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
+// import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm"; // Removed unused import
 // import ManageQuestionsModal from "../components/questionBank/ManageQuestionsModal"; // Removed ManageQuestionsModal import
 // We'll need a way to display the list of question banks
 // import QuestionBankList from '../components/questionBank/QuestionBankList'; // Assuming this exists or will be created
@@ -62,9 +66,6 @@ const QuizAndBankManagementPage: React.FC = () => {
   // Modal States - Question Banks
   const [isCreateBankModalOpen, setIsCreateBankModalOpen] = useState(false);
   const [bankToDelete, setBankToDelete] = useState<IQuestionBank | null>(null);
-  const [isNavigatingToBankEdit, setIsNavigatingToBankEdit] = useState<
-    string | null
-  >(null);
 
   // Modal States - Quizzes
   const [isGenerateQuizModalOpen, setIsGenerateQuizModalOpen] = useState(false);
@@ -74,6 +75,12 @@ const QuizAndBankManagementPage: React.FC = () => {
   // ADDED: State for EditQuizModal
   const [isEditQuizModalOpen, setIsEditQuizModalOpen] = useState(false);
   const [quizToEdit, setQuizToEdit] = useState<ClientIQuiz | null>(null);
+
+  // ADDED: State for Deactivation Confirmation Modal
+  const [isConfirmDeactivateModalOpen, setIsConfirmDeactivateModalOpen] =
+    useState(false);
+  const [quizToDeactivateTarget, setQuizToDeactivateTarget] =
+    useState<ClientIQuiz | null>(null);
 
   // State for Staff Quiz Progress Modal
   const [isStaffProgressModalOpen, setIsStaffProgressModalOpen] =
@@ -88,6 +95,21 @@ const QuizAndBankManagementPage: React.FC = () => {
   const [staffProgressError, setStaffProgressError] = useState<string | null>(
     null
   );
+
+  // Helper function to get question bank names for a quiz
+  const getBankNamesForQuiz = (quiz: ClientIQuiz): string => {
+    if (
+      !quiz.sourceQuestionBankIds ||
+      quiz.sourceQuestionBankIds.length === 0
+    ) {
+      return "N/A";
+    }
+    const names = quiz.sourceQuestionBankIds.map((bankId) => {
+      const bank = questionBanks.find((b) => b._id === bankId);
+      return bank ? bank.name : `ID: ${bankId}`; // Show name if found, else ID with prefix
+    });
+    return names.join(", ");
+  };
 
   const fetchBanks = useCallback(async () => {
     setIsLoadingBanks(true);
@@ -145,14 +167,14 @@ const QuizAndBankManagementPage: React.FC = () => {
     fetchBanks();
   };
 
-  const handleEditBankSuccess = (updatedBank: IQuestionBank) => {
-    setQuestionBanks((prev) =>
-      prev.map((b) => (b._id === updatedBank._id ? updatedBank : b))
-    );
-    setSuccessMessage(
-      `Question bank "${updatedBank.name}" updated successfully!`
-    );
-  };
+  // const handleEditBankSuccess = (updatedBank: IQuestionBank) => { // Removed unused function
+  //   setQuestionBanks((prev) =>
+  //     prev.map((b) => (b._id === updatedBank._id ? updatedBank : b))
+  //   );
+  //   setSuccessMessage(
+  //     `Question bank "${updatedBank.name}" updated successfully!`
+  //   );
+  // };
 
   const handleDeleteBank = async () => {
     if (!bankToDelete) return;
@@ -192,7 +214,7 @@ const QuizAndBankManagementPage: React.FC = () => {
     if (!quizToDelete) return;
     setIsDeletingQuizId(quizToDelete._id);
     try {
-      await api.delete(`/quizzes/${quizToDelete._id}`);
+      await deleteQuiz(quizToDelete._id);
       setQuizzes((prev) => prev.filter((q) => q._id !== quizToDelete._id));
       setSuccessMessage(`Quiz "${quizToDelete.title}" deleted.`);
     } catch (err: any) {
@@ -243,71 +265,57 @@ const QuizAndBankManagementPage: React.FC = () => {
       return;
     }
 
-    const wasPreviouslyInactive = quizToActivate.isAvailable === false;
+    // const wasPreviouslyInactive = quizToActivate.isAvailable === false; // Not currently used, but good for context
 
     try {
       const updatedQuiz = await updateQuizDetails(quizId, {
         isAvailable: true,
       });
       setQuizzes((prevQuizzes) =>
-        prevQuizzes.map((q) => (q._id === quizId ? updatedQuiz : q))
+        prevQuizzes.map((q) => (q._id === updatedQuiz._id ? updatedQuiz : q))
       );
-
-      let currentSuccessMessage = `Quiz "${updatedQuiz.title}" is now active and available to staff.`;
-
-      if (wasPreviouslyInactive) {
-        try {
-          // If quiz was inactive and is now active, reset its progress
-          const resetResult = await resetQuizProgress(quizId);
-          console.log("Quiz progress reset result:", resetResult);
-          currentSuccessMessage += ` All previous staff progress has been reset.`;
-        } catch (resetError: any) {
-          console.error(
-            "Failed to reset quiz progress after activation:",
-            resetError
-          );
-          // Append a warning to the success message, but don't block activation success
-          currentSuccessMessage += ` (Warning: an issue occurred trying to reset staff progress: ${
-            resetError.response?.data?.message || resetError.message
-          }).`;
-        }
-      }
-      setSuccessMessage(currentSuccessMessage);
+      setSuccessMessage(`Quiz "${updatedQuiz.title}" activated successfully.`);
     } catch (err: any) {
-      console.error("Failed to activate quiz:", err);
-      setError(
-        err.response?.data?.message ||
-          `Failed to activate quiz "${quizToActivate.title}".`
-      );
+      setError(err.response?.data?.message || "Failed to activate quiz.");
     }
   };
 
-  const handleDeactivateQuiz = async (quizId: string) => {
+  // MODIFIED: Opens confirmation modal instead of direct deactivation
+  const handleDeactivateQuiz = (quizId: string) => {
     setError(null);
     setSuccessMessage(null);
-    const quizToDeactivate = quizzes.find((q) => q._id === quizId);
-    if (!quizToDeactivate) {
+    const quiz = quizzes.find((q) => q._id === quizId);
+    if (!quiz) {
       setError("Quiz not found for deactivation.");
       return;
     }
+    setQuizToDeactivateTarget(quiz);
+    setIsConfirmDeactivateModalOpen(true);
+  };
+
+  // ADDED: Actual deactivation logic after confirmation
+  const confirmDeactivateQuiz = async () => {
+    if (!quizToDeactivateTarget) return;
+
+    setError(null);
+    setSuccessMessage(null);
 
     try {
-      const updatedQuiz = await updateQuizDetails(quizId, {
+      const updatedQuiz = await updateQuizDetails(quizToDeactivateTarget._id, {
         isAvailable: false,
+        // No need to change isAssigned here, deactivation primarily controls availability
       });
       setQuizzes((prevQuizzes) =>
-        prevQuizzes.map((q) => (q._id === quizId ? updatedQuiz : q))
+        prevQuizzes.map((q) => (q._id === updatedQuiz._id ? updatedQuiz : q))
       );
       setSuccessMessage(
-        `Quiz "${updatedQuiz.title}" is now inactive and hidden from staff.`
+        `Quiz "${updatedQuiz.title}" deactivated successfully.`
       );
-      // TODO: Add logic to reset progress if quiz is deactivated and then reactivated
     } catch (err: any) {
-      console.error("Failed to deactivate quiz:", err);
-      setError(
-        err.response?.data?.message ||
-          `Failed to deactivate quiz "${quizToDeactivate.title}".`
-      );
+      setError(err.response?.data?.message || "Failed to deactivate quiz.");
+    } finally {
+      setIsConfirmDeactivateModalOpen(false);
+      setQuizToDeactivateTarget(null);
     }
   };
 
@@ -386,11 +394,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <Button
                   variant="secondary"
                   onClick={() => handleManageBankQuestions(bank._id)}
-                  isLoading={isNavigatingToBankEdit === bank._id}
-                  disabled={
-                    !!isNavigatingToBankEdit &&
-                    isNavigatingToBankEdit !== bank._id
-                  }
                   className="flex-1 md:flex-none w-full md:w-auto text-sm justify-center"
                 >
                   Manage Questions
@@ -398,7 +401,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <Button
                   variant="destructive"
                   onClick={() => setBankToDelete(bank)}
-                  disabled={!!isNavigatingToBankEdit}
                   className="flex-1 md:flex-none w-full md:w-auto text-sm justify-center"
                 >
                   Delete
@@ -437,7 +439,7 @@ const QuizAndBankManagementPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={() => setIsCreateBankModalOpen(true)}
-              disabled={!restaurantId || !!isNavigatingToBankEdit}
+              disabled={!restaurantId /* || !!isNavigatingToBankEdit */}
             >
               Create New Question Bank
             </Button>
@@ -451,7 +453,6 @@ const QuizAndBankManagementPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={() => setIsGenerateQuizModalOpen(true)}
-              disabled={!!isNavigatingToBankEdit}
             >
               Create Quiz from Banks
             </Button>
@@ -472,9 +473,7 @@ const QuizAndBankManagementPage: React.FC = () => {
               onDelete={(quiz) => setQuizToDelete(quiz)}
               onViewProgress={handleViewQuizProgress}
               isDeletingQuizId={isDeletingQuizId}
-              getMenuItemNames={(quiz) =>
-                quiz.sourceQuestionBankIds.join(", ") || "N/A"
-              }
+              getMenuItemNames={getBankNamesForQuiz}
             />
           )}
           {isLoadingQuizzes && quizzes.length > 0 && (
@@ -550,11 +549,10 @@ const QuizAndBankManagementPage: React.FC = () => {
             progressData={staffProgressData}
             isLoading={isLoadingStaffProgress}
             error={staffProgressError}
-            restaurantId={restaurantId} // Pass restaurantId if modal needs it
+            // restaurantId={restaurantId} // Pass if needed by modal
           />
         )}
 
-        {/* ADDED: Render EditQuizModal */}
         {isEditQuizModalOpen && quizToEdit && (
           <EditQuizModal
             isOpen={isEditQuizModalOpen}
@@ -565,6 +563,28 @@ const QuizAndBankManagementPage: React.FC = () => {
             initialQuizData={quizToEdit}
             onQuizUpdated={handleQuizUpdated}
           />
+        )}
+
+        {isConfirmDeactivateModalOpen && quizToDeactivateTarget && (
+          <Modal
+            isOpen={isConfirmDeactivateModalOpen}
+            onClose={() => {
+              setIsConfirmDeactivateModalOpen(false);
+              setQuizToDeactivateTarget(null);
+            }}
+            title={`Deactivate Quiz: ${quizToDeactivateTarget.title}`}
+          >
+            <ConfirmationModalContent
+              message={`Are you sure you want to deactivate the quiz "${quizToDeactivateTarget.title}"? Staff will no longer be able to take new attempts.`}
+              onConfirm={confirmDeactivateQuiz}
+              onCancel={() => {
+                setIsConfirmDeactivateModalOpen(false);
+                setQuizToDeactivateTarget(null);
+              }}
+              confirmText="Deactivate"
+              confirmButtonVariant="destructive"
+            />
+          </Modal>
         )}
       </main>
     </div>

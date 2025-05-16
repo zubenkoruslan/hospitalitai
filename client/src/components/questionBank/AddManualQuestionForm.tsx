@@ -6,7 +6,6 @@ import {
   IQuestion,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
-import Card from "../common/Card";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { createQuestion as apiCreateQuestion } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
@@ -14,7 +13,7 @@ import LoadingSpinner from "../common/LoadingSpinner";
 
 interface AddManualQuestionFormProps {
   onQuestionAdded: (newQuestion: IQuestion) => void;
-  onClose: () => void;
+  onCloseRequest: () => void;
   initialBankCategories?: string[];
 }
 
@@ -28,7 +27,7 @@ const difficultyLevels = ["easy", "medium", "hard"];
 
 const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   onQuestionAdded,
-  onClose,
+  onCloseRequest,
   initialBankCategories,
 }) => {
   const [questionText, setQuestionText] = useState("");
@@ -180,188 +179,164 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   const commonLabelClass = "block text-sm font-medium text-gray-700";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-auto">
-      <Card
-        title="Add New Question Manually"
-        className="w-full max-w-2xl bg-white relative max-h-[90vh] flex flex-col"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
-          aria-label="Close form"
+    <form onSubmit={handleSubmit} className="p-1 space-y-4">
+      {formError && (
+        <p className="text-red-500 text-sm bg-red-100 p-2 rounded-md">
+          {formError}
+        </p>
+      )}
+
+      <div>
+        <label htmlFor="questionText" className={commonLabelClass}>
+          Question Text
+        </label>
+        <textarea
+          id="questionText"
+          value={questionText}
+          onChange={(e) => setQuestionText(e.target.value)}
+          required
+          rows={3}
+          className={commonInputClass}
           disabled={internalIsLoading}
-        >
-          <XMarkIcon className="h-6 w-6" />
-        </button>
-        <form
-          onSubmit={handleSubmit}
-          className="p-5 space-y-4 overflow-y-auto flex-grow"
-        >
-          {formError && (
-            <p className="text-red-500 text-sm bg-red-100 p-2 rounded-md">
-              {formError}
-            </p>
-          )}
+        />
+      </div>
 
-          <div>
-            <label htmlFor="questionText" className={commonLabelClass}>
-              Question Text
-            </label>
-            <textarea
-              id="questionText"
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              required
-              rows={3}
-              className={commonInputClass}
-              disabled={internalIsLoading}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="questionType" className={commonLabelClass}>
-                Question Type
-              </label>
-              <select
-                id="questionType"
-                value={questionType}
-                onChange={(e) =>
-                  setQuestionType(e.target.value as QuestionType)
-                }
-                className={commonInputClass}
-                disabled={internalIsLoading}
-              >
-                {questionTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type
-                      .replace(/-/g, " ")
-                      .replace(/\b\w/g, (l) => l.toUpperCase())}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="difficulty" className={commonLabelClass}>
-                Difficulty (Optional)
-              </label>
-              <select
-                id="difficulty"
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as any)}
-                className={commonInputClass}
-                disabled={internalIsLoading}
-              >
-                <option value="">Select Difficulty</option>
-                {difficultyLevels.map((level) => (
-                  <option key={level} value={level}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className={commonLabelClass}>Options</label>
-            {options.map((opt, index) => (
-              <div
-                key={index}
-                className="flex items-center space-x-2 mb-2 p-2 border rounded-md"
-              >
-                <input
-                  type="checkbox"
-                  checked={!!opt.isCorrect}
-                  onChange={(e) =>
-                    handleOptionChange(index, "isCorrect", e.target.checked)
-                  }
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  disabled={
-                    internalIsLoading ||
-                    (questionType === "multiple-choice-single" &&
-                      options.filter((o) => o.isCorrect).length >= 1 &&
-                      !opt.isCorrect)
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder={`Option ${index + 1}`}
-                  value={
-                    opt.text ||
-                    (questionType === "true-false"
-                      ? index === 0
-                        ? "True"
-                        : "False"
-                      : "")
-                  }
-                  onChange={(e) =>
-                    handleOptionChange(index, "text", e.target.value)
-                  }
-                  className={`${commonInputClass} flex-grow`}
-                  disabled={internalIsLoading || questionType === "true-false"}
-                />
-                {questionType !== "true-false" && options.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => removeOption(index)}
-                    className="text-red-500 hover:text-red-700 p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                    aria-label="Remove option"
-                    disabled={internalIsLoading}
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="questionType" className={commonLabelClass}>
+            Question Type
+          </label>
+          <select
+            id="questionType"
+            value={questionType}
+            onChange={(e) => setQuestionType(e.target.value as QuestionType)}
+            className={commonInputClass}
+            disabled={internalIsLoading}
+          >
+            {questionTypes.map((type) => (
+              <option key={type} value={type}>
+                {type
+                  .replace(/-/g, " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+              </option>
             ))}
-            {questionType !== "true-false" && options.length < 6 && (
+          </select>
+        </div>
+        <div>
+          <label htmlFor="difficulty" className={commonLabelClass}>
+            Difficulty (Optional)
+          </label>
+          <select
+            id="difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as any)}
+            className={commonInputClass}
+            disabled={internalIsLoading}
+          >
+            <option value="">Select Difficulty</option>
+            {difficultyLevels.map((level) => (
+              <option key={level} value={level}>
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className={commonLabelClass}>Options</label>
+        {options.map((opt, index) => (
+          <div
+            key={index}
+            className="flex items-center space-x-2 mb-2 p-2 border rounded-md bg-slate-50"
+          >
+            <input
+              type="checkbox"
+              checked={!!opt.isCorrect}
+              onChange={(e) =>
+                handleOptionChange(index, "isCorrect", e.target.checked)
+              }
+              className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
+              disabled={
+                internalIsLoading ||
+                (questionType === "multiple-choice-single" &&
+                  options.filter((o) => o.isCorrect).length >= 1 &&
+                  !opt.isCorrect)
+              }
+            />
+            <input
+              type="text"
+              placeholder={`Option ${index + 1}`}
+              value={
+                opt.text ||
+                (questionType === "true-false"
+                  ? index === 0
+                    ? "True"
+                    : "False"
+                  : "")
+              }
+              onChange={(e) =>
+                handleOptionChange(index, "text", e.target.value)
+              }
+              className={`${commonInputClass} flex-grow`}
+              disabled={internalIsLoading || questionType === "true-false"}
+            />
+            {questionType !== "true-false" && options.length > 2 && (
               <Button
                 type="button"
-                onClick={addOption}
-                variant="secondary"
-                className="mt-2"
+                onClick={() => removeOption(index)}
+                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 rounded-full shrink-0"
+                aria-label="Remove option"
                 disabled={internalIsLoading}
               >
-                Add Option
+                <XMarkIcon className="h-4 w-4" />
               </Button>
             )}
           </div>
+        ))}
+        {questionType !== "true-false" && options.length < 6 && (
+          <Button
+            type="button"
+            onClick={addOption}
+            variant="secondary"
+            className="mt-2"
+            disabled={internalIsLoading}
+          >
+            Add Option
+          </Button>
+        )}
+      </div>
 
-          <div>
-            <label htmlFor="categories" className={commonLabelClass}>
-              Categories (comma-separated)
-            </label>
-            <input
-              id="categories"
-              type="text"
-              value={categories}
-              onChange={(e) => setCategories(e.target.value)}
-              placeholder="e.g., Appetizers, Wines, Safety Procedures"
-              required
-              className={commonInputClass}
-              disabled={internalIsLoading}
-            />
-          </div>
+      <div>
+        <label htmlFor="categories" className={commonLabelClass}>
+          Categories (comma-separated)
+        </label>
+        <input
+          id="categories"
+          type="text"
+          value={categories}
+          onChange={(e) => setCategories(e.target.value)}
+          placeholder="e.g., Appetizers, Wines, Safety Procedures"
+          required
+          className={commonInputClass}
+          disabled={internalIsLoading}
+        />
+      </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onClose}
-              disabled={internalIsLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={internalIsLoading}
-            >
-              {internalIsLoading ? <LoadingSpinner /> : "Add Question"}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+      <div className="flex justify-end space-x-3 pt-4">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCloseRequest}
+          disabled={internalIsLoading}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" disabled={internalIsLoading}>
+          {internalIsLoading ? <LoadingSpinner /> : "Add Question"}
+        </Button>
+      </div>
+    </form>
   );
 };
 

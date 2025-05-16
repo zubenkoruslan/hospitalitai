@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { getQuizAttemptDetails, updateStaffRole } from "../services/api";
+import { ClientQuizAttemptDetails } from "../types/quizTypes";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -9,7 +10,7 @@ import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersMo
 import SuccessNotification from "../components/common/SuccessNotification";
 import { formatDate } from "../utils/helpers";
 import { useStaffDetails } from "../hooks/useStaffDetails";
-import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
+import { QuizResultDetails } from "../types/staffTypes";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 
@@ -25,12 +26,14 @@ const StaffDetails: React.FC = () => {
 
   // Keep state specific to this page (modals, role editing)
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedQuizResult, setSelectedQuizResult] =
+  const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
     useState<QuizResultDetails | null>(null);
+  const [loadingModalDetails, setLoadingModalDetails] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isEditingRole, setIsEditingRole] = useState(false);
   const [editedRole, setEditedRole] = useState<string>("");
   const [isSavingRole, setIsSavingRole] = useState(false);
-  const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleErrorText, setRoleErrorText] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Update editedRole when staffDetails load or change (if not already editing)
@@ -41,21 +44,46 @@ const StaffDetails: React.FC = () => {
   }, [staffDetails, isEditingRole]);
 
   // --- Handlers ---
-  const handleOpenModal = useCallback((result: QuizResultDetails) => {
-    setSelectedQuizResult(result);
+  const handleOpenAttemptModal = useCallback(async (attemptId: string) => {
+    setLoadingModalDetails(true);
+    setModalError(null);
+    setModalDataForIncorrectAnswers(null);
     setIsModalOpen(true);
+
+    try {
+      const attemptDetailsData = await getQuizAttemptDetails(attemptId);
+      if (attemptDetailsData) {
+        setModalDataForIncorrectAnswers({
+          _id: attemptDetailsData._id,
+          quizId: attemptDetailsData.quizId,
+          quizTitle: attemptDetailsData.quizTitle,
+          userId: attemptDetailsData.userId,
+          score: attemptDetailsData.score,
+          totalQuestions: attemptDetailsData.totalQuestions,
+          completedAt: attemptDetailsData.attemptDate,
+          incorrectQuestions: attemptDetailsData.incorrectQuestions,
+        });
+      } else {
+        setModalError("Could not load attempt details.");
+      }
+    } catch (err: any) {
+      console.error("Error fetching attempt details:", err);
+      setModalError(err.message || "Failed to load details for this attempt.");
+    } finally {
+      setLoadingModalDetails(false);
+    }
   }, []);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
-    setSelectedQuizResult(null);
+    setModalDataForIncorrectAnswers(null);
+    setModalError(null);
   }, []);
 
   const handleEditRoleToggle = useCallback(() => {
     if (isEditingRole) {
-      // Reset to original value if cancelling
       setEditedRole(staffDetails?.professionalRole || "");
-      setRoleError(null);
+      setRoleErrorText(null);
     }
     setIsEditingRole((prev) => !prev);
   }, [isEditingRole, staffDetails?.professionalRole]);
@@ -63,7 +91,7 @@ const StaffDetails: React.FC = () => {
   const handleRoleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setEditedRole(e.target.value);
-      setRoleError(null); // Clear error on change
+      setRoleErrorText(null);
     },
     []
   );
@@ -71,21 +99,20 @@ const StaffDetails: React.FC = () => {
   const handleSaveRole = useCallback(async () => {
     if (!staffId) return;
     if (editedRole === (staffDetails?.professionalRole || "")) {
-      setIsEditingRole(false); // No change, just exit edit mode
+      setIsEditingRole(false);
       return;
     }
-
     setIsSavingRole(true);
-    setRoleError(null);
+    setRoleErrorText(null);
     setSuccessMessage(null);
     try {
-      await api.patch(`/staff/${staffId}`, { professionalRole: editedRole });
-      fetchStaffDetails(); // Re-fetch details to get updated data
+      await updateStaffRole(staffId, editedRole);
+      fetchStaffDetails();
       setIsEditingRole(false);
       setSuccessMessage("Role updated successfully.");
     } catch (err: any) {
       console.error("Error saving role:", err);
-      setRoleError(err.response?.data?.message || "Failed to update role.");
+      setRoleErrorText(err.response?.data?.message || "Failed to update role.");
     } finally {
       setIsSavingRole(false);
     }
@@ -150,11 +177,11 @@ const StaffDetails: React.FC = () => {
             />
           </div>
         )}
-        {roleError && isEditingRole && (
+        {roleErrorText && isEditingRole && (
           <div className="mb-4">
             <ErrorMessage
-              message={roleError}
-              onDismiss={() => setRoleError(null)}
+              message={roleErrorText}
+              onDismiss={() => setRoleErrorText(null)}
             />
           </div>
         )}
@@ -260,106 +287,111 @@ const StaffDetails: React.FC = () => {
         </Card>
 
         {/* Updated Quiz Results & Performance Card */}
-        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Quiz Results & Performance
-          </h2>
-          {staffDetails.quizResults && staffDetails.quizResults.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-4 py-2 text-left font-medium tracking-wider"
-                    >
-                      Quiz Title
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-2 text-left font-medium tracking-wider"
-                    >
-                      Completed
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-2 text-left font-medium tracking-wider"
-                    >
-                      Score
-                    </th>
-                    <th scope="col" className="relative px-4 py-2">
-                      <span className="sr-only">View Incorrect</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200 text-sm">
-                  {staffDetails.quizResults.map((result) => (
-                    <tr key={result._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {result.quizTitle}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {formatDate(result.completedAt, true)}
-                      </td>
-                      {/* Score Column - Add Styling */}
-                      <td className="px-4 py-3 text-gray-700">
-                        {result.score}/{result.totalQuestions}
-                        {result.totalQuestions > 0 && (
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8">
+          Quiz Performance
+        </h2>
+        {loading && <LoadingSpinner message="Refreshing details..." />}
+        {staffDetails.aggregatedQuizPerformance.length === 0 && !loading && (
+          <Card className="p-4 text-center text-gray-500">
+            No quiz performance data available for this staff member.
+          </Card>
+        )}
+        <div className="space-y-6">
+          {staffDetails.aggregatedQuizPerformance.map((quizAgg) => (
+            <Card
+              key={quizAgg.quizId}
+              className="p-4 shadow-md rounded-lg bg-white"
+            >
+              <h3 className="text-xl font-semibold text-gray-700 mb-3">
+                {quizAgg.quizTitle}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 text-sm">
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Average Score:{" "}
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      (quizAgg.averageScorePercent ?? 0) >= 70
+                        ? "text-green-600"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {quizAgg.averageScorePercent?.toFixed(1) ?? "N/A"}%
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Attempts: </span>
+                  {quizAgg.numberOfAttempts}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Last Attempt:{" "}
+                  </span>
+                  {quizAgg.lastCompletedAt
+                    ? formatDate(quizAgg.lastCompletedAt)
+                    : "N/A"}
+                </div>
+              </div>
+
+              {quizAgg.attempts && quizAgg.attempts.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <h4 className="text-md font-semibold text-gray-600 mb-2">
+                    All Attempts:
+                  </h4>
+                  <ul className="space-y-2 max-h-60 overflow-y-auto">
+                    {quizAgg.attempts.map((attempt, index) => (
+                      <li
+                        key={attempt._id}
+                        className="text-sm p-3 bg-gray-50 hover:bg-gray-100 rounded-md flex flex-col sm:flex-row justify-between sm:items-center"
+                      >
+                        <div className="mb-2 sm:mb-0">
+                          <span className="font-medium">
+                            Attempt {quizAgg.attempts.length - index}
+                          </span>
+                          <span className="text-gray-500 ml-2">
+                            (
+                            {new Date(attempt.attemptDate).toLocaleDateString()}{" "}
+                            {new Date(attempt.attemptDate).toLocaleTimeString()}
+                            )
+                          </span>
                           <span
-                            className={`ml-2 font-semibold ${
-                              (result.score / result.totalQuestions) * 100 >= 70
+                            className={`font-semibold ml-3 ${
+                              attempt.score >= attempt.totalQuestions * 0.7
                                 ? "text-green-600"
-                                : "text-red-600"
+                                : "text-red-500"
                             }`}
                           >
-                            (
-                            {(
-                              (result.score / result.totalQuestions) *
-                              100
-                            ).toFixed(0)}
-                            %)
+                            Score: {attempt.score}/{attempt.totalQuestions}
                           </span>
+                        </div>
+                        {attempt.hasIncorrectAnswers && (
+                          <Button
+                            variant="secondary"
+                            className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-none shadow-none focus:outline-none focus:ring-0 self-start sm:self-center whitespace-nowrap"
+                            onClick={() => handleOpenAttemptModal(attempt._id)}
+                          >
+                            View Incorrect Answers
+                          </Button>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleOpenModal(result)}
-                          className="text-indigo-600 hover:text-indigo-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={
-                            // If incorrectQuestions exists, use it, otherwise check score vs totalQuestions
-                            (result.incorrectQuestions?.length || 0) === 0 &&
-                            result.score >= result.totalQuestions
-                          }
-                          aria-label={`View incorrect answers for ${result.quizTitle}`}
-                        >
-                          {/* Determine if there are incorrect answers by: 
-                              1. incorrectQuestions array length or 
-                              2. comparing score to totalQuestions */}
-                          {(result.incorrectQuestions?.length || 0) > 0 ||
-                          result.score < result.totalQuestions
-                            ? "View Incorrect"
-                            : "All Correct"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 p-6">
-              No quizzes have been completed by this staff member.
-            </p>
-          )}
-        </Card>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
       </main>
 
       {/* Modal for Incorrect Answers */}
-      <ViewIncorrectAnswersModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        quizResult={selectedQuizResult}
-      />
+      {isModalOpen && (
+        <ViewIncorrectAnswersModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          quizResult={modalDataForIncorrectAnswers}
+        />
+      )}
     </div>
   );
 };

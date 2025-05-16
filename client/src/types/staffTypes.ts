@@ -28,25 +28,38 @@ export interface IncorrectQuestionDetail {
   correctAnswer: string;
 }
 
-// Detailed interface for a single quiz result (often used on details pages)
+// This interface is used by ViewIncorrectAnswersModal and constructed by StaffDashboard
+// It needs to be exported and match the structure used.
 export interface QuizResultDetails {
-  _id: string; // Use string for frontend consistency
+  _id: string; // Can be the ID of the progress document or a relevant attempt ID
   quizId: string;
   quizTitle: string;
-  completedAt?: string;
+  userId: string; // ID of the user who took the quiz
   score: number;
   totalQuestions: number;
-  retakeCount?: number;
-  questions?: {
-    text: string;
-    choices: string[];
-    userAnswerIndex: number;
-    userAnswer: string;
-    correctAnswerIndex: number;
-    correctAnswer: string;
-    isCorrect: boolean;
-  }[];
-  incorrectQuestions?: IncorrectQuestionDetail[];
+  completedAt?: string; // Date as string
+  incorrectQuestions?: IncorrectQuestionDetail[]; // This is primarily used by the modal
+  // The complex 'questions' array from the old definition is removed as it's not used by this flow.
+}
+
+// ADDED: Client-side representation of a quiz attempt summary
+export interface ClientQuizAttemptSummary {
+  _id: string; // Attempt ID
+  score: number;
+  totalQuestions: number;
+  attemptDate: string; // Dates as strings from JSON
+  hasIncorrectAnswers: boolean;
+}
+
+// MODIFIED: AggregatedQuizPerformanceSummary to include a list of attempts
+export interface AggregatedQuizPerformanceSummary {
+  quizId: string;
+  quizTitle: string;
+  numberOfAttempts: number;
+  averageScorePercent: number | null;
+  lastCompletedAt?: string; // Date of the latest attempt for this quiz
+  attempts: ClientQuizAttemptSummary[]; // NEW: List of all attempt summaries
+  // Removed: _id (latest QuizResult ID), score, totalQuestions, incorrectQuestions (from latest result)
 }
 
 // Interface for a staff member with their results
@@ -56,22 +69,21 @@ export interface StaffMemberWithData {
   email: string;
   createdAt: string;
   professionalRole?: string;
-  // resultsSummary: ResultSummary[]; // <-- This will be replaced
-  quizProgressSummaries: ClientQuizProgressSummary[]; // <-- New field
+  quizProgressSummaries: ClientQuizProgressSummary[];
   averageScore: number | null;
-  quizzesTaken: number; // This might now be derivable from quizProgressSummaries.length if it means unique quizzes with progress
+  quizzesTaken: number;
 }
 
 // Detailed interface for a staff member including full quiz result details
+// This is the primary type for the StaffDetails page, now using aggregated data.
 export interface StaffDetailsData {
   _id: string;
   name: string;
   email: string;
   createdAt: string;
   professionalRole?: string;
-  quizResults: QuizResultDetails[]; // Use the detailed quiz result type
-  averageScore: number | null; // This might be calculated or come from API
-  // Add other fields returned by /api/staff/:id if necessary
+  aggregatedQuizPerformance: AggregatedQuizPerformanceSummary[]; // This now uses the updated version
+  averageScore: number | null;
 }
 
 // Sort types
@@ -87,4 +99,51 @@ export type SortDirection = "asc" | "desc";
 export interface Filters {
   name: string;
   role: string;
+}
+
+// === Types moved from api.ts ===
+
+// From api.ts: ClientUserMinimal (This should be imported from ./user.ts if already moved there)
+// For now, defining it here if it's specifically for staff context or assuming it will be imported.
+// import { ClientUserMinimal } from './user'; // Assuming user.ts exports this
+
+// From api.ts: ClientIQuiz (This should be imported from ./quizTypes.ts if already moved there)
+// For now, defining a minimal version here or assuming it will be imported.
+// import { ClientIQuiz } from './quizTypes'; // Assuming quizTypes.ts exports this
+
+// Placeholder imports - replace with actual imports once types are centralized
+import { ClientUserMinimal } from "./user"; // Assuming ClientUserMinimal is in user.ts
+import { ClientIQuiz } from "./quizTypes"; // Assuming ClientIQuiz is in quizTypes.ts
+
+// From api.ts: ClientStaffQuizProgress
+export interface ClientStaffQuizProgress {
+  _id: string;
+  staffUserId: string;
+  quizId: string;
+  restaurantId: string;
+  seenQuestionIds: string[];
+  totalUniqueQuestionsInSource: number;
+  isCompletedOverall: boolean;
+  lastAttemptTimestamp?: string;
+  // questionsAnsweredToday: number; // REMOVED - field was removed from backend StaffQuizProgress model
+  // lastActivityDateForDailyReset?: string; // REMOVED - field was removed from backend StaffQuizProgress model
+  createdAt?: string;
+  updatedAt?: string;
+  averageScore?: number | null;
+}
+
+// From api.ts: ClientStaffQuizProgressWithAttempts
+// This type relies on ClientStaffQuizProgress, ClientUserMinimal, and ClientIQuiz.
+export interface ClientStaffQuizProgressWithAttempts
+  extends Omit<
+    ClientStaffQuizProgress,
+    "staffUserId" | "quizId" | "lastAttemptTimestamp"
+    // Omitted fields are already removed from ClientStaffQuizProgress directly
+    // | "questionsAnsweredToday"
+    // | "lastActivityDateForDailyReset"
+  > {
+  staffUserId: ClientUserMinimal;
+  quizId: ClientIQuiz;
+  averageScore?: number | null;
+  attempts: ClientQuizAttemptSummary[];
 }

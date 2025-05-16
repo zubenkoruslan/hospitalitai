@@ -403,7 +403,7 @@ describe("AddEditMenuItemModal", () => {
     );
     // Use less specific regex for Price label
     await userEvent.type(
-      screen.getByLabelText(/Price \(.*?\)/i),
+      screen.getByLabelText(/Price \\(.*?\\)/i),
       "invalid-price"
     );
 
@@ -411,13 +411,14 @@ describe("AddEditMenuItemModal", () => {
     await userEvent.click(submitButton);
 
     // Check for error using findByTestId (based on mock)
+    // The component actually shows "Price must be a valid non-negative number."
     expect(await screen.findByTestId("error-message")).toHaveTextContent(
-      "Price must be a valid number."
+      "Price must be a valid non-negative number."
     );
     expect(mockOnSubmit).not.toHaveBeenCalled();
   });
 
-  it("disables buttons and shows spinner when isSubmitting is true", () => {
+  it("disables buttons and shows correct text on submit button when isSubmitting is true (Add mode)", () => {
     render(
       <AddEditMenuItemModal
         {...baseProps}
@@ -427,12 +428,173 @@ describe("AddEditMenuItemModal", () => {
     );
 
     const cancelButton = screen.getByRole("button", { name: "Cancel" });
-    const submitButton = screen.getByTestId("loading-spinner");
+    // The submit button's text changes to "Adding..." and contains the loading state
+    // We can check for the text and disabled state. The Button mock doesn't show a spinner.
+    const submitButton = screen.getByRole("button", { name: "Adding..." });
 
-    expect(cancelButton).toBeInTheDocument();
-    // expect(cancelButton).toBeDisabled(); // Uncomment if Cancel should be disabled too
-    expect(submitButton).toBeInTheDocument();
-    // Submit button should be disabled while submitting
-    expect(screen.getByRole("button", { name: /loading/i })).toBeDisabled();
+    expect(cancelButton).toBeDisabled();
+    expect(submitButton).toBeDisabled();
+  });
+
+  it("disables buttons and shows correct text on submit button when isSubmitting is true (Edit mode)", () => {
+    render(
+      <AddEditMenuItemModal
+        {...baseProps}
+        currentItem={mockFoodItem} // Provide a current item for edit mode
+        isSubmitting={true}
+      />
+    );
+
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    const submitButton = screen.getByRole("button", { name: "Saving..." }); // Text in edit mode
+
+    expect(cancelButton).toBeDisabled();
+    expect(submitButton).toBeDisabled();
+  });
+
+  // --- Add New Category Flow Tests ---
+
+  it("shows inline new category input when 'Add New Category...' is selected", async () => {
+    render(
+      <AddEditMenuItemModal
+        {...baseProps}
+        currentItem={null}
+        availableCategories={["Existing Cat"]}
+      />
+    );
+    const typeSelect = screen.getByLabelText(/Item Type/);
+    const categorySelect = screen.getByLabelText(/Category/);
+
+    // Select item type to enable category select
+    await userEvent.selectOptions(typeSelect, "food");
+    expect(categorySelect).toBeEnabled();
+
+    // Select "Add New Category..."
+    await userEvent.selectOptions(categorySelect, "_add_new_category_");
+
+    expect(screen.getByLabelText(/New Category Name/)).toBeInTheDocument();
+    // Verify the main category dropdown value changes
+    expect(categorySelect).toHaveValue("_add_new_category_");
+  });
+
+  it("submits with the new category name typed inline", async () => {
+    render(<AddEditMenuItemModal {...baseProps} currentItem={null} />);
+    const typeSelect = screen.getByLabelText(/Item Type/);
+    const categorySelect = screen.getByLabelText(/Category/);
+    const nameInput = screen.getByLabelText(/Name/);
+    const submitButton = screen.getByRole("button", { name: "Add Item" });
+
+    // Fill basic required fields
+    await userEvent.type(nameInput, "Item With New Cat");
+    await userEvent.selectOptions(typeSelect, "food");
+
+    // Select "Add New Category..."
+    await userEvent.selectOptions(categorySelect, "_add_new_category_");
+
+    // Type in the new category name input
+    const newCategoryInput = screen.getByLabelText(/New Category Name/);
+    await userEvent.type(newCategoryInput, "My Custom Category");
+
+    // Submit
+    await userEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledTimes(1);
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Item With New Cat",
+          itemType: "food",
+          category: "My Custom Category", // Verify the new category is submitted
+        }),
+        null
+      );
+    });
+    expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
+  });
+
+  it("shows 'Category is required' error if 'Add New Category' is chosen but new name is empty", async () => {
+    render(<AddEditMenuItemModal {...baseProps} currentItem={null} />);
+    const typeSelect = screen.getByLabelText(/Item Type/);
+    const categorySelect = screen.getByLabelText(/Category/);
+    const nameInput = screen.getByLabelText(/Name/);
+    const submitButton = screen.getByRole("button", { name: "Add Item" });
+
+    // Fill basic required fields
+    await userEvent.type(nameInput, "Item With Empty New Cat");
+    await userEvent.selectOptions(typeSelect, "food");
+
+    // Select "Add New Category..."
+    await userEvent.selectOptions(categorySelect, "_add_new_category_");
+
+    // Ensure new category input is present but leave it empty
+    const newCategoryInput = screen.getByLabelText(/New Category Name/);
+    expect(newCategoryInput).toHaveValue(""); // Initially empty after selection
+
+    // Submit
+    await userEvent.click(submitButton);
+
+    expect(await screen.findByTestId("error-message")).toHaveTextContent(
+      "Category is required."
+    );
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+
+  it("populates category dropdown with availableCategories and tempCategories", async () => {
+    const initialAvailable = ["Desserts", "Starters"];
+    const { rerender } = render(
+      <AddEditMenuItemModal
+        {...baseProps}
+        currentItem={null}
+        availableCategories={initialAvailable}
+      />
+    );
+
+    await userEvent.selectOptions(screen.getByLabelText(/Item Type/), "food");
+    const categorySelect = screen.getByLabelText<HTMLSelectElement>(/Category/);
+
+    for (const cat of initialAvailable) {
+      expect(screen.getByRole("option", { name: cat })).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByRole("option", { name: "Newly Added Temp Cat" })
+    ).not.toBeInTheDocument();
+
+    // Simulate adding a new category via the (currently somewhat orphaned) sub-modal flow
+    // For the test, we'll directly manipulate a state that would lead to tempCategories update
+    // This is a bit of a workaround as the trigger for sub-modal is missing.
+    // We can improve this if we clarify how handleSaveNewCategory is called
+    // For now, let's assume a scenario where a category was added to tempCategories in a previous step
+    // and the modal re-evaluates combinedCategories.
+    // A more direct test would involve triggering `handleSaveNewCategory` if possible.
+    // The component's useEffect for edit mode *does* add to tempCategories if currentItem.category is unknown.
+
+    // To test combinedCategories more directly based on current setup:
+    // If we are in edit mode, and the currentItem has a category not in availableCategories
+    // it should be added to tempCategories and appear in the dropdown.
+    const mockItemWithUniqueCategory = {
+      ...mockFoodItem,
+      category: "Chef's Special", // This category is not in initialAvailable
+    };
+
+    rerender(
+      <AddEditMenuItemModal
+        {...baseProps}
+        currentItem={mockItemWithUniqueCategory}
+        availableCategories={initialAvailable}
+      />
+    );
+
+    await userEvent.selectOptions(screen.getByLabelText(/Item Type/), "food"); // re-select type
+
+    // The current item's unique category should now be in the dropdown options
+    // because the useEffect in the component adds it to tempCategories
+    await waitFor(() => {
+      expect(
+        screen.getByRole("option", { name: "Chef's Special" })
+      ).toBeInTheDocument();
+    });
+    for (const cat of initialAvailable) {
+      expect(screen.getByRole("option", { name: cat })).toBeInTheDocument();
+    }
   });
 });

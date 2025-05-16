@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext } from "react";
 
 // Validation helper types
-interface ValidationFunctions {
+export interface ValidationFunctions {
   isValidName: (name: string) => { valid: boolean; message?: string };
   isValidPrice: (price: string) => { valid: boolean; message?: string };
   isValidDescription: (desc: string) => { valid: boolean; message?: string };
@@ -14,7 +14,7 @@ interface ValidationFunctions {
 }
 
 // Create the context
-const ValidationContext = createContext<ValidationFunctions | undefined>(
+export const ValidationContext = createContext<ValidationFunctions | undefined>(
   undefined
 );
 

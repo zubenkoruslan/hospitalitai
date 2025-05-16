@@ -8,12 +8,7 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import Modal from "../components/common/Modal";
 import { IQuestionBank, IQuestion } from "../types/questionBankTypes";
-import {
-  getQuestionBankById,
-  updateQuestionBank,
-  addQuestionToBank,
-  removeQuestionFromBank,
-} from "../services/api";
+import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import EditQuestionBankDetailsForm from "../components/questionBank/EditQuestionBankDetailsForm";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
@@ -24,9 +19,19 @@ import ConfirmationModalContent from "../components/common/ConfirmationModalCont
 const QuestionBankEditPage: React.FC = () => {
   const { bankId } = useParams<{ bankId: string }>();
   const navigate = useNavigate();
-  const [bank, setBank] = useState<IQuestionBank | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Use the hook for bank data and operations
+  const {
+    currentQuestionBank,
+    isLoading,
+    error,
+    fetchQuestionBankById,
+    editQuestionBank,
+    addQuestionToCurrentBank,
+    removeQuestionFromCurrentBank,
+    clearError,
+  } = useQuestionBanks();
+
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // States for editing bank details
@@ -49,29 +54,14 @@ const QuestionBankEditPage: React.FC = () => {
     useState(false);
   const [isProcessingRemove, setIsProcessingRemove] = useState(false);
 
-  const fetchBankDetails = useCallback(async () => {
-    if (!bankId) {
-      setError("No bank ID provided.");
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await getQuestionBankById(bankId);
-      setBank(data);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Failed to fetch question bank details."
-      );
-      setBank(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [bankId]);
-
   useEffect(() => {
-    fetchBankDetails();
-  }, [fetchBankDetails]);
+    if (bankId) {
+      fetchQuestionBankById(bankId);
+    } else {
+      // setError("No bank ID provided."); // Hook might handle this or set error
+      // If hook doesn't set error for missing bankId before fetch, page should.
+    }
+  }, [bankId, fetchQuestionBankById]);
 
   useEffect(() => {
     if (successMessage) {
@@ -87,15 +77,15 @@ const QuestionBankEditPage: React.FC = () => {
     }
   }, [questionManagementError]);
 
-  const handleBankDetailsUpdated = (updatedBank: IQuestionBank) => {
-    setBank(updatedBank);
-    setIsEditingDetails(false);
-    setSuccessMessage("Bank details updated successfully!");
-  };
-
-  const handleQuestionsUpdated = () => {
-    fetchBankDetails();
-  };
+  const handleBankDetailsUpdated =
+    (/* updatedBankFromForm: IQuestionBank */) => {
+      // If EditQuestionBankDetailsForm uses the hook's editQuestionBank, this callback might just close a modal.
+      // For now, assume the hook has updated currentQuestionBank.
+      // setBank(updatedBank); // No longer setting local bank
+      // setIsEditingDetails(false); // This local state might be for a modal trigger
+      setSuccessMessage("Bank details updated successfully!");
+      // Potentially, if a modal was open for EditQuestionBankDetailsForm, close it here.
+    };
 
   const openAddManualQuestionModal = () => {
     setQuestionManagementError(null);
@@ -109,18 +99,14 @@ const QuestionBankEditPage: React.FC = () => {
   const handleManualQuestionCreatedAndAddToBank = async (
     newlyCreatedQuestion: IQuestion
   ) => {
-    if (!bank) {
+    if (!currentQuestionBank) {
       setQuestionManagementError("Bank not loaded. Cannot add question.");
       return;
     }
     setIsProcessingAddQuestion(true);
     setQuestionManagementError(null);
     try {
-      const updatedBank = await addQuestionToBank(
-        bank._id,
-        newlyCreatedQuestion._id
-      );
-      setBank(updatedBank);
+      await addQuestionToCurrentBank(newlyCreatedQuestion._id);
       setSuccessMessage(
         `Question "${newlyCreatedQuestion.questionText.substring(
           0,
@@ -129,9 +115,11 @@ const QuestionBankEditPage: React.FC = () => {
       );
       closeAddManualQuestionModal();
     } catch (err: any) {
-      setQuestionManagementError(
-        err.response?.data?.message || "Failed to add created question to bank."
-      );
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to add created question to bank.";
+      setQuestionManagementError(message);
     } finally {
       setIsProcessingAddQuestion(false);
     }
@@ -150,18 +138,12 @@ const QuestionBankEditPage: React.FC = () => {
   };
 
   const handleQuestionUpdatedByForm = (updatedQuestion: IQuestion) => {
-    if (bank) {
-      const updatedQuestions = (bank.questions as IQuestion[]).map((q) =>
-        q._id === updatedQuestion._id ? updatedQuestion : q
-      );
-      setBank({ ...bank, questions: updatedQuestions });
-      setSuccessMessage(
-        `Question "${updatedQuestion.questionText.substring(
-          0,
-          30
-        )}..." updated.`
-      );
+    if (bankId) {
+      fetchQuestionBankById(bankId);
     }
+    setSuccessMessage(
+      `Question "${updatedQuestion.questionText.substring(0, 30)}..." updated.`
+    );
     closeEditQuestionModal();
   };
 
@@ -178,16 +160,12 @@ const QuestionBankEditPage: React.FC = () => {
   };
 
   const confirmRemoveQuestionFromBank = async () => {
-    if (!bank || !questionToRemove) return;
+    if (!currentQuestionBank || !questionToRemove) return;
 
     setIsProcessingRemove(true);
     setQuestionManagementError(null);
     try {
-      const updatedBank = await removeQuestionFromBank(
-        bank._id,
-        questionToRemove._id
-      );
-      setBank(updatedBank); // Update local bank state with the bank returned from API
+      await removeQuestionFromCurrentBank(questionToRemove._id);
       setSuccessMessage(
         `Question "${questionToRemove.questionText.substring(
           0,
@@ -195,16 +173,18 @@ const QuestionBankEditPage: React.FC = () => {
         )}..." removed from bank.`
       );
     } catch (err: any) {
-      setQuestionManagementError(
-        err.response?.data?.message || "Failed to remove question."
-      );
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to remove question.";
+      setQuestionManagementError(message);
     } finally {
       setIsProcessingRemove(false);
       closeRemoveConfirmModal();
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !currentQuestionBank) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -215,7 +195,13 @@ const QuestionBankEditPage: React.FC = () => {
     );
   }
 
-  if (error && !bank) {
+  const displayError = error
+    ? error instanceof Error
+      ? error.message
+      : String(error)
+    : null;
+
+  if (displayError && !currentQuestionBank) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -226,7 +212,10 @@ const QuestionBankEditPage: React.FC = () => {
             </h1>
           </div>
           <Card className="p-6">
-            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+            <ErrorMessage
+              message={displayError}
+              onDismiss={() => clearError()}
+            />
             <div className="mt-6">
               <Button
                 onClick={() => navigate("/quiz-management")}
@@ -241,7 +230,7 @@ const QuestionBankEditPage: React.FC = () => {
     );
   }
 
-  if (!bank) {
+  if (!currentQuestionBank) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -283,7 +272,7 @@ const QuestionBankEditPage: React.FC = () => {
 
         <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-            Edit Question Bank: {bank.name}
+            Edit Question Bank: {currentQuestionBank.name}
           </h1>
         </div>
 
@@ -295,15 +284,18 @@ const QuestionBankEditPage: React.FC = () => {
             />
           </div>
         )}
-        {error && !questionManagementError && (
+        {displayError && (
           <div className="mb-4">
-            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+            <ErrorMessage
+              message={displayError}
+              onDismiss={() => clearError()}
+            />
           </div>
         )}
 
         <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-8">
           <EditQuestionBankDetailsForm
-            bank={bank}
+            bank={currentQuestionBank}
             onBankUpdated={handleBankDetailsUpdated}
             onCancel={() => setIsEditingDetails(false)}
           />
@@ -328,9 +320,10 @@ const QuestionBankEditPage: React.FC = () => {
             </div>
           )}
 
-          {bank.questions && bank.questions.length > 0 ? (
+          {currentQuestionBank.questions &&
+          currentQuestionBank.questions.length > 0 ? (
             <ul className="space-y-3">
-              {(bank.questions as IQuestion[]).map((q) => (
+              {(currentQuestionBank.questions as IQuestion[]).map((q) => (
                 <li
                   key={q._id}
                   className="bg-white shadow-md rounded-lg p-3 flex justify-between items-center hover:shadow-lg transition-shadow duration-200"
@@ -364,16 +357,16 @@ const QuestionBankEditPage: React.FC = () => {
           )}
         </Card>
 
-        {isAddManualModalOpen && (
+        {isAddManualModalOpen && currentQuestionBank && (
           <Modal
             isOpen={isAddManualModalOpen}
             onClose={closeAddManualQuestionModal}
-            title="Add New Question to Bank"
+            title="Add New Question"
           >
             <AddManualQuestionForm
               onQuestionAdded={handleManualQuestionCreatedAndAddToBank}
-              onClose={closeAddManualQuestionModal}
-              initialBankCategories={bank.categories}
+              onCloseRequest={closeAddManualQuestionModal}
+              initialBankCategories={currentQuestionBank.categories}
             />
           </Modal>
         )}

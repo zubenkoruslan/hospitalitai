@@ -19,12 +19,7 @@ export interface MenuItem {
   isVegan: boolean;
 }
 
-// Matches the backend Menu model (relevant fields)
-export interface Menu {
-  _id: string;
-  name: string;
-  description?: string;
-}
+// Removed local Menu interface to avoid conflict with menuTypes.ts
 
 // Represents the type of menu item
 export type ItemType = "food" | "beverage";
@@ -49,6 +44,7 @@ export interface MenuItemFormData {
   ingredients: string; // Comma-separated string for form input
   itemType: ItemType | ""; // Allow empty for initial state
   category: string; // MODIFIED: Allow any string for dynamic categories
+  menuId: string; // ADDED: menuId is required to create/associate an item
   isGlutenFree: boolean;
   isDairyFree: boolean;
   isVegetarian: boolean;

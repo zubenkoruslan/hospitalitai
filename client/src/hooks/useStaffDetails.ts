@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+// import api from "../services/api"; // To be replaced
+import { getStaffDetails } from "../services/api"; // Import service function
 import { useAuth } from "../context/AuthContext";
 // Import types from shared file
 import {
@@ -79,11 +80,12 @@ export function useStaffDetails(
     setLoading(true);
     setError(null);
     try {
-      // Assuming the API returns { staff: StaffDetailsData }
-      const response = await api.get<{ staff: StaffDetailsData }>(
-        `/staff/${staffId}`
-      );
-      setStaffDetails(response.data.staff || null);
+      // const response = await api.get<{ staff: StaffDetailsData }>(
+      //   `/staff/${staffId}`
+      // );
+      // setStaffDetails(response.data.staff || null);
+      const details = await getStaffDetails(staffId);
+      setStaffDetails(details || null);
     } catch (err: any) {
       console.error(`Error fetching details for staff ${staffId}:`, err);
       setError(err.response?.data?.message || "Failed to fetch staff details.");

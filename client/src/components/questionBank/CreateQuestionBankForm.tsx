@@ -6,7 +6,7 @@ import {
 } from "../../types/questionBankTypes";
 import { IMenuClient } from "../../types/menuTypes"; // IMenuWithItemsClient seems unused directly
 import {
-  getRestaurantMenus,
+  getMenusByRestaurant,
   getMenuWithItems,
   createQuestionBankFromMenu,
   createQuestionBank as apiCreateQuestionBank,
@@ -66,7 +66,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
       setIsLoadingMenus(true);
       setMenusError(null);
       try {
-        const fetchedMenus = await getRestaurantMenus(restaurantId);
+        const fetchedMenus = await getMenusByRestaurant(restaurantId);
         setMenus(fetchedMenus);
       } catch (err: any) {
         console.error("Error fetching menus:", err);

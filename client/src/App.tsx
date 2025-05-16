@@ -1,7 +1,6 @@
 import React from "react";
-// import "./App.css"; // <-- Re-enable this import
+// import "./App.css"; // <-- Re-enabled this import - NOW REMOVING
 import { AuthProvider, useAuth } from "./context/AuthContext";
-// import { NotificationProvider } from "./context/NotificationContext"; // Removed
 import {
   BrowserRouter as Router,
   Routes,

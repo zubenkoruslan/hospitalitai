@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+// import api from "../services/api"; // To be replaced
+import { getQuizCount } from "../services/api"; // Import service function
 import { useAuth } from "../context/AuthContext";
 
 interface UseQuizCountReturn {
@@ -27,8 +28,10 @@ export function useQuizCount(): UseQuizCountReturn {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ count: number }>("/quizzes/count");
-      setQuizCount(response.data.count || 0);
+      // const response = await api.get<{ count: number }>("/quizzes/count");
+      // setQuizCount(response.data.count || 0);
+      const count = await getQuizCount(); // Use service function
+      setQuizCount(count || 0); // Set data from service
     } catch (err: any) {
       console.error("Error fetching quiz count:", err);
       setError(err.response?.data?.message || "Failed to fetch quiz count.");

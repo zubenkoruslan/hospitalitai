@@ -5,34 +5,40 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-import axios from "axios";
+// import axios from "axios"; // Not directly used now, api instance is used
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import {
+  login as loginService,
+  getCurrentUser as getCurrentUserService,
+} from "../services/api"; // Import api services
+import { ClientUserMinimal, UserRole } from "../types/user"; // For context user type
+import { LoginCredentials, AuthResponse } from "../types/authTypes"; // For loginService params
 
-// Define the shape of the decoded JWT payload
-interface DecodedToken {
-  userId: string;
-  role: "restaurant" | "staff";
+// Define the shape of the actual decoded JWT payload
+export interface DecodedToken {
+  id: string; // Standard JWT subject, maps to user._id
+  role: UserRole;
   name: string;
   restaurantId?: string;
-  restaurantName?: string;
-  professionalRole?: string;
+  // professionalRole?: string; // Not typically in token, part of User object
+  // restaurantName?: string; // Not in token, part of login response body
   iat?: number;
   exp?: number;
 }
 
 // Define the shape of the context data
-interface AuthContextType {
+export interface AuthContextType {
   token: string | null;
-  user: DecodedToken | null;
-  login: (email: string, password: string) => Promise<void>;
+  user: ClientUserMinimal | null; // User object will be ClientUserMinimal
+  login: (email: string, password: string) => Promise<void>; // Parameters match LoginCredentials
   logout: () => void;
   isLoading: boolean;
   error: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -42,43 +48,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("authToken")
   );
-  const [user, setUser] = useState<DecodedToken | null>(null);
+  const [user, setUser] = useState<ClientUserMinimal | null>(null); // User state is ClientUserMinimal
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       const storedToken = localStorage.getItem("authToken");
       if (storedToken) {
         try {
           const decoded = jwtDecode<DecodedToken>(storedToken);
-          // Check token expiration
           if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-            console.log("Token expired");
             throw new Error("Token expired");
           }
-          // Token is valid, set state and headers
-          setToken(storedToken);
-          setUser(decoded);
+          // Token is not expired, set it for API calls
           api.defaults.headers.common[
             "Authorization"
           ] = `Bearer ${storedToken}`;
-          console.log("Auth initialized with token.");
+          setToken(storedToken);
+
+          // Fetch full user details
+          const { user: fetchedUser } = await getCurrentUserService();
+          setUser(fetchedUser);
         } catch (error) {
           console.error("Failed to initialize auth from stored token:", error);
-          // Clear invalid/expired token
           localStorage.removeItem("authToken");
           setToken(null);
           setUser(null);
           delete api.defaults.headers.common["Authorization"];
         }
       } else {
-        // No token found, ensure state is clear
         setToken(null);
         setUser(null);
         delete api.defaults.headers.common["Authorization"];
-        console.log("No token found, auth not initialized.");
       }
       setIsLoading(false);
     };
@@ -90,22 +93,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post("/auth/login", { email, password });
-      const { token: receivedToken } = response.data;
+      const response: AuthResponse = await loginService({ email, password });
+      const { token: receivedToken, user: loggedInUser } = response;
 
-      if (!receivedToken) {
-        throw new Error("Login failed: No token received.");
-      }
-
-      // Store token and update state
       localStorage.setItem("authToken", receivedToken);
       setToken(receivedToken);
-
-      // Decode and set user
-      const decoded = jwtDecode<DecodedToken>(receivedToken);
-      setUser(decoded);
-
-      // Set auth header
+      setUser(loggedInUser);
       api.defaults.headers.common["Authorization"] = `Bearer ${receivedToken}`;
     } catch (err: any) {
       const errorMessage =
@@ -115,7 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error("Login API error:", err);
       setError(errorMessage);
       delete api.defaults.headers.common["Authorization"];
-      throw new Error(errorMessage);
+      // No need to throw here if error state is handled by UI
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +119,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem("authToken");
     delete api.defaults.headers.common["Authorization"];
-    console.log("User logged out, auth header removed.");
     navigate("/login");
   };
 
@@ -139,9 +131,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
   };
 
-  // Don't render until auth check is complete
+  // Don't render children until the initial auth check is complete.
   if (isLoading) {
-    return null;
+    return null; // Or a loading spinner component
   }
 
   return (

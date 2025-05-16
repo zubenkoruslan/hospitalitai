@@ -218,6 +218,15 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onClick={triggerFileSelect} // Allow click to select file
+          tabIndex={0} // Make it focusable
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault(); // Prevent default spacebar scroll or enter submit
+              triggerFileSelect();
+            }
+          }}
+          role="button" // Indicate it's an interactive element
+          aria-label="Drop PDF file here or click to select a file"
           className={`p-6 py-10 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors duration-200 ease-in-out 
             ${
               isDraggingOver

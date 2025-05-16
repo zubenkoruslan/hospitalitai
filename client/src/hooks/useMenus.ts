@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+// import api from "../services/api"; // To be replaced
+import { getMenusByRestaurant } from "../services/api"; // Import service function
 import { useAuth } from "../context/AuthContext";
-// Import shared Menu type
-import { Menu } from "../types/menuItemTypes";
+// Import IMenuClient from menuTypes.ts
+import { IMenuClient } from "../types/menuTypes"; // Corrected import path for menu type
 
 // Define a minimal Menu interface needed by the hook/dashboard
 // Consider moving to a shared types file if used elsewhere
@@ -15,14 +16,14 @@ interface MenuSummary {
 */
 
 interface UseMenusReturn {
-  menus: Menu[]; // Use imported Menu type
+  menus: IMenuClient[]; // Use IMenuClient type
   loading: boolean;
   error: string | null;
   fetchMenus: () => void;
 }
 
 export function useMenus(): UseMenusReturn {
-  const [menus, setMenus] = useState<Menu[]>([]); // Use imported Menu type
+  const [menus, setMenus] = useState<IMenuClient[]>([]); // Use IMenuClient type
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -51,18 +52,28 @@ export function useMenus(): UseMenusReturn {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = `/menus/restaurant/${user.restaurantId}`; // Construct URL
-      console.log("Calling API with URL:", apiUrl); // Log the URL
+      // const apiUrl = `/menus/restaurant/${user.restaurantId}`; // Construct URL
+      // console.log("Calling API with URL:", apiUrl); // Log the URL
 
       // Ensure the expected response type matches the actual backend response structure
-      const response = await api.get<{
-        success: boolean;
-        count: number;
-        data: Menu[];
-      }>(
-        apiUrl // Use the constructed URL
-      );
-      setMenus(response.data.data || []); // Adjusted to access response.data.data
+      // const response = await api.get<{
+      //   success: boolean;
+      //   count: number;
+      //   data: Menu[];
+      // }>(
+      //   apiUrl // Use the constructed URL
+      // );
+      // setMenus(response.data.data || []); // Adjusted to access response.data.data
+      if (user && user.restaurantId) {
+        // Ensure restaurantId is present before calling
+        const fetchedMenus = await getMenusByRestaurant(user.restaurantId);
+        setMenus(fetchedMenus || []);
+      } else {
+        // This case should ideally be caught by the check at the beginning of fetchMenus
+        // but as a safeguard if user/restaurantId becomes null between check and call:
+        setMenus([]);
+        // Optionally set an error, though the initial check should handle it.
+      }
     } catch (err: any) {
       console.error("Error fetching menus:", err);
       setError(err.response?.data?.message || "Failed to fetch menus.");

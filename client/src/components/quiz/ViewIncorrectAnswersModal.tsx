@@ -21,6 +21,11 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
+  console.log(
+    "[ViewIncorrectAnswersModal] Received props.results:",
+    JSON.stringify(quizResult, null, 2)
+  ); // Log incoming prop
+
   // Effect for closing modal on Escape key press
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -86,6 +91,11 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
         correctAnswer: q.correctAnswer,
       }));
   }
+
+  console.log(
+    "[ViewIncorrectAnswersModal] Calculated incorrectQuestions:",
+    JSON.stringify(incorrectQuestions, null, 2)
+  ); // Log calculated/derived incorrect questions
 
   const footer = (
     <Button

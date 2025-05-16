@@ -1,18 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   IQuestionBank,
   IQuestion,
   NewQuestionClientData,
 } from "../../types/questionBankTypes"; // Corrected path
-import Modal from "../common/Modal"; // Corrected path
+import Modal from "../common/Modal"; // Generic Modal
 import Button from "../common/Button"; // Corrected path
 import LoadingSpinner from "../common/LoadingSpinner"; // Corrected path
 import ErrorMessage from "../common/ErrorMessage"; // Corrected path
 import AddManualQuestionForm from "./AddManualQuestionForm"; // <-- Import AddManualQuestionForm
-import { addQuestionToBank, removeQuestionFromBank } from "../../services/api"; // Correctly import removeQuestionFromBank
+import {
+  addQuestionToBank,
+  removeQuestionFromBank,
+  getQuestionBankById,
+  getQuestionById,
+} from "../../services/api"; // Correctly import removeQuestionFromBank
 import GenerateAiQuestionsForm from "./GenerateAiQuestionsForm"; // Uncommented and corrected path
 import EditQuestionForm from "./EditQuestionForm"; // <-- Import EditQuestionForm
 import ConfirmationModalContent from "../common/ConfirmationModalContent"; // Uncommented & For remove confirmation
+import { useValidation } from "../../context/ValidationContext";
+import {
+  PlusCircleIcon,
+  SparklesIcon,
+  PencilIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import QuestionListItem from "./QuestionListItem"; // Uncommented
 
 interface ManageQuestionsModalProps {
   bank: IQuestionBank;
@@ -27,7 +40,7 @@ const ManageQuestionsModal: React.FC<ManageQuestionsModalProps> = ({
   onBankQuestionsUpdated, // <-- Destructure new prop
 }) => {
   const [questions, setQuestions] = useState<IQuestion[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingBankUpdate, setIsProcessingBankUpdate] = useState(false); // For addQuestionToBank operation
 
@@ -41,64 +54,78 @@ const ManageQuestionsModal: React.FC<ManageQuestionsModalProps> = ({
   const [isRemoveConfirmModalOpen, setIsRemoveConfirmModalOpen] =
     useState(false); // <-- New state for confirm modal
   const [isProcessingRemove, setIsProcessingRemove] = useState(false); // <-- New state for loading during removal
+  const { formatErrorMessage } = useValidation();
 
-  useEffect(() => {
-    if (bank && Array.isArray(bank.questions)) {
-      setQuestions(bank.questions as IQuestion[]);
-    } else {
-      setQuestions([]);
-    }
-  }, [bank]);
-
-  const handleOpenAddManualForm = () => {
-    setError(null); // Clear previous errors before opening form
-    setIsAddManualModalOpen(true);
-  };
-
-  // This handler is called after AddManualQuestionForm successfully creates a question
-  const handleQuestionCreatedByForm = async (
-    newlyCreatedQuestion: IQuestion
-  ) => {
-    if (!bank) return;
-    setIsProcessingBankUpdate(true);
+  const loadQuestions = useCallback(async () => {
+    setIsLoading(true);
     setError(null);
     try {
-      // The form has already created the question (newlyCreatedQuestion has an _id)
-      // Now, add this existing question to the current bank
-      const updatedBank = await addQuestionToBank(
-        bank._id,
-        newlyCreatedQuestion._id
-      );
-      onBankQuestionsUpdated(updatedBank); // Notify parent page to update bank state
-      setIsAddManualModalOpen(false); // Close the AddManualQuestionForm modal
-      // Success message can be set here or in parent based on onBankQuestionsUpdated
-    } catch (err: any) {
-      console.error("Error adding created question to bank:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to add question to bank. The question was created but could not be added to this bank."
-      );
+      const currentBankDetails = await getQuestionBankById(bank._id);
+      if (
+        currentBankDetails.questions &&
+        currentBankDetails.questions.length > 0
+      ) {
+        if (typeof currentBankDetails.questions[0] === "string") {
+          // If backend sends only IDs, fetch them individually
+          const questionDetails = await Promise.all(
+            (currentBankDetails.questions as string[]).map((id) =>
+              getQuestionById(id)
+            )
+          );
+          setQuestions(
+            questionDetails.filter((q) => q !== null) as IQuestion[]
+          ); // Filter out nulls if getQuestionById can return null
+        } else {
+          // Questions are already populated objects
+          setQuestions(currentBankDetails.questions as IQuestion[]);
+        }
+      } else {
+        setQuestions([]); // No questions or empty array
+      }
+    } catch (err) {
+      console.error("Error loading questions:", err);
+      setError(formatErrorMessage(err));
+      setQuestions([]); // Clear questions on error
     } finally {
-      setIsProcessingBankUpdate(false);
+      setIsLoading(false);
     }
+  }, [bank._id, formatErrorMessage]);
+
+  useEffect(() => {
+    loadQuestions();
+  }, [loadQuestions]);
+
+  const handleQuestionCreatedByForm = (newQuestion: IQuestion) => {
+    // Add to local state and update parent, then close form's modal
+    setQuestions((prev) =>
+      [newQuestion, ...prev].sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+      )
+    );
+    onBankQuestionsUpdated({
+      ...bank,
+      questionCount: (bank.questionCount || 0) + 1,
+    });
+    setIsAddManualModalOpen(false);
+    setError(null);
   };
 
-  const handleGenerateAiQuestions = () => {
-    setError(null); // Clear previous errors
-    setIsGenerateAiModalOpen(true);
-  };
-
-  const handleAiQuestionsGenerated = (generatedQuestions: IQuestion[]) => {
-    // The backend service already added these questions to the bank.
-    // We just need to notify the parent to refresh the bank details.
-    if (bank) {
-      // We can pass the current bank or an identifier; the parent will refetch.
-      // Let's pass the bank to be consistent with onBankQuestionsUpdated signature,
-      // expecting the parent to refetch for freshness.
-      onBankQuestionsUpdated(bank); // Parent will use bank._id to refetch the latest bank data
-    }
+  const handleAiQuestionsGenerated = (newQuestions: IQuestion[]) => {
+    setQuestions((prev) =>
+      [...newQuestions, ...prev].sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+      )
+    );
+    onBankQuestionsUpdated({
+      ...bank,
+      questionCount: (bank.questionCount || 0) + newQuestions.length,
+    });
     setIsGenerateAiModalOpen(false);
-    // Optionally, set a success message here or let parent handle it.
+    setError(null);
   };
 
   const handleEditQuestion = (question: IQuestion) => {
@@ -135,12 +162,28 @@ const ManageQuestionsModal: React.FC<ManageQuestionsModalProps> = ({
     setIsProcessingRemove(true);
     setError(null);
     try {
-      // Replace with actual API call: await api.removeQuestionFromBank(bank._id, questionToRemove._id);
       const updatedBank = await removeQuestionFromBank(
         bank._id,
         questionToRemove._id
       );
       onBankQuestionsUpdated(updatedBank);
+      if (updatedBank.questions) {
+        if (
+          updatedBank.questions.length > 0 &&
+          typeof updatedBank.questions[0] === "string"
+        ) {
+          const questionDetails = await Promise.all(
+            (updatedBank.questions as string[]).map((id) => getQuestionById(id))
+          );
+          setQuestions(
+            questionDetails.filter((q) => q !== null) as IQuestion[]
+          );
+        } else {
+          setQuestions(updatedBank.questions as IQuestion[]);
+        }
+      } else {
+        setQuestions([]);
+      }
 
       setSuccessMessage(
         `Question "${questionToRemove.questionText.substring(
@@ -169,139 +212,178 @@ const ManageQuestionsModal: React.FC<ManageQuestionsModalProps> = ({
     }
   }, [successMessage]);
 
+  if (isLoading && questions.length === 0) {
+    return (
+      <Modal
+        isOpen={true}
+        onClose={onClose}
+        title={`Manage Questions: ${bank.name}`}
+        size="2xl" // Changed from 3xl
+      >
+        <div className="p-6 text-center">
+          <LoadingSpinner />
+          <p className="mt-2 text-gray-500">Loading questions...</p>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       isOpen={true}
       onClose={onClose}
-      title={`Manage Questions: ${bank.name}`}
+      title={`Manage Questions: ${bank.name} (${
+        isLoading ? "..." : questions.length
+      })`}
+      size="2xl"
     >
       <div className="space-y-6 p-1">
         {error && (
-          <ErrorMessage message={error} onDismiss={() => setError(null)} />
+          <div
+            className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md"
+            role="alert"
+          >
+            {error}
+          </div>
         )}
+
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-4 bg-slate-50 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-slate-700 self-center sm:self-auto">
+            Modify Questions for:{" "}
+            <span className="text-blue-600">{bank.name}</span>
+          </h3>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Button
+              variant="secondary"
+              onClick={() => setIsAddManualModalOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <PlusCircleIcon className="h-5 w-5 mr-2" />
+              Add Manual Question
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setIsGenerateAiModalOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <SparklesIcon className="h-5 w-5 mr-2" />
+              Generate AI Questions
+            </Button>
+          </div>
+        </div>
+
         {successMessage && (
-          <div className="p-3 mb-3 text-sm text-green-700 bg-green-100 rounded-md">
+          <div className="mb-4 p-3 text-sm text-green-700 bg-green-100 rounded-md shadow">
             {successMessage}
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 mb-4">
-          <Button
-            variant="primary"
-            onClick={handleOpenAddManualForm}
-            disabled={isProcessingBankUpdate}
-          >
-            Add Manual Question
-          </Button>
-          <Button variant="secondary" onClick={handleGenerateAiQuestions}>
-            Generate AI Questions
-          </Button>
-        </div>
-
-        {isLoading && <LoadingSpinner />}
-        {isProcessingBankUpdate && (
-          <LoadingSpinner message="Adding question to bank..." />
-        )}
-
-        {!isLoading && questions.length === 0 && (
-          <p className="text-gray-500 text-center py-4">
-            This question bank currently has no questions.
-          </p>
-        )}
-
-        {!isLoading && questions.length > 0 && (
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {questions.map((q, index) => (
-              <div
-                key={q._id || index}
-                className="p-3 border rounded-md shadow-sm bg-white"
-              >
-                <p className="font-medium text-gray-800">
-                  {index + 1}. {q.questionText}
-                </p>
-                {/* TODO: Display more question details like type, options if needed */}
-                <div className="mt-2 flex justify-end space-x-2">
-                  <Button
-                    variant="secondary"
-                    /*size="sm"*/ onClick={() => handleEditQuestion(q)}
-                  >
-                    {" "}
-                    {/* Size prop removed as it does not exist */}
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    /*size="sm"*/ onClick={() => handleRemoveQuestion(q)}
-                  >
-                    {" "}
-                    {/* Size prop removed */}
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ))}
+        {isLoading && questions.length === 0 ? (
+          <div className="text-center p-6">
+            <LoadingSpinner />
+            <p className="mt-2 text-slate-500">Loading questions...</p>
           </div>
+        ) : !isLoading && questions.length === 0 ? (
+          <div className="text-center p-6 bg-white rounded-lg shadow">
+            <p className="text-slate-500 text-lg">
+              No questions found in this bank.
+            </p>
+            <p className="text-slate-400 mt-1">
+              Add questions manually or generate them using AI.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-4 max-h-[calc(100vh-350px)] overflow-y-auto pr-2 custom-scrollbar">
+            {questions.map((q, index) => (
+              <QuestionListItem
+                key={q._id}
+                question={q}
+                index={index}
+                onEdit={() => handleEditQuestion(q)}
+                onDelete={() => handleRemoveQuestion(q)}
+              />
+            ))}
+          </ul>
         )}
+      </div>
 
-        {isAddManualModalOpen && bank && (
+      {isAddManualModalOpen && bank && (
+        <Modal
+          isOpen={isAddManualModalOpen}
+          onClose={() => {
+            setIsAddManualModalOpen(false);
+            setError(null);
+          }}
+          title="Add New Question Manually"
+          size="2xl"
+        >
           <AddManualQuestionForm
-            initialBankCategories={bank.categories} // Corrected prop name
-            onQuestionAdded={handleQuestionCreatedByForm} // Corrected handler and prop name
-            onClose={() => {
+            initialBankCategories={bank.categories}
+            onQuestionAdded={handleQuestionCreatedByForm}
+            onCloseRequest={() => {
               setIsAddManualModalOpen(false);
-              setError(null); // Clear any errors from this modal if form is simply closed
-            }}
-            // AddManualQuestionForm has its own internalIsLoading, does not take isLoading prop
-          />
-        )}
-
-        {isGenerateAiModalOpen && bank && (
-          <GenerateAiQuestionsForm
-            bankId={bank._id}
-            bankCategories={bank.categories || []}
-            onAiQuestionsGenerated={handleAiQuestionsGenerated}
-            onClose={() => {
-              setIsGenerateAiModalOpen(false);
-              setError(null); // Clear any errors if form is simply closed
-            }}
-          />
-        )}
-
-        {isEditQuestionModalOpen && questionToEdit && (
-          <EditQuestionForm
-            questionToEdit={questionToEdit}
-            onQuestionUpdated={handleQuestionUpdatedByForm}
-            onClose={() => {
-              setIsEditQuestionModalOpen(false);
-              setQuestionToEdit(null);
               setError(null);
             }}
           />
-        )}
+        </Modal>
+      )}
 
-        {isRemoveConfirmModalOpen && questionToRemove && bank && (
-          <Modal
-            isOpen={isRemoveConfirmModalOpen}
-            onClose={() => {
+      {isGenerateAiModalOpen && bank && (
+        <Modal
+          isOpen={isGenerateAiModalOpen}
+          onClose={() => {
+            setIsGenerateAiModalOpen(false);
+            setError(null);
+          }}
+          title="Generate Questions with AI"
+          size="xl"
+        >
+          <GenerateAiQuestionsForm
+            bankId={bank._id}
+            bankCategories={bank.categories}
+            onAiQuestionsGenerated={handleAiQuestionsGenerated}
+            onCloseRequest={() => {
+              setIsGenerateAiModalOpen(false);
+              setError(null);
+            }}
+          />
+        </Modal>
+      )}
+
+      {isEditQuestionModalOpen && questionToEdit && (
+        <EditQuestionForm
+          questionToEdit={questionToEdit}
+          onQuestionUpdated={handleQuestionUpdatedByForm}
+          onClose={() => {
+            setIsEditQuestionModalOpen(false);
+            setQuestionToEdit(null);
+            setError(null);
+          }}
+        />
+      )}
+
+      {isRemoveConfirmModalOpen && questionToRemove && bank && (
+        <Modal
+          isOpen={isRemoveConfirmModalOpen}
+          onClose={() => {
+            setIsRemoveConfirmModalOpen(false);
+            setQuestionToRemove(null);
+          }}
+          title="Confirm Removal"
+        >
+          <ConfirmationModalContent
+            message={`Are you sure you want to remove the question "${questionToRemove.questionText}" from the bank "${bank.name}"? This action cannot be undone.`}
+            onConfirm={confirmRemoveQuestionFromBank}
+            onCancel={() => {
               setIsRemoveConfirmModalOpen(false);
               setQuestionToRemove(null);
             }}
-            title="Confirm Removal"
-          >
-            <ConfirmationModalContent
-              message={`Are you sure you want to remove the question "${questionToRemove.questionText}" from the bank "${bank.name}"? This action cannot be undone.`}
-              onConfirm={confirmRemoveQuestionFromBank}
-              onCancel={() => {
-                setIsRemoveConfirmModalOpen(false);
-                setQuestionToRemove(null);
-              }}
-              confirmText="Remove Question"
-              confirmButtonVariant="destructive"
-              isLoadingConfirm={isProcessingRemove}
-            />
-          </Modal>
-        )}
-      </div>
+            confirmText="Remove Question"
+            confirmButtonVariant="destructive"
+            isLoadingConfirm={isProcessingRemove}
+          />
+        </Modal>
+      )}
     </Modal>
   );
 };

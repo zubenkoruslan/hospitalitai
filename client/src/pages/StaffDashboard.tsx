@@ -1,37 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import api, {
-  ClientIQuiz,
-  ClientStaffQuizProgress,
   getAvailableQuizzesForStaff,
   getMyQuizProgress,
+  getQuizAttemptDetails,
 } from "../services/api";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
-import QuizResultDetailModal from "../components/QuizResultDetailModal";
-
-// Types needed for Quiz Data (copied from deleted StaffQuizListPage)
-interface QuizListItem {
-  _id: string;
-  title: string;
-  description?: string;
-  numQuestions: number;
-  score?: number;
-  totalQuestions?: number;
-  completedAt?: Date | string;
-  retakeCount?: number;
-  status?: string; // e.g., 'pending', 'completed'
-  latestResultId?: string; // Added field for the specific result ID from backend
-}
+import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
+import {
+  ClientStaffQuizProgressWithAttempts,
+  ClientQuizAttemptSummary,
+} from "../types/staffTypes";
+import { ClientIQuiz, ClientQuizAttemptDetails } from "../types/quizTypes";
 
 // New interface for combining Quiz definition with its progress
 interface StaffQuizDisplayItem extends ClientIQuiz {
-  progress?: ClientStaffQuizProgress | null;
-  averageScore?: number | null;
+  progress?: ClientStaffQuizProgressWithAttempts | null;
 }
 
 // Interface for Ranking Data
@@ -62,43 +51,36 @@ const formatApiError = (err: any, context: string): string => {
   }
 };
 
-// --- Helper Component for Rendering a Single Quiz Item ---
+// --- Helper Component for Rendering a Single Quiz Item (Refactored) ---
 interface QuizItemProps {
   quizDisplayItem: StaffQuizDisplayItem;
-  formatDate: (dateString?: string | Date) => string;
+  onViewAttemptIncorrectAnswers: (attemptId: string) => void;
 }
 
-const QuizItem: React.FC<QuizItemProps> = ({ quizDisplayItem, formatDate }) => {
-  const { title, description, progress, averageScore } = quizDisplayItem;
-
-  // ADDED: Log quizId and title
-  useEffect(() => {
-    if (quizDisplayItem && quizDisplayItem._id && quizDisplayItem.title) {
-      console.log(
-        `QUIZ INFO: ID = ${quizDisplayItem._id}, Title = "${quizDisplayItem.title}", AvgScore = ${averageScore}%`
-      );
-    }
-  }, [quizDisplayItem, averageScore]);
+const QuizItem: React.FC<QuizItemProps> = ({
+  quizDisplayItem,
+  onViewAttemptIncorrectAnswers,
+}) => {
+  const { title, description, progress, _id: quizId } = quizDisplayItem;
+  const navigate = useNavigate();
 
   const isCompletedOverall = progress?.isCompletedOverall || false;
-  const seenQuestionsCount = progress?.seenQuestionIds?.length || 0;
-  const totalUniqueInSource =
-    progress?.totalUniqueQuestionsInSource ||
-    quizDisplayItem.numberOfQuestionsPerAttempt; // Fallback for display, use quizDisplayItem.numberOfQuestionsPerAttempt
-
-  // Overall Progress calculation
   const overallProgressPercentage =
-    totalUniqueInSource > 0
-      ? Math.round((seenQuestionsCount / totalUniqueInSource) * 100)
+    progress?.totalUniqueQuestionsInSource &&
+    progress.totalUniqueQuestionsInSource > 0
+      ? Math.round(
+          ((progress.seenQuestionIds?.length || 0) /
+            progress.totalUniqueQuestionsInSource) *
+            100
+        )
       : 0;
 
   return (
-    <div
-      key={quizDisplayItem._id}
-      className="bg-white border border-gray-200 shadow-sm rounded-lg p-4 flex flex-col justify-between hover:shadow-lg transition-shadow duration-200 h-full"
+    <Card
+      data-testid={`quiz-item-${quizId}`}
+      className="flex flex-col justify-between h-full shadow-sm hover:shadow-lg transition-shadow duration-200 border border-gray-200"
     >
-      {/* Quiz Info Section */}
-      <div className="flex-grow">
+      <div className="flex-grow p-4">
         <h3
           className="text-md font-semibold text-gray-800 mb-1 truncate"
           title={title}
@@ -125,41 +107,93 @@ const QuizItem: React.FC<QuizItemProps> = ({ quizDisplayItem, formatDate }) => {
               style={{ width: `${overallProgressPercentage}%` }}
             ></div>
           </div>
-          {/* {isCompletedOverall && (
-            <span className="block text-xxs text-green-600 font-semibold mt-1">
-              (Completed Overall)
-            </span>
-          )} */}
         </div>
 
-        {averageScore !== null && averageScore !== undefined && (
-          <p className="text-xs text-gray-500 mt-1 mb-2">
-            Your Average Score:{" "}
-            <span
-              className={`font-semibold ${
-                averageScore >= 70 ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {averageScore.toFixed(1)}%
-            </span>
-          </p>
+        {progress?.averageScore !== null &&
+          progress?.averageScore !== undefined && (
+            <p className="text-xs text-gray-500 mt-1 mb-2">
+              Your Average Score:{" "}
+              <span
+                className={`font-semibold ${
+                  progress.averageScore >= 70
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {progress.averageScore.toFixed(1)}%
+              </span>
+            </p>
+          )}
+
+        {progress && progress.attempts && progress.attempts.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <h4 className="text-xs font-medium text-gray-600 mb-2">
+              Your Attempts:
+            </h4>
+            <ul className="space-y-2 max-h-32 overflow-y-auto pr-1">
+              {progress.attempts.map((attempt, index) => (
+                <li
+                  key={attempt._id}
+                  className="text-xs p-2 bg-gray-50 hover:bg-gray-100 rounded-md flex justify-between items-center"
+                >
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Attempt {progress.attempts.length - index}
+                    </span>
+                    <span className="text-gray-500 ml-2">
+                      ({new Date(attempt.attemptDate).toLocaleDateString()})
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <span
+                      className={`font-semibold mr-2 ${
+                        attempt.score >= attempt.totalQuestions * 0.7
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {attempt.score}/{attempt.totalQuestions} pts
+                    </span>
+                    {attempt.hasIncorrectAnswers &&
+                      progress.staffUserId?._id && (
+                        <Button
+                          variant="secondary"
+                          className="text-blue-600 hover:text-blue-700 hover:underline text-xs p-0 m-0 leading-none bg-transparent border-none shadow-none focus:outline-none focus:ring-0"
+                          onClick={() =>
+                            onViewAttemptIncorrectAnswers(attempt._id)
+                          }
+                        >
+                          View Incorrect
+                        </Button>
+                      )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
-      {/* Action Section */}
-      <div className="flex-shrink-0 mt-auto pt-3">
+      <div className="flex-shrink-0 mt-auto p-4 border-t border-gray-100">
         {!isCompletedOverall ? (
-          <Link
-            to={`/staff/quiz/${quizDisplayItem._id}/take`}
-            className="w-full block"
+          <Button
+            variant="primary"
+            className="w-full text-sm py-1.5"
+            onClick={() => navigate(`/staff/quiz/${quizId}/take`)}
           >
-            <Button variant="primary" className="w-full text-sm py-1.5">
-              Take Quiz
-            </Button>
-          </Link>
-        ) : null}
+            Take Quiz
+          </Button>
+        ) : progress && progress.attempts.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-1.5">
+            Quiz completed. No attempts logged.
+          </p>
+        ) : (
+          <p className="text-xs text-green-600 text-center py-1.5">
+            You have completed this quiz.
+          </p>
+        )}
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -167,31 +201,23 @@ const StaffDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Log the user object to inspect its contents
-  useEffect(() => {
-    console.log("Auth User Object in StaffDashboard:", user);
-    if (user && user.userId) {
-      console.log("STAFF USER ID (Misha's UserID):", user.userId);
-    }
-  }, [user]);
-
   // State for quizzes
   const [quizzes, setQuizzes] = useState<StaffQuizDisplayItem[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState<boolean>(true);
   const [quizError, setQuizError] = useState<string | null>(null);
-  // const [isCompletedVisible, setIsCompletedVisible] = useState<boolean>(false); // State for collapsible section - REMOVED FOR NOW, simplify
 
   // State for ranking
   const [rankingData, setRankingData] = useState<RankingData | null>(null);
   const [loadingRanking, setLoadingRanking] = useState<boolean>(true);
   const [rankingError, setRankingError] = useState<string | null>(null);
 
-  // State for Quiz Detail Modal
-  // const [selectedResultIdForModal, setSelectedResultIdForModal] = useState<
-  //   string | null
-  // >(null);
-  // const [isQuizDetailModalOpen, setIsQuizDetailModalOpen] =
-  //   useState<boolean>(false);
+  // State for Incorrect Answers Modal
+  const [isIncorrectAnswersModalOpen, setIsIncorrectAnswersModalOpen] =
+    useState<boolean>(false);
+  const [selectedAttemptForModal, setSelectedAttemptForModal] =
+    useState<ClientQuizAttemptDetails | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState<boolean>(false);
 
   // Combined loading state
   const isLoading = authIsLoading || loadingQuizzes || loadingRanking;
@@ -207,25 +233,31 @@ const StaffDashboard: React.FC = () => {
       setLoadingQuizzes(true);
       setQuizError(null);
       try {
-        // 1. Fetch available quiz definitions
-        const availableQuizzes = await getAvailableQuizzesForStaff();
-
-        // 2. For each quiz, fetch its progress
-        const quizzesWithProgress = await Promise.all(
-          availableQuizzes.map(async (quizDef) => {
+        const available = await getAvailableQuizzesForStaff();
+        if (available && available.length > 0) {
+          const quizzesWithProgressPromises = available.map(async (quizDef) => {
             try {
               const progress = await getMyQuizProgress(quizDef._id);
-              return { ...quizDef, progress: progress || undefined }; // Ensure progress is undefined not null if not found
+              return {
+                ...quizDef,
+                progress: progress || undefined,
+              };
             } catch (progressError) {
               console.error(
                 `Failed to fetch progress for quiz ${quizDef._id}:`,
                 progressError
               );
-              return { ...quizDef, progress: undefined }; // Attach quiz def even if progress fails
+              return {
+                ...quizDef,
+                progress: undefined,
+              };
             }
-          })
-        );
-        setQuizzes(quizzesWithProgress);
+          });
+          const quizzesWithProgress = await Promise.all(
+            quizzesWithProgressPromises
+          );
+          setQuizzes(quizzesWithProgress);
+        }
       } catch (err: any) {
         setQuizError(formatApiError(err, "fetching quizzes and progress"));
       } finally {
@@ -267,15 +299,43 @@ const StaffDashboard: React.FC = () => {
     }
   };
 
-  // --- Modal Handlers ---
-  const handleOpenQuizDetailModal = (resultId: string) => {
-    // setSelectedResultIdForModal(resultId);
-    // setIsQuizDetailModalOpen(true);
-  };
+  // MODIFIED/NEW: Handler for opening modal with specific attempt details
+  const handleOpenAttemptIncorrectAnswersModal = useCallback(
+    async (attemptId: string) => {
+      setModalLoading(true);
+      setModalError(null);
+      setSelectedAttemptForModal(null);
+      setIsIncorrectAnswersModalOpen(true);
+      try {
+        const attemptDetails = await getQuizAttemptDetails(attemptId);
+        if (attemptDetails) {
+          setSelectedAttemptForModal({
+            _id: attemptDetails._id,
+            quizId: attemptDetails.quizId,
+            quizTitle: attemptDetails.quizTitle,
+            userId: attemptDetails.userId,
+            score: attemptDetails.score,
+            totalQuestions: attemptDetails.totalQuestions,
+            attemptDate: attemptDetails.attemptDate,
+            incorrectQuestions: attemptDetails.incorrectQuestions,
+          });
+        } else {
+          setModalError("Could not load attempt details.");
+        }
+      } catch (error) {
+        console.error("Error fetching attempt details for modal:", error);
+        setModalError(formatApiError(error, "loading incorrect answers"));
+      } finally {
+        setModalLoading(false);
+      }
+    },
+    []
+  );
 
-  const handleCloseQuizDetailModal = () => {
-    // setIsQuizDetailModalOpen(false);
-    // setSelectedResultIdForModal(null);
+  const handleCloseIncorrectAnswersModal = () => {
+    setIsIncorrectAnswersModalOpen(false);
+    setSelectedAttemptForModal(null);
+    setModalError(null);
   };
 
   // Show loading spinner if auth context is loading
@@ -319,7 +379,7 @@ const StaffDashboard: React.FC = () => {
     if (!rankingData)
       return <p className="text-gray-600">Could not load performance data.</p>;
 
-    const { myAverageScore, myRank, totalRankedStaff } = rankingData;
+    const { myAverageScore } = rankingData;
 
     return (
       <Card title="Performance Summary">
@@ -339,15 +399,6 @@ const StaffDashboard: React.FC = () => {
               " N/A (No completed quizzes)"
             )}
           </p>
-          {/* 
-          <p>
-            <span className="font-medium">Your Rank:</span> 
-            {myRank !== null && totalRankedStaff > 0 
-              ? ` ${myRank} out of ${totalRankedStaff}` 
-              : " Not ranked yet"}
-          </p>
-          {totalRankedStaff === 0 && <p className="text-xs text-gray-500">(No staff have completed quizzes yet)</p>}
-          */}
         </div>
       </Card>
     );
@@ -400,9 +451,10 @@ const StaffDashboard: React.FC = () => {
         <div className="space-y-6">
           {/* Performance Summary Section */}
           <div>
-            {" "}
-            {/* Wrapper div for consistent spacing if needed, can be Card directly */}
-            <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+            <Card
+              className="bg-white shadow-lg rounded-xl p-4 sm:p-6"
+              data-testid="performance-summary-card"
+            >
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">
                 Your Performance Summary
               </h2>
@@ -442,7 +494,9 @@ const StaffDashboard: React.FC = () => {
                       <QuizItem
                         key={quiz._id}
                         quizDisplayItem={quiz}
-                        formatDate={formatDate}
+                        onViewAttemptIncorrectAnswers={
+                          handleOpenAttemptIncorrectAnswersModal
+                        }
                       />
                     ))}
                   </div>
@@ -464,7 +518,9 @@ const StaffDashboard: React.FC = () => {
                       <QuizItem
                         key={quiz._id}
                         quizDisplayItem={quiz}
-                        formatDate={formatDate}
+                        onViewAttemptIncorrectAnswers={
+                          handleOpenAttemptIncorrectAnswersModal
+                        }
                       />
                     ))}
                   </div>
@@ -478,15 +534,13 @@ const StaffDashboard: React.FC = () => {
           )}
         </div>
       </main>
-      {/* Removed QuizDetailModal for now to simplify, can be re-added if needed 
-      {selectedResultIdForModal && (
-        <QuizResultDetailModal
-          isOpen={isQuizDetailModalOpen}
-          onClose={handleCloseQuizDetailModal}
-          resultId={selectedResultIdForModal}
+      {isIncorrectAnswersModalOpen && selectedAttemptForModal && (
+        <ViewIncorrectAnswersModal
+          isOpen={isIncorrectAnswersModalOpen}
+          onClose={handleCloseIncorrectAnswersModal}
+          quizResult={selectedAttemptForModal}
         />
       )}
-      */}
     </div>
   );
 };

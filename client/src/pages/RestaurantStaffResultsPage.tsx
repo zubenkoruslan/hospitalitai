@@ -6,7 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+// import api from "../services/api"; // Removed unused direct API import
 import { useAuth } from "../context/AuthContext";
 import { useStaffSummary } from "../hooks/useStaffSummary"; // Import the new hook
 import { useQuizCount } from "../hooks/useQuizCount"; // Import the quiz count hook

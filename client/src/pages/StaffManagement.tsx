@@ -1,25 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { getStaffList, deleteStaffMember } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import Card from "../components/common/Card";
-
-// --- Interfaces ---
-interface StaffMemberSummary {
-  _id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  professionalRole?: string;
-}
+import { StaffMemberWithData } from "../types/staffTypes";
 
 // --- Main Component ---
 const StaffManagement: React.FC = () => {
-  const [staffList, setStaffList] = useState<StaffMemberSummary[]>([]);
+  const [staffList, setStaffList] = useState<StaffMemberWithData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -30,10 +22,8 @@ const StaffManagement: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get<{ staff: StaffMemberSummary[] }>(
-          "/staff"
-        );
-        setStaffList(response.data.staff || []);
+        const fetchedStaff = await getStaffList();
+        setStaffList(fetchedStaff || []);
       } catch (err: any) {
         console.error("Error fetching staff list:", err);
         setError(err.response?.data?.message || "Failed to load staff data.");
@@ -79,7 +69,7 @@ const StaffManagement: React.FC = () => {
     // For now, rely on the main loading state if needed, or just update UI optimistically/on success.
 
     try {
-      await api.delete(`/staff/${staffId}`);
+      await deleteStaffMember(staffId);
       // Update UI: Remove the deleted staff member from the list
       setStaffList((prevList) =>
         prevList.filter((staff) => staff._id !== staffId)

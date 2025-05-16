@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React, { ReactNode, useEffect, useRef } from "react";
 import Button from "./Button"; // Assuming Button component exists
 
 interface ModalProps {
@@ -18,6 +18,29 @@ const Modal: React.FC<ModalProps> = ({
   footerContent,
   size = "md", // Default size
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null); // Ref for the modal content
+
+  // Handle Escape key press for closing the modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      // Set initial focus to the modal container or a specific element
+      // For simplicity, focusing the modal content div itself.
+      // A more robust solution might focus the first interactive element or the close button.
+      modalRef.current?.focus();
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -44,6 +67,8 @@ const Modal: React.FC<ModalProps> = ({
       }
     >
       <div
+        ref={modalRef} // Assign ref
+        tabIndex={-1} // Make the modal content focusable
         className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast`}
         onClick={handleContentClick} // Prevent closing when clicking modal content
       >

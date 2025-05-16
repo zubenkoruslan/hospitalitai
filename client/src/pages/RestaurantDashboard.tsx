@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import { processPdfMenuUpload } from "../services/api"; // For menu upload
 import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
@@ -16,32 +16,14 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
+import { StaffMemberWithData, ResultSummary } from "../types/staffTypes"; // Import from types
 
-// Updated Interfaces to match API response from GET /api/staff
-interface ResultSummary {
-  // Assuming this remains the same if still needed
-  _id: string;
-  quizId: string;
-  quizTitle: string;
-  score: number;
-  totalQuestions: number;
-  completedAt?: string;
-  status: string;
-  retakeCount: number;
-}
-
-interface StaffMemberWithData {
-  _id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  professionalRole?: string;
-  resultsSummary: ResultSummary[]; // Keep summary if needed
-  averageScore: number | null; // Add the average score from backend
-  quizzesTaken: number; // Add the count from backend
-}
+// // Updated Interfaces to match API response from GET /api/staff (REMOVED - Now imported)
+// interface ResultSummary { ... }
+// interface StaffMemberWithData { ... }
 
 // Helper function to check if a quiz is completed regardless of capitalization
+// This function uses ResultSummary, ensure it's compatible with the imported one
 const isCompletedQuiz = (result: ResultSummary): boolean => {
   const status = result.status.toLowerCase();
   return status === "completed";
@@ -148,11 +130,7 @@ const RestaurantDashboard: React.FC = () => {
     formData.append("menuPdf", selectedFile);
 
     try {
-      await api.post(`/menus/upload/pdf/${user.restaurantId}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await processPdfMenuUpload(user.restaurantId, formData);
       setUploadMessage("Menu uploaded successfully!");
       setSelectedFile(null);
       if (fileInputRef.current) {
@@ -227,11 +205,13 @@ const RestaurantDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                {user?.restaurantName
+                {
+                  /* user?.restaurantName // This field is not in ClientUserMinimal
                   ? `${user.restaurantName} Dashboard`
-                  : user?.name
-                  ? `${user.name}'s Dashboard`
-                  : "Restaurant Dashboard"}
+                  : */ user?.name
+                    ? `${user.name}'s Dashboard`
+                    : "Restaurant Dashboard"
+                }
               </h1>
               {user?.restaurantId && (
                 <div className="mt-2 flex items-center">

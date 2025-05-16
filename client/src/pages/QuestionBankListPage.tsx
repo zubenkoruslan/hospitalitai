@@ -6,7 +6,7 @@ import {
   IQuestionBank,
   // CreateQuestionBankData, // No longer directly used here if form handles its own type
   // CreateQuestionBankFromMenuClientData, // No longer directly used here
-  // MenuAiGenerationClientParams, // No longer directly used here
+  // MenuAiGenerationClientParams, // No longer used here
 } from "../types/questionBankTypes";
 // import { IMenuClient, IMenuWithItemsClient } from "../types/menuTypes"; // No longer used
 // import {

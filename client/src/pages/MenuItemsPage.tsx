@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { AxiosResponse } from "axios";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import {
+  createMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
+  updateMenu,
+  deleteMenuCategory,
+} from "../services/api";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -13,7 +18,6 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // A
 // Import shared types
 import {
   MenuItem,
-  Menu,
   MenuItemFormData,
   ItemType,
   ItemCategory,
@@ -22,6 +26,7 @@ import {
   FOOD_CATEGORIES,
   BEVERAGE_CATEGORIES,
 } from "../types/menuItemTypes";
+import { IMenuClient } from "../types/menuTypes"; // Correct: Import IMenuClient for Menu details type
 // Import quiz components
 import QuizList from "../components/quiz/QuizList";
 import CreateQuizModal from "../components/quiz/CreateQuizModal";
@@ -180,81 +185,57 @@ const MenuItemsPage: React.FC = () => {
       if (!menuId || !restaurantId) return;
 
       setIsSubmittingItem(true);
-      // setError(null); // Error from hook will be used for fetch errors
-      setSuccessMessage(null); // Clear previous success message
+      setSuccessMessage(null);
 
       try {
-        // Prepare data for API
-        const apiData = {
+        // Prepare data for API based on MenuItemFormData, menuId is already in submittedFormData
+        const dataForService: MenuItemFormData = {
           ...submittedFormData,
-          price: submittedFormData.price
-            ? parseFloat(submittedFormData.price)
-            : undefined,
-          ingredients: submittedFormData.ingredients
-            ? submittedFormData.ingredients.split(",").map((s) => s.trim())
-            : [],
-          // Ensure all boolean flags are present, even if false, as per IMenuItem expectations
-          isGlutenFree: submittedFormData.isGlutenFree ?? false,
-          isDairyFree: submittedFormData.isDairyFree ?? false,
-          isVegetarian: submittedFormData.isVegetarian ?? false,
-          isVegan: submittedFormData.isVegan ?? false,
-          menuId: menuId,
-          restaurantId: restaurantId,
+          // price string to number conversion is handled by transformMenuItemFormData in api.ts
+          // ingredients string to array is handled by transformMenuItemFormData in api.ts
         };
+        // Ensure boolean flags are correctly passed if not handled by transformMenuItemFormData for partial updates
+        // However, createMenuItem and updateMenuItem in api.ts use transformMenuItemFormData which handles this.
 
-        let response: AxiosResponse<{ item: MenuItem }>;
         const isEditMode = currentItemId !== null;
 
-        if (isEditMode) {
-          response = await api.put(`/items/${currentItemId}`, apiData);
+        if (isEditMode && currentItemId) {
+          // Ensure currentItemId is not null for edit mode
+          // updateMenuItem expects Partial<MenuItemFormData>
+          // transformMenuItemFormData in api.ts handles the conversion
+          await updateMenuItem(currentItemId, submittedFormData); // Pass submittedFormData directly
           setSuccessMessage("Menu item updated successfully.");
         } else {
-          response = await api.post("/items", apiData);
+          // createMenuItem expects MenuItemFormData
+          await createMenuItem(submittedFormData); // Pass submittedFormData directly
           setSuccessMessage("Menu item added successfully.");
         }
-        fetchData(); // Re-fetch data using the hook's function
+        fetchData();
         closeModal();
       } catch (err: any) {
-        // Handle submit-specific error differently if needed
         console.error("Error submitting item:", err);
-        // Maybe set a specific submitError state?
-        // For now, rely on the main error display if it catches API errors
-        // Or display a generic submit error message
-        setSuccessMessage(null); // Ensure no success message is shown on error
-        // Consider adding a submitError state: setSubmitError(err.response?.data?.message || "Failed to save item.")
+        // TODO: Set a specific submit error state for the modal instead of general page error
       } finally {
         setIsSubmittingItem(false);
       }
     },
-    [menuId, restaurantId, fetchData, closeModal]
+    [menuId, restaurantId, fetchData, closeModal] // restaurantId might be removed from deps if not used directly
   );
 
   // --- Delete Confirmation ---
   const handleDeleteMenuItemConfirm = useCallback(async () => {
     if (!currentItem || !currentItem._id) return;
-
     setIsSubmittingItem(true);
-    // setError(null); // Error state from hook is for fetching, maybe avoid setting it here?
-    // Let's introduce a temporary page-level error for this action if needed
-    // Or perhaps pass an onError callback to the DeleteModal
-    // For now, we will update the main error state from the hook, assuming it's okay.
-    // const { setError } = useMenuData(menuId); // This wouldn't work, hook is called at top level.
-    // We need to decide where delete errors are displayed. Let's use the main 'error' for now.
-    // To do this properly, the hook might need an `setError` function returned.
-    // **Alternative for now: Just log formatted error, rely on console.**
     setSuccessMessage(null);
-
     try {
-      await api.delete(`/items/${currentItem._id}`);
+      // await api.delete(`/items/${currentItem._id}`);
+      await deleteMenuItem(currentItem._id); // Use service function
       setSuccessMessage("Menu item deleted successfully.");
-      fetchData(); // Re-fetch data using the hook's function
+      fetchData();
       closeModal();
     } catch (err: any) {
-      // Log formatted error, but don't set state directly here without clear display target
       console.error(formatApiError(err, "deleting menu item"));
       setSuccessMessage(null);
-      // Maybe add a specific deleteError state?
-      // setDeleteError(formatApiError(err, "deleting menu item"));
     } finally {
       setIsSubmittingItem(false);
     }
@@ -263,8 +244,11 @@ const MenuItemsPage: React.FC = () => {
   // --- Menu Details Edit Handlers ---
   const handleSaveMenuDetails = useCallback(
     async (name: string, description: string) => {
-      // Modified to accept name/desc from modal
-      if (!menuId) return;
+      if (!menuId) {
+        setMenuDetailsError("Menu ID is missing. Cannot save details.");
+        return;
+      }
+      // Basic validation (optional, can be in modal too)
       if (!name.trim()) {
         setMenuDetailsError("Menu name cannot be empty.");
         // Potentially return error or throw to be caught by modal
@@ -276,16 +260,19 @@ const MenuItemsPage: React.FC = () => {
       setSuccessMessage(null);
 
       try {
-        await api.put(`/menus/${menuId}`, {
+        // await api.put(`/menus/${menuId}`, {
+        //   name: name.trim(),
+        //   description: description.trim(),
+        // });
+        await updateMenu(menuId, {
+          // Use service function
           name: name.trim(),
           description: description.trim(),
         });
         setSuccessMessage("Menu details updated successfully.");
-        // setIsEditingMenuDetails(false); // No longer needed
-        fetchData(); // Refresh all data including menu details
-        closeMenuDetailsModal(); // Close modal on success
+        fetchData();
+        closeMenuDetailsModal();
       } catch (err: any) {
-        // Use the helper for the specific modal error state
         setMenuDetailsError(formatApiError(err, "saving menu details"));
       } finally {
         setIsSavingMenuDetails(false);
@@ -345,35 +332,29 @@ const MenuItemsPage: React.FC = () => {
 
     setIsDeletingCategory(true);
     setSuccessMessage(null);
-    // setError(null); // Error is handled by the hook, let's manage specific delete error if needed
 
     try {
-      // Replace the placeholder with an actual API call
-      // The backend would handle finding items in `categoryToDelete` for this `menuId`
-      // and reassigning them to "Non Assigned".
-      await api.delete(
-        `/menus/${menuId}/categories/${encodeURIComponent(categoryToDelete)}`
-      );
+      // await api.delete(
+      //   `/menus/${menuId}/categories/${encodeURIComponent(categoryToDelete)}`
+      // );
+      await deleteMenuCategory(menuId, categoryToDelete); // Use service function
 
       setSuccessMessage(
         `Category "${categoryToDelete}" deleted successfully. Items reassigned.`
       );
-      fetchData(); // Refresh data from the server
+      fetchData();
       closeDeleteCategoryModal();
     } catch (err: any) {
       console.error(
         formatApiError(err, `deleting category ${categoryToDelete}`)
       );
-      // If you have a dedicated error state for this modal/action, set it here.
-      // For now, relying on console and potentially a general error message if fetchData fails.
-      // setError(formatApiError(err, `deleting category ${categoryToDelete}`));
       alert(
         `Failed to delete category "${categoryToDelete}". ${formatApiError(
           err,
           "deleting category"
         )}`
       );
-      closeDeleteCategoryModal(); // Still close modal on error
+      closeDeleteCategoryModal();
     } finally {
       setIsDeletingCategory(false);
     }

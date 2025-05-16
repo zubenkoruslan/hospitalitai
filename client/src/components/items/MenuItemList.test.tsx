@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import MenuItemList from "./MenuItemList";
 import { MenuItem, FOOD_CATEGORIES } from "../../types/menuItemTypes";
@@ -87,6 +87,52 @@ describe("MenuItemList", () => {
     expect(
       screen.queryByText(/No menu items added yet/i)
     ).not.toBeInTheDocument();
+  });
+
+  it("displays dietary flags correctly for items", () => {
+    render(<MenuItemList {...defaultProps} />);
+
+    // For mockItems[0] (Cheeseburger) - all flags are false
+    const cheeseburgerCard = screen
+      .getByText(mockItems[0].name)
+      .closest("div.bg-white");
+    expect(cheeseburgerCard).toBeInTheDocument();
+    expect(cheeseburgerCard).toBeInstanceOf(HTMLElement);
+    if (cheeseburgerCard) {
+      expect(
+        within(cheeseburgerCard as HTMLElement).queryByText("GF")
+      ).not.toBeInTheDocument();
+      expect(
+        within(cheeseburgerCard as HTMLElement).queryByText("DF")
+      ).not.toBeInTheDocument();
+      expect(
+        within(cheeseburgerCard as HTMLElement).queryByText("V")
+      ).not.toBeInTheDocument();
+      expect(
+        within(cheeseburgerCard as HTMLElement).queryByText("VG")
+      ).not.toBeInTheDocument();
+    }
+
+    // For mockItems[1] (French Fries) - all flags are true
+    const friesCard = screen
+      .getByText(mockItems[1].name)
+      .closest("div.bg-white");
+    expect(friesCard).toBeInTheDocument();
+    expect(friesCard).toBeInstanceOf(HTMLElement);
+    if (friesCard) {
+      expect(
+        within(friesCard as HTMLElement).getByText("GF")
+      ).toBeInTheDocument();
+      expect(
+        within(friesCard as HTMLElement).getByText("DF")
+      ).toBeInTheDocument();
+      expect(
+        within(friesCard as HTMLElement).getByText("V")
+      ).toBeInTheDocument();
+      expect(
+        within(friesCard as HTMLElement).getByText("VG")
+      ).toBeInTheDocument();
+    }
   });
 
   it("renders a message when the item list is empty", () => {

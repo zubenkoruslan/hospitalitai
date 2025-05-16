@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
-import { Menu, MenuItem } from "../types/menuItemTypes"; // Import shared types
+// import api from "../services/api"; // To be replaced
+import { getMenuWithItems } from "../services/api"; // Import service function
+// import { Menu, MenuItem } from "../types/menuItemTypes"; // Menu is incorrect here
+import { MenuItem } from "../types/menuItemTypes";
+import { IMenuClient, IMenuWithItemsClient } from "../types/menuTypes"; // Import correct menu types
 
 interface UseMenuDataReturn {
-  menuDetails: Menu | null;
+  menuDetails: IMenuClient | null; // Use IMenuClient
   items: MenuItem[];
   loading: boolean;
   error: string | null;
@@ -11,14 +14,11 @@ interface UseMenuDataReturn {
   clearError: () => void;
 }
 
-// Define the expected response structure from the single API call
-interface MenuWithItemsResponse {
-  success: boolean;
-  data: Menu & { items: MenuItem[] }; // Menu details are at the root of 'data', with an 'items' array inside
-}
+// This interface might be redundant if getMenuWithItems directly returns IMenuWithItemsClient
+// interface MenuWithItemsResponse { ... }
 
 export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
-  const [menuDetails, setMenuDetails] = useState<Menu | null>(null);
+  const [menuDetails, setMenuDetails] = useState<IMenuClient | null>(null); // Use IMenuClient
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,22 +36,15 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
     setError(null);
     console.log(`[useMenuData] Fetching data for menuId: ${menuId}`);
     try {
-      // Single API call to fetch menu details and its items
-      const response = await api.get<MenuWithItemsResponse>(`/menus/${menuId}`);
+      // const response = await api.get<MenuWithItemsResponse>(`/menus/${menuId}`);
+      const menuWithItemsData = await getMenuWithItems(menuId); // Use service function
 
-      if (response.data && response.data.success && response.data.data) {
-        const { items: fetchedItems, ...menuData } = response.data.data;
-        setMenuDetails(menuData as Menu); // Cast because ...menuData will be of type Menu
+      if (menuWithItemsData) {
+        const { items: fetchedItems, ...menuData } = menuWithItemsData;
+        setMenuDetails(menuData); // menuData is IMenuClient from IMenuWithItemsClient
         setItems(fetchedItems || []);
       } else {
-        // Handle cases where the response structure is not as expected
-        // or success is false
-        const message =
-          response.data?.success === false
-            ? "API request was not successful."
-            : "Menu data is not in the expected format or is missing.";
-        console.error("Error fetching or processing menu data:", response.data);
-        setError(message);
+        setError("Menu data not found or error in fetching.");
         setMenuDetails(null);
         setItems([]);
       }

@@ -31,29 +31,36 @@ const Button: React.FC<ButtonProps> = ({
   const baseStyles =
     "px-4 py-2 rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition ease-in-out duration-150";
 
-  // Variant-specific styles
+  // Variant-specific styles and spinner color
   let variantStyles = "";
+  let spinnerColorClass = "text-white"; // Default spinner color
+
   switch (variant) {
     case "secondary":
       variantStyles =
-        "border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-indigo-500"; // Using indigo focus for secondary as discussed
+        "border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-indigo-500";
+      spinnerColorClass = "text-gray-700"; // Spinner for secondary variant
       break;
     case "success":
       variantStyles =
         "border border-transparent text-white bg-green-600 hover:bg-green-700 focus:ring-green-500";
+      // spinnerColorClass remains text-white
       break;
     case "destructive": // Added destructive style
       variantStyles =
         "border border-transparent text-white bg-red-600 hover:bg-red-700 focus:ring-red-500";
+      // spinnerColorClass remains text-white
       break;
     case "white": // Added white style
       variantStyles =
         "border border-transparent text-blue-600 bg-white hover:bg-gray-100 focus:ring-blue-500";
+      spinnerColorClass = "text-blue-600"; // Spinner for white variant
       break;
     case "primary": // Default case
     default:
       variantStyles =
         "border border-transparent text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500";
+      // spinnerColorClass remains text-white
       break;
   }
 
@@ -70,7 +77,7 @@ const Button: React.FC<ButtonProps> = ({
       {isLoading ? (
         <span className="flex items-center justify-center">
           <svg
-            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+            className={`animate-spin -ml-1 mr-3 h-5 w-5 ${spinnerColorClass}`}
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"

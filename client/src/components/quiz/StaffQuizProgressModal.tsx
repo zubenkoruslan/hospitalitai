@@ -25,9 +25,15 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const calculatePercentage = (seen: number, total: number) => {
+  const calculatePercentage = (
+    seen: number,
+    totalInput: number | undefined | null
+  ) => {
+    const total =
+      typeof totalInput === "number" && totalInput > 0 ? totalInput : 0;
     if (total === 0) return 0;
-    return Math.round((seen / total) * 100);
+    const seenValid = typeof seen === "number" ? seen : 0;
+    return Math.round((seenValid / total) * 100);
   };
 
   const modalTitle = (
@@ -85,12 +91,28 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
-              {progressData.map((item) => {
+              {progressData.map((item: any) => {
                 let staffName = "Unknown Staff";
-                if (item.staffUserId && typeof item.staffUserId === "object") {
+                if (item.staffMember && typeof item.staffMember === "object") {
+                  if (
+                    item.staffMember.name &&
+                    item.staffMember.name.trim() !== ""
+                  ) {
+                    staffName = item.staffMember.name.trim();
+                  } else if (item.staffMember.email) {
+                    staffName = item.staffMember.email;
+                  } else if (item.staffMember._id) {
+                    staffName = `Staff ID: ${item.staffMember._id}`;
+                  }
+                } else if (
+                  item.staffUserId &&
+                  typeof item.staffUserId === "object"
+                ) {
                   const user = item.staffUserId as any;
                   if (user.name && user.name.trim() !== "") {
                     staffName = user.name.trim();
+                  } else if (user.email) {
+                    staffName = user.email;
                   } else if (user._id) {
                     staffName = `Staff ID: ${user._id}`;
                   }
@@ -98,12 +120,25 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                   staffName = `Staff ID: ${item.staffUserId}`;
                 }
 
+                // Defensively handle seenQuestionIds and totalUniqueQuestionsInSource from item.progress
+                const progressDetails = item.progress;
+                const seenIds = Array.isArray(progressDetails?.seenQuestionIds)
+                  ? progressDetails.seenQuestionIds
+                  : [];
+                const totalQsInSource =
+                  typeof progressDetails?.totalUniqueQuestionsInSource ===
+                  "number"
+                    ? progressDetails.totalUniqueQuestionsInSource
+                    : 0;
+
                 const percentage = calculatePercentage(
-                  item.seenQuestionIds.length,
-                  item.totalUniqueQuestionsInSource
+                  seenIds.length,
+                  totalQsInSource
                 );
                 return (
-                  <tr key={item._id}>
+                  <tr key={item.staffMember?._id || item._id}>
+                    {" "}
+                    {/* Use staffMember._id for key if available */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
                       {staffName}
                     </td>
@@ -112,7 +147,7 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                         <div className="w-full bg-slate-200 rounded-full h-2.5">
                           <div
                             className={`h-2.5 rounded-full ${
-                              item.isCompletedOverall
+                              progressDetails?.isCompletedOverall // Access via progressDetails
                                 ? "bg-emerald-500"
                                 : "bg-sky-500"
                             }`}
@@ -125,16 +160,16 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {item.lastAttemptTimestamp
+                      {progressDetails?.lastAttemptTimestamp // Access via progressDetails
                         ? new Date(
-                            item.lastAttemptTimestamp
+                            progressDetails.lastAttemptTimestamp
                           ).toLocaleDateString()
                         : "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {typeof item.averageScore === "number"
-                        ? `${item.averageScore.toFixed(0)}%`
-                        : "N/A"}
+                      {typeof item.averageScoreForQuiz === "number" // Use item.averageScoreForQuiz
+                        ? `${item.averageScoreForQuiz.toFixed(0)}%`
+                        : "0%"}
                     </td>
                   </tr>
                 );

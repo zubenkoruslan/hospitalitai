@@ -4,8 +4,6 @@ import {
   IQuestion,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
-import Card from "../common/Card";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 import { generateAiQuestions as apiGenerateAiQuestions } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
@@ -14,14 +12,14 @@ interface GenerateAiQuestionsFormProps {
   bankId: string;
   bankCategories: string[];
   onAiQuestionsGenerated: (questions: IQuestion[]) => void;
-  onClose: () => void;
+  onCloseRequest: () => void;
 }
 
 const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   bankId,
   bankCategories,
   onAiQuestionsGenerated,
-  onClose,
+  onCloseRequest,
 }) => {
   const { formatErrorMessage } = useValidation();
   const [categories, setCategories] = useState("");
@@ -86,107 +84,85 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   const commonLabelClass = "block text-sm font-medium text-gray-700";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-auto">
-      <Card
-        title="Generate Questions with AI"
-        className="w-full max-w-lg bg-white relative max-h-[90vh] flex flex-col"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 disabled:text-gray-300"
-          aria-label="Close form"
+    <form onSubmit={handleSubmit} className="p-1 space-y-4">
+      {formError && (
+        <div
+          className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md"
+          role="alert"
+        >
+          {formError}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="aiCategories" className={commonLabelClass}>
+          Categories for AI Generation (comma-separated)
+        </label>
+        <input
+          id="aiCategories"
+          type="text"
+          value={categories}
+          onChange={(e) => setCategories(e.target.value)}
+          placeholder="e.g., Red Wine, Italian Cuisine, Allergens"
+          required
+          className={commonInputClass}
+          disabled={internalIsLoading}
+        />
+        {bankCategories && bankCategories.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500">
+            Suggested from bank: {bankCategories.join(", ")}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="targetQuestionCount" className={commonLabelClass}>
+          Number of Questions to Generate
+        </label>
+        <input
+          id="targetQuestionCount"
+          type="number"
+          value={targetQuestionCount}
+          onChange={(e) =>
+            setTargetQuestionCount(parseInt(e.target.value, 10) || 1)
+          }
+          min="1"
+          max="20"
+          required
+          className={commonInputClass}
+          disabled={internalIsLoading}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="menuContext" className={commonLabelClass}>
+          Additional Context / Instructions (Optional)
+        </label>
+        <textarea
+          id="menuContext"
+          value={menuContext}
+          onChange={(e) => setMenuContext(e.target.value)}
+          rows={4}
+          placeholder="Provide context from your menu or specific topics... E.g., 'Focus on vegan items.'"
+          className={commonInputClass}
+          disabled={internalIsLoading}
+        />
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-3">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCloseRequest}
           disabled={internalIsLoading}
         >
-          <XMarkIcon className="h-6 w-6" />
-        </button>
-        <form
-          onSubmit={handleSubmit}
-          className="p-5 space-y-4 overflow-y-auto flex-grow"
-        >
-          {formError && (
-            <div
-              className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md"
-              role="alert"
-            >
-              {formError}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="aiCategories" className={commonLabelClass}>
-              Categories for AI Generation (comma-separated)
-            </label>
-            <input
-              id="aiCategories"
-              type="text"
-              value={categories}
-              onChange={(e) => setCategories(e.target.value)}
-              placeholder="e.g., Red Wine, Italian Cuisine, Allergens"
-              required
-              className={commonInputClass}
-              disabled={internalIsLoading}
-            />
-            {bankCategories && bankCategories.length > 0 && (
-              <p className="mt-1 text-xs text-gray-500">
-                Suggested from bank: {bankCategories.join(", ")}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="targetQuestionCount" className={commonLabelClass}>
-              Number of Questions to Generate
-            </label>
-            <input
-              id="targetQuestionCount"
-              type="number"
-              value={targetQuestionCount}
-              onChange={(e) =>
-                setTargetQuestionCount(parseInt(e.target.value, 10) || 1)
-              }
-              min="1"
-              max="20"
-              required
-              className={commonInputClass}
-              disabled={internalIsLoading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="menuContext" className={commonLabelClass}>
-              Additional Context / Instructions (Optional)
-            </label>
-            <textarea
-              id="menuContext"
-              value={menuContext}
-              onChange={(e) => setMenuContext(e.target.value)}
-              rows={4}
-              placeholder="Provide context from your menu or specific topics... E.g., 'Focus on vegan items.'"
-              className={commonInputClass}
-              disabled={internalIsLoading}
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-3">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onClose}
-              disabled={internalIsLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={internalIsLoading}
-            >
-              {internalIsLoading ? <LoadingSpinner /> : "Generate Questions"}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" disabled={internalIsLoading}>
+          {internalIsLoading ? <LoadingSpinner /> : "Generate Questions"}
+        </Button>
+      </div>
+    </form>
   );
 };
 

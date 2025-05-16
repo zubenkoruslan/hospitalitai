@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AxiosResponse } from "axios";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import { createMenu, deleteMenu } from "../services/api";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
-import { Menu } from "../types/menuItemTypes";
+import { IMenuClient } from "../types/menuTypes";
 import {
   PlusIcon,
-  PencilIcon,
   TrashIcon,
   ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
@@ -61,9 +59,9 @@ const MenusPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Modal state
-  const [isAddEditModalOpen, setIsAddEditModalOpen] = useState<boolean>(false);
+  const [isAddMenuModalOpen, setIsAddMenuModalOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
-  const [currentMenu, setCurrentMenu] = useState<Menu | null>(null);
+  const [currentMenu, setCurrentMenu] = useState<IMenuClient | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] =
     useState<boolean>(false);
@@ -80,26 +78,16 @@ const MenusPage: React.FC = () => {
     setCurrentMenu(null);
     setFormData(initialFormData);
     setFormError(null);
-    setIsAddEditModalOpen(true);
+    setIsAddMenuModalOpen(true);
   };
 
-  const openEditModal = (menu: Menu) => {
-    setCurrentMenu(menu);
-    setFormData({
-      name: menu.name,
-      description: menu.description || "",
-    });
-    setFormError(null);
-    setIsAddEditModalOpen(true);
-  };
-
-  const openDeleteModal = (menu: Menu) => {
+  const openDeleteModal = (menu: IMenuClient) => {
     setCurrentMenu(menu);
     setIsDeleteModalOpen(true);
   };
 
   const closeModal = () => {
-    setIsAddEditModalOpen(false);
+    setIsAddMenuModalOpen(false);
     setIsDeleteModalOpen(false);
     setCurrentMenu(null);
     setFormData(initialFormData);
@@ -164,25 +152,15 @@ const MenusPage: React.FC = () => {
     const payload = {
       name: trimmedName,
       description: trimmedDescription || undefined,
-      restaurantId: restaurantId!,
     };
 
     try {
-      if (currentMenu) {
-        await api.put<{ menu: Menu }>(`/menus/${currentMenu._id}`, payload);
-      } else {
-        await api.post<{ menu: Menu }>("/menus", payload);
-      }
+      await createMenu(payload);
       refetchMenus();
-      setSuccessMessage(
-        currentMenu ? "Menu updated successfully." : "Menu added successfully."
-      );
+      setSuccessMessage("Menu added successfully.");
       closeModal();
     } catch (err: any) {
-      const apiError = formatApiError(
-        err,
-        currentMenu ? "updating menu" : "adding menu"
-      );
+      const apiError = formatApiError(err, "adding menu");
       setFormError(apiError);
     } finally {
       setIsSubmitting(false);
@@ -196,7 +174,7 @@ const MenusPage: React.FC = () => {
     setPageError(null);
 
     try {
-      await api.delete(`/menus/${currentMenu._id}`);
+      await deleteMenu(currentMenu._id);
       refetchMenus();
       setSuccessMessage("Menu deleted successfully.");
       closeModal();
@@ -291,14 +269,6 @@ const MenusPage: React.FC = () => {
                   View Items
                 </Button>
               </Link>
-              <Button
-                variant="secondary"
-                onClick={() => openEditModal(menu)}
-                aria-label={`Edit details for ${menu.name}`}
-                className="text-xs p-1.5"
-              >
-                <PencilIcon className="h-4 w-4" />
-              </Button>
               <Button
                 variant="destructive"
                 onClick={() => openDeleteModal(menu)}
@@ -439,17 +409,9 @@ const MenusPage: React.FC = () => {
                         aria-label={`View items in ${menu.name}`}
                         className="text-xs p-1.5"
                       >
-                        View Items
+                        View
                       </Button>
                     </Link>
-                    <Button
-                      variant="secondary"
-                      onClick={() => openEditModal(menu)}
-                      aria-label={`Edit details for ${menu.name}`}
-                      className="text-xs p-1.5"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </Button>
                     <Button
                       variant="destructive"
                       onClick={() => openDeleteModal(menu)}
@@ -467,12 +429,10 @@ const MenusPage: React.FC = () => {
       </main>
 
       {/* Modals */}
-      {isAddEditModalOpen && (
+      {isAddMenuModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">
-              {currentMenu ? "Edit Menu" : "Add New Menu"}
-            </h2>
+            <h2 className="text-xl font-semibold mb-4">Add New Menu</h2>
             <form onSubmit={handleFormSubmit}>
               <div className="mb-4">
                 <label
@@ -525,13 +485,7 @@ const MenusPage: React.FC = () => {
                   variant="primary"
                   disabled={isSubmitting || !formData.name.trim()}
                 >
-                  {isSubmitting ? (
-                    <LoadingSpinner />
-                  ) : currentMenu ? (
-                    "Save Changes"
-                  ) : (
-                    "Add Menu"
-                  )}
+                  {isSubmitting ? <LoadingSpinner /> : "Add Menu"}
                 </Button>
               </div>
             </form>

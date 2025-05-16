@@ -6,14 +6,25 @@ import {
 } from "react-router-dom"; // useLocation might be used for quizTitle
 import { useAuth } from "../context/AuthContext";
 import {
-  ClientQuestionForAttempt,
-  ClientQuizAttemptSubmitData,
-  ClientSubmitAttemptResponse,
+  // ClientQuestionForAttempt, // To be moved
+  // ClientQuizAttemptSubmitData, // To be moved
+  // ClientSubmitAttemptResponse, // To be moved
   startQuizAttempt,
   submitQuizAttempt,
-  ClientAnswerForSubmission,
-  ClientQuestionOption,
+  // ClientAnswerForSubmission, // To be moved
+  // ClientQuestionOption, // To be moved
 } from "../services/api";
+
+import {
+  ClientQuizAttemptSubmitData,
+  ClientSubmitAttemptResponse,
+  ClientAnswerForSubmission,
+} from "../types/quizTypes"; // Correct import path
+import {
+  ClientQuestionForAttempt,
+  ClientQuestionOption,
+} from "../types/questionTypes"; // Correct import path
+
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
@@ -46,6 +57,13 @@ interface QuizSubmissionResult {
 }
 */
 
+const LOCAL_STORAGE_QUIZ_ANSWERS_PREFIX = "quizUserAnswers_";
+
+const getLocalStorageKey = (quizId: string | undefined) => {
+  if (!quizId) return null;
+  return `${LOCAL_STORAGE_QUIZ_ANSWERS_PREFIX}${quizId}`;
+};
+
 // --- Main Component ---
 const QuizTakingPage: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
@@ -58,11 +76,14 @@ const QuizTakingPage: React.FC = () => {
   const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null); // ADDED: For attempt ID from startQuizAttempt
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   // Store answers as a map: { questionId: answerGiven }
   // answerGiven can be string (for TF/MC-Single option._id) or string[] (for MC-Multiple option._id array)
-  const [userAnswers, setUserAnswers] = useState<Record<string, any>>({});
+  const [userAnswers, setUserAnswers] = useState<
+    Record<string, string | string[]>
+  >({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   // const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null); // Old
   const [submissionResult, setSubmissionResult] =
@@ -78,6 +99,7 @@ const QuizTakingPage: React.FC = () => {
   const isSubmittingRef = useRef(isSubmitting);
   const isCancellingRef = useRef(isCancelling);
   const submissionResultRef = useRef(submissionResult);
+  const manualSubmissionCompletedRef = useRef(false);
 
   // Keep refs updated with the latest state
   useEffect(() => {
@@ -86,6 +108,7 @@ const QuizTakingPage: React.FC = () => {
     isSubmittingRef.current = isSubmitting;
     isCancellingRef.current = isCancelling;
     submissionResultRef.current = submissionResult;
+    // manualSubmissionCompletedRef is updated directly, not via state
   });
 
   // Fetch questions by calling startQuizAttempt service
@@ -95,6 +118,17 @@ const QuizTakingPage: React.FC = () => {
       setIsLoading(false);
       return;
     }
+
+    // Clear any stale answers from localStorage for this quiz when a new attempt starts
+    const storageKey = getLocalStorageKey(quizId);
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {
+        console.error("Error removing item from localStorage:", e);
+      }
+    }
+
     setIsLoading(true);
     setError(null);
     setQuestions([]);
@@ -102,11 +136,43 @@ const QuizTakingPage: React.FC = () => {
     setSubmissionResult(null);
     setCurrentQuestionIndex(0);
     startTimeRef.current = Date.now();
-    // Reset title to default before fetching new questions
+    manualSubmissionCompletedRef.current = false;
+    console.log(
+      "[QuizTakingPage] loadQuizQuestions: RESET manualSubmissionCompletedRef.current to false"
+    );
     setQuizTitle("Quiz Attempt");
 
     try {
-      const fetchedQuestions = await startQuizAttempt(quizId);
+      // Attempt to load answers from localStorage first, in case of a page refresh mid-attempt
+      let initialAnswers = {};
+      if (storageKey) {
+        try {
+          const storedAnswers = localStorage.getItem(storageKey);
+          if (storedAnswers) {
+            initialAnswers = JSON.parse(storedAnswers);
+            console.log(
+              "[QuizTakingPage] Loaded answers from localStorage on init:",
+              initialAnswers
+            );
+          }
+        } catch (e) {
+          console.error(
+            "Error reading/parsing answers from localStorage on init:",
+            e
+          );
+          // If error, start with empty answers and remove potentially corrupted item
+          localStorage.removeItem(storageKey);
+        }
+      }
+      setUserAnswers(initialAnswers); // Initialize with localStorage data or empty
+      userAnswersRef.current = initialAnswers; // Sync ref too
+
+      const response = await startQuizAttempt(quizId); // Returns { questions: [], attemptId: "..." }
+      const fetchedQuestions = response.questions;
+      const newAttemptId = response.attemptId;
+
+      setCurrentAttemptId(newAttemptId); // Store the attempt ID
+
       if (fetchedQuestions && fetchedQuestions.length > 0) {
         setQuestions(fetchedQuestions);
         // Derive quizTitle from the first question's category
@@ -116,14 +182,12 @@ const QuizTakingPage: React.FC = () => {
         ) {
           setQuizTitle(`${fetchedQuestions[0].categories[0]} Quiz`);
         } else {
-          // Fallback if no category, or fetch quiz details separately for a more generic title
-          // For now, "Quiz Attempt" is fine if no specific category, or could try fetching quiz title
-          // If you have an endpoint like /api/quizzes/:quizId/details, you could fetch it here.
-          // const quizDetails = await api.get(`/quizzes/${quizId}/details`);
-          // if(quizDetails.data.title) setQuizTitle(quizDetails.data.title)
+          // Fallback if no category
+          setQuizTitle("Quiz Attempt");
         }
       } else {
         setError("No questions available for this quiz attempt.");
+        setQuestions([]); // Ensure questions is empty
       }
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load quiz questions.");
@@ -139,21 +203,81 @@ const QuizTakingPage: React.FC = () => {
   // --- Function to submit cancelled quiz (needs update) ---
   const submitQuizInBackground = useCallback(async () => {
     const currentQuizId = quizIdRef.current;
-    const currentAnswersMap = userAnswersRef.current;
-    const currentQuestions = questions; // Closure will capture questions state at time of definition
+    let answersFromStorage = null;
+    const storageKey = getLocalStorageKey(currentQuizId);
 
-    if (!currentQuizId) return;
-    if (
-      currentQuestions.length === 0 &&
-      Object.keys(currentAnswersMap).length === 0
-    )
+    if (storageKey) {
+      try {
+        const storedData = localStorage.getItem(storageKey);
+        if (storedData) {
+          answersFromStorage = JSON.parse(storedData);
+          console.log(
+            "[QuizTakingPage] submitQuizInBackground - Loaded answers from localStorage:",
+            answersFromStorage
+          );
+        }
+      } catch (e) {
+        console.error(
+          "[QuizTakingPage] submitQuizInBackground - Error reading/parsing from localStorage:",
+          e
+        );
+        // Potentially corrupted data, remove it
+        localStorage.removeItem(storageKey);
+      }
+    }
+
+    const answersToUse = answersFromStorage || userAnswersRef.current;
+    const currentQuestions = questions; // Closure will capture questions state
+
+    console.log("[QuizTakingPage] submitQuizInBackground called.");
+    console.log(
+      "[QuizTakingPage] submitQuizInBackground - answersToUse (localStorage or ref):",
+      JSON.stringify(answersToUse)
+    );
+    console.log(
+      "[QuizTakingPage] submitQuizInBackground - currentQuestions (from closure):",
+      currentQuestions.map((q) => q._id)
+    );
+
+    // Cleanup localStorage for this quiz attempt after trying to use it
+    // This prevents re-submission of the same background data if something goes wrong before full unmount
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {
+        console.error(
+          "Error removing item from localStorage post-background-submit:",
+          e
+        );
+      }
+    }
+
+    if (!currentQuizId) {
+      console.log(
+        "[QuizTakingPage] submitQuizInBackground: No currentQuizId, returning."
+      );
       return;
+    }
+    // If there are no questions in the quiz attempt OR if there are no actual answers given, don't submit.
+    if (
+      currentQuestions.length === 0 ||
+      Object.keys(answersToUse).length === 0
+    ) {
+      console.log(
+        "[QuizTakingPage] submitQuizInBackground: No questions in closure or no answers to use, returning."
+      );
+      return;
+    }
 
     const answersToSubmit: ClientAnswerForSubmission[] = currentQuestions.map(
       (q) => ({
         questionId: q._id,
-        answerGiven: currentAnswersMap[q._id],
+        answerGiven: answersToUse[q._id], // Use the determined answers (localStorage or ref)
       })
+    );
+    console.log(
+      "[QuizTakingPage] submitQuizInBackground - answersToSubmit:",
+      JSON.stringify(answersToSubmit)
     );
     const duration = startTimeRef.current
       ? Math.floor((Date.now() - startTimeRef.current) / 1000)
@@ -164,19 +288,64 @@ const QuizTakingPage: React.FC = () => {
     };
     try {
       await submitQuizAttempt(currentQuizId, submissionData);
+      console.log(
+        "[QuizTakingPage] submitQuizInBackground: Successfully submitted."
+      );
     } catch (err: any) {
-      console.error("Error during background answers submission:", err);
+      console.error(
+        "[QuizTakingPage] Error during background answers submission:",
+        err
+      );
     }
-  }, [questions]); // Added questions to dependency array
+  }, [questions]);
 
   useEffect(() => {
     return () => {
-      if (
+      console.log(
+        "[QuizTakingPage] Cleanup: manualSubmissionCompletedRef.current:",
+        manualSubmissionCompletedRef.current
+      );
+      console.log(
+        "[QuizTakingPage] Cleanup: submissionResultRef.current:",
+        submissionResultRef.current
+      );
+      console.log(
+        "[QuizTakingPage] Cleanup: isSubmittingRef.current:",
+        isSubmittingRef.current
+      );
+      console.log(
+        "[QuizTakingPage] Cleanup: isCancellingRef.current:",
+        isCancellingRef.current
+      );
+      console.log(
+        "[QuizTakingPage] Cleanup: userAnswersRef.current:",
+        userAnswersRef.current
+      );
+
+      const hasAnswers = Object.keys(userAnswersRef.current).length > 0;
+      console.log("[QuizTakingPage] Cleanup: hasAnswers:", hasAnswers);
+
+      const shouldSubmitInBackground =
+        !manualSubmissionCompletedRef.current &&
         !submissionResultRef.current &&
         !isSubmittingRef.current &&
-        !isCancellingRef.current
-      ) {
+        !isCancellingRef.current &&
+        hasAnswers; // <-- Added hasAnswers check
+
+      console.log(
+        "[QuizTakingPage] Cleanup: shouldSubmitInBackground:",
+        shouldSubmitInBackground
+      );
+
+      if (shouldSubmitInBackground) {
+        console.log(
+          "[QuizTakingPage] Cleanup: --- CALLING submitQuizInBackground ---"
+        );
         submitQuizInBackground();
+      } else {
+        console.log(
+          "[QuizTakingPage] Cleanup: --- SKIPPING submitQuizInBackground ---"
+        );
       }
     };
   }, [submitQuizInBackground]);
@@ -214,8 +383,57 @@ const QuizTakingPage: React.FC = () => {
     selectedValue: string,
     questionType: string
   ) => {
+    console.log("[QuizTakingPage] handleAnswerSelect called:", {
+      questionId,
+      selectedValue,
+      questionType,
+    });
+
+    // --- Optimistic update of userAnswersRef.current ---
+    // This attempts to make the latest selection available to submitQuizInBackground
+    // even if unmount happens before the setUserAnswers-triggered re-render and subsequent effect completes.
+    // This is a targeted fix for the race condition observed.
+    const updatedAnswersForRef = { ...userAnswersRef.current }; // Start with current ref's value
+    if (questionType === "multiple-choice-multiple") {
+      const currentSelection =
+        (updatedAnswersForRef[questionId] as string[]) || [];
+      if (currentSelection.includes(selectedValue)) {
+        updatedAnswersForRef[questionId] = currentSelection.filter(
+          (item) => item !== selectedValue
+        );
+      } else {
+        updatedAnswersForRef[questionId] = [...currentSelection, selectedValue];
+      }
+    } else {
+      updatedAnswersForRef[questionId] = selectedValue;
+    }
+    userAnswersRef.current = updatedAnswersForRef; // Directly update the ref
+    // --- End of optimistic update ---
+
+    // --- Save to localStorage ---
+    const storageKey = getLocalStorageKey(quizIdRef.current); // Use ref for quizId as state might not be updated
+    if (storageKey) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updatedAnswersForRef));
+        console.log(
+          "[QuizTakingPage] Saved answers to localStorage:",
+          updatedAnswersForRef
+        );
+      } catch (e) {
+        console.error("Error saving answers to localStorage:", e);
+        // Handle potential storage full errors, etc.
+      }
+    }
+    // --- End of save to localStorage ---
+
     setUserAnswers((prevAnswers) => {
-      const newAnswers = { ...prevAnswers };
+      // prevAnswers here is the state from the last render.
+      // The standard React state update logic should eventually align with userAnswersRef.current.
+      console.log(
+        "[QuizTakingPage] setUserAnswers callback. prevAnswers:",
+        JSON.stringify(prevAnswers)
+      );
+      const newAnswers = { ...prevAnswers }; // Use prevAnswers from React state for the new state
       if (questionType === "multiple-choice-multiple") {
         const currentSelection = (newAnswers[questionId] as string[]) || [];
         if (currentSelection.includes(selectedValue)) {
@@ -229,6 +447,10 @@ const QuizTakingPage: React.FC = () => {
         // For single-select types like mc-single, true-false
         newAnswers[questionId] = selectedValue;
       }
+      console.log(
+        "[QuizTakingPage] setUserAnswers callback. newAnswers:",
+        JSON.stringify(newAnswers)
+      );
       return newAnswers;
     });
   };
@@ -248,6 +470,16 @@ const QuizTakingPage: React.FC = () => {
   // --- Submission Handling ---
   const handleSubmit = async () => {
     if (questions.length === 0 || !quizId) return;
+    manualSubmissionCompletedRef.current = false; // Reset at start of manual attempt
+    console.log("[QuizTakingPage] handleSubmit called.");
+    console.log(
+      "[QuizTakingPage] handleSubmit - Current userAnswers state:",
+      JSON.stringify(userAnswers)
+    );
+    console.log(
+      "[QuizTakingPage] handleSubmit - Current questions state:",
+      questions.map((q) => q._id)
+    );
 
     const answeredQuestionsCount = questions.filter(
       (q) =>
@@ -273,6 +505,11 @@ const QuizTakingPage: React.FC = () => {
       answerGiven: userAnswers[q._id] === undefined ? null : userAnswers[q._id], // Send null for unanswered
     }));
 
+    console.log(
+      "[QuizTakingPage] handleSubmit - answersToSubmit:",
+      JSON.stringify(answersToSubmit)
+    );
+
     const durationInSeconds = startTimeRef.current
       ? Math.floor((Date.now() - startTimeRef.current) / 1000)
       : 0;
@@ -285,11 +522,37 @@ const QuizTakingPage: React.FC = () => {
     try {
       const result = await submitQuizAttempt(quizId, submissionData);
       setSubmissionResult(result);
+      console.log(
+        "[QuizTakingPage] handleSubmit: PRE - manualSubmissionCompletedRef.current:",
+        manualSubmissionCompletedRef.current
+      ); // Should be false here
+      manualSubmissionCompletedRef.current = true;
+      console.log(
+        "[QuizTakingPage] handleSubmit: POST - manualSubmissionCompletedRef.current:",
+        manualSubmissionCompletedRef.current
+      ); // Should be true here
+
+      // Clear localStorage on successful explicit submission
+      const storageKey = getLocalStorageKey(quizId);
+      if (storageKey) {
+        try {
+          localStorage.removeItem(storageKey);
+          console.log(
+            "[QuizTakingPage] Cleared localStorage on successful submit."
+          );
+        } catch (e) {
+          console.error(
+            "Error removing item from localStorage post-submit:",
+            e
+          );
+        }
+      }
     } catch (err: any) {
+      console.error("Error submitting quiz attempt:", err);
       setSubmitError(
-        err.response?.data?.message ||
-          "Failed to submit quiz. Please try again."
+        err.response?.data?.message || "Failed to submit quiz attempt."
       );
+      // manualSubmissionCompletedRef remains false if submission fails
     } finally {
       setIsSubmitting(false);
     }
@@ -326,22 +589,38 @@ const QuizTakingPage: React.FC = () => {
 
   // --- Helper function to render answer text for review screen ---
   const renderAnswer = (
-    answerData: any,
+    answerData: any, // This will be the user's answer (ID or ID[]) or the correctAnswerDetails object
     options: ClientQuestionOption[],
-    isCorrectAnswerDisplay = false // Flag to indicate if we are displaying the correct answer
+    isCorrectAnswerDisplay = false
   ): string => {
     if (answerData === null || answerData === undefined) {
       return isCorrectAnswerDisplay ? "Not specified" : "Not answered";
     }
+
+    if (isCorrectAnswerDisplay) {
+      // answerData is the correctAnswerDetails object from ClientGradedQuestion
+      // It has a shape like: { text?: string, texts?: string[], optionId?: string, optionIds?: string[] }
+      // We prioritize .text or .texts for display.
+      if (typeof answerData.text === "string" && answerData.text) {
+        return answerData.text;
+      }
+      if (Array.isArray(answerData.texts) && answerData.texts.length > 0) {
+        return answerData.texts.join(", ");
+      }
+      // Fallback if text/texts are not directly available, though backend should populate them.
+      // This part might indicate an issue if reached often, as backend's correctAnswerDetails should have text/texts.
+      return "Correct answer not available in expected format";
+    }
+
+    // Logic for user's answer (answerData is optionId or optionId[])
     if (Array.isArray(answerData)) {
-      // For multiple-choice-multiple
-      if (answerData.length === 0)
-        return isCorrectAnswerDisplay ? "None" : "No selection";
+      // For multiple-choice-multiple user answer
+      if (answerData.length === 0) return "No selection";
       return answerData
-        .map((id) => options.find((opt) => opt._id === id)?.text || id)
+        .map((id) => options.find((opt) => opt._id === id)?.text || `ID: ${id}`)
         .join(", ");
     }
-    // For single-choice (MC-single, True/False)
+    // For single-choice (MC-single, True/False) user answer, or potentially short answer string
     return (
       options.find((opt) => opt._id === answerData)?.text || String(answerData)
     );

@@ -9,6 +9,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message }) => (
   <div
     className="flex flex-col justify-center items-center p-4"
     data-testid="loading-spinner-container"
+    role="status"
   >
     <svg
       className="animate-spin h-8 w-8 text-blue-600"
