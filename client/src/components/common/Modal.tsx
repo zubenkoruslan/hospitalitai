@@ -4,7 +4,7 @@ import Button from "./Button"; // Assuming Button component exists
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: ReactNode;
   children: ReactNode;
   footerContent?: ReactNode;
   size?: "sm" | "md" | "lg" | "xl" | "2xl"; // Add more sizes as needed
@@ -35,31 +35,39 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
       onClick={onClose} // Close on overlay click
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? "modal-title" : undefined}
+      aria-labelledby={
+        typeof title === "string" && title ? "modal-title" : undefined
+      }
     >
       <div
-        className={`bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}
+        className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast`}
         onClick={handleContentClick} // Prevent closing when clicking modal content
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+        <div className="flex justify-between items-center p-5 border-b border-slate-200">
           {title ? (
-            <h2
-              id="modal-title"
-              className="text-lg font-semibold text-gray-800"
-            >
-              {title}
-            </h2>
+            typeof title === "string" ? (
+              <h2
+                id="modal-title"
+                className="text-xl font-semibold text-slate-700"
+              >
+                {title}
+              </h2>
+            ) : (
+              <div className="text-xl font-semibold text-slate-700">
+                {title}
+              </div>
+            )
           ) : (
             <div /> // Empty div to keep space for close button
           )}
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full p-1"
+            className="text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 rounded-full p-1.5 transition-colors duration-150 ease-in-out"
             aria-label="Close modal"
           >
             <svg
@@ -81,11 +89,13 @@ const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1 text-slate-600">
+          {children}
+        </div>
 
         {/* Footer */}
         {footerContent && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-3">
             {footerContent}
           </div>
         )}
@@ -95,3 +105,32 @@ const Modal: React.FC<ModalProps> = ({
 };
 
 export default Modal;
+
+// Add animation styles if not already globally defined
+// Consider moving these to a global CSS file if used elsewhere
+// For now, keeping it here for simplicity if Modal is the primary user of these animations
+const modalStyles = `
+  @keyframes fadeInShort {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in-short {
+    animation: fadeInShort 0.2s ease-out forwards;
+  }
+  @keyframes slideUpFast {
+    from { opacity: 0.8; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-up-fast {
+    animation: slideUpFast 0.2s ease-out forwards;
+  }
+`;
+
+// Inject styles into the head - This is a common pattern for component-specific global styles
+// but might be better handled by your global CSS setup or a CSS-in-JS solution.
+if (typeof window !== "undefined") {
+  const styleSheet = document.createElement("style");
+  styleSheet.type = "text/css";
+  styleSheet.innerText = modalStyles;
+  document.head.appendChild(styleSheet);
+}

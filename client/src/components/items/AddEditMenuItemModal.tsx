@@ -63,6 +63,12 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
   const isEditMode = currentItem !== null;
 
+  // Combine provided categories with temporarily added ones for the dropdown
+  const combinedCategories = useMemo(() => {
+    const base = availableCategories || [];
+    return [...new Set([...base, ...tempCategories])].sort();
+  }, [availableCategories, tempCategories]);
+
   // This useMemo is now less critical if `availableCategories` is the primary source for the dropdown.
   // It could still be useful if we want to merge `availableCategories` with standard fallbacks,
   // or for a secondary "suggestion" mechanism if we re-introduce a text input for "Other".
@@ -290,31 +296,6 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     </>
   );
 
-  // Consolidate available categories for the dropdown, ensuring current item's category is an option
-  // And also adding standard categories if availableCategories is empty.
-  const displayCategories = useMemo(() => {
-    const cats = new Set<string>(availableCategories || []);
-    if (
-      isEditMode &&
-      currentItem?.category &&
-      !cats.has(currentItem.category)
-    ) {
-      cats.add(currentItem.category);
-    }
-    // If no categories from prop and no current item category, use suggestions (which might have standard fallbacks)
-    if (cats.size === 0) {
-      categorySuggestions.forEach((cat) => cats.add(cat));
-    }
-    tempCategories.forEach((cat) => cats.add(cat)); // Include temporarily added categories
-    return Array.from(cats).sort();
-  }, [
-    availableCategories,
-    currentItem,
-    isEditMode,
-    categorySuggestions,
-    tempCategories,
-  ]);
-
   return (
     <Modal
       isOpen={isOpen}
@@ -327,216 +308,225 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       <form
         onSubmit={handleSubmit}
         id="add-edit-item-form"
-        className="space-y-4"
+        className="space-y-6"
       >
-        {/* Name, Description, Price, Ingredients fields remain the same */}
+        {/* Item Name */}
         <div>
           <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700"
+            htmlFor="itemName"
+            className="block text-sm font-medium text-slate-700 mb-1"
           >
-            Name <span className="text-red-500">*</span>
+            Item Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
+            id="itemName"
             name="name"
-            id="name"
             value={formData.name}
             onChange={handleInputChange}
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+            disabled={isSubmitting}
             required
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Description
-          </label>
-          <textarea
-            name="description"
-            id="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            rows={3}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-          ></textarea>
-        </div>
-
-        <div>
-          <label
-            htmlFor="price"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Price ($)
-          </label>
-          <input
-            type="number"
-            name="price"
-            id="price"
-            value={formData.price}
-            onChange={handleInputChange}
-            step="0.01"
-            min="0"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-            placeholder="e.g., 12.99"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="ingredients"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Ingredients
-          </label>
-          <input
-            type="text"
-            name="ingredients"
-            id="ingredients"
-            value={formData.ingredients}
-            onChange={handleInputChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-            placeholder="e.g., Flour, Sugar, Eggs"
-          />
-          <p className="mt-1 text-xs text-gray-500">Comma-separated list.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Item Type */}
           <div>
             <label
               htmlFor="itemType"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-slate-700 mb-1"
             >
               Item Type <span className="text-red-500">*</span>
             </label>
             <select
-              name="itemType"
               id="itemType"
+              name="itemType"
               value={formData.itemType}
               onChange={handleInputChange}
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+              disabled={isSubmitting}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
             >
-              <option value="" disabled>
-                Select Type...
-              </option>
+              <option value="">Select Type...</option>
               <option value="food">Food</option>
               <option value="beverage">Beverage</option>
             </select>
           </div>
+
+          {/* Category */}
           <div>
             <label
-              htmlFor="category"
-              className="block text-sm font-medium text-gray-700"
+              htmlFor="itemCategory"
+              className="block text-sm font-medium text-slate-700 mb-1"
             >
               Category <span className="text-red-500">*</span>
             </label>
-            <select
-              name="category"
-              id="category"
-              value={
-                isAddingNewCategory ? "_add_new_category_" : formData.category
-              }
-              onChange={handleInputChange}
-              required={!isAddingNewCategory} // Category is required if not adding a new one
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="" disabled>
-                Select Category...
-              </option>
-              {displayCategories.length === 0 && !isEditMode && (
-                <option value="" disabled>
-                  No existing categories. Add one below.
-                </option>
-              )}
-              {displayCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-              <option value="_add_new_category_">Add new category...</option>
-            </select>
-
-            {isAddingNewCategory && (
-              <div className="mt-2">
-                <label
-                  htmlFor="newCategoryName"
-                  className="block text-xs font-medium text-gray-600"
-                >
-                  New Category Name:
-                </label>
-                <input
-                  type="text"
-                  name="newCategoryName"
-                  id="newCategoryName"
-                  value={newCategoryName}
-                  onChange={handleInputChange}
-                  placeholder="Enter new category name"
-                  required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
-            )}
-            {/* Datalist is no longer needed as primary input is a select now */}
-            {/* <datalist id="category-suggestions">
-              {categorySuggestions.map((cat) => (
-                <option key={cat} value={cat} />
-              ))}
-            </datalist> */}
+            <div className="flex gap-2">
+              <select
+                id="itemCategory"
+                name="category"
+                value={
+                  isAddingNewCategory ? "_add_new_category_" : formData.category
+                }
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                disabled={
+                  isSubmitting || (!isAddingNewCategory && !formData.itemType)
+                }
+                required={!isAddingNewCategory}
+              >
+                <option value="">Select or Add Category...</option>
+                {combinedCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="_add_new_category_">Add New Category...</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Dietary Information fieldset remains the same */}
-        <fieldset>
-          <legend className="block text-sm font-medium text-gray-700 mb-2">
-            Dietary Information
-          </legend>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {(
-              [
-                "isGlutenFree",
-                "isDairyFree",
-                "isVegetarian",
-                "isVegan",
-              ] as const
-            ).map((flag) => {
-              const label = flag
-                .substring(2)
-                .replace(/([A-Z])/g, " $1")
-                .trim();
-              const isVegetarianDisabled =
-                flag === "isVegetarian" && formData.isVegan;
-              return (
-                <div key={flag} className="relative flex items-start">
-                  <div className="flex items-center h-5">
-                    <input
-                      id={flag}
-                      name={flag}
-                      type="checkbox"
-                      checked={formData[flag]}
-                      onChange={handleInputChange}
-                      disabled={isVegetarianDisabled}
-                      className={`focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50`}
-                    />
-                  </div>
-                  <div className="ml-3 text-sm">
-                    <label
-                      htmlFor={flag}
-                      className={`font-medium text-gray-700 capitalize ${
-                        isVegetarianDisabled ? "text-gray-400" : ""
-                      }`}
-                    >
-                      {label}
-                    </label>
-                  </div>
-                </div>
-              );
-            })}
+        {isAddingNewCategory && (
+          <div className="mt-4 p-4 border border-sky-200 bg-sky-50 rounded-lg">
+            <label
+              htmlFor="newCategoryName"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              New Category Name <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                id="newCategoryName"
+                name="newCategoryName" // Ensure this name is handled in handleInputChange
+                value={newCategoryName}
+                onChange={handleInputChange} // Use generic handleInputChange
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
+                placeholder="Enter new category name"
+                disabled={isSubmitting}
+                required
+              />
+              {/* The button to confirm/save the new category name from the simple modal can be removed if direct input is preferred. 
+                    Or, keep if a sub-modal for confirmation is used. For simplicity, direct input is assumed for now.
+                    If a sub-modal was used, its open state was setIsNewCategoryInputModalOpen, and save was handleSaveNewCategory.
+                    Let's remove the explicit button for now and assume typing in the field is sufficient.
+                  */}
+            </div>
           </div>
-        </fieldset>
+        )}
+
+        {/* Price */}
+        <div>
+          <label
+            htmlFor="price"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
+            Price <span className="text-sm text-slate-500">(optional)</span>
+          </label>
+          <input
+            type="number"
+            id="price"
+            name="price"
+            value={formData.price}
+            onChange={handleInputChange}
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
+            placeholder="e.g., 12.99"
+            step="0.01"
+            min="0"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
+            Description{" "}
+            <span className="text-sm text-slate-500">(optional)</span>
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            rows={3}
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Ingredients */}
+        <div>
+          <label
+            htmlFor="ingredients"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
+            Ingredients{" "}
+            <span className="text-sm text-slate-500">
+              (comma-separated, optional)
+            </span>
+          </label>
+          <input
+            type="text"
+            id="ingredients"
+            name="ingredients"
+            value={formData.ingredients}
+            onChange={handleInputChange}
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+            placeholder="e.g., Flour, Tomato, Cheese"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Dietary Flags */}
+        <div className="space-y-3 pt-2">
+          <h4 className="text-sm font-medium text-slate-700 mb-2">
+            Dietary Information{" "}
+            <span className="text-xs text-slate-500">(optional)</span>
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+            {[
+              { name: "isGlutenFree", label: "Gluten-Free" },
+              { name: "isDairyFree", label: "Dairy-Free" },
+              { name: "isVegetarian", label: "Vegetarian" },
+              { name: "isVegan", label: "Vegan" },
+            ].map((flag) => (
+              <label
+                key={flag.name}
+                className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  id={flag.name}
+                  name={flag.name}
+                  checked={
+                    formData[flag.name as keyof MenuItemFormData] as boolean
+                  }
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
+                  disabled={
+                    isSubmitting ||
+                    (flag.name === "isVegetarian" && formData.isVegan)
+                  }
+                />
+                <span
+                  className={`text-sm ${
+                    isSubmitting ||
+                    (flag.name === "isVegetarian" && formData.isVegan)
+                      ? "text-slate-400"
+                      : "text-slate-700"
+                  }`}
+                >
+                  {flag.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
       </form>
 
       {/* Sub-Modal for Adding New Category */}

@@ -46,9 +46,13 @@ const DeleteMenuItemModal: React.FC<DeleteMenuItemModalProps> = ({
       size="md"
       footerContent={footer}
     >
-      <p className="text-gray-700">
-        Are you sure you want to delete the item "<strong>{itemName}</strong>"?
-        This action cannot be undone.
+      <p className="text-slate-600 text-center text-lg">
+        Are you sure you want to delete the item "
+        <strong className="font-semibold">{itemName}</strong>"?
+        <br />
+        <span className="text-sm text-slate-500 mt-1 block">
+          This action cannot be undone.
+        </span>
       </p>
     </Modal>
   );

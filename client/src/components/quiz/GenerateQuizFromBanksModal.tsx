@@ -10,6 +10,8 @@ import {
 } from "../../services/api"; // Adjusted path
 import Button from "../common/Button"; // For consistent button styling
 import LoadingSpinner from "../common/LoadingSpinner"; // For loading states
+import Modal from "../common/Modal"; // Import generic Modal
+import ErrorMessage from "../common/ErrorMessage"; // Import ErrorMessage
 
 interface GenerateQuizFromBanksModalProps {
   isOpen: boolean;
@@ -41,12 +43,13 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
         setError(null); // Clear form error too
         try {
           const banks = await getQuestionBanks();
-          setAvailableBanks(banks);
+          setAvailableBanks(banks || []); // Ensure banks is not undefined
         } catch (err) {
           console.error("Failed to fetch question banks:", err);
           setFetchError(
             "Failed to load question banks. Please try again later."
           );
+          setAvailableBanks([]); // Ensure it's an empty array on error
         }
         setIsLoadingBanks(false);
       };
@@ -113,170 +116,175 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
     setIsLoading(false);
   };
 
-  if (!isOpen) {
-    return null;
-  }
+  const formId = "generate-quiz-form";
+
+  const footerContent = (
+    <>
+      <Button
+        variant="secondary"
+        onClick={onClose}
+        disabled={isLoading || isLoadingBanks}
+      >
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        form={formId}
+        variant="primary"
+        disabled={
+          isLoading ||
+          isLoadingBanks ||
+          !title.trim() ||
+          selectedBankIds.length === 0 ||
+          numberOfQuestionsPerAttempt <= 0
+        }
+        className="ml-3"
+      >
+        {isLoading ? <LoadingSpinner message="" /> : "Generate Quiz"}
+      </Button>
+    </>
+  );
+
+  if (!isOpen) return null; // Handled by generic Modal too, but good practice here.
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Generate Quiz from Question Banks
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
-            aria-label="Close modal"
-          >
-            &times;
-          </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Generate Quiz from Question Banks"
+      size="xl" // Or "lg", adjust as needed
+      footerContent={footerContent}
+    >
+      {fetchError && <ErrorMessage message={fetchError} />}
+
+      {isLoadingBanks ? (
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner message="Loading question banks..." />
         </div>
-
-        {fetchError && (
-          <div
-            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
-            role="alert"
-          >
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{fetchError}</span>
+      ) : (
+        <form onSubmit={handleSubmit} id={formId} className="space-y-6">
+          {error && <ErrorMessage message={error} />}
+          <div>
+            <label
+              htmlFor="modal-quiz-title"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Quiz Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="modal-quiz-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+              required
+              disabled={isLoadingBanks || isLoading}
+            />
           </div>
-        )}
 
-        <div className="overflow-y-auto flex-grow pr-2">
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label
-                htmlFor="modal-quiz-title"
-                className="block text-gray-700 font-semibold mb-1"
-              >
-                Quiz Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="modal-quiz-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150"
-                required
-                disabled={isLoadingBanks || isLoading}
-              />
-            </div>
+          <div>
+            <label
+              htmlFor="modal-quiz-description"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Description{" "}
+              <span className="text-xs text-slate-500">(Optional)</span>
+            </label>
+            <textarea
+              id="modal-quiz-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+              disabled={isLoadingBanks || isLoading}
+            />
+          </div>
 
-            <div className="mb-4">
-              <label
-                htmlFor="modal-quiz-description"
-                className="block text-gray-700 font-semibold mb-1"
-              >
-                Description (Optional)
-              </label>
-              <textarea
-                id="modal-quiz-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150"
-                disabled={isLoadingBanks || isLoading}
-              />
-            </div>
+          <div>
+            <label
+              htmlFor="modal-quiz-numberOfQuestionsPerAttempt"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Number of Questions Per Attempt{" "}
+              <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="modal-quiz-numberOfQuestionsPerAttempt"
+              value={numberOfQuestionsPerAttempt}
+              onChange={(e) =>
+                setNumberOfQuestionsPerAttempt(
+                  parseInt(e.target.value, 10) || 0
+                )
+              }
+              min="1"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              required
+              disabled={isLoadingBanks || isLoading}
+            />
+          </div>
 
-            <div className="mb-4">
-              <label
-                htmlFor="modal-quiz-numberOfQuestionsPerAttempt"
-                className="block text-gray-700 font-semibold mb-1"
-              >
-                Number of Questions Per Attempt{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="modal-quiz-numberOfQuestionsPerAttempt"
-                value={numberOfQuestionsPerAttempt}
-                onChange={(e) =>
-                  setNumberOfQuestionsPerAttempt(parseInt(e.target.value, 10))
-                }
-                min="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150"
-                required
-                disabled={isLoadingBanks || isLoading}
-              />
-            </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Select Question Banks <span className="text-red-500">*</span>
+            </label>
 
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                Select Question Banks <span className="text-red-500">*</span>
-              </h3>
-              {isLoadingBanks && (
-                <div className="flex justify-center items-center h-32">
-                  <LoadingSpinner message="Loading question banks..." />
-                </div>
-              )}
-              {!isLoadingBanks && !availableBanks.length && !fetchError && (
-                <p className="text-gray-500 text-sm">
-                  No question banks available to select.
-                </p>
-              )}
-              {!isLoadingBanks && availableBanks.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
-                  {availableBanks.map((bank) => (
-                    <div
-                      key={bank._id}
-                      className="flex items-center p-2 bg-white rounded-md border border-gray-300 hover:bg-gray-100 transition duration-150"
+            {!isLoadingBanks && availableBanks.length === 0 && !fetchError && (
+              <p className="text-slate-500 text-sm py-3">
+                No question banks available. You can create them in the
+                'Question Banks' section.
+              </p>
+            )}
+            {!isLoadingBanks && availableBanks.length > 0 && (
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
+                {availableBanks.map((bank) => (
+                  <div
+                    key={bank._id}
+                    className="flex items-start p-3 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
+                  >
+                    <input
+                      type="checkbox"
+                      id={`modal-bank-${bank._id}`}
+                      checked={selectedBankIds.includes(bank._id)}
+                      onChange={() => handleBankSelectionChange(bank._id)}
+                      className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
+                      disabled={isLoading || isLoadingBanks} // Disable if either is loading
+                    />
+                    <label
+                      htmlFor={`modal-bank-${bank._id}`}
+                      className="ml-3 flex-1 cursor-pointer"
                     >
-                      <input
-                        type="checkbox"
-                        id={`modal-bank-${bank._id}`}
-                        checked={selectedBankIds.includes(bank._id)}
-                        onChange={() => handleBankSelectionChange(bank._id)}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2 cursor-pointer"
-                        disabled={isLoading}
-                      />
-                      <label
-                        htmlFor={`modal-bank-${bank._id}`}
-                        className="text-sm text-gray-700 cursor-pointer flex-grow"
+                      <span
+                        className={`block text-sm font-medium ${
+                          isLoading || isLoadingBanks
+                            ? "text-slate-400"
+                            : "text-slate-800"
+                        }`}
                       >
-                        {bank.name}
-                        <span className="text-xs text-gray-500 ml-1">
-                          ({bank.questions.length}Q)
-                        </span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <div
-                className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative mb-4 text-sm"
-                role="alert"
-              >
-                <strong className="font-bold">Error: </strong>
-                <span className="block sm:inline">{error}</span>
+                        {bank.name} (
+                        {bank.questions?.length || bank.questionCount || 0}{" "}
+                        questions)
+                      </span>
+                      {bank.description && (
+                        <p
+                          className={`text-xs mt-0.5 ${
+                            isLoading || isLoadingBanks
+                              ? "text-slate-400"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {bank.description}
+                        </p>
+                      )}
+                    </label>
+                  </div>
+                ))}
               </div>
             )}
-
-            <div className="mt-6 flex justify-end space-x-3 pt-4 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onClose}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={isLoadingBanks || isLoading}
-              >
-                {isLoading ? "Generating..." : "Generate Quiz"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 };
 

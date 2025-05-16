@@ -12,6 +12,7 @@ import {
 import Button from "../common/Button";
 import LoadingSpinner from "../common/LoadingSpinner";
 import Modal from "../common/Modal"; // Using the generic Modal
+import ErrorMessage from "../common/ErrorMessage"; // Import ErrorMessage
 
 interface EditQuizModalProps {
   isOpen: boolean;
@@ -145,33 +146,54 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
     // }, 1000);
   };
 
+  const formId = "edit-quiz-form";
+
+  const footerContent = (
+    <>
+      <Button variant="secondary" onClick={onClose} disabled={isLoading}>
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        form={formId} // Link to form
+        variant="primary"
+        disabled={
+          isLoading ||
+          !title.trim() ||
+          selectedBankIds.length === 0 ||
+          numberOfQuestionsPerAttempt <= 0
+        }
+        className="ml-3"
+      >
+        {isLoading ? <LoadingSpinner message="" /> : "Save Changes"}
+      </Button>
+    </>
+  );
+
   // Using the generic Modal component
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={initialQuizData ? "Edit Quiz" : "Edit Quiz Details"}
+      size="xl" // Consider lg or xl depending on content
+      footerContent={footerContent}
     >
-      {fetchBanksError && (
-        <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
-          role="alert"
-        >
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{fetchBanksError}</span>
-        </div>
-      )}
+      {fetchBanksError && <ErrorMessage message={fetchBanksError} />}
+      {/* General submission error shown near footer by Modal if passed via a prop, or handle here */}
 
       {isLoadingBanks ? (
         <div className="flex justify-center items-center h-64">
           <LoadingSpinner message="Loading question banks..." />
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} id={formId} className="space-y-6">
+          {/* Display submission error here, above form fields or below title */}
+          {error && <ErrorMessage message={error} />}
           <div>
             <label
               htmlFor="edit-quiz-title"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-slate-700 mb-1"
             >
               Title <span className="text-red-500">*</span>
             </label>
@@ -180,7 +202,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               id="edit-quiz-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               required
               disabled={isLoading}
             />
@@ -189,16 +211,17 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
           <div>
             <label
               htmlFor="edit-quiz-description"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-slate-700 mb-1"
             >
-              Description (Optional)
+              Description{" "}
+              <span className="text-xs text-slate-500">(Optional)</span>
             </label>
             <textarea
               id="edit-quiz-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               disabled={isLoading}
             />
           </div>
@@ -206,7 +229,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
           <div>
             <label
               htmlFor="edit-quiz-questions-per-attempt"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-slate-700 mb-1"
             >
               Number of Questions Per Attempt{" "}
               <span className="text-red-500">*</span>
@@ -215,78 +238,72 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               type="number"
               id="edit-quiz-questions-per-attempt"
               value={numberOfQuestionsPerAttempt}
-              onChange={(e) =>
-                setNumberOfQuestionsPerAttempt(parseInt(e.target.value, 10))
+              onChange={
+                (e) =>
+                  setNumberOfQuestionsPerAttempt(
+                    parseInt(e.target.value, 10) || 0
+                  ) // Ensure it's a number, default to 0 if parse fails
               }
               min="1"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
               disabled={isLoading}
             />
           </div>
 
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-slate-700">
               Select Question Banks <span className="text-red-500">*</span>
-            </h3>
+            </label>
+
             {availableBanks.length === 0 && !fetchBanksError && (
-              <p className="text-gray-500 text-sm">
-                No question banks available, or failed to load.
+              <p className="text-slate-500 text-sm py-3">
+                No question banks available. You can create them in the
+                'Question Banks' section.
               </p>
             )}
             {availableBanks.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
                 {availableBanks.map((bank) => (
                   <div
                     key={bank._id}
-                    className="flex items-center p-2 bg-white rounded-md border border-gray-300 hover:bg-gray-100 transition duration-150"
+                    className="flex items-start p-3 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
                   >
                     <input
                       type="checkbox"
                       id={`edit-modal-bank-${bank._id}`}
                       checked={selectedBankIds.includes(bank._id)}
                       onChange={() => handleBankSelectionChange(bank._id)}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2 cursor-pointer"
+                      className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
                       disabled={isLoading}
                     />
                     <label
                       htmlFor={`edit-modal-bank-${bank._id}`}
-                      className="text-sm text-gray-700 cursor-pointer flex-grow"
+                      className="ml-3 flex-1 cursor-pointer"
                     >
-                      {bank.name}
-                      {/* Optionally show question count from bank.questionCount or bank.questions.length if available */}
-                      {/* <span className="text-xs text-gray-500 ml-1">({bank.questionCount || bank.questions?.length || 0}Q)</span> */}
+                      <span
+                        className={`block text-sm font-medium ${
+                          isLoading ? "text-slate-400" : "text-slate-800"
+                        }`}
+                      >
+                        {bank.name} ({bank.questionCount || 0} questions)
+                      </span>
+                      {bank.description && (
+                        <p
+                          className={`text-xs mt-0.5 ${
+                            isLoading ? "text-slate-400" : "text-slate-500"
+                          }`}
+                        >
+                          {bank.description}
+                        </p>
+                      )}
                     </label>
                   </div>
                 ))}
               </div>
             )}
           </div>
-
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div className="pt-2 flex justify-end space-x-3">
-            <Button
-              variant="secondary"
-              onClick={onClose}
-              disabled={isLoading}
-              type="button"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              isLoading={isLoading}
-              disabled={!!fetchBanksError || isLoadingBanks}
-            >
-              Save Changes
-            </Button>
-          </div>
+          {/* General submission error already placed above form fields */}
         </form>
       )}
     </Modal>

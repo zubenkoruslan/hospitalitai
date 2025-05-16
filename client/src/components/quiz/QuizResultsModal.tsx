@@ -1,4 +1,5 @@
 import React from "react";
+import Button from "../common/Button"; // Import our styled Button
 
 // --- Interfaces ---
 // TODO: Move to shared types file
@@ -46,102 +47,154 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
     return null;
   }
 
-  // Calculate raw percentage first for comparison
   const rawPercentage =
     results.totalQuestions > 0
       ? (results.score / results.totalQuestions) * 100
       : 0;
-  // Format percentage for display
   const displayPercentage = rawPercentage.toFixed(0);
 
+  // Stop propagation prevents closing modal when clicking inside the modal content
+  const handleContentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-gray-600 bg-opacity-75 flex items-center justify-center">
-      {/* Increased z-index slightly just in case */}
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-4 my-8">
-        <h2 className="text-xl font-semibold mb-2 text-gray-800">
-          Preview Results: {results.quizData.title}
-        </h2>
-        <p
-          className={`text-lg font-medium mb-4 ${
-            rawPercentage >= 70 ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          Score: {results.score} / {results.totalQuestions} ({displayPercentage}
-          %)
-        </p>
-
-        <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
-          {results.quizData.questions.map((q, index) => {
-            const userAnswerIndex = results.userAnswers[index];
-            const correctAnswerIndex = results.correctAnswers[index]; // Should always be defined
-            const isCorrect = userAnswerIndex === correctAnswerIndex;
-
-            return (
-              <div
-                key={`result-${index}`}
-                className={`p-4 border rounded-md ${
-                  isCorrect
-                    ? "bg-green-50 border-green-200"
-                    : "bg-red-50 border-red-200"
-                }`}
-              >
-                <p className="font-medium mb-2">
-                  {index + 1}. {q.text}
-                </p>
-                <ul className="space-y-1 list-none mb-2 pl-1">
-                  {q.choices.map((choice, choiceIndex) => {
-                    const isChoiceCorrect = choiceIndex === correctAnswerIndex;
-                    const isChoiceSelected = choiceIndex === userAnswerIndex;
-
-                    let choiceStyle = "text-gray-700";
-                    let indicator = "";
-
-                    if (isChoiceCorrect) {
-                      choiceStyle = "text-green-700 font-semibold";
-                      indicator = "(Correct Answer)";
-                    }
-                    if (isChoiceSelected && !isChoiceCorrect) {
-                      choiceStyle = "text-red-700";
-                      indicator = "(Your Answer)";
-                    }
-                    if (isChoiceSelected && isChoiceCorrect) {
-                      indicator = "(Correct)";
-                    }
-
-                    return (
-                      <li
-                        key={choiceIndex}
-                        className={`flex items-center ${choiceStyle}`}
-                      >
-                        <span
-                          className={`mr-2 ${
-                            isChoiceSelected ? "font-bold" : ""
-                          }`}
-                        >
-                          -
-                        </span>
-                        <span>{choice}</span>
-                        {indicator && (
-                          <span className="ml-2 text-xs">{indicator}</span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+    <div
+      className="fixed inset-0 z-[70] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
+      onClick={onClose} // Close on overlay click
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quiz-results-modal-title"
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl mx-auto my-8 max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast"
+        onClick={handleContentClick}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200">
+          <h2
+            id="quiz-results-modal-title"
+            className="text-xl font-semibold text-slate-700"
+          >
+            Quiz Results: {results.quizData.title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 rounded-full p-1.5 transition-colors duration-150 ease-in-out"
+            aria-label="Close modal"
+          >
+            {/* SVG Close Icon */}
+            <svg
+              className="h-6 w-6"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
 
-        <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+        {/* Body (Scrollable) */}
+        <div className="overflow-y-auto flex-1 pr-2">
+          <p
+            className={`text-2xl font-semibold mb-1 text-center ${
+              rawPercentage >= 70 ? "text-green-600" : "text-red-600" // Softer green/red for score
+            }`}
           >
+            Score: {results.score} / {results.totalQuestions}
+          </p>
+          <p
+            className={`text-lg font-medium mb-6 text-center ${
+              rawPercentage >= 70 ? "text-green-500" : "text-red-500" // Softer green/red for percentage
+            }`}
+          >
+            ({displayPercentage}%)
+          </p>
+
+          <div className="space-y-4">
+            {results.quizData.questions.map((q, index) => {
+              const userAnswerIndex = results.userAnswers[index];
+              const correctAnswerIndex = q.correctAnswer; // Use q.correctAnswer directly
+              const isCorrect = userAnswerIndex === correctAnswerIndex;
+
+              return (
+                <div
+                  key={`result-${index}`}
+                  className={`p-4 border rounded-lg shadow-sm ${
+                    isCorrect
+                      ? "bg-green-50 border-green-300"
+                      : "bg-red-50 border-red-300"
+                  }`}
+                >
+                  <p className="font-semibold text-slate-800 mb-2">
+                    {index + 1}. {q.text}
+                  </p>
+                  <ul className="space-y-1 list-none pl-1">
+                    {q.choices.map((choice, choiceIndex) => {
+                      const isChoiceCorrect =
+                        choiceIndex === correctAnswerIndex;
+                      const isChoiceSelected = choiceIndex === userAnswerIndex;
+
+                      let choiceStyle = "text-slate-700";
+                      let indicator = "";
+                      let indicatorStyle = "text-xs ml-2";
+
+                      if (isChoiceCorrect) {
+                        choiceStyle = "font-semibold text-green-700";
+                        indicator = "(Correct Answer)";
+                        indicatorStyle += " text-green-600";
+                      }
+                      if (isChoiceSelected && !isChoiceCorrect) {
+                        choiceStyle = "font-semibold text-red-700";
+                        indicator = "(Your Answer)";
+                        indicatorStyle += " text-red-600";
+                      }
+                      if (isChoiceSelected && isChoiceCorrect) {
+                        // Override indicator for selected correct answer
+                        indicator = "(Your Answer - Correct)";
+                        indicatorStyle += " text-green-600";
+                      }
+
+                      return (
+                        <li
+                          key={choiceIndex}
+                          className={`flex items-center py-1 ${choiceStyle}`}
+                        >
+                          <span
+                            className={`mr-2 ${
+                              isChoiceSelected ? "font-bold" : "text-slate-500" // Subtle dash for non-selected
+                            }`}
+                          >
+                            {isChoiceSelected ? "●" : "○"}{" "}
+                            {/* Better indicators */}
+                          </span>
+                          <span>{choice}</span>
+                          {indicator && (
+                            <span className={indicatorStyle}>{indicator}</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-5 mt-5 border-t border-slate-200 flex justify-end space-x-3">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Close Results
-          </button>
-          {/* Save button intentionally removed - saving happens from the editor */}
+          </Button>
         </div>
       </div>
     </div>

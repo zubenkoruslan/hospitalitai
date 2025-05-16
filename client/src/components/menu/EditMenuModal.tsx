@@ -63,12 +63,12 @@ const EditMenuModal: React.FC<EditMenuModalProps> = ({
       footerContent={footerContent}
       size="lg"
     >
-      <form onSubmit={handleSubmit} id="edit-menu-form" className="space-y-4">
+      <form onSubmit={handleSubmit} id="edit-menu-form" className="space-y-6">
         {error && <ErrorMessage message={error} />}
         <div>
           <label
             htmlFor="menuName"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-slate-700 mb-1"
           >
             Menu Name <span className="text-red-500">*</span>
           </label>
@@ -77,14 +77,15 @@ const EditMenuModal: React.FC<EditMenuModalProps> = ({
             id="menuName"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
             disabled={isSaving}
+            required
           />
         </div>
         <div>
           <label
             htmlFor="menuDescription"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-slate-700 mb-1"
           >
             Description
           </label>
@@ -92,8 +93,8 @@ const EditMenuModal: React.FC<EditMenuModalProps> = ({
             id="menuDescription"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            rows={4}
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
             disabled={isSaving}
           />
         </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import Button from "../common/Button";
 
 // --- Interfaces ---
 // TODO: Move to shared types file
@@ -48,22 +49,22 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
   return (
     <div
       key={`q-${index}`}
-      className="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200"
+      className="bg-white p-4 rounded-lg shadow-md mb-4 border border-slate-200"
     >
       {isEditing ? (
         <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Question {index + 1} Text
           </label>
           <input
             type="text"
             value={question.text}
             onChange={handleTextChange}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-100 disabled:text-slate-500"
           />
         </div>
       ) : (
-        <p className="text-lg font-medium text-gray-900 mb-4">
+        <p className="text-lg font-medium text-slate-800 mb-4">
           {index + 1}. {question.text}
         </p>
       )}
@@ -78,7 +79,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                   name={`correct-answer-${index}`}
                   checked={question.correctAnswer === choiceIndex}
                   onChange={() => handleCorrectAnswerChange(choiceIndex)}
-                  className="h-4 w-4 text-blue-600 border-gray-300 mr-2 focus:ring-blue-500"
+                  className="h-4 w-4 text-sky-600 border-slate-300 mr-3 focus:ring-sky-500 focus:ring-offset-1 transition-colors"
                 />
                 <input
                   type="text"
@@ -86,16 +87,16 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                   onChange={(e) =>
                     handleChoiceChange(choiceIndex, e.target.value)
                   }
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-100 disabled:text-slate-500"
                   placeholder={`Option ${choiceIndex + 1}`}
                 />
               </>
             ) : (
               <label
-                className={`flex items-center w-full p-3 border rounded-md hover:bg-gray-50 cursor-pointer transition-colors duration-150 ease-in-out ${
+                className={`flex items-center w-full p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors duration-150 ease-in-out ${
                   userAnswer === choiceIndex
-                    ? "bg-blue-50 border-blue-300 ring-1 ring-blue-300"
-                    : "border-gray-200"
+                    ? "bg-sky-50 border-sky-400 ring-2 ring-sky-300"
+                    : "border-slate-300"
                 }`}
               >
                 <input
@@ -104,9 +105,9 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                   value={choiceIndex}
                   checked={userAnswer === choiceIndex}
                   onChange={() => onAnswerSelect(index, choiceIndex)}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-sky-600 border-slate-300 focus:ring-sky-500 focus:ring-offset-1 transition-colors"
                 />
-                <span className="ml-3 text-sm text-gray-700">{choice}</span>
+                <span className="ml-3 text-sm text-slate-700">{choice}</span>
               </label>
             )}
           </div>
@@ -115,13 +116,13 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
 
       {isEditing && (
         <div className="mt-4 flex justify-end">
-          <button
+          <Button
+            variant="destructive"
             onClick={() => onQuestionDelete(index)}
-            className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm hover:bg-red-200 border border-red-200"
             aria-label={`Delete question ${index + 1}`}
           >
-            Delete Question
-          </button>
+            Delete
+          </Button>
         </div>
       )}
     </div>

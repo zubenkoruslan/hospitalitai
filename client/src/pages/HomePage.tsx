@@ -1,32 +1,39 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/common/Button";
+import Card from "../components/common/Card";
 
 const HomePage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-blue-50">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* Hero Section */}
-      <div className="relative pt-16 pb-32 flex content-center items-center justify-center">
+      <div className="relative pt-20 pb-24 md:pt-32 md:pb-40 flex content-center items-center justify-center bg-white shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap items-center">
-            <div className="w-full lg:w-6/12 px-4 ml-auto mr-auto text-center">
-              <div className="pr-12">
-                <h1 className="text-5xl font-extrabold text-gray-900 mb-6">
-                  Welcome to <span className="text-blue-600">Savvy</span>
+            <div className="w-full lg:w-7/12 px-4 ml-auto mr-auto text-center">
+              <div>
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-700 mb-6">
+                  Welcome to <span className="text-sky-600">Savvy</span>
                 </h1>
-                <p className="mt-4 text-lg text-gray-600 mb-8">
+                <p className="mt-4 text-lg md:text-xl text-slate-600 mb-10">
                   The smart solution for restaurant staff training and menu
                   management. Elevate your team's knowledge and improve guest
                   experience.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                   <Link to="/login">
-                    <Button variant="primary" className="px-8 py-3 text-base">
+                    <Button
+                      variant="primary"
+                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                    >
                       Sign In
                     </Button>
                   </Link>
                   <Link to="/signup">
-                    <Button variant="secondary" className="px-8 py-3 text-base">
+                    <Button
+                      variant="secondary"
+                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg border-sky-500 text-sky-600 hover:bg-sky-50 transition-colors"
+                    >
                       Create Account
                     </Button>
                   </Link>
@@ -38,11 +45,19 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section className="py-16 md:py-24 bg-slate-100">
         <div className="container mx-auto px-4">
-          <div className="flex flex-wrap items-center">
-            <div className="w-full md:w-4/12 px-4 mr-auto ml-auto mb-8 md:mb-0">
-              <div className="text-blue-600 p-3 text-center inline-flex items-center justify-center w-16 h-16 mb-6 shadow-lg rounded-full bg-blue-100">
+          <div className="text-center mb-12 md:mb-16">
+            <h2 className="text-3xl md:text-4xl font-semibold text-slate-700">
+              Key Features
+            </h2>
+            <p className="text-md md:text-lg text-slate-500 mt-2">
+              Discover how Savvy can transform your restaurant operations.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="p-6 bg-white shadow-lg rounded-xl transform hover:scale-105 transition-transform duration-300">
+              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-sky-100 text-sky-600 mx-auto shadow-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -58,16 +73,18 @@ const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-3xl font-semibold mb-4">Menu Management</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-2xl font-semibold text-slate-700 mb-3 text-center">
+                Menu Management
+              </h3>
+              <p className="text-slate-600 text-center">
                 Create and manage digital menus that your staff can learn from.
                 Keep your team informed about ingredients, preparation methods,
                 and allergens.
               </p>
-            </div>
+            </Card>
 
-            <div className="w-full md:w-4/12 px-4 mr-auto ml-auto mb-8 md:mb-0">
-              <div className="text-blue-600 p-3 text-center inline-flex items-center justify-center w-16 h-16 mb-6 shadow-lg rounded-full bg-blue-100">
+            <Card className="p-6 bg-white shadow-lg rounded-xl transform hover:scale-105 transition-transform duration-300">
+              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-teal-100 text-teal-600 mx-auto shadow-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -83,16 +100,18 @@ const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-3xl font-semibold mb-4">Staff Training</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-2xl font-semibold text-slate-700 mb-3 text-center">
+                Staff Training
+              </h3>
+              <p className="text-slate-600 text-center">
                 Create custom quizzes to test your staff's knowledge and track
                 their progress. Ensure your team is knowledgeable and confident
                 about your menu.
               </p>
-            </div>
+            </Card>
 
-            <div className="w-full md:w-4/12 px-4 mr-auto ml-auto">
-              <div className="text-blue-600 p-3 text-center inline-flex items-center justify-center w-16 h-16 mb-6 shadow-lg rounded-full bg-blue-100">
+            <Card className="p-6 bg-white shadow-lg rounded-xl transform hover:scale-105 transition-transform duration-300">
+              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-indigo-100 text-indigo-600 mx-auto shadow-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -108,32 +127,37 @@ const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-3xl font-semibold mb-4">Analytics</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-2xl font-semibold text-slate-700 mb-3 text-center">
+                Analytics
+              </h3>
+              <p className="text-slate-600 text-center">
                 Track staff performance with detailed analytics. Identify
                 knowledge gaps and optimize your training to improve guest
                 satisfaction and sales.
               </p>
-            </div>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-blue-600">
+      <section className="py-16 md:py-24 bg-gradient-to-r from-sky-500 to-sky-600">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap text-center justify-center">
-            <div className="w-full lg:w-6/12 px-4">
-              <h2 className="text-4xl font-semibold text-white">
-                Ready to get started?
+            <div className="w-full lg:w-8/12 px-4">
+              <h2 className="text-3xl md:text-4xl font-semibold text-white">
+                Ready to Elevate Your Restaurant?
               </h2>
-              <p className="text-lg leading-relaxed mt-4 mb-4 text-white">
+              <p className="text-lg md:text-xl leading-relaxed mt-4 mb-8 text-sky-100">
                 Join restaurants that are revolutionizing their staff training
                 and menu management. Start enhancing your team's knowledge
                 today.
               </p>
               <Link to="/signup">
-                <Button variant="white" className="mt-4 px-8 py-3 text-base">
+                <Button
+                  variant="white"
+                  className="mt-4 px-10 py-3 text-lg rounded-lg shadow-md hover:shadow-lg hover:bg-slate-50 transition-all"
+                >
                   Create Your Account
                 </Button>
               </Link>
@@ -143,25 +167,48 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 pt-8 pb-6">
+      <footer className="bg-slate-800 text-slate-300 pt-12 pb-8">
         <div className="container mx-auto px-4">
-          <div className="flex flex-wrap">
-            <div className="w-full md:w-6/12 px-4">
+          <div className="flex flex-wrap text-center md:text-left">
+            <div className="w-full md:w-6/12 px-4 mb-8 md:mb-0">
               <h4 className="text-3xl font-semibold text-white">Savvy</h4>
-              <h5 className="text-lg mt-0 mb-2 text-gray-300">
-                Empowering restaurants with better staff training
+              <h5 className="text-lg mt-1 mb-2 text-slate-400">
+                Empowering restaurants with smarter training.
               </h5>
             </div>
             <div className="w-full md:w-6/12 px-4">
               <div className="flex flex-wrap items-top mb-6">
-                <div className="w-full md:w-6/12 px-4 ml-auto">
-                  <span className="block uppercase text-gray-300 text-sm font-semibold mb-2">
-                    Links
+                <div className="w-full md:w-4/12 px-4 ml-auto mb-6 md:mb-0">
+                  <span className="block uppercase text-slate-400 text-sm font-semibold mb-2">
+                    Company
+                  </span>
+                  <ul className="list-unstyled">
+                    <li>
+                      <a
+                        className="text-slate-300 hover:text-white font-medium block pb-2 text-sm"
+                        href="#about"
+                      >
+                        About Us
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        className="text-slate-300 hover:text-white font-medium block pb-2 text-sm"
+                        href="#contact"
+                      >
+                        Contact
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+                <div className="w-full md:w-4/12 px-4">
+                  <span className="block uppercase text-slate-400 text-sm font-semibold mb-2">
+                    Get Started
                   </span>
                   <ul className="list-unstyled">
                     <li>
                       <Link
-                        className="text-gray-400 hover:text-white font-semibold block pb-2 text-sm"
+                        className="text-slate-300 hover:text-white font-medium block pb-2 text-sm"
                         to="/login"
                       >
                         Sign In
@@ -169,10 +216,18 @@ const HomePage: React.FC = () => {
                     </li>
                     <li>
                       <Link
-                        className="text-gray-400 hover:text-white font-semibold block pb-2 text-sm"
+                        className="text-slate-300 hover:text-white font-medium block pb-2 text-sm"
                         to="/signup"
                       >
                         Sign Up
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        className="text-slate-300 hover:text-white font-medium block pb-2 text-sm"
+                        to="/#features"
+                      >
+                        Features
                       </Link>
                     </li>
                   </ul>
@@ -180,12 +235,12 @@ const HomePage: React.FC = () => {
               </div>
             </div>
           </div>
-          <hr className="my-6 border-gray-700" />
+          <hr className="my-6 border-slate-700" />
           <div className="flex flex-wrap items-center md:justify-between justify-center">
             <div className="w-full md:w-4/12 px-4 mx-auto text-center">
-              <div className="text-sm text-gray-400 py-1">
-                Copyright © {new Date().getFullYear()} Savvy. All rights
-                reserved.
+              <div className="text-sm text-slate-400 py-1">
+                Copyright © {new Date().getFullYear()} Savvy Hospitality
+                Solutions.
               </div>
             </div>
           </div>

@@ -574,38 +574,15 @@ const MenusPage: React.FC = () => {
         </div>
       )}
 
+      {/* Updated PDF Upload Modal Usage */}
       {isPdfUploadModalOpen && restaurantId && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg relative">
-            <h2 className="text-xl font-semibold mb-4">Upload PDF Menu</h2>
-            <Button
-              variant="secondary"
-              onClick={closePdfUploadModal}
-              className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600"
-              aria-label="Close PDF upload modal"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </Button>
-            <PdfMenuUpload
-              restaurantId={restaurantId}
-              onUploadSuccess={handlePdfUploadSuccess}
-              onUploadError={handlePdfUploadError}
-            />
-          </div>
-        </div>
+        <PdfMenuUpload
+          isOpen={isPdfUploadModalOpen}
+          onClose={closePdfUploadModal}
+          restaurantId={restaurantId}
+          onUploadSuccess={handlePdfUploadSuccess}
+          onUploadError={handlePdfUploadError}
+        />
       )}
     </div>
   );

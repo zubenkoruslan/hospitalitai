@@ -105,10 +105,10 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
       footerContent={footer}
     >
       {error && <ErrorMessage message={error} />}
-      <div className="mb-4">
+      <div className="mb-6">
         <label
           htmlFor="quizTitleModal"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-slate-700 mb-1"
         >
           Quiz Title <span className="text-red-500">*</span>
         </label>
@@ -122,23 +122,29 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
               setError(null);
             }
           }}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
+          className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           placeholder="E.g., Appetizers Knowledge Check"
           required
+          disabled={isGenerating}
         />
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
           Select Menus to Generate Questions From{" "}
           <span className="text-red-500">*</span>
         </label>
         {isLoadingMenus ? (
-          <LoadingSpinner message="Loading menus..." />
+          <div className="py-4">
+            <LoadingSpinner message="Loading menus..." />
+          </div>
         ) : menus.length > 0 ? (
-          <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
+          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
             {menus.map((menu) => (
-              <div key={menu._id} className="flex items-center">
+              <div
+                key={menu._id}
+                className="flex items-center p-2 rounded-md hover:bg-slate-100 transition-colors"
+              >
                 <input
                   id={`modal-menu-${menu._id}`}
                   name="modal-menus"
@@ -146,11 +152,14 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
                   value={menu._id}
                   checked={selectedMenuIds.includes(menu._id)}
                   onChange={() => handleMenuSelection(menu._id)}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50"
+                  disabled={isGenerating}
                 />
                 <label
                   htmlFor={`modal-menu-${menu._id}`}
-                  className="ml-3 text-sm text-gray-700"
+                  className={`ml-3 text-sm ${
+                    isGenerating ? "text-slate-400" : "text-slate-700"
+                  } cursor-pointer`}
                 >
                   {menu.name}
                 </label>
@@ -158,7 +167,7 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500 py-4">
             No menus found. Please create menus first.
           </p>
         )}

@@ -164,12 +164,12 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
     >
       {/* Modal children now contain title input and scrollable questions */}
       {/* Input for Quiz Title - Remains near top */}
-      <div className="mb-4">
+      <div className="mb-6">
         <label
           htmlFor="quizEditTitle"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-slate-700 mb-1"
         >
-          Quiz Title
+          Quiz Title <span className="text-red-500">*</span>
         </label>
         <input
           id="quizEditTitle"
@@ -180,16 +180,21 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
               prev ? { ...prev, title: e.target.value } : null
             )
           }
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-75 disabled:bg-gray-100"
-          placeholder="Quiz Title"
+          className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+          placeholder="Enter Quiz Title"
+          required // Added required for better UX
         />
       </div>
 
       {/* Main Content Area (Scrollable) */}
       <div className="mb-6">
-        <h3 className="text-lg font-medium mb-4">Edit Quiz Questions</h3>
+        <h3 className="text-lg font-semibold text-slate-700 mb-4">
+          Quiz Questions
+        </h3>
         {/* Adjust max-height for sticky footer */}
-        <div className="space-y-4 overflow-y-auto max-h-[calc(80vh - 200px)] pr-2">
+        <div className="space-y-4 overflow-y-auto max-h-[calc(100vh - 300px)] pr-2 rounded-lg border border-slate-200 p-4 bg-slate-50">
+          {" "}
+          {/* Themed container for questions */}
           {/* Adjusted max-h estimate */}
           {quizData.questions.map((question, idx) => (
             <QuestionDisplay
@@ -204,8 +209,8 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
             />
           ))}
           {quizData.questions.length === 0 && (
-            <p className="text-center text-gray-500 py-4">
-              No questions yet. Add one!
+            <p className="text-center text-slate-500 py-6">
+              No questions yet. Click "Add Question" to begin.
             </p>
           )}
         </div>
@@ -213,15 +218,27 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
 
       {error && <ErrorMessage message={error} />}
 
-      {/* Sticky Footer with Buttons */}
-      <div className="sticky bottom-0 p-4 z-10 flex justify-end items-center space-x-3">
-        {/* Add Question Button - Moved to sticky footer */}
-        <Button variant="success" onClick={openAddQuestionModal}>
+      {/* Sticky Footer with Buttons - Styled to match Modal footer */}
+      <div className="sticky bottom-0 px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end items-center space-x-3 z-10">
+        <Button
+          variant="success"
+          onClick={openAddQuestionModal}
+          disabled={isSaving}
+        >
+          {" "}
+          {/* Disable add question if saving */}
           Add Question
         </Button>
-        {/* Save Button - Moved back to sticky footer */}
-        <Button variant="primary" onClick={handleSaveClick} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Quiz Changes"}
+        <Button
+          variant="primary"
+          onClick={handleSaveClick}
+          disabled={
+            isSaving ||
+            !quizData.title.trim() ||
+            quizData.questions.length === 0
+          }
+        >
+          {isSaving ? <LoadingSpinner message="" /> : "Save Quiz Changes"}
         </Button>
       </div>
 
