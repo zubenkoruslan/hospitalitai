@@ -1,18 +1,8 @@
 import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import EditQuestionForm from "./EditQuestionForm";
-import {
-  IQuestion,
-  IOption,
-  QuestionType,
-} from "../../types/questionBankTypes";
+import { IQuestion } from "../../types/questionBankTypes";
 import * as api from "../../services/api";
 import {
   ValidationContext,
@@ -211,7 +201,7 @@ describe("EditQuestionForm", () => {
       // Find the radio button for the first option (index 0)
       // The options are rendered with an input for text and a checkbox/radio for isCorrect
       // Let's assume checkboxes are used for 'isCorrect' and have accessible names or roles
-      const optionInputs = screen.getAllByRole("textbox"); // Gets all text inputs for options
+      const _optionInputs = screen.getAllByRole("textbox"); // Prefixed, assuming this is line 214
       const firstOptionCorrectCheckbox = screen.getAllByRole("checkbox")[0]; // Assuming order matches options
 
       fireEvent.click(firstOptionCorrectCheckbox); // Click to make first option correct

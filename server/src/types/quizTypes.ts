@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+// import { Types } from "mongoose"; // Removed unused import
 
 // Summary of a single quiz attempt, often used in lists or aggregated views.
 export interface IQuizAttemptSummary {

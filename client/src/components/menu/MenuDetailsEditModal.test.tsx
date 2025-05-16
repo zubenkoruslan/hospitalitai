@@ -6,32 +6,25 @@ import MenuDetailsEditModal from "./MenuDetailsEditModal";
 // Mock common components that are direct children or rely on context if necessary
 // Button and ErrorMessage are used, so we'll mock them.
 
-jest.mock(
-  "../common/Button",
-  () =>
-    (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      props: any
-    ) =>
-      (
-        <button
-          onClick={props.onClick}
-          type={props.type || "button"} // Ensure type is set for form submission testing
-          disabled={props.disabled}
-          data-variant={props.variant}
-          // form={props.form} // Not used by MenuDetailsEditModal's own buttons
-        >
-          {props.children}
-        </button>
-      )
+const MockButton = (props: any) => (
+  <button
+    onClick={props.onClick}
+    type={props.type || "button"} // Ensure type is set for form submission testing
+    disabled={props.disabled}
+    data-variant={props.variant}
+    // form={props.form} // Not used by MenuDetailsEditModal's own buttons
+  >
+    {props.children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
 
 const mockOnClose = jest.fn();
 const mockOnSubmit = jest.fn().mockResolvedValue(undefined); // Default to resolve

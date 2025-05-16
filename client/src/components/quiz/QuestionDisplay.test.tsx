@@ -5,20 +5,22 @@ import QuestionDisplay from "./QuestionDisplay";
 import { QuizDisplayQuestion } from "../../types/quizTypes";
 
 // Mock Button component
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, "aria-label": ariaLabel }: any) =>
-      (
-        <button
-          data-testid={`button-${variant}`}
-          onClick={onClick}
-          aria-label={ariaLabel}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({
+  onClick,
+  children,
+  variant,
+  "aria-label": ariaLabel,
+}: any) => (
+  <button
+    data-testid={`button-${variant}`}
+    onClick={onClick}
+    aria-label={ariaLabel}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 const mockQuestion: QuizDisplayQuestion = {
   _id: "q1",

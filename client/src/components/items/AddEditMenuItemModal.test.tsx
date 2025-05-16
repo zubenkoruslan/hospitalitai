@@ -9,15 +9,17 @@ import {
 } from "../../types/menuItemTypes";
 
 // Mock child components
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
-jest.mock("../common/LoadingSpinner", () => () => (
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
+
+const MockLoadingSpinner = () => (
   <div data-testid="loading-spinner">Loading...</div>
-));
+);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockOnClose = jest.fn();
 const mockOnSubmit = jest.fn();
@@ -550,7 +552,8 @@ describe("AddEditMenuItemModal", () => {
     );
 
     await userEvent.selectOptions(screen.getByLabelText(/Item Type/), "food");
-    const categorySelect = screen.getByLabelText<HTMLSelectElement>(/Category/);
+    const _categorySelect =
+      screen.getByLabelText<HTMLSelectElement>(/Category/);
 
     for (const cat of initialAvailable) {
       expect(screen.getByRole("option", { name: cat })).toBeInTheDocument();

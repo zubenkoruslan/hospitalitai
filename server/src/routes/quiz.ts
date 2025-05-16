@@ -11,7 +11,7 @@ import {
   validateObjectId,
   validateUpdateQuizBody,
 } from "../middleware/validationMiddleware";
-import { AppError } from "../utils/errorHandler";
+import { AppError as _AppError } from "../utils/errorHandler";
 import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware";
 import {
   generateQuizFromBanksController,

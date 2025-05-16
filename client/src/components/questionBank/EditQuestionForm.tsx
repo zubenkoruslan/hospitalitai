@@ -6,7 +6,6 @@ import {
   UpdateQuestionClientData,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
-import Card from "../common/Card"; // Assuming it might be wrapped in a Card if used outside a modal
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { updateQuestion as apiUpdateQuestion } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
@@ -92,7 +91,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     ) {
       setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
     }
-  }, [questionType, questionToEdit]); // Listen to changes in form's questionType and the original question
+  }, [questionType, questionToEdit, options]); // Added options to dependency array
 
   const handleOptionChange = (
     index: number,
@@ -322,8 +321,8 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         />
       </div>
 
-      <div>
-        <label className={commonLabelClass}>Options</label>
+      <fieldset>
+        <legend className={commonLabelClass}>Options</legend>
         {options.map((opt, index) => (
           <div
             key={opt._id || `new-opt-${index}`}
@@ -384,7 +383,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
             Add Option
           </Button>
         )}
-      </div>
+      </fieldset>
 
       <div>
         <label

@@ -12,7 +12,7 @@ import { MemoryRouter, useParams, useNavigate } from "react-router-dom";
 import StaffDetails from "./StaffDetails";
 import { useAuth } from "../context/AuthContext";
 import { useStaffDetails } from "../hooks/useStaffDetails";
-import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
+import { StaffDetailsData } from "../types/staffTypes";
 import { formatDate } from "../utils/helpers";
 import api from "../services/api";
 
@@ -70,29 +70,37 @@ describe("StaffDetails Page", () => {
     email: "jane.doe@test.com",
     createdAt: new Date("2023-01-01T12:00:00Z").toISOString(),
     professionalRole: "Bartender",
-    quizResults: [
+    aggregatedQuizPerformance: [
       {
-        _id: "qr1",
         quizId: "q1",
         quizTitle: "Mixology Basics",
-        completedAt: new Date("2023-02-15T10:00:00Z").toISOString(),
-        score: 9,
-        totalQuestions: 10,
-        retakeCount: 0,
-        incorrectQuestions: [
-          { questionText: "Q1", userAnswer: "B", correctAnswer: "A" },
+        numberOfAttempts: 1,
+        averageScorePercent: 90, // (9/10 * 100)
+        lastCompletedAt: new Date("2023-02-15T10:00:00Z").toISOString(),
+        attempts: [
+          {
+            _id: "qr1", // Attempt ID
+            score: 9,
+            totalQuestions: 10,
+            attemptDate: new Date("2023-02-15T10:00:00Z").toISOString(),
+            hasIncorrectAnswers: true, // Based on incorrectQuestions previously existing
+          },
         ],
       },
       {
-        _id: "qr2",
         quizId: "q2",
         quizTitle: "Wine Knowledge",
-        completedAt: new Date("2023-03-20T14:30:00Z").toISOString(),
-        score: 7,
-        totalQuestions: 8,
-        retakeCount: 1,
-        incorrectQuestions: [
-          { questionText: "Q5", userAnswer: "C", correctAnswer: "D" },
+        numberOfAttempts: 1, // Assuming retakeCount 1 implies one initial + one retake, but the old structure was unclear. Simulating 1 attempt for now.
+        averageScorePercent: 87.5, // (7/8 * 100)
+        lastCompletedAt: new Date("2023-03-20T14:30:00Z").toISOString(),
+        attempts: [
+          {
+            _id: "qr2", // Attempt ID
+            score: 7,
+            totalQuestions: 8,
+            attemptDate: new Date("2023-03-20T14:30:00Z").toISOString(),
+            hasIncorrectAnswers: true, // Based on incorrectQuestions previously existing
+          },
         ],
       },
     ],
@@ -221,7 +229,7 @@ describe("StaffDetails Page", () => {
       within(row1).getByRole("button", { name: /View Details/i })
     ).toBeInTheDocument();
     expect(mockedFormatDate).toHaveBeenCalledWith(
-      mockStaffDetailsData.quizResults[0].completedAt
+      mockStaffDetailsData.aggregatedQuizPerformance[0].lastCompletedAt
     );
 
     // Check data in the second row
@@ -233,7 +241,7 @@ describe("StaffDetails Page", () => {
       within(row2).getByRole("button", { name: /View Details/i })
     ).toBeInTheDocument();
     expect(mockedFormatDate).toHaveBeenCalledWith(
-      mockStaffDetailsData.quizResults[1].completedAt
+      mockStaffDetailsData.aggregatedQuizPerformance[1].lastCompletedAt
     );
 
     // Check back button
@@ -378,7 +386,7 @@ describe("StaffDetails Page", () => {
       expect(MockedViewIncorrectAnswersModal).toHaveBeenCalledWith(
         expect.objectContaining({
           isOpen: true,
-          quizResult: mockStaffDetailsData.quizResults[0], // Pass the first result
+          quizResult: mockStaffDetailsData.aggregatedQuizPerformance[0], // Pass the first result
           onClose: expect.any(Function),
         }),
         {}

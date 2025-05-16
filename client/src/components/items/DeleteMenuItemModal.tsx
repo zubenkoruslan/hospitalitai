@@ -47,8 +47,8 @@ const DeleteMenuItemModal: React.FC<DeleteMenuItemModalProps> = ({
       footerContent={footer}
     >
       <p className="text-slate-600 text-center text-lg">
-        Are you sure you want to delete the item "
-        <strong className="font-semibold">{itemName}</strong>"?
+        Are you sure you want to delete the item &quot;
+        <strong className="font-semibold">{itemName}</strong>&quot;?
         <br />
         <span className="text-sm text-slate-500 mt-1 block">
           This action cannot be undone.

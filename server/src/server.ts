@@ -1,11 +1,10 @@
-import express, { Express, Request, Response, NextFunction } from "express";
+import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { globalErrorHandler, AppError } from "./utils/errorHandler";
 
 // Import route files
 import authRoutes from "./routes/auth";
@@ -16,7 +15,6 @@ import { quizResultRouter } from "./routes/quizResult";
 import staffRoutes from "./routes/staff";
 import questionBankRoutes from "./routes/questionBankRoutes";
 import questionRoutes from "./routes/questionRoutes";
-import { protect } from "./middleware/authMiddleware";
 import { errorHandler } from "./middleware/errorHandler";
 
 dotenv.config();

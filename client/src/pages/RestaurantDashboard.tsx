@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { processPdfMenuUpload } from "../services/api"; // For menu upload
@@ -16,15 +10,11 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
-import { StaffMemberWithData, ResultSummary } from "../types/staffTypes"; // Import from types
-
-// // Updated Interfaces to match API response from GET /api/staff (REMOVED - Now imported)
-// interface ResultSummary { ... }
-// interface StaffMemberWithData { ... }
+import { ResultSummary } from "../types/staffTypes"; // Removed StaffMemberWithData
 
 // Helper function to check if a quiz is completed regardless of capitalization
 // This function uses ResultSummary, ensure it's compatible with the imported one
-const isCompletedQuiz = (result: ResultSummary): boolean => {
+const _isCompletedQuiz = (result: ResultSummary): boolean => {
   const status = result.status.toLowerCase();
   return status === "completed";
 };

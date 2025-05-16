@@ -12,7 +12,6 @@ interface QuizListProps {
   onDelete: (quiz: ClientIQuiz) => void;
   onViewProgress: (quizId: string) => void;
   isDeletingQuizId: string | null;
-  getMenuItemNames: (quiz: ClientIQuiz) => string;
 }
 
 // --- Component ---
@@ -25,7 +24,6 @@ const QuizList: React.FC<QuizListProps> = ({
   onDelete,
   onViewProgress,
   isDeletingQuizId,
-  getMenuItemNames,
 }) => {
   if (isLoading) {
     return <LoadingSpinner message="Loading quizzes..." />;

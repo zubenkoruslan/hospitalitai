@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { getQuizAttemptDetails, updateStaffRole } from "../services/api";
-import { ClientQuizAttemptDetails } from "../types/quizTypes";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -17,7 +16,7 @@ import Card from "../components/common/Card";
 // --- Main Component ---
 const StaffDetails: React.FC = () => {
   const { id: staffId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const navigate = useNavigate();
 
   // Use the custom hook
@@ -28,8 +27,8 @@ const StaffDetails: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
     useState<QuizResultDetails | null>(null);
-  const [loadingModalDetails, setLoadingModalDetails] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [_loadingModalDetails, _setLoadingModalDetails] = useState(false);
+  const [_modalError, _setModalError] = useState<string | null>(null);
   const [isEditingRole, setIsEditingRole] = useState(false);
   const [editedRole, setEditedRole] = useState<string>("");
   const [isSavingRole, setIsSavingRole] = useState(false);
@@ -44,41 +43,46 @@ const StaffDetails: React.FC = () => {
   }, [staffDetails, isEditingRole]);
 
   // --- Handlers ---
-  const handleOpenAttemptModal = useCallback(async (attemptId: string) => {
-    setLoadingModalDetails(true);
-    setModalError(null);
-    setModalDataForIncorrectAnswers(null);
-    setIsModalOpen(true);
+  const handleOpenAttemptModal = useCallback(
+    async (attemptId: string) => {
+      _setLoadingModalDetails(true);
+      _setModalError(null);
+      setModalDataForIncorrectAnswers(null);
+      setIsModalOpen(true);
 
-    try {
-      const attemptDetailsData = await getQuizAttemptDetails(attemptId);
-      if (attemptDetailsData) {
-        setModalDataForIncorrectAnswers({
-          _id: attemptDetailsData._id,
-          quizId: attemptDetailsData.quizId,
-          quizTitle: attemptDetailsData.quizTitle,
-          userId: attemptDetailsData.userId,
-          score: attemptDetailsData.score,
-          totalQuestions: attemptDetailsData.totalQuestions,
-          completedAt: attemptDetailsData.attemptDate,
-          incorrectQuestions: attemptDetailsData.incorrectQuestions,
-        });
-      } else {
-        setModalError("Could not load attempt details.");
+      try {
+        const attemptDetailsData = await getQuizAttemptDetails(attemptId);
+        if (attemptDetailsData) {
+          setModalDataForIncorrectAnswers({
+            _id: attemptDetailsData._id,
+            quizId: attemptDetailsData.quizId,
+            quizTitle: attemptDetailsData.quizTitle,
+            userId: attemptDetailsData.userId,
+            score: attemptDetailsData.score,
+            totalQuestions: attemptDetailsData.totalQuestions,
+            completedAt: attemptDetailsData.attemptDate,
+            incorrectQuestions: attemptDetailsData.incorrectQuestions,
+          });
+        } else {
+          _setModalError("Could not load attempt details.");
+        }
+      } catch (err: any) {
+        console.error("Error fetching attempt details:", err);
+        _setModalError(
+          err.message || "Failed to load details for this attempt."
+        );
+      } finally {
+        _setLoadingModalDetails(false);
       }
-    } catch (err: any) {
-      console.error("Error fetching attempt details:", err);
-      setModalError(err.message || "Failed to load details for this attempt.");
-    } finally {
-      setLoadingModalDetails(false);
-    }
-  }, []);
+    },
+    [_setLoadingModalDetails, _setModalError]
+  );
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setModalDataForIncorrectAnswers(null);
-    setModalError(null);
-  }, []);
+    _setModalError(null);
+  }, [_setModalError]);
 
   const handleEditRoleToggle = useCallback(() => {
     if (isEditingRole) {

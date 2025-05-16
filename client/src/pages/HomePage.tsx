@@ -17,8 +17,8 @@ const HomePage: React.FC = () => {
                 </h1>
                 <p className="mt-4 text-lg md:text-xl text-slate-600 mb-10">
                   The smart solution for restaurant staff training and menu
-                  management. Elevate your team's knowledge and improve guest
-                  experience.
+                  management. Elevate your team&apos;s knowledge and improve
+                  guest experience.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                   <Link to="/login">
@@ -104,9 +104,9 @@ const HomePage: React.FC = () => {
                 Staff Training
               </h3>
               <p className="text-slate-600 text-center">
-                Create custom quizzes to test your staff's knowledge and track
-                their progress. Ensure your team is knowledgeable and confident
-                about your menu.
+                Create custom quizzes to test your staff&apos;s knowledge and
+                track their progress. Ensure your team is knowledgeable and
+                confident about your menu.
               </p>
             </Card>
 
@@ -150,7 +150,7 @@ const HomePage: React.FC = () => {
               </h2>
               <p className="text-lg md:text-xl leading-relaxed mt-4 mb-8 text-sky-100">
                 Join restaurants that are revolutionizing their staff training
-                and menu management. Start enhancing your team's knowledge
+                and menu management. Start enhancing your team&apos;s knowledge
                 today.
               </p>
               <Link to="/signup">

@@ -6,36 +6,31 @@ import { QuizResultDetails } from "../../types/staffTypes";
 import { IncorrectQuestionDetail } from "../../types/quizTypes";
 
 // Mock the child components
-jest.mock(
-  "../common/Modal",
-  () =>
-    ({ isOpen, onClose, title, footerContent, children, size }: any) =>
-      isOpen ? (
-        <div data-testid="modal">
-          <h1>{title}</h1>
-          <div>{children}</div>
-          <footer>{footerContent}</footer>
-          <button data-testid="modal-close-button" onClick={onClose}>
-            Internal Close
-          </button>
-        </div>
-      ) : null
-);
+const MockModal = ({ isOpen, onClose, title, footerContent, children }: any) =>
+  isOpen ? (
+    <div data-testid="modal">
+      <h1>{title}</h1>
+      <div>{children}</div>
+      <footer>{footerContent}</footer>
+      <button data-testid="modal-close-button" onClick={onClose}>
+        Internal Close
+      </button>
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, className }: any) =>
-      (
-        <button
-          data-testid={`button-${variant}`}
-          onClick={onClick}
-          className={className}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({ onClick, children, variant, className }: any) => (
+  <button
+    data-testid={`button-${variant}`}
+    onClick={onClick}
+    className={className}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 const mockQuizResultBase: QuizResultDetails = {
   _id: "result1",

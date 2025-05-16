@@ -1,9 +1,9 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useStaffDetails } from "./useStaffDetails";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { AxiosResponse } from "axios";
-import { StaffDetailsData, QuizResultDetails } from "../types/staffTypes";
+import { StaffDetailsData } from "../types/staffTypes";
 
 // Mock dependencies
 jest.mock("../services/api");
@@ -21,18 +21,7 @@ const mockStaffDetails: StaffDetailsData = {
   email: "john.doe@example.com",
   createdAt: new Date().toISOString(),
   professionalRole: "Chef",
-  quizResults: [
-    {
-      _id: "qr1", // Quiz Result ID
-      quizId: "quiz1", // Quiz ID
-      quizTitle: "Food Safety Basics",
-      completedAt: new Date().toISOString(),
-      score: 8,
-      totalQuestions: 10,
-      retakeCount: 0,
-      incorrectQuestions: [],
-    },
-  ],
+  aggregatedQuizPerformance: [],
   averageScore: 80,
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { createMenu, deleteMenu } from "../services/api";
@@ -187,7 +187,7 @@ const MenusPage: React.FC = () => {
   };
 
   // --- Render Logic ---
-  const renderMenusGrid = () => {
+  const _renderMenusGrid = () => {
     if (isLoading) {
       return <LoadingSpinner message="Loading menus..." />;
     }
@@ -498,8 +498,8 @@ const MenusPage: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4">Confirm Deletion</h2>
             <p className="text-gray-600 mb-1">
-              Are you sure you want to delete the menu "
-              <strong>{currentMenu.name}</strong>"?
+              Are you sure you want to delete the menu &quot;
+              <strong>{currentMenu.name}</strong>&quot;?
             </p>
             <p className="text-sm text-red-600 mb-4">
               This action will also delete all associated menu items. This

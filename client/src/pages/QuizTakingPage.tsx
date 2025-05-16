@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Link,
+  // Link, // Removed Link
   useParams,
   useNavigate /*, useLocation*/,
 } from "react-router-dom"; // useLocation might be used for quizTitle
@@ -67,7 +67,7 @@ const getLocalStorageKey = (quizId: string | undefined) => {
 // --- Main Component ---
 const QuizTakingPage: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
-  const { user } = useAuth();
+  const { user: _user } = useAuth(); // Prefixed user
   const navigate = useNavigate();
   // const location = useLocation(); // Potentially for quizTitle
 
@@ -76,7 +76,9 @@ const QuizTakingPage: React.FC = () => {
   const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null); // ADDED: For attempt ID from startQuizAttempt
+  const [_currentAttemptId, setCurrentAttemptId] = useState<string | null>(
+    null
+  ); // Prefixed currentAttemptId
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   // Store answers as a map: { questionId: answerGiven }
@@ -626,6 +628,19 @@ const QuizTakingPage: React.FC = () => {
     );
   };
 
+  // Derived states for navigation and UI
+  const currentQuestion = questions[currentQuestionIndex];
+  const _isFirstQuestion = currentQuestionIndex === 0; // Prefixed
+  const _isLastQuestion = currentQuestionIndex === questions.length - 1; // Prefixed
+  const _allAnswered =
+    questions.length > 0 &&
+    questions.every((q) => userAnswers[q._id] !== undefined); // Prefixed
+
+  const _totalQuestions = questions.length; // Prefixed totalQuestions
+  const _isFirstQuestionLocal = _isFirstQuestion; // Prefixed isFirstQuestion, and renamed to avoid conflict with line 633
+  const _isLastQuestionLocal = _isLastQuestion; // Prefixed isLastQuestion, and renamed to avoid conflict with line 634
+  const _allAnsweredLocal = _allAnswered; // Prefixed allAnswered, and renamed to avoid conflict with line 635
+
   // --- Main Render ---
   if (isLoading) {
     return (
@@ -751,7 +766,6 @@ const QuizTakingPage: React.FC = () => {
   }
 
   // --- Current Question Display ---
-  const currentQuestion = questions[currentQuestionIndex];
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -780,13 +794,6 @@ const QuizTakingPage: React.FC = () => {
       </div>
     );
   }
-
-  const totalQuestions = questions.length;
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
-  const allAnswered = Object.values(userAnswers).every(
-    (ans) => ans !== undefined && ans !== null
-  );
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">

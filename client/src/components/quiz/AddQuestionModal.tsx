@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Button from "../common/Button"; // Import our styled Button
 import { QuizDisplayQuestion } from "../../types/quizTypes"; // IMPORTED
 
@@ -20,12 +20,15 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
   onSubmit,
   initialMenuItemId,
 }) => {
-  const getInitialQuestionState = (): QuizDisplayQuestion => ({
-    text: "New Question",
-    choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
-    correctAnswer: 0,
-    menuItemId: initialMenuItemId || "", // Ensure menuItemId is always a string
-  });
+  const getInitialQuestionState = useCallback(
+    (): QuizDisplayQuestion => ({
+      text: "New Question",
+      choices: ["Option 1", "Option 2", "Option 3", "Option 4"],
+      correctAnswer: 0,
+      menuItemId: initialMenuItemId || "", // Ensure menuItemId is always a string
+    }),
+    [initialMenuItemId]
+  );
 
   const [newQuestion, setNewQuestion] = useState<QuizDisplayQuestion>(
     getInitialQuestionState()
@@ -36,7 +39,7 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     if (isOpen) {
       setNewQuestion(getInitialQuestionState());
     }
-  }, [isOpen, initialMenuItemId]); // Added initialMenuItemId to dependency array
+  }, [isOpen, getInitialQuestionState]);
 
   const handleSubmit = () => {
     // Basic validation could be added here
@@ -49,6 +52,18 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     e.stopPropagation();
   };
 
+  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.stopPropagation();
+    }
+  };
+
+  const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      onClose();
+    }
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -57,13 +72,19 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     <div
       className="fixed inset-0 z-[60] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
       onClick={onClose} // Close on overlay click
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="add-question-modal-title"
+      onKeyDown={handleOverlayKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Close modal"
     >
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
       <div
         className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-auto my-8 max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast"
         onClick={handleContentClick}
+        onKeyDown={handleContentKeyDown}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-question-modal-title"
       >
         <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200">
           <h2
@@ -117,54 +138,52 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+          <fieldset className="space-y-3">
+            <legend className="block text-sm font-medium text-slate-700 mb-2">
               Answer Choices <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-3">
-              {newQuestion.choices.map((choice, index) => (
-                <div
-                  key={index}
-                  className="flex items-center space-x-3 bg-slate-50 p-3 rounded-lg border border-slate-200"
-                >
-                  <input
-                    type="radio"
-                    id={`new-correct-${index}`}
-                    name="newCorrectAnswer"
-                    checked={newQuestion.correctAnswer === index}
-                    onChange={() =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        correctAnswer: index,
-                      })
-                    }
-                    className="h-5 w-5 text-sky-600 border-slate-300 focus:ring-sky-500 focus:ring-offset-1 transition-colors"
-                  />
-                  <input
-                    type="text"
-                    value={choice}
-                    onChange={(e) => {
-                      const newChoices = [...newQuestion.choices];
-                      newChoices[index] = e.target.value;
-                      setNewQuestion({
-                        ...newQuestion,
-                        choices: newChoices,
-                      });
-                    }}
-                    className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm transition duration-150 ease-in-out"
-                    placeholder={`Option ${index + 1}`}
-                    required
-                  />
-                </div>
-              ))}
-            </div>
+            </legend>
+            {newQuestion.choices.map((choice, index) => (
+              <div
+                key={index}
+                className="flex items-center space-x-3 bg-slate-50 p-3 rounded-lg border border-slate-200"
+              >
+                <input
+                  type="radio"
+                  id={`new-correct-${index}`}
+                  name="newCorrectAnswer"
+                  checked={newQuestion.correctAnswer === index}
+                  onChange={() =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      correctAnswer: index,
+                    })
+                  }
+                  className="h-5 w-5 text-sky-600 border-slate-300 focus:ring-sky-500 focus:ring-offset-1 transition-colors"
+                />
+                <input
+                  type="text"
+                  value={choice}
+                  onChange={(e) => {
+                    const newChoices = [...newQuestion.choices];
+                    newChoices[index] = e.target.value;
+                    setNewQuestion({
+                      ...newQuestion,
+                      choices: newChoices,
+                    });
+                  }}
+                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm transition duration-150 ease-in-out"
+                  placeholder={`Option ${index + 1}`}
+                  required
+                />
+              </div>
+            ))}
             <p className="text-xs text-slate-500 mt-2">
               Select the radio button next to the correct answer.
             </p>
             <p className="text-xs text-slate-500 mt-1">
               (Associated Menu Item ID: {newQuestion.menuItemId || "N/A"})
             </p>
-          </div>
+          </fieldset>
         </div>
 
         <div className="pt-5 mt-5 border-t border-slate-200 flex justify-end space-x-3">
@@ -184,6 +203,7 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
           </Button>
         </div>
       </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
     </div>
   );
 };

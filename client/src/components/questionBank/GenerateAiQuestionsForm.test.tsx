@@ -12,10 +12,15 @@ jest.mock("../../services/api", () => ({
 }));
 
 // Mock common components
-jest.mock("../common/Button", () => (props: any) => <button {...props} />);
-jest.mock("../common/LoadingSpinner", () => () => (
+const MockButton = (props: any) => <button {...props} />;
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
+
+const MockLoadingSpinner = () => (
   <div data-testid="loading-spinner">Loading...</div>
-));
+);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockOnAiQuestionsGenerated = jest.fn();
 const mockOnCloseRequest = jest.fn();

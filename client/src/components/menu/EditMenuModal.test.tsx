@@ -4,67 +4,61 @@ import userEvent from "@testing-library/user-event";
 import EditMenuModal from "./EditMenuModal";
 
 // Mock common components
-jest.mock(
-  "../common/Modal",
-  () =>
-    ({
-      isOpen,
-      onClose,
-      title,
-      children,
-      footerContent,
-    }: {
-      isOpen: boolean;
-      onClose: () => void;
-      title: string;
-      children: React.ReactNode;
-      footerContent: React.ReactNode;
-    }) =>
-      isOpen ? (
-        <div data-testid="mock-modal" role="dialog" aria-label={title}>
-          <h1>{title}</h1>
-          <div>{children}</div>
-          <footer>{footerContent}</footer>
-          <button onClick={onClose}>MockCloseModal</button>{" "}
-          {/* For testing modal close directly if needed */}
-        </div>
-      ) : null
-);
+const MockModal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  footerContent,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  footerContent: React.ReactNode;
+}) =>
+  isOpen ? (
+    <div data-testid="mock-modal" role="dialog" aria-label={title}>
+      <h1>{title}</h1>
+      <div>{children}</div>
+      <footer>{footerContent}</footer>
+      <button onClick={onClose}>MockCloseModal</button>{" "}
+      {/* For testing modal close directly if needed */}
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock(
-  "../common/Button",
-  () =>
-    (
-      props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-        variant?: string;
-        form?: string;
-      }
-    ) =>
-      (
-        <button
-          // eslint-disable-next-line react/prop-types
-          onClick={props.onClick}
-          // eslint-disable-next-line react/prop-types
-          type={props.type}
-          // eslint-disable-next-line react/prop-types
-          disabled={props.disabled}
-          // eslint-disable-next-line react/prop-types
-          form={props.form}
-          // eslint-disable-next-line react/prop-types
-          data-variant={props.variant}
-        >
-          {/* eslint-disable-next-line react/prop-types */}
-          {props.children}
-        </button>
-      )
+const MockButton = (
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: string;
+    form?: string;
+  }
+) => (
+  <button
+     
+    onClick={props.onClick}
+     
+    type={props.type}
+     
+    disabled={props.disabled}
+     
+    form={props.form}
+     
+    data-variant={props.variant}
+  >
+    { }
+    {props.children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
 
 const mockOnClose = jest.fn();
 const mockOnSubmit = jest.fn();

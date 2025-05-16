@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getStaffList, deleteStaffMember } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
@@ -15,7 +15,7 @@ const StaffManagement: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Removed unused navigate
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -49,7 +49,8 @@ const StaffManagement: React.FC = () => {
         month: "short",
         day: "numeric",
       });
-    } catch (e) {
+    } catch (_e) {
+      // Prefixed e
       return "Invalid Date";
     }
   };

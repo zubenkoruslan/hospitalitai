@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   MenuItem,
   MenuItemFormData,
-  ItemType,
+  // ItemType,
   // ItemCategory, // No longer directly used here for fixed lists
   FOOD_CATEGORIES,
   BEVERAGE_CATEGORIES,
@@ -13,12 +13,13 @@ import Button from "../common/Button";
 import Modal from "../common/Modal";
 
 // Define initialFormData outside the component for a stable reference
-const initialFormDataConstant: MenuItemFormData = {
+const baseInitialFormData = {
+  // Renamed to avoid confusion, menuId will be added dynamically
   name: "",
   description: "",
   price: "",
   ingredients: "",
-  itemType: "",
+  itemType: "" as "" | "food" | "beverage", // Ensure type matches MenuItemFormData
   category: "",
   isGlutenFree: false,
   isDairyFree: false,
@@ -44,15 +45,16 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   onSubmit,
   currentItem,
   menuId,
-  restaurantId,
+  restaurantId: _restaurantId,
   isSubmitting,
-  allItemsInMenu,
+  allItemsInMenu: _allItemsInMenu,
   availableCategories, // Destructure the new prop
 }) => {
-  // Use the constant for initial state
-  const [formData, setFormData] = useState<MenuItemFormData>(
-    initialFormDataConstant
-  );
+  // Initialize formData with menuId from props
+  const [formData, setFormData] = useState<MenuItemFormData>(() => ({
+    ...baseInitialFormData,
+    menuId: menuId, // Corrected: Use menuId from props
+  }));
   const [formError, setFormError] = useState<string | null>(null);
   // State to manage if user is typing a new category
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
@@ -127,6 +129,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             ingredients: (currentItem.ingredients || []).join(", "),
             itemType: currentItem.itemType,
             category: categoryToSet,
+            menuId: currentItem.menuId, // Ensure menuId is included from currentItem
             isGlutenFree: currentItem.isGlutenFree ?? false,
             isDairyFree: currentItem.isDairyFree ?? false,
             isVegetarian: currentItem.isVegetarian ?? false,
@@ -143,13 +146,18 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
           ) {
             setTempCategories((prev) => [...new Set([...prev, categoryToSet])]);
           }
-        } catch (error) {
-          // console.error("[Modal useEffect] Error during edit mode population:", error);
+        } catch (_error) {
+          // Prefixed error
+          // console.error("[Modal useEffect] Error during edit mode population:", _error);
           setFormError("Failed to load item data for editing.");
         }
       } else if (!isEditMode) {
         // console.log("[Modal useEffect] Resetting form for add mode.");
-        setFormData(initialFormDataConstant); // Use the stable constant here
+        setFormData({
+          // Reset with menuId from props
+          ...baseInitialFormData,
+          menuId: menuId, // Corrected: Use menuId from props
+        });
         setFormError(null);
       }
     }
@@ -159,6 +167,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     isOpen,
     availableCategories,
     categorySuggestions,
+    menuId, // menuId from props is a dependency now
   ]);
 
   const handleInputChange = (

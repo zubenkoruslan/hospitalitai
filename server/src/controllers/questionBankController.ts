@@ -3,8 +3,8 @@ import { AppError } from "../utils/errorHandler"; // Assuming you have a custom 
 import * as QuestionBankService from "../services/questionBankService";
 import mongoose from "mongoose";
 import {
-  CreateQuestionBankData,
-  UpdateQuestionBankData,
+  CreateQuestionBankData as _CreateQuestionBankData,
+  UpdateQuestionBankData as _UpdateQuestionBankData,
   CreateQuestionBankFromMenuData,
 } from "../services/questionBankService";
 

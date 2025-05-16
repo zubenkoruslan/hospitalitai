@@ -1,10 +1,10 @@
 import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel";
-import QuestionModel, { IQuestion } from "../models/QuestionModel";
-import MenuItemModel, { IMenuItem } from "../models/MenuItem";
-import {
-  generateAiQuestionsService,
-  AiGenerationParams,
-} from "./questionService";
+import QuestionModel from "../models/QuestionModel";
+// import MenuItemModel, { IMenuItem } from "../models/MenuItem"; // This line should be removed
+// import { // This block should be removed
+//   generateAiQuestionsService,
+//   AiGenerationParams,
+// } from "./questionService";
 import { AppError } from "../utils/errorHandler";
 import mongoose from "mongoose";
 
@@ -284,8 +284,8 @@ export const createQuestionBankFromMenuService = async (
     restaurantId,
     menuId,
     selectedCategoryNames,
-    generateAiQuestions,
-    aiParams,
+    generateAiQuestions: _generateAiQuestions,
+    aiParams: _aiParams,
   } = data;
 
   // Validate basic inputs
@@ -470,7 +470,7 @@ export const getUniqueValidQuestionIdsFromQuestionBanks = async (
       .select("questions")
       .lean();
 
-    let allQuestionIdsFromBanks: mongoose.Types.ObjectId[] = [];
+    const allQuestionIdsFromBanks: mongoose.Types.ObjectId[] = [];
     questionBanks.forEach((bank) => {
       if (bank.questions && bank.questions.length > 0) {
         // Assuming bank.questions are already ObjectIds or can be cast

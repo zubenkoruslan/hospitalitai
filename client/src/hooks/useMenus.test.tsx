@@ -1,9 +1,9 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useMenus } from "./useMenus";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { AxiosResponse } from "axios";
-import { Menu } from "../types/menuItemTypes";
+import { IMenuClient } from "../types/menuTypes";
 
 // Mock dependencies
 jest.mock("../services/api");
@@ -13,10 +13,30 @@ jest.mock("../context/AuthContext");
 const mockedApi = api as jest.Mocked<typeof api>;
 const mockedUseAuth = useAuth as jest.Mock;
 
-const mockMenusData: Menu[] = [
-  { _id: "menu1", name: "Breakfast Menu", description: "Served 7am-11am" },
-  { _id: "menu2", name: "Lunch Menu" },
-  { _id: "menu3", name: "Dinner Specials", description: "Nightly features" },
+const mockMenusData: IMenuClient[] = [
+  {
+    _id: "menu1",
+    name: "Breakfast Menu",
+    description: "Served 7am-11am",
+    restaurantId: "r1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    _id: "menu2",
+    name: "Lunch Menu",
+    restaurantId: "r1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    _id: "menu3",
+    name: "Dinner Specials",
+    description: "Nightly features",
+    restaurantId: "r1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
 ];
 
 // User roles for testing
@@ -29,7 +49,7 @@ describe("useMenus Hook", () => {
     // Default mock for successful API call
     mockedApi.get.mockResolvedValue({
       data: { menus: mockMenusData },
-    } as AxiosResponse<{ menus: Menu[] }>);
+    } as AxiosResponse<{ menus: IMenuClient[] }>);
     // Default mock for authorized user
     mockedUseAuth.mockReturnValue({ user: mockAuthorizedUser });
   });

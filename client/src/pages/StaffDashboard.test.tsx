@@ -53,20 +53,23 @@ const mockedAxiosInstance = apiServices.default as jest.Mocked<
 >; // For default export (api.get)
 
 // Mock child components that are not the focus of these tests
-jest.mock("../components/Navbar", () => () => (
-  <div data-testid="navbar-mock">Navbar</div>
-));
-jest.mock("../components/quiz/ViewIncorrectAnswersModal", () =>
-  jest.fn(({ isOpen, onClose, quizResult }) =>
-    isOpen ? (
-      <div data-testid="view-incorrect-answers-modal-mock">
-        <button onClick={onClose}>Close Modal</button>
-        {quizResult && (
-          <div data-testid="modal-quiz-title">{quizResult.quizTitle}</div>
-        )}
-      </div>
-    ) : null
-  )
+const MockNavbar = () => <div data-testid="navbar-mock">Navbar</div>;
+MockNavbar.displayName = "MockNavbar";
+jest.mock("../components/Navbar", () => MockNavbar);
+
+const MockViewIncorrectAnswersModal = ({ isOpen, onClose, quizResult }: any) =>
+  isOpen ? (
+    <div data-testid="view-incorrect-answers-modal-mock">
+      <button onClick={onClose}>Close Modal</button>
+      {quizResult && (
+        <div data-testid="modal-quiz-title">{quizResult.quizTitle}</div>
+      )}
+    </div>
+  ) : null;
+MockViewIncorrectAnswersModal.displayName = "MockViewIncorrectAnswersModal";
+jest.mock(
+  "../components/quiz/ViewIncorrectAnswersModal",
+  () => MockViewIncorrectAnswersModal
 );
 
 // Helper to wrap component with BrowserRouter for Link/Navigate

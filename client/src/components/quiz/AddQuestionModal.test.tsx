@@ -5,22 +5,17 @@ import AddQuestionModal from "./AddQuestionModal";
 import { QuizDisplayQuestion } from "../../types/quizTypes";
 
 // Mock Button component
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, type, disabled }: any) =>
-      (
-        <button
-          data-testid={`button-${variant || "default"}${
-            type ? "-" + type : ""
-          }`}
-          onClick={onClick}
-          disabled={disabled}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({ onClick, children, variant, type, disabled }: any) => (
+  <button
+    data-testid={`button-${variant || "default"}${type ? "-" + type : ""}`}
+    onClick={onClick}
+    disabled={disabled}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 const defaultInitialMenuItemId = "menuItem123";
 

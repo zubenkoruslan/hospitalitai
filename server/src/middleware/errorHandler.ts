@@ -10,7 +10,7 @@ export const errorHandler = (
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   // Condition to skip logging for the specific "No progress found" 404 error
   const isNoProgressError =
@@ -27,7 +27,7 @@ export const errorHandler = (
 
   let statusCode: number;
   let message: string;
-  let errors: any = {};
+  const errors: any = {};
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
@@ -49,6 +49,17 @@ export const errorHandler = (
   } else {
     statusCode = 500;
     message = "Internal Server Error";
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    if (!err.isOperational) {
+      console.error("💥 UNHANDLED ERROR:", err);
+      const errors = [
+        { message: "Something went very wrong! Please try again later." },
+      ];
+      res.status(500).json({ status: "error", errors });
+      return;
+    }
   }
 
   res.status(statusCode).json({

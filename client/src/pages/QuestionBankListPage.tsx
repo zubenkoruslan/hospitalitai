@@ -139,7 +139,7 @@ const QuestionBankListPage: React.FC = () => {
     setEditingBank(null);
   };
 
-  const handleBankUpdatedInModal = (updatedBank: IQuestionBank) => {
+  const handleBankUpdatedInModal = (_updatedBank: IQuestionBank) => {
     // Option 1: Optimistically update the list (if API doesn't return the full updated list)
     // const updatedBanks = questionBanks.map(b => b._id === updatedBank._id ? updatedBank : b);
     // setQuestionBanks(updatedBanks); // If useQuestionBanks hook doesn't manage state internally on update

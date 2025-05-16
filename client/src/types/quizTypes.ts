@@ -1,5 +1,5 @@
 // import { IncorrectQuestionDetail } from "./staffTypes"; // REMOVED IMPORT
-import { ClientUserMinimal } from "./user"; // Changed from userTypes.ts to user.ts
+// import { ClientUserMinimal } from "./user"; // Changed from userTypes.ts to user.ts - THIS WILL BE REMOVED
 
 // ADDED: Definition for IncorrectQuestionDetail
 export interface IncorrectQuestionDetail {

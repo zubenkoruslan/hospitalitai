@@ -250,10 +250,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         {selectedMenuId &&
           !isLoadingCategories &&
           menuCategories.length > 0 && (
-            <div className="pt-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <fieldset className="pt-2">
+              <legend className="block text-sm font-medium text-gray-700 mb-1">
                 Select Categories from Menu (for Bank & AI)
-              </label>
+              </legend>
               <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-md">
                 {menuCategories.map((category) => (
                   <label key={category} className="flex items-center space-x-2">
@@ -275,7 +275,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
           )}
         {selectedMenuId && !isLoadingCategories && categoriesError && (
           <p className="text-sm text-red-500 mt-1">

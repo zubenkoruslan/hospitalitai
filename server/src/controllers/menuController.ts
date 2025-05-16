@@ -5,12 +5,12 @@ import { AppError } from "../utils/errorHandler";
 import MenuItem from "../models/MenuItem"; // Used in getMenuByIdWithItems and deleteCategoryAndReassignItems
 import ItemService from "../services/itemService"; // Added import for ItemService
 import {
-  handleValidationErrors,
-  validateCreateMenu,
-  validateObjectId,
-  validateMenuIdParam,
-  validateUpdateMenu,
-  validateCategoryNameParam,
+  handleValidationErrors as _handleValidationErrors,
+  validateCreateMenu as _validateCreateMenu,
+  validateObjectId as _validateObjectId,
+  validateMenuIdParam as _validateMenuIdParam,
+  validateUpdateMenu as _validateUpdateMenu,
+  validateCategoryNameParam as _validateCategoryNameParam,
 } from "../middleware/validationMiddleware";
 
 // No need for AuthenticatedRequest if AuthPayload is globally declared via authMiddleware.ts

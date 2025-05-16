@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import ManageQuestionsModal from "./ManageQuestionsModal";
 import { ValidationContext } from "../../context/ValidationContext";
 import * as apiService from "../../services/api";
@@ -22,140 +21,147 @@ jest.mock("../../services/api", () => ({
 }));
 
 // Mock Child Forms/Modals and Common Components
-jest.mock(
-  "./AddManualQuestionForm",
-  () => (props: any) =>
-    props.isAddManualModalOpen || props.isOpen ? (
-      <div data-testid="mock-add-manual-form">
-        <h3>Add Manual Question Form</h3>
-        <button
-          onClick={() =>
-            props.onQuestionAdded({
-              _id: "newManualQ1",
-              questionText: "Manual Q",
+const MockAddManualQuestionForm = (props: any) =>
+  props.isAddManualModalOpen || props.isOpen ? (
+    <div data-testid="mock-add-manual-form">
+      <h3>Add Manual Question Form</h3>
+      <button
+        onClick={() =>
+          props.onQuestionAdded({
+            _id: "newManualQ1",
+            questionText: "Manual Q",
+            options: [],
+            categories: [],
+            questionType: "multiple-choice-single",
+            restaurantId: "res123", // Added
+            createdBy: "manual", // Added
+            createdAt: new Date().toISOString(), // Added
+            updatedAt: new Date().toISOString(), // Added
+          })
+        }
+      >
+        Mock Add
+      </button>
+      <button onClick={props.onCloseRequest || props.onClose}>
+        Close AddManualForm
+      </button>
+    </div>
+  ) : null;
+MockAddManualQuestionForm.displayName = "MockAddManualQuestionForm";
+jest.mock("./AddManualQuestionForm", () => MockAddManualQuestionForm);
+
+const MockGenerateAiQuestionsForm = (props: any) =>
+  props.isGenerateAiModalOpen || props.isOpen ? (
+    <div data-testid="mock-generate-ai-form">
+      <h3>Generate AI Questions Form</h3>
+      <button
+        onClick={() =>
+          props.onQuestionsGenerated([
+            {
+              _id: "newAiQ1",
+              questionText: "AI Q",
               options: [],
               categories: [],
               questionType: "multiple-choice-single",
-              restaurantId: "res123", // Added
-              createdBy: "manual", // Added
-              createdAt: new Date().toISOString(), // Added
-              updatedAt: new Date().toISOString(), // Added
-            })
-          }
-        >
-          Mock Add
-        </button>
-        <button onClick={props.onCloseRequest || props.onClose}>
-          Close AddManualForm
-        </button>
-      </div>
-    ) : null
-);
-
-jest.mock(
-  "./GenerateAiQuestionsForm",
-  () => (props: any) =>
-    props.isGenerateAiModalOpen || props.isOpen ? (
-      <div data-testid="mock-generate-ai-form">
-        <h3>Generate AI Questions Form</h3>
-        <button
-          onClick={() =>
-            props.onQuestionsGenerated([
-              {
-                _id: "newAiQ1",
-                questionText: "AI Q",
-                options: [],
-                categories: [],
-                questionType: "multiple-choice-single",
-              },
-            ])
-          }
-        >
-          Mock Generate
-        </button>
-        <button onClick={props.onClose}>Close GenerateAiForm</button>
-      </div>
-    ) : null
-);
-
-jest.mock(
-  "./EditQuestionForm",
-  () => (props: any) =>
-    props.isOpen && props.questionToEdit ? (
-      <div data-testid="mock-edit-question-form">
-        <h3>Edit Question Form: {props.questionToEdit.questionText}</h3>
-        <button
-          onClick={() =>
-            props.onQuestionUpdated({
-              ...props.questionToEdit,
-              questionText: "Updated Q",
-            })
-          }
-        >
-          Mock Update
-        </button>
-        <button onClick={props.onClose}>Close EditForm</button>
-      </div>
-    ) : null
-);
-
-jest.mock(
-  "../common/Modal",
-  () => (props: any) =>
-    props.isOpen ? (
-      <div
-        data-testid="mock-modal"
-        role="dialog"
-        aria-labelledby={
-          props.title &&
-          props.title.replace(/\s+/g, "-").toLowerCase() + "-title"
+            },
+          ])
         }
       >
-        {props.title && (
-          <h1 id={props.title.replace(/\s+/g, "-").toLowerCase() + "-title"}>
-            {props.title}
-          </h1>
-        )}
-        <div>{props.children}</div>
-        {props.footerContent && <footer>{props.footerContent}</footer>}
-        <button onClick={props.onClose}>MockModalCloseButton</button>
-      </div>
-    ) : null
-);
+        Mock Generate
+      </button>
+      <button onClick={props.onClose}>Close GenerateAiForm</button>
+    </div>
+  ) : null;
+MockGenerateAiQuestionsForm.displayName = "MockGenerateAiQuestionsForm";
+jest.mock("./GenerateAiQuestionsForm", () => MockGenerateAiQuestionsForm);
 
-jest.mock("../common/Button", () => (props: any) => (
+const MockEditQuestionForm = (props: any) =>
+  props.isOpen && props.questionToEdit ? (
+    <div data-testid="mock-edit-question-form">
+      <h3>Edit Question Form: {props.questionToEdit.questionText}</h3>
+      <button
+        onClick={() =>
+          props.onQuestionUpdated({
+            ...props.questionToEdit,
+            questionText: "Updated Q",
+          })
+        }
+      >
+        Mock Update
+      </button>
+      <button onClick={props.onClose}>Close EditForm</button>
+    </div>
+  ) : null;
+MockEditQuestionForm.displayName = "MockEditQuestionForm";
+jest.mock("./EditQuestionForm", () => MockEditQuestionForm);
+
+const MockModal = (props: any) =>
+  props.isOpen ? (
+    <div
+      data-testid="mock-modal"
+      role="dialog"
+      aria-labelledby={
+        props.title && props.title.replace(/\s+/g, "-").toLowerCase() + "-title"
+      }
+    >
+      {props.title && (
+        <h1 id={props.title.replace(/\s+/g, "-").toLowerCase() + "-title"}>
+          {props.title}
+        </h1>
+      )}
+      <div>{props.children}</div>
+      {props.footerContent && <footer>{props.footerContent}</footer>}
+      <button onClick={props.onClose}>MockModalCloseButton</button>
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
+
+const MockButton = (props: any) => (
   <button {...props} disabled={props.disabled}>
     {props.children}
   </button>
-));
-jest.mock("../common/LoadingSpinner", () => () => (
-  <div data-testid="loading-spinner">Loading...</div>
-));
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      (
-        <div data-testid="error-message" role="alert">
-          {message}
-        </div>
-      )
 );
-jest.mock("../common/ConfirmationModalContent", () => (props: any) => (
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
+
+const MockLoadingSpinner = () => (
+  <div data-testid="loading-spinner">Loading...</div>
+);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
+
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message" role="alert">
+    {message}
+  </div>
+);
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
+
+const MockConfirmationModalContent = (props: any) => (
   <div data-testid="mock-confirmation-modal">
     <p>{props.message}</p>
     <button onClick={props.onConfirm}>Confirm</button>
     <button onClick={props.onCancel}>Cancel</button>
   </div>
-));
-jest.mock("./QuestionListItem", () => (props: any) => (
+);
+MockConfirmationModalContent.displayName = "MockConfirmationModalContent";
+jest.mock(
+  "../common/ConfirmationModalContent",
+  () => MockConfirmationModalContent
+);
+
+const MockQuestionListItem = (props: any) => (
   <div data-testid={`question-list-item-${props.question._id}`}>
     <p>{props.question.questionText}</p>
     <button onClick={() => props.onEdit(props.question)}>Edit</button>
     <button onClick={() => props.onDelete(props.question)}>Delete</button>{" "}
     {/* Changed from onRemove to onDelete to match a prop in component */}
   </div>
-));
+);
+MockQuestionListItem.displayName = "MockQuestionListItem";
+jest.mock("./QuestionListItem", () => MockQuestionListItem);
 
 const mockOnClose = jest.fn();
 const mockOnBankQuestionsUpdated = jest.fn();

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   getQuestionBanks as apiGetQuestionBanks,
   createQuestionBank as apiCreateQuestionBank,
@@ -176,8 +176,8 @@ export const useQuestionBanks = (): UseQuestionBanksReturn => {
         setIsLoading(false);
       }
     },
-    [user, currentQuestionBank, apiAddQuestionToBank]
-  ); // Added apiAddQuestionToBank to dependencies
+    [user, currentQuestionBank]
+  );
 
   // Function to remove a question from the currently loaded question bank
   const removeQuestionFromCurrentBank = useCallback(
@@ -205,8 +205,8 @@ export const useQuestionBanks = (): UseQuestionBanksReturn => {
         setIsLoading(false);
       }
     },
-    [user, currentQuestionBank, apiRemoveQuestionFromBank]
-  ); // Added apiRemoveQuestionFromBank to dependencies
+    [user, currentQuestionBank]
+  );
 
   // Optionally, fetch question banks when the hook is first used and user is available
   // useEffect(() => {

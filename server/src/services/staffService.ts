@@ -1,8 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import User, { IUser } from "../models/User";
-import QuizResult, { IQuizResult } from "../models/QuizResult";
-import Quiz, { IQuiz } from "../models/Quiz";
-import { IQuestion } from "../models/QuestionModel";
+import QuizResult from "../models/QuizResult";
+import { IQuiz } from "../models/Quiz";
 import QuizResultService from "./quizResultService";
 import { AppError } from "../utils/errorHandler";
 import StaffQuizProgress, {
@@ -35,7 +34,7 @@ interface StaffMemberWithQuizProgress {
   quizProgressSummaries: QuizProgressSummary[]; // REPLACES resultsSummary
 }
 
-interface IncorrectQuestionDetail {
+interface _IncorrectQuestionDetail {
   questionText: string;
   userAnswer: string;
   correctAnswer: string;

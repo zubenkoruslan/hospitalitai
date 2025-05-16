@@ -3,8 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Button from "./common/Button";
 import ErrorMessage from "./common/ErrorMessage";
-import { FaSpinner } from "react-icons/fa";
-// import { useAuth } from '../context/AuthContext'; // Import if login on signup is needed
 
 const SignupForm: React.FC = () => {
   const [name, setName] = useState("");
@@ -105,8 +103,8 @@ const SignupForm: React.FC = () => {
           {error && <ErrorMessage message={error} />}
 
           {/* Role Selection */}
-          <div className="space-y-2">
-            <label className={labelClasses}>I am a:</label>
+          <fieldset className="space-y-2">
+            <legend className={labelClasses}>I am a:</legend>
             <div className="flex items-center justify-around space-x-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
               <label className="flex items-center cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
                 <input
@@ -135,7 +133,7 @@ const SignupForm: React.FC = () => {
                 </span>
               </label>
             </div>
-          </div>
+          </fieldset>
 
           {/* Common Fields */}
           <div>
@@ -278,18 +276,14 @@ const SignupForm: React.FC = () => {
             </>
           )}
 
-          <div>
+          <div className="mt-8">
             <Button
               type="submit"
               variant="primary"
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50"
-              disabled={isLoading}
+              isLoading={isLoading}
             >
-              {isLoading ? (
-                <FaSpinner className="animate-spin h-5 w-5 mr-3" />
-              ) : (
-                "Create Account"
-              )}
+              Sign Up
             </Button>
           </div>
         </form>

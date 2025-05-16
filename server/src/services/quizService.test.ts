@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import mongoose from "mongoose";
-import QuizService from "./quizService";
-import Quiz from "../models/Quiz";
+import { QuizService } from "./quizService";
 import MenuItem from "../models/MenuItem";
-import QuizResult from "../models/QuizResult";
-import User from "../models/User";
 import { AppError } from "../utils/errorHandler";
 
 // Mock Mongoose models using vi.mock

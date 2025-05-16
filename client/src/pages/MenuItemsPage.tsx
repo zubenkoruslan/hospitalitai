@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { /* Link, */ useParams, useNavigate } from "react-router-dom"; // Removed Link
 import { useAuth } from "../context/AuthContext";
 import {
   createMenuItem,
@@ -19,18 +19,18 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // A
 import {
   MenuItem,
   MenuItemFormData,
-  ItemType,
-  ItemCategory,
-  FoodCategory,
-  BeverageCategory,
-  FOOD_CATEGORIES,
-  BEVERAGE_CATEGORIES,
+  // ItemType, // Removed
+  // ItemCategory, // Removed
+  // FoodCategory, // Removed
+  // BeverageCategory, // Removed
+  // FOOD_CATEGORIES, // Removed
+  // BEVERAGE_CATEGORIES, // Removed
 } from "../types/menuItemTypes";
-import { IMenuClient } from "../types/menuTypes"; // Correct: Import IMenuClient for Menu details type
+// import { IMenuClient } from "../types/menuTypes"; // Removed IMenuClient
 // Import quiz components
-import QuizList from "../components/quiz/QuizList";
-import CreateQuizModal from "../components/quiz/CreateQuizModal";
-import QuizEditorModal from "../components/quiz/QuizEditorModal";
+// import QuizList from "../components/quiz/QuizList"; // Removed QuizList
+// import CreateQuizModal from "../components/quiz/CreateQuizModal"; // Removed CreateQuizModal
+// import QuizEditorModal from "../components/quiz/QuizEditorModal"; // Removed QuizEditorModal
 // Import item components
 import AddEditMenuItemModal from "../components/items/AddEditMenuItemModal"; // Import the new modal
 import MenuItemList from "../components/items/MenuItemList"; // Import the item list
@@ -96,9 +96,9 @@ const MenuItemsPage: React.FC = () => {
   // State for editing menu details (name, description)
   const [isMenuDetailsModalOpen, setIsMenuDetailsModalOpen] =
     useState<boolean>(false); // New state for modal
-  const [editedMenuName, setEditedMenuName] = useState<string>("");
-  const [editedMenuDescription, setEditedMenuDescription] =
-    useState<string>("");
+  const [_editedMenuName, setEditedMenuName] = useState<string>(""); // Prefixed
+  const [_editedMenuDescription, setEditedMenuDescription] =
+    useState<string>(""); // Prefixed
   const [isSavingMenuDetails, setIsSavingMenuDetails] =
     useState<boolean>(false);
   const [menuDetailsError, setMenuDetailsError] = useState<string | null>(null);
@@ -189,7 +189,8 @@ const MenuItemsPage: React.FC = () => {
 
       try {
         // Prepare data for API based on MenuItemFormData, menuId is already in submittedFormData
-        const dataForService: MenuItemFormData = {
+        const _dataForService: MenuItemFormData = {
+          // Prefixed
           ...submittedFormData,
           // price string to number conversion is handled by transformMenuItemFormData in api.ts
           // ingredients string to array is handled by transformMenuItemFormData in api.ts
@@ -283,7 +284,8 @@ const MenuItemsPage: React.FC = () => {
 
   // --- Data Grouping for Display ---
   // Memoize grouped items to avoid recalculation on every render
-  const groupedItems = useMemo(() => {
+  const _groupedItems = useMemo(() => {
+    // Prefixed
     if (!items || items.length === 0) {
       return {};
     }

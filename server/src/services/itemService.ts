@@ -229,7 +229,7 @@ class ItemService {
           typeof filter.menuId === "string"
             ? new Types.ObjectId(filter.menuId)
             : filter.menuId;
-      } catch (e) {
+      } catch (_e) {
         throw new AppError("Invalid Menu ID format in filter.", 400);
       }
     }

@@ -1,8 +1,7 @@
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 import User, { IUser } from "../models/User";
 import Restaurant, { IRestaurant } from "../models/Restaurant";
 import { AppError } from "../utils/errorHandler";
-import bcrypt from "bcryptjs"; // Needed for password comparison if not using instance method
 
 // Interface for data passed to signup methods
 interface SignupData {
@@ -212,7 +211,7 @@ class AuthService {
         }
       }
 
-      const { password, ...userObject } = user.toObject();
+      const { password: _password, ...userObject } = user.toObject();
 
       // Return all necessary fields
       return {

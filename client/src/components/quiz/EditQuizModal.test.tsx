@@ -17,50 +17,51 @@ jest.mock("../../services/api");
 const mockedApiService = apiService as jest.Mocked<typeof apiService>;
 
 // Mock common components
-jest.mock(
-  "../common/Modal",
-  () =>
-    ({ isOpen, onClose, title, footerContent, children, size }: any) =>
-      isOpen ? (
-        <div data-testid="modal">
-          <h1>{title}</h1>
-          <div data-testid="modal-children">{children}</div>
-          <div data-testid="modal-footer">{footerContent}</div>
-        </div>
-      ) : null
-);
+const MockModal = ({ isOpen, title, footerContent, children }: any) =>
+  isOpen ? (
+    <div data-testid="modal">
+      <h1>{title}</h1>
+      <div data-testid="modal-children">{children}</div>
+      <div data-testid="modal-footer">{footerContent}</div>
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, type, form, disabled, className }: any) =>
-      (
-        <button
-          data-testid={`button-${variant}${type === "submit" ? "-submit" : ""}`}
-          onClick={onClick}
-          type={type}
-          form={form}
-          disabled={disabled}
-          className={className}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({
+  onClick,
+  children,
+  variant,
+  type,
+  form,
+  disabled,
+  className,
+}: any) => (
+  <button
+    data-testid={`button-${variant}${type === "submit" ? "-submit" : ""}`}
+    onClick={onClick}
+    type={type}
+    form={form}
+    disabled={disabled}
+    className={className}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
-jest.mock(
-  "../common/LoadingSpinner",
-  () =>
-    ({ message }: { message?: string }) =>
-      <div data-testid="loading-spinner">{message || "Loading..."}</div>
+const MockLoadingSpinner = ({ message }: { message?: string }) => (
+  <div data-testid="loading-spinner">{message || "Loading..."}</div>
 );
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
 
 const mockQuestionBanks: IQuestionBank[] = [
   {
@@ -319,7 +320,7 @@ describe("EditQuizModal", () => {
       // This case is tricky to set up perfectly as the form populates from initialData.
       // We already tested that submitting with initialData=null shows the error.
       // Here, we simulate a scenario where initialData somehow becomes null before submit, or ID is null.
-      const { rerender } = render(
+      render(
         <EditQuizModal
           isOpen={true}
           onClose={mockOnClose}
@@ -371,6 +372,51 @@ describe("EditQuizModal", () => {
 
     act(() => {
       rerender(
+        <EditQuizModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onQuizUpdated={mockOnQuizUpdated}
+          initialQuizData={newInitialData}
+        />
+      );
+    });
+
+    // Banks might re-fetch or be re-evaluated, wait for a known element from banks list
+    await waitFor(() =>
+      expect(screen.getByLabelText("Bank 3 (8 questions)")).toBeInTheDocument()
+    );
+
+    expect(screen.getByLabelText(/Title/)).toHaveValue(newInitialData.title);
+    expect(screen.getByLabelText("Bank 1 (10 questions)")).not.toBeChecked();
+    expect(screen.getByLabelText("Bank 3 (8 questions)")).toBeChecked();
+  });
+
+  // Test case for initialQuizData change (if modal is persistent and data can change)
+  // This is a more advanced scenario, might not be strictly needed if modal always unmounts/remounts
+  test("updates form fields if initialQuizData prop changes while modal is open", async () => {
+    mockedApiService.getQuestionBanks.mockResolvedValue(mockQuestionBanks);
+    render(
+      <EditQuizModal
+        isOpen={true}
+        onClose={mockOnClose}
+        onQuizUpdated={mockOnQuizUpdated}
+        initialQuizData={mockInitialQuiz}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Bank 1 (10 questions)")).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText(/Title/)).toHaveValue(mockInitialQuiz.title);
+
+    const newInitialData: ClientIQuiz = {
+      ...mockInitialQuiz,
+      _id: "newQuiz456",
+      title: "Newly Loaded Quiz Title",
+      sourceQuestionBankIds: ["qb3"],
+    };
+
+    act(() => {
+      render(
         <EditQuizModal
           isOpen={true}
           onClose={mockOnClose}

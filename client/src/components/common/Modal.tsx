@@ -1,5 +1,4 @@
 import React, { ReactNode, useEffect, useRef } from "react";
-import Button from "./Button"; // Assuming Button component exists
 
 interface ModalProps {
   isOpen: boolean;
@@ -56,21 +55,44 @@ const Modal: React.FC<ModalProps> = ({
     e.stopPropagation();
   };
 
+  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Stop propagation for keys that might trigger overlay actions if they bubble
+    // e.g., if overlay has onKeyDown for Enter/Space to close.
+    // This ensures that pressing Enter/Space inside the modal content area
+    // doesn't inadvertently close the modal if those keys are also handled by the overlay.
+    if (e.key === "Enter" || e.key === " ") {
+      e.stopPropagation();
+    }
+    // Add other specific key stopPropagation if needed, e.g. Escape, Tab (though Tab is usually for focus)
+  };
+
+  const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
       onClick={onClose} // Close on overlay click
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={
-        typeof title === "string" && title ? "modal-title" : undefined
-      }
+      onKeyDown={handleOverlayKeyDown} // Handle Enter/Space for overlay
+      role="button" // Overlay acts as a clickable area to close
+      tabIndex={0} // Make overlay focusable for keydown
+      aria-label="Close modal" // Accessible name for the overlay acting as a close button
     >
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
       <div
         ref={modalRef} // Assign ref
-        tabIndex={-1} // Make the modal content focusable
+        role="dialog" // The actual dialog content
+        aria-modal="true"
+        aria-labelledby={
+          typeof title === "string" && title ? "modal-title" : undefined
+        }
+        tabIndex={-1} // Make the modal content focusable for programmatic focus
         className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast`}
         onClick={handleContentClick} // Prevent closing when clicking modal content
+        onKeyDown={handleContentKeyDown} // Added to satisfy click-events-have-key-events
       >
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-slate-200">
@@ -125,6 +147,7 @@ const Modal: React.FC<ModalProps> = ({
           </div>
         )}
       </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
     </div>
   );
 };
@@ -153,6 +176,7 @@ const modalStyles = `
 
 // Inject styles into the head - This is a common pattern for component-specific global styles
 // but might be better handled by your global CSS setup or a CSS-in-JS solution.
+// For now, keeping it here for simplicity if Modal is the primary user of these animations
 if (typeof window !== "undefined") {
   const styleSheet = document.createElement("style");
   styleSheet.type = "text/css";

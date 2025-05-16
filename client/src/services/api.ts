@@ -111,8 +111,6 @@ import { IMenuClient, IMenuWithItemsClient } from "../types/menuTypes"; // Added
 
 // Import from staffTypes
 import {
-  IncorrectQuestionDetail,
-  ClientQuizAttemptSummary as StaffTypesClientQuizAttemptSummary, // Alias to avoid naming conflict if defined locally too
   ClientStaffQuizProgress,
   ClientStaffQuizProgressWithAttempts,
   StaffMemberWithData,
@@ -121,27 +119,22 @@ import {
 } from "../types/staffTypes";
 
 // Import User types (assuming a simple one for now)
-import { ClientUserMinimal, UserRole } from "../types/user"; // Added UserRole if needed for SignupDataClient
+import { ClientUserMinimal } from "../types/user"; // UserRole Removed
 
 // Import from quizTypes
 import {
   ClientIQuiz,
   GenerateQuizFromBanksClientData,
-  ClientAvailableQuiz,
   ClientQuizAttemptDetails,
-  ClientAnswerForSubmission,
   ClientQuizAttemptSubmitData,
-  ClientGradedQuestion,
   ClientSubmitAttemptResponse,
+  IncorrectQuestionDetail,
 } from "../types/quizTypes";
 
-import {
-  ClientQuestionOption,
-  ClientQuestionForAttempt,
-} from "../types/questionTypes";
+import { ClientQuestionForAttempt } from "../types/questionTypes";
 
 // Corrected MenuItem types import
-import { MenuItem, MenuItemFormData, ItemType } from "../types/menuItemTypes";
+import { MenuItem, MenuItemFormData } from "../types/menuItemTypes"; // ItemType Removed
 
 // Import Auth types
 import {

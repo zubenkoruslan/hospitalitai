@@ -1,19 +1,18 @@
 import mongoose, { Types } from "mongoose";
 import Quiz, { IQuiz } from "../models/Quiz";
 import { IQuestion } from "../models/QuestionModel";
-import MenuItem, { IMenuItem } from "../models/MenuItem";
-import QuizResult, { IQuizResult } from "../models/QuizResult";
+import MenuItem from "../models/MenuItem"; // Removed IMenuItem
+import QuizResult from "../models/QuizResult"; // Removed IQuizResult
 import User, { IUser } from "../models/User"; // Import User model AND IUser interface
 import Restaurant from "../models/Restaurant"; // ADDED: Import Restaurant model
 // Import other models if needed (e.g., Menu, User, QuizResult)
 import { AppError } from "../utils/errorHandler";
-import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel";
+import QuestionBankModel from "../models/QuestionBankModel"; // Removed IQuestionBank
 import StaffQuizProgress, {
   IStaffQuizProgress,
 } from "../models/StaffQuizProgress";
 import QuestionModel, {
   IQuestion as QuestionDocument,
-  IOption as QuestionModelIOption,
 } from "../models/QuestionModel"; // Renamed to avoid conflict with IQuestion from QuestionBankModel if any
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 import { getUniqueValidQuestionIdsFromQuestionBanks } from "./questionBankService"; // Added import
@@ -191,7 +190,8 @@ async function _generateIngredientDistractors(
 }
 
 // Interface for the data structure returned by generateQuizQuestions
-interface GeneratedQuizData {
+interface _GeneratedQuizData {
+  // Prefixed GeneratedQuizData
   title: string;
   menuItemIds: Types.ObjectId[];
   questions: IQuestion[];
@@ -815,7 +815,7 @@ export class QuizService {
           id.toString()
         )
       );
-      let availableUnseenQuestionIds = allActiveQuestionIdsInBanks.filter(
+      const availableUnseenQuestionIds = allActiveQuestionIdsInBanks.filter(
         (id) => !seenQuestionIdsSet.has(id.toString())
       );
       console.log(

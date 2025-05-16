@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
-import axios from "axios";
+// import axios from "axios"; // Removed unused import
 import QuestionModel, {
   IQuestion,
-  IOption,
+  // IOption, // Removed unused IOption import
   QuestionType,
 } from "../models/QuestionModel";
 import QuestionBankModel from "../models/QuestionBankModel";
@@ -458,9 +458,9 @@ export const generateAiQuestionsService = async (
     // 3. Iterate through selected menu items and generate questions
     for (const menuItem of menuItemsToProcess) {
       // Prepare context for AI based on menuItem
-      const aiContext = `Menu Item: ${menuItem.name}. Description: ${
-        menuItem.description || "N/A"
-      }. Category: ${menuItem.category || "N/A"}.`;
+      // let _aiContext = `Menu Item: ${menuItem.name}. Description: ${ // Removed unused variable declaration
+      //   menuItem.description || "N/A"
+      // }. Category: ${menuItem.category || "N/A"}.`;
 
       // Simulate AI Call - Placeholder for actual Gemini API call
       // TODO: Replace this section with your actual AI question generation logic

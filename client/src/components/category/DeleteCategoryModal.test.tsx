@@ -4,7 +4,7 @@ import DeleteCategoryModal from "./DeleteCategoryModal";
 
 // Mock the Modal and Button components as they are tested separately
 // and we want to focus on DeleteCategoryModal's logic.
-jest.mock("../common/Modal", () => (props: any) => (
+const MockModal = (props: any) => (
   <div data-testid="mock-modal" data-isopen={props.isOpen.toString()}>
     {props.title && <h1>{props.title}</h1>}
     <div>{props.children}</div>
@@ -12,9 +12,11 @@ jest.mock("../common/Modal", () => (props: any) => (
     <button onClick={props.onClose}>Close Modal</button>{" "}
     {/* For testing onClose from Modal interaction if needed */}
   </div>
-));
+);
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock("../common/Button", () => (props: any) => (
+const MockButton = (props: any) => (
   <button
     onClick={props.onClick}
     disabled={props.disabled}
@@ -23,7 +25,9 @@ jest.mock("../common/Button", () => (props: any) => (
   >
     {props.children}
   </button>
-));
+);
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 describe("DeleteCategoryModal Component", () => {
   const mockOnClose = jest.fn();

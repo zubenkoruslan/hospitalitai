@@ -27,7 +27,7 @@ const globalErrorHandler = (
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   // Default to 500 if status code or operational flag isn't set
   err.statusCode = err.statusCode || 500;

@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  IQuestionBank,
-  IQuestion,
-  NewQuestionClientData,
-} from "../../types/questionBankTypes"; // Corrected path
+import { IQuestionBank, IQuestion } from "../../types/questionBankTypes"; // Corrected path
 import Modal from "../common/Modal"; // Generic Modal
 import Button from "../common/Button"; // Corrected path
 import LoadingSpinner from "../common/LoadingSpinner"; // Corrected path
-import ErrorMessage from "../common/ErrorMessage"; // Corrected path
 import AddManualQuestionForm from "./AddManualQuestionForm"; // <-- Import AddManualQuestionForm
 import {
-  addQuestionToBank,
   removeQuestionFromBank,
   getQuestionBankById,
   getQuestionById,
@@ -19,12 +13,7 @@ import GenerateAiQuestionsForm from "./GenerateAiQuestionsForm"; // Uncommented 
 import EditQuestionForm from "./EditQuestionForm"; // <-- Import EditQuestionForm
 import ConfirmationModalContent from "../common/ConfirmationModalContent"; // Uncommented & For remove confirmation
 import { useValidation } from "../../context/ValidationContext";
-import {
-  PlusCircleIcon,
-  SparklesIcon,
-  PencilIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { PlusCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import QuestionListItem from "./QuestionListItem"; // Uncommented
 
 interface ManageQuestionsModalProps {
@@ -42,7 +31,6 @@ const ManageQuestionsModal: React.FC<ManageQuestionsModalProps> = ({
   const [questions, setQuestions] = useState<IQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isProcessingBankUpdate, setIsProcessingBankUpdate] = useState(false); // For addQuestionToBank operation
 
   const [isAddManualModalOpen, setIsAddManualModalOpen] = useState(false);
   const [isGenerateAiModalOpen, setIsGenerateAiModalOpen] = useState(false);

@@ -16,44 +16,41 @@ jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock common components if they interfere or for simplicity
-jest.mock(
-  "../common/Modal",
-  () => (props: any) =>
-    props.isOpen ? (
-      <div data-testid="mock-modal" role="dialog">
-        <h1>{props.title}</h1>
-        <div>{props.children}</div>
-        <footer>{props.footerContent}</footer>
-      </div>
-    ) : null
+const MockModal = (props: any) =>
+  props.isOpen ? (
+    <div data-testid="mock-modal" role="dialog">
+      <h1>{props.title}</h1>
+      <div>{props.children}</div>
+      <footer>{props.footerContent}</footer>
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
+
+const MockButton = (
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant: string;
+    form?: string;
+  }
+) => (
+  <button {...props} data-variant={props.variant} form={props.form}>
+    {props.children}
+  </button>
 );
-jest.mock(
-  "../common/Button",
-  () =>
-    (
-      props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-        variant: string;
-        form?: string;
-      }
-    ) =>
-      (
-        <button {...props} data-variant={props.variant} form={props.form}>
-          {props.children}
-        </button>
-      )
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
+
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
+
+const MockLoadingSpinner = ({ message }: { message?: string }) => (
+  <div data-testid="loading-spinner">{message || "Loading..."}</div>
 );
-jest.mock(
-  "../common/LoadingSpinner",
-  () =>
-    ({ message }: { message?: string }) =>
-      <div data-testid="loading-spinner">{message || "Loading..."}</div>
-);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockAuthContextValue: AuthContextType = {
   token: "test-token",
@@ -220,7 +217,7 @@ describe("PdfMenuUpload Component", () => {
       if (config && config.onUploadProgress) {
         onUploadProgressCallback = config.onUploadProgress;
       }
-      return new Promise((resolve, reject) => {
+      return new Promise((_resolve, _reject) => {
         // Don't resolve immediately to keep loading state
       });
     });

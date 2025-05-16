@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema, Model, Types } from "mongoose";
-import { IUser } from "./User"; // For restaurantId reference
+// import { IUser } from "./User"; // Removed unused import
 
 // Define allowed types and categories (can be used for validation later)
 export const ITEM_TYPES = ["food", "beverage"] as const;

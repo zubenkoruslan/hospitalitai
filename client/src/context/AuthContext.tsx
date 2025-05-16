@@ -14,7 +14,7 @@ import {
   getCurrentUser as getCurrentUserService,
 } from "../services/api"; // Import api services
 import { ClientUserMinimal, UserRole } from "../types/user"; // For context user type
-import { LoginCredentials, AuthResponse } from "../types/authTypes"; // For loginService params
+import { /* LoginCredentials, */ AuthResponse } from "../types/authTypes"; // For loginService params
 
 // Define the shape of the actual decoded JWT payload
 export interface DecodedToken {

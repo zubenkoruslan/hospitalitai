@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getMenuWithItems } from "../services/api"; // Import service function
 // import { Menu, MenuItem } from "../types/menuItemTypes"; // Menu is incorrect here
 import { MenuItem } from "../types/menuItemTypes";
-import { IMenuClient, IMenuWithItemsClient } from "../types/menuTypes"; // Import correct menu types
+import { IMenuClient /*, IMenuWithItemsClient */ } from "../types/menuTypes"; // Import correct menu types
 
 interface UseMenuDataReturn {
   menuDetails: IMenuClient | null; // Use IMenuClient

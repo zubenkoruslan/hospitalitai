@@ -45,12 +45,13 @@ const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
     >
       <div className="text-center">
         <p className="text-lg text-slate-600">
-          Are you sure you want to delete the category "
-          <strong className="font-semibold">{categoryName}</strong>"?
+          Are you sure you want to delete the category &quot;
+          <strong className="font-semibold">{categoryName}</strong>&quot;?
         </p>
         <p className="text-sm text-slate-500 mt-3">
           All items currently in this category will be reassigned to a category
-          named "<strong className="font-medium">Non Assigned</strong>".
+          named &quot;<strong className="font-medium">Non Assigned</strong>
+          &quot;.
         </p>
         <p className="text-sm text-slate-500 mt-2">
           This action cannot be undone.

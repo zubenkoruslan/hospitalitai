@@ -1,15 +1,17 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import StaffResultsFilter from "./StaffResultsFilter";
 import { Filters, StaffMemberWithData } from "../../types/staffTypes";
 
 // Mock Button component
-jest.mock("../common/Button", () => ({ onClick, children, variant }: any) => (
+const MockButton = ({ onClick, children, variant }: any) => (
   <button data-testid={`button-${variant}`} onClick={onClick}>
     {children}
   </button>
-));
+);
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 const mockStaffData: StaffMemberWithData[] = [
   {
@@ -178,9 +180,3 @@ describe("StaffResultsFilter Component", () => {
     expect(mockOnResetFilters).toHaveBeenCalledTimes(1);
   });
 });
-
-// Helper for querying within elements, if not directly importing `within` from RTL
-import { queries } from "@testing-library/dom";
-function within(element: HTMLElement) {
-  return queries.getQueriesForElement(element);
-}

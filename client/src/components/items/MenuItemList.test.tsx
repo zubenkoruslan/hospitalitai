@@ -152,14 +152,7 @@ describe("MenuItemList", () => {
   it("calls onEdit with the correct item when Edit button is clicked", () => {
     render(<MenuItemList {...defaultProps} />);
 
-    // Find the Edit button associated with the first item
-    // This assumes the button is within the same container/row as the item name
-    const firstItemEditButton = screen.getByRole("button", {
-      name: /Edit/i,
-      // Example of a more specific selector if needed:
-      // description: `Edit ${mockItems[0].name}` // Assuming an aria-label or similar
-    });
-    // Or find all edit buttons and click the first one:
+    // Find all edit buttons and click the first one:
     const editButtons = screen.getAllByRole("button", { name: /Edit/i });
 
     fireEvent.click(editButtons[0]);

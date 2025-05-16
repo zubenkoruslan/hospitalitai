@@ -1,24 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
-import {
-  IQuestion,
-  IQuestionBank,
-  NewQuestionClientData,
-  AiGenerationClientParams,
-} from "../types/questionBankTypes";
+import { IQuestion, IQuestionBank } from "../types/questionBankTypes";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
 import GenerateAiQuestionsForm from "../components/questionBank/GenerateAiQuestionsForm";
 import Modal from "../components/common/Modal";
 import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
-import {
-  createQuestion as apiCreateQuestion,
-  generateAiQuestions as apiGenerateAiQuestions,
-} from "../services/api";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import Card from "../components/common/Card";
@@ -105,7 +95,9 @@ const QuestionBankDetailPage: React.FC = () => {
     null
   );
 
-  const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, []);
+  const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
+    fetchQuestionBankById,
+  ]);
 
   useEffect(() => {
     if (bankId) {
@@ -214,7 +206,7 @@ const QuestionBankDetailPage: React.FC = () => {
     setIsEditBankModalOpen(false);
   };
 
-  const handleBankDetailsUpdated = (updatedBank: IQuestionBank) => {
+  const handleBankDetailsUpdated = (_updatedBank: IQuestionBank) => {
     if (bankId) {
       fetchQuestionBankById(bankId);
     }
@@ -234,14 +226,13 @@ const QuestionBankDetailPage: React.FC = () => {
 
   const handleQuestionUpdatedInModal = (updatedQuestion: IQuestion) => {
     // Option 1: Optimistically update in local state (if currentQuestionBank.questions is array of IQuestion)
-    // This avoids a full re-fetch of the bank if only one question changed.
     if (currentQuestionBank && Array.isArray(currentQuestionBank.questions)) {
-      const updatedQuestions = (
+      const _updatedQuestions = (
         currentQuestionBank.questions as IQuestion[]
       ).map((q) => (q._id === updatedQuestion._id ? updatedQuestion : q));
       // This assumes useQuestionBanks hook allows direct update of currentQuestionBank or provides a setter.
       // For now, we will rely on re-fetching the bank for simplicity.
-      // setCurrentQuestionBank({ ...currentQuestionBank, questions: updatedQuestions });
+      // setCurrentQuestionBank({ ...currentQuestionBank, questions: _updatedQuestions });
     }
 
     // Option 2: Re-fetch the entire bank to ensure data consistency
@@ -436,7 +427,7 @@ const QuestionBankDetailPage: React.FC = () => {
           >
             <AddManualQuestionForm
               onQuestionAdded={handleManualQuestionSubmit}
-              onClose={() => setShowAddManualQuestionModal(false)}
+              onCloseRequest={() => setShowAddManualQuestionModal(false)}
               initialBankCategories={currentQuestionBank?.categories || []}
             />
           </Modal>
@@ -449,10 +440,10 @@ const QuestionBankDetailPage: React.FC = () => {
             title="Generate Questions with AI"
           >
             <GenerateAiQuestionsForm
-              bankId={currentQuestionBank._id}
-              bankCategories={currentQuestionBank.categories || []}
+              bankId={bankId}
+              bankCategories={currentQuestionBank?.categories || []}
               onAiQuestionsGenerated={handleAiQuestionsGenerated}
-              onClose={() => setShowGenerateAiQuestionsModal(false)}
+              onCloseRequest={() => setShowGenerateAiQuestionsModal(false)}
             />
           </Modal>
         )}
@@ -475,10 +466,10 @@ const QuestionBankDetailPage: React.FC = () => {
           <Modal
             isOpen={isConfirmRemoveModalOpen}
             onClose={handleCancelRemoveQuestion}
-            title="Confirm Removal"
+            title="Confirm Question Removal"
+            size="sm"
           >
             <ConfirmationModalContent
-              title="Confirm Remove Question"
               message="Are you sure you want to remove this question from the bank? This action cannot be undone."
               onConfirm={executeRemoveQuestion}
               onCancel={handleCancelRemoveQuestion}

@@ -9,35 +9,34 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState<string>("");
   const [componentError, setComponentError] = useState<string | null>(null); // Separate error state for component-level display
   const navigate = useNavigate();
-  const auth = useAuth(); // Get context values
+  const auth = useAuth(); // Called unconditionally at the top
 
-  // Handle case where context might not be ready or loaded yet
-  if (!auth) {
-    // Optionally return a loading state or null
-    return <div>Loading auth context...</div>;
-  }
-
-  const { login, isLoading, error: authError, user, token } = auth;
-
-  // --- Navigation Effect --- >>
-  // Navigate user after successful login when user/token context changes
+  // useEffect for navigation, also called unconditionally at the top level scope of the component function
+  // It will internally decide whether to navigate based on auth context values.
   useEffect(() => {
-    // Only navigate if we have a user and token, and not during initial load
-    if (user && token && !isLoading) {
-      console.log("User logged in, navigating based on role:", user.role);
-      if (user.role === "staff") {
+    // Only navigate if auth context is available and we have a user and token, and not during initial auth loading.
+    if (auth && auth.user && auth.token && !auth.isLoading) {
+      console.log("User logged in, navigating based on role:", auth.user.role);
+      if (auth.user.role === "staff") {
         navigate("/staff/dashboard");
-      } else if (user.role === "restaurant") {
+      } else if (auth.user.role === "restaurant") {
         navigate("/dashboard");
       } else {
-        // Default redirect if role is unexpected (shouldn't happen ideally)
         navigate("/");
       }
     }
-    // Dependency array includes user and token to trigger on login/logout
-    // Also include navigate and isLoading to satisfy lint rules
-  }, [user, token, navigate, isLoading]);
-  // --- Navigation Effect --- <<
+    // Dependency array includes parts of auth context that trigger navigation
+  }, [auth, navigate]); // Simplified dependency: effect re-runs if auth object instance changes or navigate changes.
+  // auth.user, auth.token, auth.isLoading are part of auth object.
+
+  // Handle case where context might not be ready or loaded yet, or other hooks aren't ready.
+  // This check is now AFTER all hook calls.
+  if (!auth) {
+    return <div>Loading auth context...</div>; // Or a more sophisticated loading spinner
+  }
+
+  // Destructure after the null check for auth, and after all hooks have been called.
+  const { login, isLoading, error: authError } = auth;
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -164,7 +163,7 @@ const LoginForm: React.FC = () => {
         </form>
         <div className="text-sm text-center pt-4 border-t border-gray-200">
           <p className="text-gray-600">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               to="/signup"
               className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-150 ease-in-out"

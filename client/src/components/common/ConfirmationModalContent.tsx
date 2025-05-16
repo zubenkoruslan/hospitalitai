@@ -2,7 +2,6 @@ import React from "react";
 import Button from "./Button";
 
 interface ConfirmationModalContentProps {
-  title?: string;
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -13,7 +12,6 @@ interface ConfirmationModalContentProps {
 }
 
 const ConfirmationModalContent: React.FC<ConfirmationModalContentProps> = ({
-  title = "Confirm Action",
   message,
   onConfirm,
   onCancel,

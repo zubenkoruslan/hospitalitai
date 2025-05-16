@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { getQuestionBanks, updateQuizDetails } from "../../services/api";
 import { IQuestionBank } from "../../types/questionBankTypes";
 import { ClientIQuiz } from "../../types/quizTypes";
@@ -244,15 +244,15 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
             />
           </div>
 
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-slate-700">
+          <fieldset className="space-y-3">
+            <legend className="block text-sm font-medium text-slate-700">
               Select Question Banks <span className="text-red-500">*</span>
-            </label>
+            </legend>
 
             {availableBanks.length === 0 && !fetchBanksError && (
               <p className="text-slate-500 text-sm py-3">
                 No question banks available. You can create them in the
-                'Question Banks' section.
+                &apos;Question Banks&apos; section.
               </p>
             )}
             {availableBanks.length > 0 && (
@@ -295,7 +295,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
                 ))}
               </div>
             )}
-          </div>
+          </fieldset>
           {/* General submission error already placed above form fields */}
         </form>
       )}

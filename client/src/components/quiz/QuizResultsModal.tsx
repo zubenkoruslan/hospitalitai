@@ -34,17 +34,35 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
     e.stopPropagation();
   };
 
+  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.stopPropagation();
+    }
+  };
+
+  const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[70] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
       onClick={onClose} // Close on overlay click
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="quiz-results-modal-title"
+      onKeyDown={handleOverlayKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Close modal"
     >
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
       <div
         className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl mx-auto my-8 max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast"
         onClick={handleContentClick}
+        onKeyDown={handleContentKeyDown}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quiz-results-modal-title"
       >
         {/* Header */}
         <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200">
@@ -173,6 +191,7 @@ const QuizResultsModal: React.FC<QuizResultsModalProps> = ({
           </Button>
         </div>
       </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
     </div>
   );
 };

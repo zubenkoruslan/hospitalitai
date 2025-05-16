@@ -90,7 +90,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         ]);
       }
     }
-  }, [questionType]);
+  }, [questionType, options]);
 
   useEffect(() => {
     if (initialBankCategories && initialBankCategories.length > 0) {
@@ -243,8 +243,8 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         </div>
       </div>
 
-      <div>
-        <label className={commonLabelClass}>Options</label>
+      <fieldset>
+        <legend className={commonLabelClass}>Options</legend>
         {options.map((opt, index) => (
           <div
             key={index}
@@ -305,7 +305,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
             Add Option
           </Button>
         )}
-      </div>
+      </fieldset>
 
       <div>
         <label htmlFor="categories" className={commonLabelClass}>

@@ -5,7 +5,6 @@ import {
 } from "../../types/questionBankTypes";
 import { updateQuestionBank } from "../../services/api";
 import Button from "../common/Button";
-import LoadingSpinner from "../common/LoadingSpinner";
 import ErrorMessage from "../common/ErrorMessage";
 import { useValidation } from "../../context/ValidationContext"; // If you have specific validation messages
 

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { ResultSummary, StaffMemberWithData } from "../../types/staffTypes"; // Corrected import path
+import { StaffMemberWithData } from "../../types/staffTypes"; // Corrected import path, Removed ResultSummary
 
 // Interfaces (Copied from parent - consider moving to shared types)
 // // Removed local definitions
@@ -44,7 +44,6 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
     return distribution;
   }, [staffData]);
 
-  const maxCount = Math.max(...Object.values(scoreDistribution));
   const totalStaff = Object.values(scoreDistribution).reduce(
     (a, b) => a + b,
     0

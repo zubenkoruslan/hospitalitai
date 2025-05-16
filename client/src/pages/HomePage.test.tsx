@@ -4,19 +4,15 @@ import { BrowserRouter } from "react-router-dom";
 import HomePage from "./HomePage";
 
 // Mock the Button component to avoid testing its implementation
-jest.mock("../components/common/Button", () => {
-  return ({ children, variant, className, ...props }: any) => {
-    return (
-      <button
-        data-testid={`button-${variant}`}
-        className={className}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  };
-});
+const MockButton = ({ children, variant, className, ...props }: any) => {
+  return (
+    <button data-testid={`button-${variant}`} className={className} {...props}>
+      {children}
+    </button>
+  );
+};
+MockButton.displayName = "MockButton";
+jest.mock("../components/common/Button", () => MockButton);
 
 describe("HomePage", () => {
   beforeEach(() => {

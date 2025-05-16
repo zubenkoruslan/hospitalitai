@@ -1,56 +1,49 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import CreateQuizModal from "./CreateQuizModal";
 import { IMenuClient } from "../../types/menuTypes";
 
 // Mock common components
-jest.mock(
-  "../common/Modal",
-  () =>
-    ({ isOpen, onClose, title, footerContent, children, size }: any) =>
-      isOpen ? (
-        <div data-testid="modal">
-          <h1>{title}</h1>
-          <div>{children}</div>
-          <footer>{footerContent}</footer>
-          <button data-testid="modal-onclose-btn" onClick={onClose}>
-            Close Modal
-          </button>
-        </div>
-      ) : null
-);
+const MockModal = ({ isOpen, onClose, title, footerContent, children }: any) =>
+  isOpen ? (
+    <div data-testid="modal">
+      <h1>{title}</h1>
+      <div>{children}</div>
+      <footer>{footerContent}</footer>
+      <button data-testid="modal-onclose-btn" onClick={onClose}>
+        Close Modal
+      </button>
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, type, disabled }: any) =>
-      (
-        <button
-          data-testid={`button-${variant || "default"}${
-            type === "button" ? "-button" : ""
-          }`}
-          onClick={onClick}
-          disabled={disabled}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({ onClick, children, variant, type, disabled }: any) => (
+  <button
+    data-testid={`button-${variant || "default"}${
+      type === "button" ? "-button" : ""
+    }`}
+    onClick={onClick}
+    disabled={disabled}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
-jest.mock(
-  "../common/LoadingSpinner",
-  () =>
-    ({ message }: { message?: string }) =>
-      <div data-testid="loading-spinner">{message || "Loading..."}</div>
+const MockLoadingSpinner = ({ message }: { message?: string }) => (
+  <div data-testid="loading-spinner">{message || "Loading..."}</div>
 );
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
 
 const mockMenus: IMenuClient[] = [
   {

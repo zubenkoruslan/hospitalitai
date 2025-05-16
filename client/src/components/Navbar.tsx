@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // Define props interface
@@ -12,13 +12,12 @@ const Navbar: React.FC<NavbarProps> = ({
   isBlockingNavigation = false,
   onAttemptBlockedNavigation,
 }) => {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const navigate = useNavigate(); // Get navigate function
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,7 +73,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const baseStyle = "inline-flex items-center px-3 py-2 text-sm font-medium";
 
   // --- Navigation Handler ---
-  const handleNavigationClick = (event: React.MouseEvent, to: string) => {
+  const handleNavigationClick = (event: React.MouseEvent, _to: string) => {
     if (isBlockingNavigation && onAttemptBlockedNavigation) {
       const proceed = onAttemptBlockedNavigation(); // Ask for confirmation
       if (!proceed) {

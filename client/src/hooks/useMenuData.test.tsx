@@ -1,14 +1,8 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useMenuData } from "./useMenuData";
 import api from "../services/api"; // Corrected import
-import {
-  Menu,
-  MenuItem,
-  FOOD_CATEGORIES,
-  MenuItemFormData,
-  ItemType,
-  ItemCategory,
-} from "../types/menuItemTypes";
+import { MenuItem, FOOD_CATEGORIES } from "../types/menuItemTypes";
+import { IMenuClient } from "../types/menuTypes"; // Added IMenuClient import
 import { AxiosResponse } from "axios";
 
 // Mock the api module
@@ -20,12 +14,13 @@ const mockedApi = api as jest.Mocked<typeof api>;
 const mockMenuId = "menu456";
 
 // Added mock Menu details
-const mockMenuDetails: Menu = {
+const mockMenuDetails: IMenuClient = {
   _id: mockMenuId,
   name: "Main Menu",
   description: "Our finest selection",
-  // createdAt: new Date().toISOString(), // Removed - Not part of Menu type
-  // updatedAt: new Date().toISOString(), // Removed - Not part of Menu type
+  restaurantId: "rest123", // Added restaurantId to satisfy IMenuClient
+  createdAt: new Date().toISOString(), // Added createdAt to satisfy IMenuClient
+  updatedAt: new Date().toISOString(), // Added updatedAt to satisfy IMenuClient
 };
 
 const mockMenuItems: MenuItem[] = [
@@ -61,7 +56,7 @@ const mockMenuItems: MenuItem[] = [
   },
 ];
 
-const mockAddedItem: MenuItem = {
+const _mockAddedItem: MenuItem = {
   _id: "newItem3",
   restaurantId: "rest123",
   menuId: mockMenuId,
@@ -79,7 +74,7 @@ const mockAddedItem: MenuItem = {
   updatedAt: new Date().toISOString(),
 };
 
-const mockUpdatedItem: MenuItem = {
+const _mockUpdatedItem: MenuItem = {
   ...mockMenuItems[0],
   name: "Updated Burger Deluxe",
   price: 11.5,
@@ -94,7 +89,7 @@ describe("useMenuData Hook", () => {
       if (url === `/menus/${mockMenuId}`) {
         return Promise.resolve({
           data: { menu: mockMenuDetails },
-        } as AxiosResponse<{ menu: Menu }>);
+        } as AxiosResponse<{ menu: IMenuClient }>);
       } else if (url === "/items" && config?.params?.menuId === mockMenuId) {
         return Promise.resolve({
           data: { items: mockMenuItems },
@@ -167,7 +162,7 @@ describe("useMenuData Hook", () => {
       if (url === `/menus/${mockMenuId}`) {
         return Promise.resolve({
           data: { menu: mockMenuDetails },
-        } as AxiosResponse<{ menu: Menu }>);
+        } as AxiosResponse<{ menu: IMenuClient }>);
       } else if (url === "/items" && config?.params?.menuId === mockMenuId) {
         return Promise.reject(new Error(errorMessage));
       } else {

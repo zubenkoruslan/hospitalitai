@@ -1,11 +1,5 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-} from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 // import api from "../services/api"; // Removed unused direct API import
 import { useAuth } from "../context/AuthContext";
 import { useStaffSummary } from "../hooks/useStaffSummary"; // Import the new hook
@@ -18,15 +12,9 @@ import StaffResultsFilter from "../components/staff/StaffResultsFilter"; // Impo
 import StaffResultsTable from "../components/staff/StaffResultsTable"; // Import the table component
 import Card from "../components/common/Card"; // Import Card
 // Import shared types
-import {
-  ResultSummary,
-  StaffMemberWithData,
-  SortField,
-  SortDirection,
-  Filters,
-} from "../types/staffTypes";
+import { Filters } from "../types/staffTypes";
 // Import utility functions
-import { formatDate } from "../utils/helpers"; // Import only formatDate
+// import { formatDate } from "../utils/helpers"; // Removed formatDate
 
 // Helper Components (Assuming LoadingSpinner and ErrorMessage exist elsewhere or define here)
 // // Removed LoadingSpinner definition
@@ -46,7 +34,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
     error: staffError,
   } = useStaffSummary();
   const {
-    quizCount: totalQuizzes,
+    quizCount: _totalQuizzes,
     loading: quizCountLoading,
     error: quizCountError,
   } = useQuizCount();
@@ -60,8 +48,8 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
   // Keep other state specific to this page
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
-  const { user } = useAuth(); // Still needed for potential conditional logic or display
-  const navigate = useNavigate();
+  const { user: _user } = useAuth();
+  const _navigate = useNavigate();
 
   // Filtering state
   const [filters, setFilters] = useState<Filters>({

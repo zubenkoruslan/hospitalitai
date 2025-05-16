@@ -1,32 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api, {
+import {
   getQuestionBanks,
-  createQuestionBank,
-  updateQuestionBank,
   deleteQuestionBank,
   getQuizzes,
-  generateQuizFromQuestionBanks,
   getRestaurantQuizStaffProgress,
-  getQuestionBankById,
   updateQuizDetails,
-  resetQuizProgress,
   deleteQuiz,
 } from "../services/api";
 
-import {
-  ClientIQuiz,
-  GenerateQuizFromBanksClientData,
-} from "../types/quizTypes";
+import { ClientIQuiz } from "../types/quizTypes";
 import { ClientStaffQuizProgress } from "../types/staffTypes";
 
-import {
-  IQuestionBank,
-  CreateQuestionBankData,
-  UpdateQuestionBankData,
-  IQuestion,
-} from "../types/questionBankTypes";
+import { IQuestionBank } from "../types/questionBankTypes";
 
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
@@ -97,7 +84,7 @@ const QuizAndBankManagementPage: React.FC = () => {
   );
 
   // Helper function to get question bank names for a quiz
-  const getBankNamesForQuiz = (quiz: ClientIQuiz): string => {
+  const _getBankNamesForQuiz = (quiz: ClientIQuiz): string => {
     if (
       !quiz.sourceQuestionBankIds ||
       quiz.sourceQuestionBankIds.length === 0
@@ -320,14 +307,10 @@ const QuizAndBankManagementPage: React.FC = () => {
   };
 
   const handleManageBankQuestions = (bankId: string) => {
-    // Instead of navigating to a separate edit page for questions,
-    // navigate to the bank detail page, which handles question management.
-    navigate(`/question-banks/${bankId}`);
+    navigate(`/question-banks/${bankId}/edit`);
   };
 
-  // Renamed original onPreview to handleOpenEditQuizModal
-  const handleOpenEditQuizModal = (quiz: ClientIQuiz) => {
-    console.log("Opening edit modal for quiz:", quiz);
+  const _handleOpenEditQuizModal = (quiz: ClientIQuiz) => {
     setQuizToEdit(quiz);
     setIsEditQuizModalOpen(true);
   };
@@ -466,14 +449,13 @@ const QuizAndBankManagementPage: React.FC = () => {
           {!isLoadingQuizzes && quizzes.length > 0 && (
             <QuizList
               quizzes={quizzes}
-              isLoading={isLoadingQuizzes}
-              onPreview={handleOpenEditQuizModal}
+              isLoading={false}
+              onPreview={(quiz) => navigate(`/quizzes/preview/${quiz._id}`)}
               onActivate={handleActivateQuiz}
               onDeactivate={handleDeactivateQuiz}
               onDelete={(quiz) => setQuizToDelete(quiz)}
               onViewProgress={handleViewQuizProgress}
               isDeletingQuizId={isDeletingQuizId}
-              getMenuItemNames={getBankNamesForQuiz}
             />
           )}
           {isLoadingQuizzes && quizzes.length > 0 && (

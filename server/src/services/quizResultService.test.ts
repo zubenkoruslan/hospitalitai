@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import mongoose, { Types } from "mongoose";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Types } from "mongoose";
 import QuizResultService from "./quizResultService";
 import Quiz from "../models/Quiz";
 import QuizResult from "../models/QuizResult";
-import User from "../models/User"; // Needed for checking user access/details potentially
 import { AppError } from "../utils/errorHandler";
 
 // Mock Mongoose models
@@ -225,7 +224,7 @@ describe("QuizResultService", () => {
   describe("getMyResults", () => {
     const mockUserIdString = new Types.ObjectId().toString();
     const mockUserId = new Types.ObjectId(mockUserIdString);
-    const mockResults = [
+    const _mockResults = [
       {
         _id: new Types.ObjectId(),
         quizId: { _id: new Types.ObjectId(), title: "Quiz 2" },

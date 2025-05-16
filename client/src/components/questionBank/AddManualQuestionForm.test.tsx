@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AddManualQuestionForm from "./AddManualQuestionForm";
 import { ValidationContext } from "../../context/ValidationContext";
@@ -12,7 +12,7 @@ jest.mock("../../services/api", () => ({
 }));
 
 // Mock common components
-jest.mock("../common/Button", () => (props: any) => (
+const MockButton = (props: any) => (
   <button
     {...props}
     data-testid={
@@ -25,10 +25,22 @@ jest.mock("../common/Button", () => (props: any) => (
   >
     {props.children}
   </button>
-));
-jest.mock("../common/LoadingSpinner", () => () => (
+);
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
+
+// Mock child components
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
+);
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../../common/ErrorMessage", () => MockErrorMessage);
+
+const MockLoadingSpinner = () => (
   <div data-testid="loading-spinner">Loading...</div>
-));
+);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockOnQuestionAdded = jest.fn();
 const mockOnCloseRequest = jest.fn();

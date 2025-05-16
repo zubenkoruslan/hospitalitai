@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -7,7 +7,7 @@ import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import Modal from "../components/common/Modal";
-import { IQuestionBank, IQuestion } from "../types/questionBankTypes";
+import { IQuestion } from "../types/questionBankTypes";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import EditQuestionBankDetailsForm from "../components/questionBank/EditQuestionBankDetailsForm";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
@@ -26,7 +26,7 @@ const QuestionBankEditPage: React.FC = () => {
     isLoading,
     error,
     fetchQuestionBankById,
-    editQuestionBank,
+    editQuestionBank: _editQuestionBank,
     addQuestionToCurrentBank,
     removeQuestionFromCurrentBank,
     clearError,
@@ -35,11 +35,12 @@ const QuestionBankEditPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // States for editing bank details
-  const [isEditingDetails, setIsEditingDetails] = useState<boolean>(false);
+  const [_isEditingDetails, setIsEditingDetails] = useState<boolean>(false);
 
   // States for Question Management
   const [isAddManualModalOpen, setIsAddManualModalOpen] = useState(false);
-  const [isProcessingAddQuestion, setIsProcessingAddQuestion] = useState(false);
+  const [_isProcessingAddQuestion, setIsProcessingAddQuestion] =
+    useState(false);
   const [questionManagementError, setQuestionManagementError] = useState<
     string | null
   >(null);
@@ -389,11 +390,18 @@ const QuestionBankEditPage: React.FC = () => {
           <Modal
             isOpen={isRemoveConfirmModalOpen}
             onClose={closeRemoveConfirmModal}
-            title="Confirm Remove Question"
+            title="Confirm Question Removal"
+            size="sm"
           >
             <ConfirmationModalContent
-              title="Confirm Remove Question"
-              message={`Are you sure you want to remove the question: "${questionToRemove.questionText}"? This action cannot be undone.`}
+              message={
+                questionToRemove
+                  ? `Are you sure you want to remove the question "${questionToRemove.questionText.substring(
+                      0,
+                      50
+                    )}..."? This action cannot be undone.`
+                  : "Are you sure you want to remove this question? This action cannot be undone."
+              }
               onConfirm={confirmRemoveQuestionFromBank}
               onCancel={closeRemoveConfirmModal}
               confirmText="Remove"

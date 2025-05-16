@@ -73,7 +73,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const isFetchingUnreadCount = useRef(false);
   const lastFetchTime = useRef(0);
   const retryCount = useRef(0);
-  const maxRetries = 3;
+  const _maxRetries = 3;
   const networkErrorCount = useRef(0);
 
   // Debounce function to prevent too many API calls
@@ -89,7 +89,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   };
 
   // Function to safely make API calls with retry logic
-  const safeApiCall = async <T,>(
+  const _safeApiCall = async <T,>(
     apiCallFn: () => Promise<T>,
     errorMessage: string
   ): Promise<T | null> => {
@@ -208,7 +208,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     });
   }, [fetchNotifications]);
 
-  const debouncedFetchUnreadCount = useCallback(() => {
+  const _debouncedFetchUnreadCount = useCallback(() => {
     return new Promise<void>((resolve) => {
       debounce(() => {
         fetchUnreadCount().then(resolve);

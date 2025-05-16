@@ -158,7 +158,7 @@ const QuizEditorModal: React.FC<QuizEditorModalProps> = ({
           ))}
           {quizData.questions.length === 0 && (
             <p className="text-center text-slate-500 py-6">
-              No questions yet. Click "Add Question" to begin.
+              No questions yet. Click &quot;Add Question&quot; to begin.
             </p>
           )}
         </div>

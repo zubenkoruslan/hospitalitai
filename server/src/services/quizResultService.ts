@@ -1,12 +1,12 @@
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
 import Quiz, { IQuiz } from "../models/Quiz";
-import User, { IUser } from "../models/User";
+import User from "../models/User";
 import { AppError } from "../utils/errorHandler";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 
 // Interface for the data returned by submitAnswers
-interface QuizSubmissionResult {
+interface _QuizSubmissionResult {
   message: string;
   score: number;
   totalQuestions: number;

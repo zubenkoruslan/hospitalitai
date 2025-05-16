@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { /* Link, */ useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import api, {
@@ -12,10 +12,7 @@ import Card from "../components/common/Card";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
-import {
-  ClientStaffQuizProgressWithAttempts,
-  ClientQuizAttemptSummary,
-} from "../types/staffTypes";
+import { ClientStaffQuizProgressWithAttempts } from "../types/staffTypes";
 import { ClientIQuiz, ClientQuizAttemptDetails } from "../types/quizTypes";
 
 // New interface for combining Quiz definition with its progress
@@ -216,8 +213,8 @@ const StaffDashboard: React.FC = () => {
     useState<boolean>(false);
   const [selectedAttemptForModal, setSelectedAttemptForModal] =
     useState<ClientQuizAttemptDetails | null>(null);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [modalLoading, setModalLoading] = useState<boolean>(false);
+  const [_modalError, setModalError] = useState<string | null>(null);
+  const [_modalLoading, setModalLoading] = useState<boolean>(false);
 
   // Combined loading state
   const isLoading = authIsLoading || loadingQuizzes || loadingRanking;
@@ -283,7 +280,7 @@ const StaffDashboard: React.FC = () => {
   }, [user]); // Rerun if user changes
 
   // Helper to format date (copied from deleted StaffQuizListPage)
-  const formatDate = (dateString?: string | Date) => {
+  const _formatDate = (dateString?: string | Date) => {
     if (!dateString) return "N/A";
     try {
       return new Date(dateString).toLocaleDateString("en-US", {

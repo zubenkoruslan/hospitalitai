@@ -1,9 +1,12 @@
 import express, { Request, Response, Router, NextFunction } from "express";
-import bcrypt from "bcryptjs";
+// import bcrypt as _bcrypt from "bcryptjs"; // Removing bcrypt import
 import jwt from "jsonwebtoken";
-import User, { IUser } from "../models/User";
-import Restaurant, { IRestaurant } from "../models/Restaurant";
-import mongoose, { Types } from "mongoose";
+// import { default as _User, IUser } from "../models/User"; // Removing default User import, keeping IUser
+import { IUser } from "../models/User";
+// import { default as _Restaurant, IRestaurant } from "../models/Restaurant"; // Removing default Restaurant import, keeping IRestaurant
+import { IRestaurant } from "../models/Restaurant";
+// import mongoose, { Types as _Types } from "mongoose"; // Removing Types import, keeping mongoose default
+import mongoose from "mongoose";
 import { protect } from "../middleware/authMiddleware";
 // import notificationService from "../services/notificationService"; // Removed - Service deleted
 import AuthService from "../services/authService";

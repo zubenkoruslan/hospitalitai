@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 // import { IMenuItem } from "./MenuItem"; // No longer directly primary source for quiz structure, commented out
-import { IUser } from "./User"; // Import for referencing
+// import { IUser } from "./User"; // Removed unused import
 // MODIFIED: Import main IQuestion from QuestionModel and QuestionModel itself to access its schema
 // import QuestionModel, { IQuestion as MainIQuestion } from "./QuestionModel"; // Commented out as questions array is removed
 

@@ -15,16 +15,24 @@ jest.mock("../../services/api", () => ({
 }));
 
 // Mock common components
-jest.mock("../common/Button", () => (props: any) => <button {...props} />);
-jest.mock("../common/Card", () => ({ title, children, className }: any) => (
+const MockButton = (props: any) => <button {...props} />;
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
+
+const MockCard = ({ title, children, className }: any) => (
   <div data-testid="mock-card" className={className}>
     <h2>{title}</h2>
     {children}
   </div>
-));
-jest.mock("../common/LoadingSpinner", () => () => (
+);
+MockCard.displayName = "MockCard";
+jest.mock("../common/Card", () => MockCard);
+
+const MockLoadingSpinner = () => (
   <div data-testid="loading-spinner">Loading...</div>
-));
+);
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockOnBankCreated = jest.fn();
 const mockOnCancel = jest.fn();

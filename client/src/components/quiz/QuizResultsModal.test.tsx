@@ -9,21 +9,16 @@ import {
 } from "../../types/quizTypes";
 
 // Mock Button component
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, type }: any) =>
-      (
-        <button
-          data-testid={`button-${variant || "default"}${
-            type ? "-" + type : ""
-          }`}
-          onClick={onClick}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({ onClick, children, variant, type }: any) => (
+  <button
+    data-testid={`button-${variant || "default"}${type ? "-" + type : ""}`}
+    onClick={onClick}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 const mockQuestion1: QuizDisplayQuestion = {
   _id: "q1",

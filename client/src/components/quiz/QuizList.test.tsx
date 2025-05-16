@@ -4,12 +4,11 @@ import "@testing-library/jest-dom";
 import QuizList from "./QuizList";
 import { ClientIQuiz } from "../../types/quizTypes";
 
-jest.mock(
-  "../common/LoadingSpinner",
-  () =>
-    ({ message }: { message?: string }) =>
-      <div data-testid="loading-spinner">{message || "Loading..."}</div>
+const MockLoadingSpinner = ({ message }: { message?: string }) => (
+  <div data-testid="loading-spinner">{message || "Loading..."}</div>
 );
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
 const mockQuizzes: ClientIQuiz[] = [
   {

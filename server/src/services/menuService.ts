@@ -1,15 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import Menu, { IMenu } from "../models/Menu";
-import MenuItem, {
-  IMenuItem,
-  ItemType,
-  ItemCategory,
-  FOOD_CATEGORIES,
-  BEVERAGE_CATEGORIES,
-  ITEM_TYPES,
-  FoodCategory,
-  BeverageCategory,
-} from "../models/MenuItem";
+import MenuItem, { ItemType, ITEM_TYPES } from "../models/MenuItem";
 import ItemService from "./itemService";
 import { AppError } from "../utils/errorHandler";
 // Import MenuItem if needed for future operations like cascade delete
@@ -21,7 +12,7 @@ import {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
-  Part,
+  Part as _Part,
   FunctionDeclaration,
   FunctionDeclarationSchemaType,
   FunctionDeclarationSchema,
@@ -45,13 +36,13 @@ interface ExtractedMenuItem {
   isVegetarian: boolean;
 }
 
-interface ExtractedMenuData {
+interface _ExtractedMenuData {
   menuName: string;
   menuItems: ExtractedMenuItem[];
 }
 
 // System instruction for the AI
-const systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.
+const _systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.
 
 **Crucially, you must call the provided 'extract_menu_data' function directly with the extracted data. Do NOT generate Python code, print statements, or any other form of code. Only use the function calling mechanism.**
 

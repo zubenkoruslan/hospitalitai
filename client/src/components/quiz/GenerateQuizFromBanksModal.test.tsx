@@ -17,52 +17,53 @@ jest.mock("../../services/api");
 const mockedApiService = apiService as jest.Mocked<typeof apiService>;
 
 // Mock common components
-jest.mock(
-  "../common/Modal",
-  () =>
-    ({ isOpen, onClose, title, footerContent, children, size }: any) =>
-      isOpen ? (
-        <div data-testid="modal">
-          <h1>{title}</h1>
-          <div data-testid="modal-children">{children}</div>
-          <div data-testid="modal-footer">{footerContent}</div>
-          <button onClick={onClose}>Close Modal</button>{" "}
-          {/* For testing onClose via Modal interaction if needed */}
-        </div>
-      ) : null
-);
+const MockModal = ({ isOpen, onClose, title, footerContent, children }: any) =>
+  isOpen ? (
+    <div data-testid="modal">
+      <h1>{title}</h1>
+      <div data-testid="modal-children">{children}</div>
+      <div data-testid="modal-footer">{footerContent}</div>
+      <button onClick={onClose}>Close Modal</button>{" "}
+      {/* For testing onClose via Modal interaction if needed */}
+    </div>
+  ) : null;
+MockModal.displayName = "MockModal";
+jest.mock("../common/Modal", () => MockModal);
 
-jest.mock(
-  "../common/Button",
-  () =>
-    ({ onClick, children, variant, type, form, disabled, className }: any) =>
-      (
-        <button
-          data-testid={`button-${variant}${type === "submit" ? "-submit" : ""}`}
-          onClick={onClick}
-          type={type}
-          form={form}
-          disabled={disabled}
-          className={className}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({
+  onClick,
+  children,
+  variant,
+  type,
+  form,
+  disabled,
+  className,
+}: any) => (
+  <button
+    data-testid={`button-${variant}${type === "submit" ? "-submit" : ""}`}
+    onClick={onClick}
+    type={type}
+    form={form}
+    disabled={disabled}
+    className={className}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
-jest.mock(
-  "../common/LoadingSpinner",
-  () =>
-    ({ message }: { message?: string }) =>
-      <div data-testid="loading-spinner">{message || "Loading..."}</div>
+const MockLoadingSpinner = ({ message }: { message?: string }) => (
+  <div data-testid="loading-spinner">{message || "Loading..."}</div>
 );
+MockLoadingSpinner.displayName = "MockLoadingSpinner";
+jest.mock("../common/LoadingSpinner", () => MockLoadingSpinner);
 
-jest.mock(
-  "../common/ErrorMessage",
-  () =>
-    ({ message }: { message: string }) =>
-      <div data-testid="error-message">{message}</div>
+const MockErrorMessage = ({ message }: { message: string }) => (
+  <div data-testid="error-message">{message}</div>
 );
+MockErrorMessage.displayName = "MockErrorMessage";
+jest.mock("../common/ErrorMessage", () => MockErrorMessage);
 
 const mockQuestionBanks: IQuestionBank[] = [
   {

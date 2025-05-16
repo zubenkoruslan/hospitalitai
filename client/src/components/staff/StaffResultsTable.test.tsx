@@ -10,31 +10,28 @@ import {
 import { formatDate } from "../../utils/helpers";
 
 // Mock Button component
-jest.mock(
-  "../common/Button",
-  () =>
-    ({
-      onClick,
-      children,
-      variant,
-      className,
-      "aria-expanded": ariaExpanded,
-      "aria-controls": ariaControls,
-      "aria-label": ariaLabel,
-    }: any) =>
-      (
-        <button
-          data-testid={`button-${variant}`}
-          onClick={onClick}
-          className={className}
-          aria-expanded={ariaExpanded}
-          aria-controls={ariaControls}
-          aria-label={ariaLabel}
-        >
-          {children}
-        </button>
-      )
+const MockButton = ({
+  onClick,
+  children,
+  variant,
+  className,
+  "aria-expanded": ariaExpanded,
+  "aria-controls": ariaControls,
+  "aria-label": ariaLabel,
+}: any) => (
+  <button
+    data-testid={`button-${variant}`}
+    onClick={onClick}
+    className={className}
+    aria-expanded={ariaExpanded}
+    aria-controls={ariaControls}
+    aria-label={ariaLabel}
+  >
+    {children}
+  </button>
 );
+MockButton.displayName = "MockButton";
+jest.mock("../common/Button", () => MockButton);
 
 // Mock formatDate if its specific output format is crucial and complex
 // For now, assume it works as expected or use the real one if simple enough
@@ -236,7 +233,7 @@ describe("StaffResultsTable", () => {
   });
 
   test("applies correct styling for expanded row and button", () => {
-    const { container } = renderTable(mockStaffData[0]._id);
+    const { container: _container } = renderTable(mockStaffData[0]._id);
     const staff1Row = screen.getByText(mockStaffData[0].name).closest("tr");
     expect(staff1Row).toHaveClass("bg-blue-50");
 
