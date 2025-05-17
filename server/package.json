@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
+    "test": "NODE_ENV=test JWT_SECRET=test_jwt_secret_for_mocha_!@#$#% npx mocha -r ts-node/register src/**/*.test.ts",
     "start": "ts-node src/server.ts",
     "build": "tsc",
     "dev": "NODE_ENV=development nodemon src/server.ts"

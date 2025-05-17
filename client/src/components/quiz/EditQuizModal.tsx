@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { getQuestionBanks, updateQuizDetails } from "../../services/api";
+import {
+  getQuestionBanks,
+  updateQuizDetails,
+  getRoles,
+} from "../../services/api";
 import { IQuestionBank } from "../../types/questionBankTypes";
-import { ClientIQuiz } from "../../types/quizTypes";
+import { ClientIQuiz, UpdateQuizClientData } from "../../types/quizTypes";
 import Button from "../common/Button";
 import LoadingSpinner from "../common/LoadingSpinner";
 import Modal from "../common/Modal"; // Using the generic Modal
 import ErrorMessage from "../common/ErrorMessage"; // Import ErrorMessage
+import { IRole } from "../../types/roleTypes";
+import { useAuth } from "../../context/AuthContext";
 
 interface EditQuizModalProps {
   isOpen: boolean;
@@ -32,6 +38,14 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fetchBanksError, setFetchBanksError] = useState<string | null>(null);
 
+  // State for roles
+  const [availableRoles, setAvailableRoles] = useState<IRole[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState<boolean>(false);
+  const [fetchRolesError, setFetchRolesError] = useState<string | null>(null);
+
+  const { user } = useAuth();
+
   // Effect to populate form when initialQuizData changes (e.g., when modal opens with a quiz)
   useEffect(() => {
     if (initialQuizData) {
@@ -41,19 +55,24 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
         initialQuizData.numberOfQuestionsPerAttempt
       );
       setSelectedBankIds(initialQuizData.sourceQuestionBankIds || []);
+      // Populate selectedRoleIds from initialQuizData
+      setSelectedRoleIds(
+        initialQuizData.targetRoles?.map((role) => role._id) || []
+      );
     } else {
       // Reset form if no initial data (e.g. modal closed or opened for new - though this modal is for edit)
       setTitle("");
       setDescription("");
       setNumberOfQuestionsPerAttempt(10);
       setSelectedBankIds([]);
+      setSelectedRoleIds([]); // Reset selected roles
     }
   }, [initialQuizData]);
 
-  // Effect to fetch available question banks when the modal is open
+  // Effect to fetch available question banks and roles when the modal is open
   useEffect(() => {
     if (isOpen) {
-      const fetchBanks = async () => {
+      const fetchInitialData = async () => {
         setIsLoadingBanks(true);
         setFetchBanksError(null);
         try {
@@ -67,16 +86,45 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
           setAvailableBanks([]);
         }
         setIsLoadingBanks(false);
+
+        if (user?.restaurantId) {
+          setIsLoadingRoles(true);
+          setFetchRolesError(null);
+          try {
+            const roles = await getRoles(user.restaurantId);
+            setAvailableRoles(roles || []);
+          } catch (err) {
+            console.error("Failed to fetch roles for edit modal:", err);
+            setFetchRolesError(
+              "Failed to load roles for selection. Please try again later."
+            );
+            setAvailableRoles([]);
+          }
+          setIsLoadingRoles(false);
+        }
       };
-      fetchBanks();
+      fetchInitialData();
+    } else {
+      // Clear errors when modal closes
+      setFetchBanksError(null);
+      setFetchRolesError(null);
+      setError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, user?.restaurantId]);
 
   const handleBankSelectionChange = (bankId: string) => {
     setSelectedBankIds((prevSelected) =>
       prevSelected.includes(bankId)
         ? prevSelected.filter((id) => id !== bankId)
         : [...prevSelected, bankId]
+    );
+  };
+
+  const handleRoleSelectionChange = (roleId: string) => {
+    setSelectedRoleIds((prevSelected) =>
+      prevSelected.includes(roleId)
+        ? prevSelected.filter((id) => id !== roleId)
+        : [...prevSelected, roleId]
     );
   };
 
@@ -102,18 +150,14 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
     }
 
     setIsLoading(true);
-    const quizUpdateData: Partial<ClientIQuiz> = {
-      // Use Partial as we only send changed fields
+    const quizUpdateData: UpdateQuizClientData = {
       title,
       description,
       sourceQuestionBankIds: selectedBankIds,
       numberOfQuestionsPerAttempt,
-      // isAvailable: initialQuizData.isAvailable, // Preserve isAvailable status unless explicitly changed
-      // If you want to allow editing isAvailable in this modal, add a form field for it.
+      targetRoles: selectedRoleIds,
     };
 
-    // console.log("Submitting quiz update data:", quizUpdateData, "for quiz ID:", initialQuizData._id);
-    // REMOVED Placeholder, ADDED actual API call
     try {
       const updatedQuiz = await updateQuizDetails(
         initialQuizData._id,
@@ -152,6 +196,8 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
         variant="primary"
         disabled={
           isLoading ||
+          isLoadingBanks ||
+          isLoadingRoles ||
           !title.trim() ||
           selectedBankIds.length === 0 ||
           numberOfQuestionsPerAttempt <= 0
@@ -173,6 +219,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
       footerContent={footerContent}
     >
       {fetchBanksError && <ErrorMessage message={fetchBanksError} />}
+      {fetchRolesError && <ErrorMessage message={fetchRolesError} />}
       {/* General submission error shown near footer by Modal if passed via a prop, or handle here */}
 
       {isLoadingBanks ? (
@@ -197,7 +244,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               required
-              disabled={isLoading}
+              disabled={isLoading || isLoadingBanks || isLoadingRoles}
             />
           </div>
 
@@ -215,7 +262,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-              disabled={isLoading}
+              disabled={isLoading || isLoadingBanks || isLoadingRoles}
             />
           </div>
 
@@ -231,16 +278,13 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               type="number"
               id="edit-quiz-questions-per-attempt"
               value={numberOfQuestionsPerAttempt}
-              onChange={
-                (e) =>
-                  setNumberOfQuestionsPerAttempt(
-                    parseInt(e.target.value, 10) || 0
-                  ) // Ensure it's a number, default to 0 if parse fails
+              onChange={(e) =>
+                setNumberOfQuestionsPerAttempt(Number(e.target.value))
               }
               min="1"
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
-              disabled={isLoading}
+              disabled={isLoading || isLoadingBanks || isLoadingRoles}
             />
           </div>
 
@@ -268,7 +312,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
                       checked={selectedBankIds.includes(bank._id)}
                       onChange={() => handleBankSelectionChange(bank._id)}
                       className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingBanks || isLoadingRoles}
                     />
                     <label
                       htmlFor={`edit-modal-bank-${bank._id}`}
@@ -276,7 +320,9 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
                     >
                       <span
                         className={`block text-sm font-medium ${
-                          isLoading ? "text-slate-400" : "text-slate-800"
+                          isLoading || isLoadingBanks || isLoadingRoles
+                            ? "text-slate-400"
+                            : "text-slate-800"
                         }`}
                       >
                         {bank.name} ({bank.questionCount || 0} questions)
@@ -284,7 +330,9 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
                       {bank.description && (
                         <p
                           className={`text-xs mt-0.5 ${
-                            isLoading ? "text-slate-400" : "text-slate-500"
+                            isLoading || isLoadingBanks || isLoadingRoles
+                              ? "text-slate-400"
+                              : "text-slate-500"
                           }`}
                         >
                           {bank.description}
@@ -296,7 +344,76 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
               </div>
             )}
           </fieldset>
-          {/* General submission error already placed above form fields */}
+
+          {/* Target Roles Selection */}
+          <fieldset className="space-y-3 mt-6">
+            <legend className="block text-sm font-medium text-slate-700">
+              Target Roles (Optional)
+            </legend>
+            <p className="text-xs text-slate-500">
+              Select roles this quiz is for. Leave blank if it's for all roles.
+            </p>
+            {isLoadingRoles && (
+              <div className="py-3">
+                <LoadingSpinner message="Loading roles..." />
+              </div>
+            )}
+            {fetchRolesError && !isLoadingRoles && (
+              <ErrorMessage message={fetchRolesError} />
+            )}
+            {!isLoadingRoles &&
+              !fetchRolesError &&
+              availableRoles.length === 0 && (
+                <p className="text-slate-500 text-sm py-3">
+                  No roles available to assign. You can create roles in Staff
+                  Management.
+                </p>
+              )}
+            {!isLoadingRoles && availableRoles.length > 0 && (
+              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
+                {availableRoles.map((role) => (
+                  <div
+                    key={role._id}
+                    className="flex items-start p-3 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
+                  >
+                    <input
+                      type="checkbox"
+                      id={`edit-modal-role-${role._id}`}
+                      checked={selectedRoleIds.includes(role._id)}
+                      onChange={() => handleRoleSelectionChange(role._id)}
+                      className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
+                      disabled={isLoading || isLoadingBanks || isLoadingRoles}
+                    />
+                    <label
+                      htmlFor={`edit-modal-role-${role._id}`}
+                      className="ml-3 flex-1 cursor-pointer"
+                    >
+                      <span
+                        className={`block text-sm font-medium ${
+                          isLoading || isLoadingBanks || isLoadingRoles
+                            ? "text-slate-400"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {role.name}
+                      </span>
+                      {role.description && (
+                        <p
+                          className={`text-xs mt-0.5 ${
+                            isLoading || isLoadingBanks || isLoadingRoles
+                              ? "text-slate-400"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {role.description}
+                        </p>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </fieldset>
         </form>
       )}
     </Modal>

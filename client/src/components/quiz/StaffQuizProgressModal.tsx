@@ -4,11 +4,13 @@ import { ClientStaffQuizProgress } from "../../types/staffTypes";
 import LoadingSpinner from "../common/LoadingSpinner";
 import ErrorMessage from "../common/ErrorMessage";
 import Button from "../common/Button";
+import { IRole } from "../../types/roleTypes";
 
 interface StaffQuizProgressModalProps {
   isOpen: boolean;
   onClose: () => void;
   quizTitle: string;
+  quizTargetRoles?: IRole[];
   progressData: ClientStaffQuizProgress[] | null;
   isLoading: boolean;
   error: string | null;
@@ -19,6 +21,7 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
   isOpen,
   onClose,
   quizTitle,
+  quizTargetRoles,
   progressData,
   isLoading,
   error,
@@ -39,6 +42,11 @@ const StaffQuizProgressModal: React.FC<StaffQuizProgressModalProps> = ({
   const modalTitle = (
     <>
       Staff Progress: <span className="text-sky-600">{quizTitle}</span>
+      {quizTargetRoles && quizTargetRoles.length > 0 && (
+        <span className="block text-xs font-normal text-slate-500 mt-1">
+          Target Roles: {quizTargetRoles.map((role) => role.name).join(", ")}
+        </span>
+      )}
     </>
   );
 

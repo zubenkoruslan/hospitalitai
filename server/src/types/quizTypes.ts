@@ -1,4 +1,5 @@
 // import { Types } from "mongoose"; // Removed unused import
+import { ServerQuestionOption } from "./questionTypes"; // ADDED IMPORT
 
 // Summary of a single quiz attempt, often used in lists or aggregated views.
 export interface IQuizAttemptSummary {
@@ -34,5 +35,35 @@ export interface SubmitQuizAttemptRequestBody {
     questionId: string;
     answerGiven: any; // Consider making this more specific if possible, e.g., number | string | string[]
   }>;
+  durationInSeconds?: number;
+}
+
+// ADDED: Details of a correct answer for the quiz review
+export interface ServerCorrectAnswerDetails {
+  text?: string; // For True/False, or single correct option text
+  texts?: string[]; // For multiple correct option texts
+  optionId?: string; // ID of the correct option (if single)
+  optionIds?: string[]; // IDs of correct options (if multiple)
+}
+
+// ADDED: Structure for a single graded question in the submission response
+export interface ServerGradedQuestion {
+  questionId: string;
+  questionText?: string;
+  answerGiven: any;
+  isCorrect: boolean;
+  correctAnswer?: ServerCorrectAnswerDetails;
+  options?: ServerQuestionOption[]; // The original options for this question
+}
+
+// ADDED: Response structure for a submitted quiz attempt
+export interface ServerSubmitAttemptResponse {
+  attemptId: string;
+  score: number;
+  totalQuestionsAttempted: number;
+  questions: ServerGradedQuestion[];
+  quizId: string;
+  staffUserId: string;
+  attemptDate: string; // ISO Date string
   durationInSeconds?: number;
 }

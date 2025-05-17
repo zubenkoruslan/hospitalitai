@@ -61,8 +61,8 @@ app.use(express.urlencoded({ extended: true }));
 const uri: string =
   process.env.MONGODB_URI || "mongodb://localhost:27017/hospitality-training";
 
-// Only connect if not in a test environment (vitest sets process.env.VITEST)
-if (!process.env.VITEST) {
+// Only connect if not in a test environment
+if (process.env.NODE_ENV !== "test") {
   (async () => {
     try {
       await mongoose.connect(uri);

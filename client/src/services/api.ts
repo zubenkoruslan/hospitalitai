@@ -130,6 +130,7 @@ import {
   ClientQuizAttemptSubmitData,
   ClientSubmitAttemptResponse,
   IncorrectQuestionDetail,
+  UpdateQuizClientData,
 } from "../types/quizTypes";
 
 import { ClientQuestionForAttempt } from "../types/questionTypes";
@@ -391,13 +392,13 @@ export const getQuizzes = async (): Promise<ClientIQuiz[]> => {
  */
 export const updateQuizDetails = async (
   quizId: string,
-  quizData: Partial<ClientIQuiz>
+  quizData: UpdateQuizClientData
 ): Promise<ClientIQuiz> => {
-  const response = await api.put<{ message: string; quiz: ClientIQuiz }>(
+  const response = await api.put<{ data: ClientIQuiz }>(
     `/quizzes/${quizId}`,
     quizData
   );
-  return response.data.quiz;
+  return response.data.data;
 };
 
 /**
@@ -423,7 +424,10 @@ export const resetQuizProgress = async (
  * Fetches available quizzes for the current staff member's restaurant.
  */
 export const getAvailableQuizzesForStaff = async (): Promise<ClientIQuiz[]> => {
-  const response = await api.get<{ quizzes: ClientIQuiz[] }>("/quizzes");
+  // Updated to use the new dedicated endpoint for staff
+  const response = await api.get<{ quizzes: ClientIQuiz[] }>(
+    "/quizzes/available-for-staff"
+  );
   return response.data.quizzes;
 };
 
@@ -541,11 +545,11 @@ export const deleteQuiz = async (quizId: string): Promise<void> => {
  */
 export const startQuizAttempt = async (
   quizId: string
-): Promise<{ questions: ClientQuestionForAttempt[]; attemptId: string }> => {
+): Promise<ClientQuestionForAttempt[]> => {
   const response = await api.post<{
-    data: { questions: ClientQuestionForAttempt[]; attemptId: string };
+    data: ClientQuestionForAttempt[];
   }>(`/quizzes/${quizId}/start-attempt`);
-  return response.data.data; // Backend returns { data: { questions: [], attemptId: "..." } }
+  return response.data.data; // Backend now expected to return { data: questions[] }
 };
 
 /**

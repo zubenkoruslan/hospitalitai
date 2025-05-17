@@ -169,11 +169,11 @@ const QuizTakingPage: React.FC = () => {
       setUserAnswers(initialAnswers); // Initialize with localStorage data or empty
       userAnswersRef.current = initialAnswers; // Sync ref too
 
-      const response = await startQuizAttempt(quizId); // Returns { questions: [], attemptId: "..." }
-      const fetchedQuestions = response.questions;
-      const newAttemptId = response.attemptId;
+      const fetchedQuestions = await startQuizAttempt(quizId); // Now directly returns ClientQuestionForAttempt[]
+      // const newAttemptId = response.attemptId; // No longer returned here
 
-      setCurrentAttemptId(newAttemptId); // Store the attempt ID
+      // setCurrentAttemptId(newAttemptId); // Attempt ID will be set on submit
+      setCurrentAttemptId(null); // Ensure it's null when starting/restarting an attempt viewing
 
       if (fetchedQuestions && fetchedQuestions.length > 0) {
         setQuestions(fetchedQuestions);

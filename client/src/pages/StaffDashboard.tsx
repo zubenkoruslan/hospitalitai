@@ -302,20 +302,11 @@ const StaffDashboard: React.FC = () => {
       setModalLoading(true);
       setModalError(null);
       setSelectedAttemptForModal(null);
-      setIsIncorrectAnswersModalOpen(true);
+
       try {
-        const attemptDetails = await getQuizAttemptDetails(attemptId);
-        if (attemptDetails) {
-          setSelectedAttemptForModal({
-            _id: attemptDetails._id,
-            quizId: attemptDetails.quizId,
-            quizTitle: attemptDetails.quizTitle,
-            userId: attemptDetails.userId,
-            score: attemptDetails.score,
-            totalQuestions: attemptDetails.totalQuestions,
-            attemptDate: attemptDetails.attemptDate,
-            incorrectQuestions: attemptDetails.incorrectQuestions,
-          });
+        const attemptDetailsResponse = await getQuizAttemptDetails(attemptId);
+        if (attemptDetailsResponse) {
+          setSelectedAttemptForModal(attemptDetailsResponse);
         } else {
           setModalError("Could not load attempt details.");
         }
@@ -324,6 +315,7 @@ const StaffDashboard: React.FC = () => {
         setModalError(formatApiError(error, "loading incorrect answers"));
       } finally {
         setModalLoading(false);
+        setIsIncorrectAnswersModalOpen(true);
       }
     },
     []
@@ -535,7 +527,7 @@ const StaffDashboard: React.FC = () => {
         <ViewIncorrectAnswersModal
           isOpen={isIncorrectAnswersModalOpen}
           onClose={handleCloseIncorrectAnswersModal}
-          quizResult={selectedAttemptForModal}
+          attemptDetails={selectedAttemptForModal}
         />
       )}
     </div>

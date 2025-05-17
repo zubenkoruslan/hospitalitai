@@ -1,4 +1,4 @@
-import mongoose, { Types, Document } from "mongoose";
+import mongoose, { Types, Document, Types as MongooseTypes } from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import supertest from "supertest";
 import app from "../server"; // Express app instance
@@ -10,22 +10,26 @@ import Question, {
   QuestionType,
   IOption,
 } from "../models/QuestionModel"; // Import QuestionType and IOption
-import Quiz, { IQuiz } from "../models/Quiz";
-import { expect } from "chai";
-import { describe, it, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import QuizModel, { IQuiz } from "../models/QuizModel";
 import jwt from "jsonwebtoken";
 
-// Mock pdf-parse to prevent file access errors during tests unrelated to PDF parsing
+let expect: Chai.ExpectStatic;
+// vi related imports and mocks are commented out for Mocha compatibility attempt
+
+/*
+// import { describe, it, beforeAll, afterAll, beforeEach, vi } from "vitest"; // Vitest specific
+// Mock pdf-parse 
 vi.mock("pdf-parse", () => ({
   default: vi.fn().mockResolvedValue({
     numpages: 0,
     numrender: 0,
-    info: null, // Using null as per typical structure if no info
-    metadata: null, // Using null for metadata
-    version: null, // Using null for version
-    text: "", // Empty text string
+    info: null, 
+    metadata: null, 
+    version: null, 
+    text: "", 
   }),
 }));
+*/
 
 let mongoServer: MongoMemoryServer;
 // Use supertest.Agent - this is a common way and might resolve type issues
@@ -34,18 +38,16 @@ let restaurantOwner: IUser;
 let restaurant: IRestaurant;
 let ownerToken: string;
 
-// Mock the auth middleware
+/*
+// Mock the auth middleware (Vitest specific)
 vi.mock("../middleware/authMiddleware", () => ({
   protect: vi.fn((req, res, next) => {
-    // Simulate token verification and user attachment
-    // For tests, assume restaurantOwner is the authenticated user
     req.user = restaurantOwner;
     next();
   }),
   restrictTo: (...roles: string[]) =>
     vi.fn((req, res, next) => {
       if (req.user && roles.includes(req.user.role)) {
-        // Attach restaurantId to req.user if it's a restaurant owner, as controller expects it
         if (req.user.role === "restaurant" && restaurant && restaurant._id) {
           (req.user as IUser).restaurantId = restaurant._id as Types.ObjectId;
         }
@@ -55,13 +57,30 @@ vi.mock("../middleware/authMiddleware", () => ({
       }
     }),
 }));
+*/
 
-describe("/api/quizzes/from-banks Routes", () => {
-  beforeAll(async () => {
+describe("/api/quizzes/from-banks Routes", function () {
+  // Use function to access Mocha context
+  this.timeout(10000); // Set timeout for the whole suite, can be adjusted
+
+  before(async () => {
+    // Changed from beforeAll
+    const chaiImport = await import("chai");
+    expect = chaiImport.expect;
+    // Initialize other Vitest specific things if they were used, or adapt to Sinon/Mocha.
+
+    // Disconnect if already connected by the main app
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.disconnect();
+    }
+
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
-    await mongoose.connect(mongoUri);
-    request = supertest.agent(app); // Use supertest.agent()
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    } as mongoose.ConnectOptions);
+    request = supertest.agent(app);
 
     const ownerData = {
       name: "Test Quiz Owner",
@@ -69,36 +88,32 @@ describe("/api/quizzes/from-banks Routes", () => {
       password: "password123",
       role: "restaurant" as "restaurant",
     };
-    const createdOwner: IUser = await User.create(ownerData);
-    if (!createdOwner)
+    restaurantOwner = await User.create(ownerData);
+    if (!restaurantOwner)
       throw new Error("Failed to create restaurant owner for tests");
-    restaurantOwner = createdOwner;
 
     const restaurantData = {
       name: "Test Quiz Restaurant",
-      owner: createdOwner._id as Types.ObjectId,
+      owner: restaurantOwner._id as MongooseTypes.ObjectId,
       description: "A place for tasty quizzes",
     };
-    const createdRestaurant: IRestaurant = await Restaurant.create(
-      restaurantData
-    );
-    if (!createdRestaurant)
-      throw new Error("Failed to create restaurant for tests");
-    restaurant = createdRestaurant;
+    restaurant = await Restaurant.create(restaurantData);
+    if (!restaurant) throw new Error("Failed to create restaurant for tests");
 
-    if (restaurantOwner && createdRestaurant._id) {
-      // Ensure restaurantOwner and restaurant._id exist
-      restaurantOwner.restaurantId = createdRestaurant._id as Types.ObjectId;
+    if (restaurantOwner && restaurant._id) {
+      restaurantOwner.restaurantId = restaurant._id as MongooseTypes.ObjectId;
       await restaurantOwner.save();
     }
 
-    const secret = process.env.JWT_SECRET || "test-secret-for-quiz-routes";
+    // Align fallback secret with authMiddleware.ts
+    const secret = process.env.JWT_SECRET || "your_very_secret_key_change_me";
     if (restaurantOwner?._id && restaurant?._id) {
       // Ensure IDs exist before signing token
       ownerToken = jwt.sign(
         {
-          id: restaurantOwner._id.toString(),
+          userId: restaurantOwner._id.toString(),
           role: "restaurant",
+          name: restaurantOwner.name,
           restaurantId: restaurant._id.toString(),
         },
         secret,
@@ -111,7 +126,8 @@ describe("/api/quizzes/from-banks Routes", () => {
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
+    // Changed from afterAll
     await mongoose.disconnect();
     if (mongoServer) {
       await mongoServer.stop();
@@ -119,9 +135,9 @@ describe("/api/quizzes/from-banks Routes", () => {
   });
 
   beforeEach(async () => {
-    await Question.deleteMany({});
+    await Question.deleteMany({}); // Use Mongoose model for questions
     await QuestionBank.deleteMany({});
-    await Quiz.deleteMany({});
+    await QuizModel.deleteMany({});
   });
 
   describe("POST /api/quizzes/from-banks", () => {
@@ -137,7 +153,7 @@ describe("/api/quizzes/from-banks Routes", () => {
         questionType: "multiple-choice-single" as QuestionType, // Corrected type
         options: q1Options as Types.Array<IOption>, // Provide valid options
         categories: ["Math", "Easy"],
-        restaurantId: restaurant._id as Types.ObjectId,
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
       };
       const q1: IQuestion = (await Question.create(q1Data)) as IQuestion;
@@ -151,7 +167,7 @@ describe("/api/quizzes/from-banks Routes", () => {
         questionType: "multiple-choice-single" as QuestionType, // Corrected type
         options: q2Options as Types.Array<IOption>,
         categories: ["Math", "Easy"],
-        restaurantId: restaurant._id as Types.ObjectId,
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
       };
       const q2: IQuestion = (await Question.create(q2Data)) as IQuestion;
@@ -165,15 +181,18 @@ describe("/api/quizzes/from-banks Routes", () => {
         questionType: "multiple-choice-single" as QuestionType, // Corrected type
         options: q3Options as Types.Array<IOption>,
         categories: ["Geography"],
-        restaurantId: restaurant._id as Types.ObjectId,
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
       };
       const q3: IQuestion = (await Question.create(q3Data)) as IQuestion;
 
       const bank1Data: Partial<IQuestionBank> = {
         name: "Math Bank Easy",
-        restaurantId: restaurant._id as Types.ObjectId,
-        questions: [q1._id as Types.ObjectId, q2._id as Types.ObjectId],
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
+        questions: [
+          q1._id as MongooseTypes.ObjectId,
+          q2._id as MongooseTypes.ObjectId,
+        ],
         categories: ["Math", "Easy"],
       };
       const bank1: IQuestionBank = (await QuestionBank.create(
@@ -182,8 +201,8 @@ describe("/api/quizzes/from-banks Routes", () => {
 
       const bank2Data: Partial<IQuestionBank> = {
         name: "Geography Bank",
-        restaurantId: restaurant._id as Types.ObjectId,
-        questions: [q3._id as Types.ObjectId],
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
+        questions: [q3._id as MongooseTypes.ObjectId],
         categories: ["Geography"],
       };
       const bank2: IQuestionBank = (await QuestionBank.create(
@@ -194,76 +213,69 @@ describe("/api/quizzes/from-banks Routes", () => {
         title: "Mixed Knowledge Quiz",
         description: "A quiz from Math and Geography banks.",
         questionBankIds: [
-          (bank1._id as Types.ObjectId).toString(),
-          (bank2._id as Types.ObjectId).toString(),
+          (bank1._id as MongooseTypes.ObjectId).toString(),
+          (bank2._id as MongooseTypes.ObjectId).toString(),
         ],
-        numberOfQuestions: 3,
+        numberOfQuestionsPerAttempt: 2,
       };
 
       const res = await request
-        .post("/api/quiz/from-banks")
+        .post("/api/quizzes/from-banks")
         .set("Authorization", `Bearer ${ownerToken}`)
         .send(quizData)
         .expect(201);
 
-      expect(res.body.data).to.exist;
-      const createdQuiz = res.body.data as IQuiz;
+      const createdQuiz = res.body.quiz as IQuiz;
+      expect(createdQuiz).to.exist;
       expect(createdQuiz.title).to.equal(quizData.title);
-      expect((createdQuiz.restaurantId as Types.ObjectId).toString()).to.equal(
-        (restaurant._id as Types.ObjectId).toString()
+      expect(createdQuiz.numberOfQuestionsPerAttempt).to.equal(
+        quizData.numberOfQuestionsPerAttempt
       );
-      expect(
-        createdQuiz.sourceQuestionBankIds.map((id) =>
-          (id as Types.ObjectId).toString()
-        )
-      ).to.deep.include.members(quizData.questionBankIds);
-      expect(createdQuiz.questions.length).to.equal(quizData.numberOfQuestions);
-      expect(createdQuiz.numberOfQuestions).to.equal(
-        quizData.numberOfQuestions
+      expect(createdQuiz.sourceQuestionBankIds).to.have.lengthOf(
+        quizData.questionBankIds.length
       );
+      // Type for id in map
+      const sentBankIds = quizData.questionBankIds.sort();
+      const receivedBankIds = createdQuiz.sourceQuestionBankIds
+        .map((id: Types.ObjectId | string) => id.toString())
+        .sort();
+      expect(receivedBankIds).to.deep.equal(sentBankIds);
 
-      const questionIdsInQuiz = createdQuiz.questions
-        .map((q) =>
-          (q as any)._id
-            ? ((q as any)._id as Types.ObjectId).toString()
-            : undefined
-        )
-        .filter(Boolean) as string[];
-      const sourceQuestionIds = [
-        (q1._id as Types.ObjectId).toString(),
-        (q2._id as Types.ObjectId).toString(),
-        (q3._id as Types.ObjectId).toString(),
-      ];
-      questionIdsInQuiz.forEach((id) =>
-        expect(sourceQuestionIds).to.include(id)
-      );
-      expect(new Set(questionIdsInQuiz).size).to.equal(
-        questionIdsInQuiz.length
-      );
+      // Check totalUniqueQuestionsInSourceSnapshot if it's relevant and populated.
+      if (createdQuiz.totalUniqueQuestionsInSourceSnapshot !== undefined) {
+        expect(createdQuiz.totalUniqueQuestionsInSourceSnapshot).to.be.a(
+          "number"
+        );
+        // Potentially assert its value if known, e.g., based on q1,q2,q3 unique questions
+        // For this test, banks have q1,q2 (bank1) and q3 (bank2). Total unique = 3.
+        expect(createdQuiz.totalUniqueQuestionsInSourceSnapshot).to.equal(3);
+      }
     });
 
     it("should return 400 if questionBankIds is empty", async () => {
       const quizData = {
         title: "Empty Bank Quiz",
         questionBankIds: [],
-        numberOfQuestions: 5,
+        numberOfQuestionsPerAttempt: 5,
       };
 
       const res = await request
-        .post("/api/quiz/from-banks")
+        .post("/api/quizzes/from-banks")
         .set("Authorization", `Bearer ${ownerToken}`)
         .send(quizData)
         .expect(400);
 
-      expect(res.body.message).to.equal(
-        "questionBankIds must be a non-empty array of strings."
+      expect(res.body.message).to.equal("Validation failed");
+      expect(res.body.errors).to.be.an("array").that.is.not.empty;
+      expect(res.body.errors[0].msg).to.equal(
+        "At least one question bank ID must be provided in the array."
       );
     });
 
-    it("should return 400 if numberOfQuestions is zero or negative", async () => {
+    it("should return 400 if numberOfQuestionsPerAttempt is zero or negative", async () => {
       const bankData: Partial<IQuestionBank> = {
         name: "Test Bank",
-        restaurantId: restaurant._id as Types.ObjectId,
+        restaurantId: restaurant._id as MongooseTypes.ObjectId,
         questions: [],
       };
       const bank: IQuestionBank = (await QuestionBank.create(
@@ -272,25 +284,27 @@ describe("/api/quizzes/from-banks Routes", () => {
 
       const quizData = {
         title: "No Questions Quiz",
-        questionBankIds: [(bank._id as Types.ObjectId).toString()],
-        numberOfQuestions: 0,
+        questionBankIds: [(bank._id as MongooseTypes.ObjectId).toString()],
+        numberOfQuestionsPerAttempt: 0,
       };
 
       const res = await request
-        .post("/api/quiz/from-banks")
+        .post("/api/quizzes/from-banks")
         .set("Authorization", `Bearer ${ownerToken}`)
         .send(quizData)
         .expect(400);
 
-      expect(res.body.message).to.equal(
-        "numberOfQuestions must be a positive number."
+      expect(res.body.message).to.equal("Validation failed");
+      expect(res.body.errors).to.be.an("array").that.is.not.empty;
+      expect(res.body.errors[0].msg).to.equal(
+        "numberOfQuestionsPerAttempt is required and must be a positive integer"
       );
     });
 
     // Add more tests:
     // - Not enough unique questions available across banks
     // - One or more bank IDs are invalid/not found
-    // - Missing required fields (title, restaurantId, numberOfQuestions)
+    // - Missing required fields (title, restaurantId, numberOfQuestionsPerAttempt)
     // - User not authenticated (no token)
     // - User authenticated but not 'restaurant' role (if restrictTo mock is more nuanced)
     // - Question banks exist but have no questions

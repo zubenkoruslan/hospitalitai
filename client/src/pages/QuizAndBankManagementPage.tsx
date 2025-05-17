@@ -450,7 +450,7 @@ const QuizAndBankManagementPage: React.FC = () => {
             <QuizList
               quizzes={quizzes}
               isLoading={false}
-              onPreview={(quiz) => navigate(`/quizzes/preview/${quiz._id}`)}
+              onPreview={_handleOpenEditQuizModal}
               onActivate={handleActivateQuiz}
               onDeactivate={handleDeactivateQuiz}
               onDelete={(quiz) => setQuizToDelete(quiz)}
@@ -528,10 +528,10 @@ const QuizAndBankManagementPage: React.FC = () => {
               setStaffProgressError(null);
             }}
             quizTitle={selectedQuizForProgress.title}
+            quizTargetRoles={selectedQuizForProgress.targetRoles}
             progressData={staffProgressData}
             isLoading={isLoadingStaffProgress}
             error={staffProgressError}
-            // restaurantId={restaurantId} // Pass if needed by modal
           />
         )}
 

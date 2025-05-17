@@ -2,7 +2,8 @@ import mongoose, { Types } from "mongoose";
 import User, { IUser } from "../models/User";
 import QuizResult from "../models/QuizResult";
 import { IQuiz } from "../models/QuizModel";
-import QuizResultService from "./quizResultService";
+import QuizModel from "../models/QuizModel";
+import { QuizResultService } from "./quizResultService";
 import { AppError } from "../utils/errorHandler";
 import StaffQuizProgress, {
   IStaffQuizProgress,
@@ -33,6 +34,7 @@ interface StaffMemberWithQuizProgress {
   assignedRoleId?: Types.ObjectId;
   averageScore: number | null; // Overall average score from QuizResultService.calculateAverageScoreForUser
   quizzesTaken: number; // Count of unique quizzes with attempts by this staff member
+  assignableQuizzesCount: number; // ADDED: Count of quizzes assignable to this staff member's role
   quizProgressSummaries: QuizProgressSummary[]; // REPLACES resultsSummary
 }
 
@@ -116,6 +118,30 @@ class StaffService {
             staffObjectId,
             restaurantId
           );
+
+        // ADDED: Calculate assignableQuizzesCount
+        let assignableQuizzesCount = 0;
+        const queryConditionsForAssignableQuizzes: mongoose.FilterQuery<IQuiz> =
+          {
+            restaurantId: restaurantId,
+            isAvailable: true,
+          };
+
+        if (staffMember.assignedRoleId) {
+          queryConditionsForAssignableQuizzes.$or = [
+            { targetRoles: { $exists: false } },
+            { targetRoles: { $size: 0 } },
+            { targetRoles: staffMember.assignedRoleId },
+          ];
+        } else {
+          queryConditionsForAssignableQuizzes.$or = [
+            { targetRoles: { $exists: false } },
+            { targetRoles: { $size: 0 } },
+          ];
+        }
+        assignableQuizzesCount = await QuizModel.countDocuments(
+          queryConditionsForAssignableQuizzes
+        );
 
         // Fetch all StaffQuizProgress records for this staff member, populating quiz active status
         let staffProgressRecords = await StaffQuizProgress.find({
@@ -228,6 +254,7 @@ class StaffService {
           assignedRoleId: staffMember.assignedRoleId,
           averageScore: averageScore,
           quizzesTaken: quizzesTaken,
+          assignableQuizzesCount: assignableQuizzesCount,
           quizProgressSummaries: quizProgressSummaries,
         } as StaffMemberWithQuizProgress;
       });

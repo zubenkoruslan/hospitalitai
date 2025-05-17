@@ -9,7 +9,7 @@ import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersMo
 import SuccessNotification from "../components/common/SuccessNotification";
 import { formatDate } from "../utils/helpers";
 import { useStaffDetails } from "../hooks/useStaffDetails";
-import { QuizResultDetails } from "../types/staffTypes";
+import { ClientQuizAttemptDetails } from "../types/quizTypes";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 
@@ -26,7 +26,7 @@ const StaffDetails: React.FC = () => {
   // Keep state specific to this page (modals, role editing)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
-    useState<QuizResultDetails | null>(null);
+    useState<ClientQuizAttemptDetails | null>(null);
   const [_loadingModalDetails, _setLoadingModalDetails] = useState(false);
   const [_modalError, _setModalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -44,21 +44,11 @@ const StaffDetails: React.FC = () => {
       _setLoadingModalDetails(true);
       _setModalError(null);
       setModalDataForIncorrectAnswers(null);
-      setIsModalOpen(true);
 
       try {
         const attemptDetailsData = await getQuizAttemptDetails(attemptId);
         if (attemptDetailsData) {
-          setModalDataForIncorrectAnswers({
-            _id: attemptDetailsData._id,
-            quizId: attemptDetailsData.quizId,
-            quizTitle: attemptDetailsData.quizTitle,
-            userId: attemptDetailsData.userId,
-            score: attemptDetailsData.score,
-            totalQuestions: attemptDetailsData.totalQuestions,
-            completedAt: attemptDetailsData.attemptDate,
-            incorrectQuestions: attemptDetailsData.incorrectQuestions,
-          });
+          setModalDataForIncorrectAnswers(attemptDetailsData);
         } else {
           _setModalError("Could not load attempt details.");
         }
@@ -69,6 +59,7 @@ const StaffDetails: React.FC = () => {
         );
       } finally {
         _setLoadingModalDetails(false);
+        setIsModalOpen(true);
       }
     },
     [_setLoadingModalDetails, _setModalError]
@@ -317,7 +308,7 @@ const StaffDetails: React.FC = () => {
         <ViewIncorrectAnswersModal
           isOpen={isModalOpen}
           onClose={handleCloseModal}
-          quizResult={modalDataForIncorrectAnswers}
+          attemptDetails={modalDataForIncorrectAnswers}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   getQuestionBanks,
   generateQuizFromQuestionBanks,
+  getRoles,
 } from "../../services/api"; // Adjusted path
 import { IQuestionBank } from "../../types/questionBankTypes";
 import {
@@ -12,6 +13,8 @@ import Button from "../common/Button"; // For consistent button styling
 import LoadingSpinner from "../common/LoadingSpinner"; // For loading states
 import Modal from "../common/Modal"; // Import generic Modal
 import ErrorMessage from "../common/ErrorMessage"; // Import ErrorMessage
+import { IRole } from "../../types/roleTypes"; // Import IRole
+import { useAuth } from "../../context/AuthContext"; // Import useAuth to get restaurantId
 
 interface GenerateQuizFromBanksModalProps {
   isOpen: boolean;
@@ -35,12 +38,21 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null); // For errors fetching banks
 
+  // State for roles
+  const [availableRoles, setAvailableRoles] = useState<IRole[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState<boolean>(false);
+  const [fetchRolesError, setFetchRolesError] = useState<string | null>(null);
+
+  const { user } = useAuth(); // Get user from AuthContext
+
   useEffect(() => {
     if (isOpen) {
-      const fetchBanks = async () => {
+      const fetchInitialData = async () => {
         setIsLoadingBanks(true);
         setFetchError(null);
         setError(null); // Clear form error too
+
         try {
           const banks = await getQuestionBanks();
           setAvailableBanks(banks || []); // Ensure banks is not undefined
@@ -52,26 +64,53 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
           setAvailableBanks([]); // Ensure it's an empty array on error
         }
         setIsLoadingBanks(false);
+
+        if (user?.restaurantId) {
+          setIsLoadingRoles(true);
+          setFetchRolesError(null);
+          try {
+            const roles = await getRoles(user.restaurantId);
+            setAvailableRoles(roles || []);
+          } catch (err) {
+            console.error("Failed to fetch roles:", err);
+            setFetchRolesError(
+              "Failed to load roles for selection. Please try again later."
+            );
+            setAvailableRoles([]);
+          }
+          setIsLoadingRoles(false);
+        }
       };
-      fetchBanks();
+      fetchInitialData();
     } else {
       // Reset form when modal is closed or becomes non-visible
       setTitle("");
       setDescription("");
       setNumberOfQuestionsPerAttempt(10);
       setSelectedBankIds([]);
+      setSelectedRoleIds([]); // Reset selected roles
       setError(null);
       setFetchError(null);
+      setFetchRolesError(null); // Reset fetch roles error
       setIsLoading(false);
       setIsLoadingBanks(false);
+      setIsLoadingRoles(false); // Reset loading roles
     }
-  }, [isOpen]);
+  }, [isOpen, user?.restaurantId]);
 
   const handleBankSelectionChange = (bankId: string) => {
     setSelectedBankIds((prevSelected) =>
       prevSelected.includes(bankId)
         ? prevSelected.filter((id) => id !== bankId)
         : [...prevSelected, bankId]
+    );
+  };
+
+  const handleRoleSelectionChange = (roleId: string) => {
+    setSelectedRoleIds((prevSelected) =>
+      prevSelected.includes(roleId)
+        ? prevSelected.filter((id) => id !== roleId)
+        : [...prevSelected, roleId]
     );
   };
 
@@ -95,10 +134,14 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
     setIsLoading(true);
     const quizData: GenerateQuizFromBanksClientData = {
       title,
-      description,
       questionBankIds: selectedBankIds,
       numberOfQuestionsPerAttempt,
+      targetRoles: selectedRoleIds, // Add selected role IDs
     };
+
+    if (description.trim()) {
+      quizData.description = description.trim();
+    }
 
     try {
       const newQuiz: ClientIQuiz = await generateQuizFromQuestionBanks(
@@ -134,6 +177,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
         disabled={
           isLoading ||
           isLoadingBanks ||
+          isLoadingRoles || // Disable if roles are loading
           !title.trim() ||
           selectedBankIds.length === 0 ||
           numberOfQuestionsPerAttempt <= 0
@@ -178,7 +222,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               required
-              disabled={isLoadingBanks || isLoading}
+              disabled={isLoadingBanks || isLoading || isLoadingRoles}
             />
           </div>
 
@@ -196,7 +240,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-              disabled={isLoadingBanks || isLoading}
+              disabled={isLoadingBanks || isLoading || isLoadingRoles}
             />
           </div>
 
@@ -213,14 +257,12 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
               id="modal-quiz-numberOfQuestionsPerAttempt"
               value={numberOfQuestionsPerAttempt}
               onChange={(e) =>
-                setNumberOfQuestionsPerAttempt(
-                  parseInt(e.target.value, 10) || 0
-                )
+                setNumberOfQuestionsPerAttempt(Number(e.target.value))
               }
               min="1"
-              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               required
-              disabled={isLoadingBanks || isLoading}
+              disabled={isLoadingBanks || isLoading || isLoadingRoles}
             />
           </div>
 
@@ -248,7 +290,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                       checked={selectedBankIds.includes(bank._id)}
                       onChange={() => handleBankSelectionChange(bank._id)}
                       className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
-                      disabled={isLoading || isLoadingBanks} // Disable if either is loading
+                      disabled={isLoading || isLoadingBanks || isLoadingRoles} // Disable if either is loading
                     />
                     <label
                       htmlFor={`modal-bank-${bank._id}`}
@@ -256,7 +298,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                     >
                       <span
                         className={`block text-sm font-medium ${
-                          isLoading || isLoadingBanks
+                          isLoading || isLoadingBanks || isLoadingRoles
                             ? "text-slate-400"
                             : "text-slate-800"
                         }`}
@@ -268,12 +310,82 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                       {bank.description && (
                         <p
                           className={`text-xs mt-0.5 ${
-                            isLoading || isLoadingBanks
+                            isLoading || isLoadingBanks || isLoadingRoles
                               ? "text-slate-400"
                               : "text-slate-500"
                           }`}
                         >
                           {bank.description}
+                        </p>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </fieldset>
+
+          {/* Target Roles Selection */}
+          <fieldset className="space-y-3">
+            <legend className="block text-sm font-medium text-slate-700">
+              Target Roles (Optional)
+            </legend>
+            <p className="text-xs text-slate-500">
+              Select roles this quiz is for. Leave blank if it's for all roles.
+            </p>
+            {isLoadingRoles && (
+              <div className="py-3">
+                <LoadingSpinner message="Loading roles..." />
+              </div>
+            )}
+            {fetchRolesError && !isLoadingRoles && (
+              <ErrorMessage message={fetchRolesError} />
+            )}
+            {!isLoadingRoles &&
+              !fetchRolesError &&
+              availableRoles.length === 0 && (
+                <p className="text-slate-500 text-sm py-3">
+                  No roles available to assign. You can create roles in Staff
+                  Management.
+                </p>
+              )}
+            {!isLoadingRoles && availableRoles.length > 0 && (
+              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
+                {availableRoles.map((role) => (
+                  <div
+                    key={role._id}
+                    className="flex items-start p-3 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
+                  >
+                    <input
+                      type="checkbox"
+                      id={`modal-role-${role._id}`}
+                      checked={selectedRoleIds.includes(role._id)}
+                      onChange={() => handleRoleSelectionChange(role._id)}
+                      className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
+                      disabled={isLoading || isLoadingBanks || isLoadingRoles}
+                    />
+                    <label
+                      htmlFor={`modal-role-${role._id}`}
+                      className="ml-3 flex-1 cursor-pointer"
+                    >
+                      <span
+                        className={`block text-sm font-medium ${
+                          isLoading || isLoadingBanks || isLoadingRoles
+                            ? "text-slate-400"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {role.name}
+                      </span>
+                      {role.description && (
+                        <p
+                          className={`text-xs mt-0.5 ${
+                            isLoading || isLoadingBanks || isLoadingRoles
+                              ? "text-slate-400"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {role.description}
                         </p>
                       )}
                     </label>

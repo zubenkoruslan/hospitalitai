@@ -5,7 +5,7 @@ import { ensureRestaurantAssociation } from "../middleware/restaurantMiddleware"
 // QuizResult, User, Quiz models are used by QuizResultService, keep if service methods are used.
 // For now, assuming service methods called below (getMyResults, getStaffRankingData) handle their own model interactions.
 // If these routes were to directly use models, imports would be needed.
-import QuizResultService from "../services/quizResultService";
+import { QuizResultService } from "../services/quizResultService"; // Changed to named import
 import { AppError as _AppError } from "../utils/errorHandler"; // Aliased
 // Removed: validateObjectId from here as the route using it is being removed.
 // import { handleValidationErrors, validateObjectId } from "../middleware/validationMiddleware";

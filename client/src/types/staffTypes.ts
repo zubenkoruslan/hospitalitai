@@ -74,6 +74,7 @@ export interface StaffMemberWithData {
   quizProgressSummaries: ClientQuizProgressSummary[];
   averageScore: number | null;
   quizzesTaken: number;
+  assignableQuizzesCount?: number; // ADDED: Count of quizzes assignable to this staff member's role
 }
 
 // Detailed interface for a staff member including full quiz result details

@@ -31,6 +31,7 @@ export interface GenerateQuizFromBanksClientData {
   description?: string;
   questionBankIds: string[];
   numberOfQuestionsPerAttempt: number;
+  targetRoles?: string[]; // Added for target roles selection
 }
 
 // From api.ts: ClientAvailableQuiz (lines 413-423)
@@ -127,4 +128,14 @@ export interface ClientQuizEditable {
   isAssigned?: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Interface for request body when updating a quiz (client-side specific)
+export interface UpdateQuizClientData {
+  title?: string;
+  description?: string;
+  sourceQuestionBankIds?: string[];
+  numberOfQuestionsPerAttempt?: number;
+  isAvailable?: boolean;
+  targetRoles?: string[];
 }

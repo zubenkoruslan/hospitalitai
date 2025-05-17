@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import mongoose from "mongoose";
 import QuizResult, { IQuizResult } from "../models/QuizResult";
 import QuizModel, { IQuiz } from "../models/QuizModel";
 import User from "../models/User";
@@ -29,7 +30,7 @@ interface StaffQuizViewItem {
   latestResultId?: string; // Added field for the specific result ID
 }
 
-class QuizResultService {
+export class QuizResultService {
   /**
    * Fetches a combined view of all quizzes available to a restaurant
    * merged with the specific staff member's results for those quizzes.
@@ -115,15 +116,18 @@ class QuizResultService {
     userId: Types.ObjectId,
     restaurantId: Types.ObjectId
   ): Promise<{ averageScore: number | null; quizzesTaken: number }> {
-    // Temporary: Replace with Misha's actual ObjectId for specific debugging
-    const mishaIdForDebug = "MISHA_USER_ID_PLACEHOLDER";
+    const mishaIdForDebug = "MISHA_USER_ID_PLACEHOLDER"; // Keep Misha debug logic if desired
     const isDebuggingMisha = userId.toString() === mishaIdForDebug;
 
-    if (isDebuggingMisha) {
+    // Simplified test debugging condition
+    const isDebuggingTestUser = !process.env.VITEST;
+
+    if (isDebuggingTestUser) {
       console.log(
-        `[AvgScoreDebug] Calculating average for Misha (ID: ${userId})`
+        `[TEST_DEBUG] Service: Calculating average for user ${userId}`
       );
     }
+    // ... (Misha log if active)
 
     try {
       const userAttempts = await QuizAttempt.find({
@@ -134,9 +138,9 @@ class QuizResultService {
           quizId: Pick<IQuiz, "_id" | "isAvailable" | "title"> | null;
         }>({
           path: "quizId",
-          select: "isAvailable title",
+          select: "isAvailable title", // Restore original select
         })
-        .select("quizId score questionsPresented")
+        .select("quizId score questionsPresented") // quizId is needed for population, score & qP for logic
         .lean<
           Array<
             IQuizAttempt & {
@@ -145,22 +149,26 @@ class QuizResultService {
           >
         >();
 
-      if (isDebuggingMisha) {
+      if (isDebuggingTestUser) {
         console.log(
-          "[AvgScoreDebug] Misha's ALL attempts (before filtering by isAvailable):",
+          `[TEST_DEBUG] Service: User ${userId} - ALL attempts (after populate & lean):`,
           userAttempts.map((a) => ({
-            quizId: a.quizId?._id?.toString(),
-            quizTitle: a.quizId?.title,
-            quizIsAvailable: a.quizId?.isAvailable,
+            quizIdObj: a.quizId, // Log the whole populated quizId object
+            isAvailable: a.quizId?.isAvailable,
+            title: a.quizId?.title,
             score: a.score,
-            qsPresented: a.questionsPresented?.length,
+            qsPres: a.questionsPresented?.length,
           }))
         );
       }
 
+      // ... (Misha log for all attempts if active)
+
       if (!userAttempts || userAttempts.length === 0) {
-        if (isDebuggingMisha)
-          console.log("[AvgScoreDebug] Misha has NO attempts at all.");
+        if (isDebuggingTestUser)
+          console.log(
+            `[TEST_DEBUG] Service: User ${userId} - NO attempts at all.`
+          );
         return { averageScore: null, quizzesTaken: 0 };
       }
 
@@ -169,63 +177,56 @@ class QuizResultService {
         return isActive;
       });
 
-      if (isDebuggingMisha) {
+      if (isDebuggingTestUser) {
         console.log(
-          "[AvgScoreDebug] Misha's ACTIVE attempts (after filtering by isAvailable):",
+          `[TEST_DEBUG] Service: User ${userId} - ACTIVE attempts (after filtering):`,
           activeUserAttempts.map((a) => ({
-            quizId: a.quizId?._id?.toString(),
-            quizTitle: a.quizId?.title,
+            title: a.quizId?.title,
+            isAvailable: a.quizId?.isAvailable,
             score: a.score,
-            qsPresented: a.questionsPresented?.length,
+            qsPres: a.questionsPresented?.length,
           }))
         );
       }
 
+      // ... (Misha log for active attempts if active)
+
       if (activeUserAttempts.length === 0) {
-        if (isDebuggingMisha)
+        if (isDebuggingTestUser)
           console.log(
-            "[AvgScoreDebug] Misha has NO ACTIVE attempts after filtering."
+            `[TEST_DEBUG] Service: User ${userId} - NO ACTIVE attempts after filtering.`
           );
         return { averageScore: null, quizzesTaken: 0 };
       }
 
-      // Explicitly type attemptsByQuiz value arrays
       const attemptsByQuiz: {
         [quizId: string]: Array<
           IQuizAttempt & {
-            quizId: Pick<IQuiz, "_id" | "isAvailable" | "title">;
+            quizId: Pick<IQuiz, "_id" | "isAvailable" | "title">; // quizId here should be populated and asserted as non-null
           }
         >;
       } = {};
+
       activeUserAttempts.forEach((attempt) => {
-        const populatedQuizId = attempt.quizId as Pick<
-          IQuiz,
-          "_id" | "isAvailable" | "title"
-        >;
-        if (populatedQuizId) {
-          // Check if populatedQuizId (the cast result) is truthy
-          const quizIdStr = populatedQuizId._id.toString();
-          if (!attemptsByQuiz[quizIdStr]) {
-            attemptsByQuiz[quizIdStr] = [];
-          }
-          attemptsByQuiz[quizIdStr].push(
-            attempt as IQuizAttempt & {
-              quizId: Pick<IQuiz, "_id" | "isAvailable" | "title">;
-            }
-          );
+        // activeUserAttempts are filtered, so attempt.quizId should be populated and non-null
+        const populatedQuizId = attempt.quizId!;
+        const quizIdStr = populatedQuizId._id.toString();
+        if (!attemptsByQuiz[quizIdStr]) {
+          attemptsByQuiz[quizIdStr] = [];
         }
+        attemptsByQuiz[quizIdStr].push(
+          attempt as IQuizAttempt & {
+            quizId: Pick<IQuiz, "_id" | "isAvailable" | "title">;
+          }
+        );
       });
 
-      const perQuizAveragePercentages: number[] = [];
-      let uniqueQuizzesAttemptedCount = 0;
-
-      if (isDebuggingMisha) {
+      if (isDebuggingTestUser) {
         console.log(
-          "[AvgScoreDebug] Misha's attempts grouped by ACTIVE quiz (IDs shown):",
+          `[TEST_DEBUG] Service: User ${userId} - Attempts grouped by ACTIVE quiz:`,
           Object.keys(attemptsByQuiz).map((quizId_str) => ({
             quizId: quizId_str,
-            // Access title from the first attempt in the group, which has the populated quizId
-            quizTitle: attemptsByQuiz[quizId_str][0]?.quizId?.title,
+            title: attemptsByQuiz[quizId_str][0]?.quizId?.title,
             numAttempts: attemptsByQuiz[quizId_str].length,
             scoresAndPresented: attemptsByQuiz[quizId_str].map((a) => ({
               score: a.score,
@@ -234,6 +235,11 @@ class QuizResultService {
           }))
         );
       }
+
+      // ... (rest of the logic: perQuizAveragePercentages calculation, etc.)
+      // This part should be fine if attemptsByQuiz is correctly populated.
+      const perQuizAveragePercentages: number[] = [];
+      let uniqueQuizzesAttemptedCount = 0;
 
       for (const quizIdStr in attemptsByQuiz) {
         const attemptsForThisQuiz = attemptsByQuiz[quizIdStr];
@@ -259,54 +265,51 @@ class QuizResultService {
                 validAttemptsForThisQuizCount) *
               100;
             perQuizAveragePercentages.push(averagePercentageForThisQuiz);
-            // Ensure quizId and title exist before logging
-            if (isDebuggingMisha && attemptsForThisQuiz[0].quizId?.title) {
-              console.log(
-                `[AvgScoreDebug] Misha - For Quiz '${
-                  attemptsForThisQuiz[0].quizId.title
-                }' (ID: ${quizIdStr}): Avg Percentage = ${averagePercentageForThisQuiz.toFixed(
-                  2
-                )}% (from ${validAttemptsForThisQuizCount} attempts)`
-              );
-            }
           }
           uniqueQuizzesAttemptedCount++;
         }
       }
 
+      if (isDebuggingTestUser)
+        console.log(
+          `[TEST_DEBUG] Service: User ${userId} - Final perQuizAveragePercentages: [${perQuizAveragePercentages
+            .map((p) => p.toFixed(2))
+            .join(
+              ", "
+            )}], uniqueQuizzesAttemptedCount: ${uniqueQuizzesAttemptedCount}`
+        );
+
       if (perQuizAveragePercentages.length === 0) {
-        if (isDebuggingMisha)
+        if (isDebuggingTestUser)
           console.log(
-            "[AvgScoreDebug] Misha - No per-quiz averages were calculated (possibly all active attempts had 0 questions presented or other issues)."
+            `[TEST_DEBUG] Service: User ${userId} - No per-quiz averages calculated. Returning null score.`
           );
-        // If no per-quiz averages, quizzesTaken should also be 0, unless we define "taken" differently (e.g. just having an active attempt regardless of validity for scoring)
-        // For now, aligning quizzesTaken with scorable quizzes.
-        return { averageScore: null, quizzesTaken: 0 };
+        return { averageScore: null, quizzesTaken: 0 }; // quizzesTaken is 0 if no avg score
       }
 
       const overallAverageScore =
         perQuizAveragePercentages.reduce((sum, avg) => sum + avg, 0) /
         perQuizAveragePercentages.length;
 
-      if (isDebuggingMisha) {
+      if (isDebuggingTestUser)
         console.log(
-          `[AvgScoreDebug] Misha - Per-quiz averages that went into final calculation: [${perQuizAveragePercentages
-            .map((p) => p.toFixed(2))
-            .join(", ")}]`
-        );
-        console.log(
-          `[AvgScoreDebug] Misha - Final Calculated Average: ${overallAverageScore.toFixed(
+          `[TEST_DEBUG] Service: User ${userId} - Final overallAverageScore=${overallAverageScore.toFixed(
             1
-          )}%, Quizzes Taken (active with valid attempts): ${uniqueQuizzesAttemptedCount}`
+          )}, quizzesTaken=${uniqueQuizzesAttemptedCount}`
         );
-      }
 
       return {
         averageScore: parseFloat(overallAverageScore.toFixed(1)),
         quizzesTaken: uniqueQuizzesAttemptedCount,
       };
     } catch (error) {
-      if (isDebuggingMisha)
+      // ... error logging ...
+      if (isDebuggingTestUser)
+        console.error(
+          `[TEST_DEBUG] Service: User ${userId} - Error in calculateAverageScoreForUser:`,
+          error
+        );
+      else if (isDebuggingMisha)
         console.error(
           "[AvgScoreDebug] Misha - Error in calculateAverageScoreForUser:",
           error
@@ -490,5 +493,3 @@ class QuizResultService {
     }
   }
 }
-
-export default QuizResultService;

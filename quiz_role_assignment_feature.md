@@ -58,29 +58,29 @@
     - [x] Fetch available roles from `/api/roles?restaurantId=...` to populate the selector.
     - [x] Update API calls to include the selected `roleIds`. (Note: Updated API calls for single `assignedRoleId`)
 
-- [ ] **4. Admin - Quiz Management UI (Update Existing):**
+- [x] **4. Admin - Quiz Management UI (Update Existing):**
 
-  - [ ] In the quiz creation/editing form (e.g., `client/src/components/quiz/QuizForm.tsx` or page like `AdminQuizManagementPage.tsx`):
-    - [ ] Add a multi-select dropdown or checkboxes for `targetRoles`.
-    - [ ] Fetch available roles from `/api/roles?restaurantId=...`.
-    - [ ] An option to leave it blank (for "all roles") should be clear.
-    - [ ] Update API calls to include `targetRoleIds`.
+  - [x] In the quiz creation/editing form (e.g., `client/src/components/quiz/QuizForm.tsx` or page like `AdminQuizManagementPage.tsx`):
+    - [x] Add a multi-select dropdown or checkboxes for `targetRoles`.
+    - [x] Fetch available roles from `/api/roles?restaurantId=...`.
+    - [x] An option to leave it blank (for "all roles") should be clear.
+    - [x] Update API calls to include `targetRoleIds` (as `targetRoles: string[]`).
 
 - [x] **5. Staff - Quiz Listing UI (Update Existing/Create New):**
 
-  - [x] The page/component where staff view their available quizzes (e.g., new `client/src/pages/MyQuizzesPage.tsx` or `client/src/components/quiz/StaffQuizList.tsx`).
+  - [x] The page/component where staff view their available quizzes (e.g., new `client/src/pages/MyQuizzesPage.tsx` or `client/src/components/quiz/StaffQuizList.tsx`). (`StaffDashboard.tsx` uses a dedicated `/api/quizzes/available-for-staff` endpoint which calls `QuizService.getAvailableQuizzesForStaff` for role-based filtering).
   - [x] This UI should now automatically display the correctly filtered quizzes based on the API response.
 
 - [x] **6. API Service Calls (`client/src/services/`):**
   - [x] Add new functions for `Role` CRUD operations.
-  - [x] Update existing API functions for creating/editing quizzes and staff to include role information. (Note: Staff part done, Quiz part pending Form updates in II.4)
+  - [x] Update existing API functions for creating/editing quizzes and staff to include role information. (Note: Quiz part now also done via `UpdateQuizClientData` and updates to modals).
 
 ## III. Testing
 
 - [ ] **1. Backend (Mocha/Chai/Supertest):**
-  - [ ] Write unit tests for new `RoleModel`, `RoleService`.
-  - [ ] Update unit tests for `QuizModel`, `UserModel`, `QuizService`, `UserService/StaffService`.
-  - [ ] Write integration tests for new `roleRoutes` and ensure existing `quizRoutes` and `userRoutes/staffRoutes` function correctly with role assignments and quiz filtering. Cover authentication/authorization.
+  - [x] Write unit tests for new `RoleModel`, `RoleService`. (Completed, all passing)
+  - [ ] Update unit tests for `QuizModel`, `UserModel`, `QuizService`, `UserService/StaffService`. (User model tests exist and pass. QuizModel has no dedicated tests yet. QuizService (including related `quizResultService.test.ts`) and StaffService tests are partially converted from Vitest or have commented out sections; need full migration, updates for role features, and validation of all existing tests.)
+  - [ ] Write integration tests for new `roleRoutes` and ensure existing `quizRoutes` and `userRoutes/staffRoutes` function correctly with role assignments and quiz filtering. Cover authentication/authorization. (roleRoutes integration tests need verification/completion. quizRoutes (`quiz.fromBanks.test.ts`) passing with JWT secret handled by test script. userRoutes/staffRoutes (`auth.test.ts`) has transaction tests skipped, other auth tests pass. General filtering logic based on roles in routes needs comprehensive testing.)
 - [ ] **2. Frontend (Jest/React Testing Library):**
   - [ ] Write component tests for new UI elements related to role selection and the role management page.
   - [ ] Test that API calls are made with the correct role data.

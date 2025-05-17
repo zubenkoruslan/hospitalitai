@@ -49,7 +49,6 @@ export const generateQuizFromBanksController = async (
     const newQuiz = await QuizService.generateQuizFromBanksService(quizData);
 
     res.status(201).json({
-      status: "success",
       message: "Quiz generated successfully from question banks.",
       data: newQuiz,
     });
@@ -86,19 +85,17 @@ export const startQuizAttemptController = async (
       quizObjectId
     );
 
-    if (questions.length === 0) {
-      res.status(200).json({
-        status: "success",
-        message: "No new questions available for this quiz, or quiz completed.",
-        data: [],
-      });
-      return;
-    }
+    // No explicit attemptId is created or returned here by the service.
+    // The client will receive the questions array directly.
+    // If questions.length is 0, the service itself handles the logic of quiz completion or no availability.
 
     res.status(200).json({
       status: "success",
-      message: "Quiz attempt started successfully.",
-      data: questions,
+      message:
+        questions.length > 0
+          ? "Quiz attempt questions fetched."
+          : "No new questions available for this quiz, or quiz completed.",
+      data: questions, // Send the array of questions directly
     });
   } catch (error) {
     if (!(error instanceof AppError)) {

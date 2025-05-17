@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 
 // Interface for Role document
 export interface IRole extends Document {
+  _id: Types.ObjectId; // Explicitly define _id for better type inference
   name: string;
   description?: string;
   restaurantId: Types.ObjectId; // Reference to the Restaurant model

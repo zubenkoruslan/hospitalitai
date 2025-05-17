@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Interface for the Restaurant document
 export interface IRestaurant extends Document {
+  _id: mongoose.Types.ObjectId; // Explicitly define _id type
   name: string;
   owner: mongoose.Types.ObjectId; // Reference to the User who owns/created the restaurant
   // staff: mongoose.Types.ObjectId[]; // REMOVED: Array of User IDs who are staff members

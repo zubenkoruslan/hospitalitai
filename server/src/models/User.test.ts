@@ -1,55 +1,54 @@
-import mongoose from "mongoose";
+import mongoose, { Types as MongooseTypes } from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { expect } from "chai"; // Restore static import
-import { describe, it, beforeAll, afterAll, beforeEach } from "vitest"; // Add vitest imports
-import User, { IUser } from "./User"; // Adjust path as needed
+// Removed static: import { expect } from "chai";
+// Removed: import { describe, it, beforeAll, afterAll, beforeEach } from "vitest";
+import User, { IUser } from "./User";
 
 let mongoServer: MongoMemoryServer;
-// Remove expect declaration, use static import
-// let expect: Chai.ExpectStatic;
+let expect: Chai.ExpectStatic; // Declare expect
 
 describe("User Model Test", () => {
-  beforeAll(async () => {
-    // Remove dynamic import
-    // const chai = await import("chai");
-    // expect = chai.expect;
+  before(async () => {
+    // Changed from beforeAll for Mocha, assuming global describe/it
+    const chai = await import("chai"); // Dynamic import chai
+    expect = chai.expect; // Assign expect
 
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
-    await mongoose.connect(mongoUri);
+    // Added ConnectOptions for consistency with other test files
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    } as mongoose.ConnectOptions);
   });
 
-  // Teardown: Disconnect Mongoose and stop MongoDB Memory Server
-  afterAll(async () => {
+  after(async () => {
+    // Changed from afterAll for Mocha
     await mongoose.disconnect();
-    // Add null check for safety
     if (mongoServer) {
       await mongoServer.stop();
     }
   });
 
-  // Cleanup: Remove all user data before each test
   beforeEach(async () => {
-    // Add safety check for connection before deleting
     if (mongoose.connection.readyState === 1) {
       await User.deleteMany({});
     }
   });
 
-  // --- Test Cases Start Here ---
+  // ... (rest of the tests, ensuring they use the dynamically imported expect)
+  // Example adjustment if any test relied on vitest-specific features, otherwise should be fine.
 
   it("should create & save a restaurant user successfully", async () => {
     const validUserData = {
       name: "Test Restaurant Owner",
       email: "owner@test.com",
       password: "password123",
-      role: "restaurant", // Changed from 'owner' based on schema, adjust if needed
+      role: "restaurant",
     };
     const userData = new User(validUserData);
     const savedUser = await userData.save();
 
-    // Assertions
-    // @ts-ignore - Bypassing potential _id issues if they reappear
     expect(savedUser._id).to.exist;
     expect(savedUser.name).to.equal(validUserData.name);
     expect(savedUser.email).to.equal(validUserData.email);
@@ -60,7 +59,7 @@ describe("User Model Test", () => {
   });
 
   it("should create & save a staff user successfully with restaurantId and professionalRole", async () => {
-    const restaurantId = new mongoose.Types.ObjectId();
+    const restaurantId = new MongooseTypes.ObjectId(); // Use MongooseTypes
     const validStaffData = {
       name: "Test Staff Member",
       email: "staff@test.com",
@@ -72,8 +71,6 @@ describe("User Model Test", () => {
     const staffData = new User(validStaffData);
     const savedStaff = await staffData.save();
 
-    // Assertions
-    // @ts-ignore
     expect(savedStaff._id).to.exist;
     expect(savedStaff.name).to.equal(validStaffData.name);
     expect(savedStaff.email).to.equal(validStaffData.email);
@@ -192,7 +189,7 @@ describe("User Model Test", () => {
       email: "staffnoprof@test.com",
       password: "password123",
       role: "staff",
-      restaurantId: new mongoose.Types.ObjectId(),
+      restaurantId: new MongooseTypes.ObjectId(), // Use MongooseTypes
       // professionalRole is missing
     };
     const userData = new User(staffWithoutProfRole);
@@ -259,7 +256,7 @@ describe("User Model Test", () => {
       email: "duplicate@test.com",
       password: "password456",
       role: "staff",
-      restaurantId: new mongoose.Types.ObjectId(),
+      restaurantId: new MongooseTypes.ObjectId(),
       professionalRole: "Manager",
     };
     const user2 = new User(userData2);

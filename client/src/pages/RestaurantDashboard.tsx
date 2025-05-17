@@ -493,7 +493,9 @@ const RestaurantDashboard: React.FC = () => {
                               {staff.professionalRole || "-"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {staff.quizzesTaken ?? 0} / {totalQuizzes}
+                              {`${staff.quizzesTaken ?? 0} / ${
+                                staff.assignableQuizzesCount ?? 0
+                              }`}
                             </td>
                             <td
                               className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
@@ -506,7 +508,7 @@ const RestaurantDashboard: React.FC = () => {
                             >
                               {staff.averageScore !== null
                                 ? `${staff.averageScore.toFixed(1)}%`
-                                : "N/A"}
+                                : "-"}
                             </td>
                           </tr>
                         );

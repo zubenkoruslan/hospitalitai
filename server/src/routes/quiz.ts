@@ -144,6 +144,36 @@ router.delete(
   }
 );
 
+/**
+ * @route   GET /api/quiz/available-for-staff
+ * @desc    Get all quizzes available for the logged-in staff member based on their role.
+ * @access  Private (Staff Role)
+ */
+router.get(
+  "/available-for-staff",
+  restrictTo("staff"),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+    const staffUserId = req.user?.userId as mongoose.Types.ObjectId;
+
+    if (!restaurantId || !staffUserId) {
+      return next(
+        new _AppError("User restaurant or ID not found on request.", 400)
+      );
+    }
+
+    try {
+      const quizzes = await QuizService.getAvailableQuizzesForStaff(
+        restaurantId,
+        staffUserId
+      );
+      res.status(200).json({ quizzes }); // Ensure consistent response structure { quizzes: [] }
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // === Routes using Quiz Controllers ===
 
 /**
