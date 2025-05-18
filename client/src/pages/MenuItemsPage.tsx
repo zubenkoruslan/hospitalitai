@@ -681,7 +681,15 @@ const MenuItemsPage: React.FC = () => {
           menuId={menuId ?? ""}
           allItemsInMenu={items}
           restaurantId={restaurantId ?? ""}
-          availableCategories={uniqueFoodCategories}
+          availableCategories={
+            currentItem?.itemType === "beverage"
+              ? uniqueBeverageCategories
+              : currentItem?.itemType === "food"
+              ? uniqueFoodCategories
+              : activeTab === "beverage" // Fallback to activeTab for new items
+              ? uniqueBeverageCategories
+              : uniqueFoodCategories // Default to food categories for new items if food tab active or other cases
+          }
         />
       )}
 
