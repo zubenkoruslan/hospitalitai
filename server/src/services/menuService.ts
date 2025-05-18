@@ -42,37 +42,71 @@ interface _ExtractedMenuData {
 }
 
 // System instruction for the AI
-const _systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.
+const _systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.\n\n**Crucially, you must call the provided 'extract_menu_data' function directly with the extracted data. Do NOT generate Python code, print statements, or any other form of code. Only use the function calling mechanism.**\n\nInput Context Provided per Request:\n- Raw text extracted from a PDF menu (labelled as \"Input Text to Parse\").\n- Original filename of the PDF for context (labelled as \"Original Filename\").\n\nInstructions:\n1. **Menu Name**:\n   - Identify the menu name from the text (e.g., a title at the top like \"Dinner Menu\" or \"Summer Menu\").\n   - If no clear menu name is found, use the \"Original Filename\" (without the \".pdf\" extension) as the menu name.\n\n2. **Menu Items**:\n   - Extract each menu item from the \"Input Text to Parse\". Menu items often consist of a name, an optional description/ingredients, and a price.\n   - **Layout Awareness**: Be mindful of multi-column layouts. Try to associate item names with their corresponding details (price, ingredients) even if they are in different visual columns. Read down columns where possible before moving across.\n   - For each item, determine:\n     - **Item Name**: The name of the dish or beverage. This is often the most prominent text for an item.\n     - **Item Price**: The numerical price. If no price is listed, or if terms like \"Market Price\" or \"MP\" are used, omit this field or set to null. Prices are often at the end of an item\'s entry or in a separate column aligned with the item.\n     - **Item Type**: Classify as \"food\" or \"beverage\".\n     - **Item Ingredients**: Extract all listed or clearly described ingredients as an array of strings. Focus on nouns or noun phrases representing the food components. Omit general adjectives (e.g., \'delicious\', \'fresh\') unless part of a specific ingredient name (e.g., \'fresh mozzarella\'). Ingredients may be in a list below the item name or integrated into a descriptive sentence.\n     - **Item Category**: Identify the category primarily from section headers in the text (e.g., \"Starters\", \"Mains\", \"Desserts\", \"Butchers block\", \"Sides\", \"For the Table\", \"Dish of the day\"). Use the exact wording from the menu\'s section header if available. These headers are typically larger or distinctly styled. If no explicit section headers exist directly above a group of items, infer the category based on the item\'s position or typical menu structure (e.g., appetizers often appear first). Prioritize explicit headers found anywhere relevant before relying solely on positional inference. Sub-categories under a major header should generally be considered part of the major category unless the schema specifically asks for sub-categories (which it currently does not).\n     - **Dietary Flags**: Identify dietary attributes (isGlutenFree, isVegan, isVegetarian) based on explicit indicators (e.g., (V), (VG), (GF)) or analysis of ingredients. Set to false if not clearly indicated.\n\n3. **Output Schema**:\n   - Return the parsed data in the JSON structure defined by the 'extract_menu_data' function.\n\n4. **Additional Notes on Robustness & Tricky Layouts**:\n   - **Varied Formats**: Menus can have diverse visual structures. Try to identify patterns within the current menu to guide parsing.\n   - **Multi-line Items**: An item\'s name, description, or ingredients might span multiple lines. Consolidate this information for a single item. A new item typically starts with a distinctly formatted name or when a price for a previous item is clearly identified.\n   - **Irrelevant Text**: Ignore page numbers, restaurant contact details, decorative text, and visual separators (lines, asterisks) that are not part of item names, descriptions, or categories.\n   - **Price Association**: Ensure prices are correctly associated with their respective items, especially in multi-column layouts or when prices are listed separately but aligned with items.\n   - **Currency**: Ensure prices are numbers (e.g., 12.99), not strings with currency symbols (e.g., \"$12.99\"). The function call schema expects a number or null.\n\nExample Input Text (for your reference, this is an illustration of how an input might look, it is NOT the actual text to parse for the current request):\n\`\`\`
+Dinner Menu
+Starters
+Garlic Bread (V) - 8
+Toasted ciabatta, garlic butter, parsley
 
-**Crucially, you must call the provided 'extract_menu_data' function directly with the extracted data. Do NOT generate Python code, print statements, or any other form of code. Only use the function calling mechanism.**
+Main Courses
+Freedown Hill Wagyu Steak Burger - 24
+Caramelised onion, tomato relish, double cheese, tomato, gem lettuce
+Vegan Curry (VG) - 18
+Chickpeas, spinach, coconut milk, basmati rice
 
-Input:
-- Raw text extracted from a PDF menu.
-- Original filename of the PDF for context (e.g., to infer the menu name if not explicit in the text).
+Drinks
+House Red Wine - 10
+\`\`\`
 
-Instructions:
-1. **Menu Name**:
-   - Identify the menu name from the text (e.g., a title at the top like "Dinner Menu" or "Summer Menu").
-   - If no clear menu name is found, use the original filename (without the ".pdf" extension) as the menu name.
-
-2. **Menu Items**:
-   - Extract each menu item from the text, identifying its details based on common menu formatting.
-   - For each item, determine:
-     - **Item Name**: The name of the dish or beverage.
-     - **Item Price**: The numerical price. If no price is listed, omit this field or set to null.
-     - **Item Type**: Classify as "food" or "beverage".
-     - **Item Ingredients**: Extract all listed ingredients as an array of strings. Include only specific ingredients.
-     - **Item Category**: Identify the category primarily from section headers in the text (e.g., "Starters", "Mains", "Desserts", "Butchers block", "Sides", "For the Table", "Dish of the day"). Use the exact wording from the menu's section header if available. If no explicit section headers exist, then infer the category based on the item's position or typical menu structure (e.g., appetizers often appear first). Do not use generic placeholders if a specific header was found.
-     - **Dietary Flags**: Identify dietary attributes (isGlutenFree, isVegan, isVegetarian) based on explicit indicators or ingredient analysis. Set to false if not indicated.
-
-3. **Output Schema**:
-   - Return the parsed data in the JSON structure defined by the 'extract_menu_data' function.
-
-4. **Additional Notes**:
-   - Be robust to varied menu formats.
-   - Ignore irrelevant text (e.g., restaurant address, phone number, decorative phrases not part of an item's details).
-   - If an item seems to span multiple lines or has complex formatting, do your best to consolidate its information correctly.
-   - Ensure prices are numbers, not strings with currency symbols.
+Example Output (for your reference, illustrating the expected JSON structure from the function call):
+\`\`\`json
+{
+  "menuName": "Dinner Menu",
+  "menuItems": [
+    {
+      "itemName": "Garlic Bread",
+      "itemPrice": 8,
+      "itemType": "food",
+      "itemIngredients": ["toasted ciabatta", "garlic butter", "parsley", "bread"],
+      "itemCategory": "Starters",
+      "isGlutenFree": false,
+      "isVegan": false,
+      "isVegetarian": true
+    },
+    {
+      "itemName": "Freedown Hill Wagyu Steak Burger",
+      "itemPrice": 24,
+      "itemType": "food",
+      "itemIngredients": ["caramelised onion", "tomato relish", "double cheese", "tomato", "gem lettuce", "wagyu beef"],
+      "itemCategory": "Main Courses",
+      "isGlutenFree": false,
+      "isVegan": false,
+      "isVegetarian": false
+    },
+    {
+      "itemName": "Vegan Curry",
+      "itemPrice": 18,
+      "itemType": "food",
+      "itemIngredients": ["chickpeas", "spinach", "coconut milk", "basmati rice", "curry paste"],
+      "itemCategory": "Main Courses",
+      "isGlutenFree": true,
+      "isVegan": true,
+      "isVegetarian": true
+    },
+    {
+      "itemName": "House Red Wine",
+      "itemPrice": 10,
+      "itemType": "beverage",
+      "itemIngredients": [],
+      "itemCategory": "Drinks",
+      "isGlutenFree": true,
+      "isVegan": true,
+      "isVegetarian": true
+    }
+  ]
+}
+\`\`\`
+Remember to use the actual "Input Text to Parse" and "Original Filename" provided in each request.
 `;
 
 // Define the schema for the function call for Gemini
@@ -474,6 +508,7 @@ class MenuService {
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash-latest",
         tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
+        systemInstruction: _systemInstruction,
         safetySettings: [
           {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -494,114 +529,13 @@ class MenuService {
         ],
       });
 
-      const prompt = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.
-
-Input:
-- Raw text extracted from a PDF menu.
-- Original filename of the PDF for context (e.g., to infer the menu name if not explicit in the text).
-
-Instructions:
-1. **Menu Name**:
-   - Identify the menu name from the text (e.g., a title at the top like "Dinner Menu" or "Summer Menu").
-   - If no clear menu name is found, use the original filename (without the ".pdf" extension) as the menu name.
-
-2. **Menu Items**:
-   - Extract each menu item from the text, identifying its details based on common menu formatting.
-   - For each item, determine:
-     - **Item Name**: The name of the dish or beverage.
-     - **Item Price**: The numerical price. If no price is listed, omit this field or set to null.
-     - **Item Type**: Classify as "food" or "beverage".
-     - **Item Ingredients**: Extract all listed ingredients as an array of strings. Include only specific ingredients.
-     - **Item Category**: Identify the category primarily from section headers in the text (e.g., "Starters", "Mains", "Desserts", "Butchers block", "Sides", "For the Table", "Dish of the day"). Use the exact wording from the menu's section header if available. If no explicit section headers exist, then infer the category based on the item's position or typical menu structure (e.g., appetizers often appear first). Do not use generic placeholders if a specific header was found.
-     - **Dietary Flags**: Identify dietary attributes (isGlutenFree, isVegan, isVegetarian) based on explicit indicators or ingredient analysis. Set to false if not indicated.
-
-3. **Output Schema**:
-   - Return the parsed data in the JSON structure defined by the 'extract_menu_data' function.
-
-4. **Additional Notes**:
-   - Be robust to varied menu formats.
-   - Ignore irrelevant text (e.g., restaurant address, phone number, decorative phrases not part of an item's details).
-   - If an item seems to span multiple lines or has complex formatting, do your best to consolidate its information correctly.
-   - Ensure prices are numbers, not strings with currency symbols.
-
-Example Input Text (for your reference during parsing, this is NOT the actual text to parse for this request):
-\`\`\`
-Dinner Menu
-Starters
-Garlic Bread (V) - 8
-Toasted ciabatta, garlic butter, parsley
-
-Main Courses
-Freedown Hill Wagyu Steak Burger - 24
-Caramelised onion, tomato relish, double cheese, tomato, gem lettuce
-Vegan Curry (VG) - 18
-Chickpeas, spinach, coconut milk, basmati rice
-
-Drinks
-House Red Wine - 10
-\`\`\`
-
-Example Output (for your reference, ensure your output for the actual text matches the schema):
-\`\`\`json
-{
-  "menuName": "Dinner Menu",
-  "menuItems": [
-    {
-      "itemName": "Garlic Bread",
-      "itemPrice": 8,
-      "itemType": "food",
-      "itemIngredients": ["toasted ciabatta", "garlic butter", "parsley"],
-      "itemCategory": "Starters",
-      "isGlutenFree": false,
-      "isVegan": false,
-      "isVegetarian": true
-    },
-    {
-      "itemName": "Freedown Hill Wagyu Steak Burger",
-      "itemPrice": 24,
-      "itemType": "food",
-      "itemIngredients": ["caramelised onion", "tomato relish", "double cheese", "tomato", "gem lettuce"],
-      "itemCategory": "Main Courses",
-      "isGlutenFree": false,
-      "isVegan": false,
-      "isVegetarian": false
-    },
-    {
-      "itemName": "Vegan Curry",
-      "itemPrice": 18,
-      "itemType": "food",
-      "itemIngredients": ["chickpeas", "spinach", "coconut milk", "basmati rice"],
-      "itemCategory": "Main Courses",
-      "isGlutenFree": true,
-      "isVegan": true,
-      "isVegetarian": true
-    },
-    {
-      "itemName": "House Red Wine",
-      "itemPrice": 10,
-      "itemType": "beverage",
-      "itemIngredients": [],
-      "itemCategory": "Drinks",
-      "isGlutenFree": true,
-      "isVegan": true,
-      "isVegetarian": true
-    }
-  ]
-}
-\`\`\`
-
-Input Text to Parse:
--------------------------
-${rawText}
--------------------------
-
-Original Filename (for context): ${originalFileName || "N/A"}
-
-Now, analyze the "Input Text to Parse" and directly call the 'extract_menu_data' function with the extracted structured menu data. Do not write any code.
-`;
+      // Simplified prompt for the specific task, relying on systemInstruction for overall guidance
+      const taskPrompt = `Input Text to Parse:\n-------------------------\n${rawText}\n-------------------------\n\nOriginal Filename (for context): ${
+        originalFileName || "N/A"
+      }\n\nNow, analyze the "Input Text to Parse" and directly call the 'extract_menu_data' function with the extracted structured menu data.`;
 
       const chat = model.startChat();
-      const result = await chat.sendMessage(prompt);
+      const result = await chat.sendMessage(taskPrompt); // USE simplified taskPrompt
       const response = result.response;
 
       const functionCalls = response.functionCalls();

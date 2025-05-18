@@ -676,16 +676,8 @@ export class QuizService {
     staffUserId: Types.ObjectId,
     quizId: Types.ObjectId
   ): Promise<QuestionForQuizAttempt[]> {
-    console.log(
-      `[QuizService.startQuizAttempt] Called for staff: ${staffUserId}, quiz: ${quizId}`
-    ); // LOG 1
     // 1. Fetch the Quiz definition
     const quiz = await QuizModel.findById(quizId).lean();
-    console.log(
-      `[QuizService.startQuizAttempt] Fetched quiz definition: ${
-        quiz ? quiz.title : "NOT FOUND"
-      }, Available: ${quiz?.isAvailable}`
-    ); // LOG 2
 
     if (!quiz || !quiz.isAvailable) {
       console.error(
@@ -700,9 +692,6 @@ export class QuizService {
       quizId,
       restaurantId: quiz.restaurantId,
     });
-    console.log(
-      `[QuizService.startQuizAttempt] Found staff progress: ${!!staffProgress}`
-    ); // LOG 3
 
     if (!staffProgress) {
       staffProgress = await StaffQuizProgress.create({
@@ -713,56 +702,31 @@ export class QuizService {
         totalUniqueQuestionsInSource: quiz.totalUniqueQuestionsInSourceSnapshot,
         isCompletedOverall: false,
       });
-      console.log(
-        `[QuizService.startQuizAttempt] Created new staff progress. CompletedOverall: ${staffProgress.isCompletedOverall}`
-      ); // LOG 4
-    } else {
-      console.log(
-        `[QuizService.startQuizAttempt] Existing staff progress. CompletedOverall: ${staffProgress.isCompletedOverall}, Seen IDs: ${staffProgress.seenQuestionIds?.length}`
-      ); // LOG 5
     }
 
     // 3. If already completed, return empty array
     if (staffProgress.isCompletedOverall) {
-      console.log(
-        `[QuizService.startQuizAttempt] Staff has already completed this quiz overall.`
-      ); // LOG 6
       return [];
     }
 
     // 4. Fetch all unique, active question IDs from the Quiz's source question banks
-    console.log(
-      `[QuizService.startQuizAttempt] Fetching unique valid question IDs from banks: ${quiz.sourceQuestionBankIds}`
-    ); // LOG 7
     const allQuestionIdsInSource =
       await getUniqueValidQuestionIdsFromQuestionBanks(
         quiz.sourceQuestionBankIds,
         quiz.restaurantId
       );
-    console.log(
-      `[QuizService.startQuizAttempt] Got ${allQuestionIdsInSource.length} unique valid question IDs from source banks.`
-    ); // LOG 8
 
     // 5. Filter out seen questions
     const seenQuestionIdsSet = new Set(
       staffProgress.seenQuestionIds.map((id) => id.toString())
     );
-    console.log(
-      `[QuizService.startQuizAttempt] User has seen ${seenQuestionIdsSet.size} questions previously.`
-    ); // LOG 9
 
     const availablePoolIds = allQuestionIdsInSource.filter(
       (id) => !seenQuestionIdsSet.has(id.toString())
     );
-    console.log(
-      `[QuizService.startQuizAttempt] Available pool size after filtering seen questions: ${availablePoolIds.length}`
-    ); // LOG 10
 
     // 6. If availablePool is empty, mark as completed and return empty
     if (availablePoolIds.length === 0) {
-      console.log(
-        `[QuizService.startQuizAttempt] No questions in available pool. Marking quiz as completed for user.`
-      ); // LOG 11
       staffProgress.isCompletedOverall = true;
       await staffProgress.save();
       return [];
@@ -774,9 +738,6 @@ export class QuizService {
       0,
       quiz.numberOfQuestionsPerAttempt
     );
-    console.log(
-      `[QuizService.startQuizAttempt] Selected ${questionsToPresentIds.length} questions to present (numberOfQuestionsPerAttempt: ${quiz.numberOfQuestionsPerAttempt})`
-    ); // LOG 12
 
     if (
       questionsToPresentIds.length === 0 &&
@@ -785,8 +746,6 @@ export class QuizService {
       console.warn(
         `[QuizService.startQuizAttempt] WARNING: Selected 0 questions to present, but numberOfQuestionsPerAttempt is ${quiz.numberOfQuestionsPerAttempt}. This implies availablePoolIds was empty or smaller than N.`
       );
-      // This might be redundant if the check at LOG 11 already caught availablePoolIds.length === 0
-      // but useful if slice results in empty for other reasons.
       return []; // Explicitly return empty if nothing was selected to present
     }
 
@@ -1220,15 +1179,8 @@ export class QuizService {
       .lean<IQuizAttempt | null>();
 
     if (!attempt) {
-      console.log(
-        `[QuizService.getQuizAttemptDetails] Attempt ${attemptId} not found.`
-      );
       return null;
     }
-    console.log(
-      `[QuizService.getQuizAttemptDetails] Processing attempt ${attemptId}. Full attempt data:`,
-      JSON.stringify(attempt, null, 2)
-    );
 
     // Authorization check: User must be the one who took the attempt or a restaurant admin of that restaurant
     const restaurantIdOfAttempt = (
@@ -1258,19 +1210,8 @@ export class QuizService {
 
     const incorrectQuestionsDetails: IncorrectQuestionDetailForAttempt[] = [];
     if (attempt.questionsPresented && attempt.questionsPresented.length > 0) {
-      console.log(
-        `[QuizService.getQuizAttemptDetails] Attempt ${attemptId} has ${attempt.questionsPresented.length} presented questions. Iterating...`
-      );
       for (const presentedQ of attempt.questionsPresented) {
-        console.log(
-          `[QuizService.getQuizAttemptDetails] Checking presentedQ: ${JSON.stringify(
-            presentedQ
-          )}. IsCorrect: ${presentedQ.isCorrect}`
-        );
         if (!presentedQ.isCorrect) {
-          console.log(
-            `[QuizService.getQuizAttemptDetails] Found an incorrect question: ${presentedQ.questionId}`
-          );
           const questionDoc = await QuestionModel.findById(
             presentedQ.questionId
           )
@@ -1280,9 +1221,6 @@ export class QuizService {
               "questionText" | "options" | "questionType"
             > | null>();
           if (questionDoc) {
-            console.log(
-              `[QuizService.getQuizAttemptDetails] Found questionDoc for ${presentedQ.questionId}: ${questionDoc.questionText}`
-            );
             let correctAnswerText = "N/A";
             const correctOption = questionDoc.options.find(
               (opt) => opt.isCorrect
@@ -1320,9 +1258,6 @@ export class QuizService {
                 }
               }
             }
-            console.log(
-              `[QuizService.getQuizAttemptDetails] User answer given (raw): ${presentedQ.answerGiven}, Resolved text: ${userAnswerText}`
-            );
 
             incorrectQuestionsDetails.push({
               questionText: questionDoc.questionText,
@@ -1336,18 +1271,7 @@ export class QuizService {
           }
         }
       }
-    } else {
-      console.log(
-        `[QuizService.getQuizAttemptDetails] Attempt ${attemptId} has no questionsPresented or it's empty.`
-      );
     }
-    console.log(
-      `[QuizService.getQuizAttemptDetails] Finished processing. Found ${
-        incorrectQuestionsDetails.length
-      } incorrect questions for client for attempt ${attemptId}. Details: ${JSON.stringify(
-        incorrectQuestionsDetails
-      )}`
-    );
 
     return {
       _id: (attempt._id as Types.ObjectId).toString(),

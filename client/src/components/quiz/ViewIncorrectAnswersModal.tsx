@@ -25,10 +25,10 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
   // isLoading, // Optional: if modal shows its own spinner based on StaffDashboard's _modalLoading
   // error,    // Optional: if modal shows its own error message based on StaffDashboard's _modalError
 }) => {
-  console.log(
-    "[ViewIncorrectAnswersModal] Received attemptDetails:",
-    JSON.stringify(attemptDetails, null, 2)
-  );
+  // console.log(
+  //   "[ViewIncorrectAnswersModal] Received attemptDetails:",
+  //   JSON.stringify(attemptDetails, null, 2)
+  // );
 
   // Effect for closing modal on Escape key press
   useEffect(() => {
@@ -49,10 +49,10 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
     attemptDetails?.incorrectQuestions || [];
   const quizTitle = attemptDetails?.quizTitle || "Quiz Attempt";
 
-  console.log(
-    "[ViewIncorrectAnswersModal] Derived incorrectQuestions:",
-    JSON.stringify(incorrectQuestions, null, 2)
-  );
+  // console.log(
+  //   "[ViewIncorrectAnswersModal] Derived incorrectQuestions:",
+  //   JSON.stringify(incorrectQuestions, null, 2)
+  // );
 
   const footer = (
     <Button

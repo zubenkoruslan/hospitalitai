@@ -139,9 +139,6 @@ const QuizTakingPage: React.FC = () => {
     setCurrentQuestionIndex(0);
     startTimeRef.current = Date.now();
     manualSubmissionCompletedRef.current = false;
-    console.log(
-      "[QuizTakingPage] loadQuizQuestions: RESET manualSubmissionCompletedRef.current to false"
-    );
     setQuizTitle("Quiz Attempt");
 
     try {
@@ -152,10 +149,6 @@ const QuizTakingPage: React.FC = () => {
           const storedAnswers = localStorage.getItem(storageKey);
           if (storedAnswers) {
             initialAnswers = JSON.parse(storedAnswers);
-            console.log(
-              "[QuizTakingPage] Loaded answers from localStorage on init:",
-              initialAnswers
-            );
           }
         } catch (e) {
           console.error(
@@ -213,10 +206,6 @@ const QuizTakingPage: React.FC = () => {
         const storedData = localStorage.getItem(storageKey);
         if (storedData) {
           answersFromStorage = JSON.parse(storedData);
-          console.log(
-            "[QuizTakingPage] submitQuizInBackground - Loaded answers from localStorage:",
-            answersFromStorage
-          );
         }
       } catch (e) {
         console.error(
@@ -231,33 +220,7 @@ const QuizTakingPage: React.FC = () => {
     const answersToUse = answersFromStorage || userAnswersRef.current;
     const currentQuestions = questions; // Closure will capture questions state
 
-    console.log("[QuizTakingPage] submitQuizInBackground called.");
-    console.log(
-      "[QuizTakingPage] submitQuizInBackground - answersToUse (localStorage or ref):",
-      JSON.stringify(answersToUse)
-    );
-    console.log(
-      "[QuizTakingPage] submitQuizInBackground - currentQuestions (from closure):",
-      currentQuestions.map((q) => q._id)
-    );
-
-    // Cleanup localStorage for this quiz attempt after trying to use it
-    // This prevents re-submission of the same background data if something goes wrong before full unmount
-    if (storageKey) {
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (e) {
-        console.error(
-          "Error removing item from localStorage post-background-submit:",
-          e
-        );
-      }
-    }
-
     if (!currentQuizId) {
-      console.log(
-        "[QuizTakingPage] submitQuizInBackground: No currentQuizId, returning."
-      );
       return;
     }
     // If there are no questions in the quiz attempt OR if there are no actual answers given, don't submit.
@@ -265,9 +228,6 @@ const QuizTakingPage: React.FC = () => {
       currentQuestions.length === 0 ||
       Object.keys(answersToUse).length === 0
     ) {
-      console.log(
-        "[QuizTakingPage] submitQuizInBackground: No questions in closure or no answers to use, returning."
-      );
       return;
     }
 
@@ -276,10 +236,6 @@ const QuizTakingPage: React.FC = () => {
         questionId: q._id,
         answerGiven: answersToUse[q._id], // Use the determined answers (localStorage or ref)
       })
-    );
-    console.log(
-      "[QuizTakingPage] submitQuizInBackground - answersToSubmit:",
-      JSON.stringify(answersToSubmit)
     );
     const duration = startTimeRef.current
       ? Math.floor((Date.now() - startTimeRef.current) / 1000)
@@ -290,9 +246,6 @@ const QuizTakingPage: React.FC = () => {
     };
     try {
       await submitQuizAttempt(currentQuizId, submissionData);
-      console.log(
-        "[QuizTakingPage] submitQuizInBackground: Successfully submitted."
-      );
     } catch (err: any) {
       console.error(
         "[QuizTakingPage] Error during background answers submission:",
@@ -303,51 +256,28 @@ const QuizTakingPage: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      console.log(
-        "[QuizTakingPage] Cleanup: manualSubmissionCompletedRef.current:",
-        manualSubmissionCompletedRef.current
-      );
-      console.log(
-        "[QuizTakingPage] Cleanup: submissionResultRef.current:",
-        submissionResultRef.current
-      );
-      console.log(
-        "[QuizTakingPage] Cleanup: isSubmittingRef.current:",
-        isSubmittingRef.current
-      );
-      console.log(
-        "[QuizTakingPage] Cleanup: isCancellingRef.current:",
-        isCancellingRef.current
-      );
-      console.log(
-        "[QuizTakingPage] Cleanup: userAnswersRef.current:",
-        userAnswersRef.current
-      );
-
       const hasAnswers = Object.keys(userAnswersRef.current).length > 0;
-      console.log("[QuizTakingPage] Cleanup: hasAnswers:", hasAnswers);
-
       const shouldSubmitInBackground =
         !manualSubmissionCompletedRef.current &&
         !submissionResultRef.current &&
         !isSubmittingRef.current &&
         !isCancellingRef.current &&
-        hasAnswers; // <-- Added hasAnswers check
-
-      console.log(
-        "[QuizTakingPage] Cleanup: shouldSubmitInBackground:",
-        shouldSubmitInBackground
-      );
+        hasAnswers;
 
       if (shouldSubmitInBackground) {
-        console.log(
-          "[QuizTakingPage] Cleanup: --- CALLING submitQuizInBackground ---"
-        );
         submitQuizInBackground();
       } else {
-        console.log(
-          "[QuizTakingPage] Cleanup: --- SKIPPING submitQuizInBackground ---"
-        );
+        const storageKey = getLocalStorageKey(quizIdRef.current);
+        if (storageKey) {
+          try {
+            localStorage.removeItem(storageKey);
+          } catch (e) {
+            console.error(
+              "Error removing item from localStorage during final cleanup:",
+              e
+            );
+          }
+        }
       }
     };
   }, [submitQuizInBackground]);
@@ -385,16 +315,6 @@ const QuizTakingPage: React.FC = () => {
     selectedValue: string,
     questionType: string
   ) => {
-    console.log("[QuizTakingPage] handleAnswerSelect called:", {
-      questionId,
-      selectedValue,
-      questionType,
-    });
-
-    // --- Optimistic update of userAnswersRef.current ---
-    // This attempts to make the latest selection available to submitQuizInBackground
-    // even if unmount happens before the setUserAnswers-triggered re-render and subsequent effect completes.
-    // This is a targeted fix for the race condition observed.
     const updatedAnswersForRef = { ...userAnswersRef.current }; // Start with current ref's value
     if (questionType === "multiple-choice-multiple") {
       const currentSelection =
@@ -410,31 +330,18 @@ const QuizTakingPage: React.FC = () => {
       updatedAnswersForRef[questionId] = selectedValue;
     }
     userAnswersRef.current = updatedAnswersForRef; // Directly update the ref
-    // --- End of optimistic update ---
 
-    // --- Save to localStorage ---
-    const storageKey = getLocalStorageKey(quizIdRef.current); // Use ref for quizId as state might not be updated
+    // Save to localStorage after every selection
+    const storageKey = getLocalStorageKey(quizId);
     if (storageKey) {
       try {
         localStorage.setItem(storageKey, JSON.stringify(updatedAnswersForRef));
-        console.log(
-          "[QuizTakingPage] Saved answers to localStorage:",
-          updatedAnswersForRef
-        );
       } catch (e) {
         console.error("Error saving answers to localStorage:", e);
-        // Handle potential storage full errors, etc.
       }
     }
-    // --- End of save to localStorage ---
 
     setUserAnswers((prevAnswers) => {
-      // prevAnswers here is the state from the last render.
-      // The standard React state update logic should eventually align with userAnswersRef.current.
-      console.log(
-        "[QuizTakingPage] setUserAnswers callback. prevAnswers:",
-        JSON.stringify(prevAnswers)
-      );
       const newAnswers = { ...prevAnswers }; // Use prevAnswers from React state for the new state
       if (questionType === "multiple-choice-multiple") {
         const currentSelection = (newAnswers[questionId] as string[]) || [];
@@ -449,10 +356,6 @@ const QuizTakingPage: React.FC = () => {
         // For single-select types like mc-single, true-false
         newAnswers[questionId] = selectedValue;
       }
-      console.log(
-        "[QuizTakingPage] setUserAnswers callback. newAnswers:",
-        JSON.stringify(newAnswers)
-      );
       return newAnswers;
     });
   };
@@ -473,15 +376,6 @@ const QuizTakingPage: React.FC = () => {
   const handleSubmit = async () => {
     if (questions.length === 0 || !quizId) return;
     manualSubmissionCompletedRef.current = false; // Reset at start of manual attempt
-    console.log("[QuizTakingPage] handleSubmit called.");
-    console.log(
-      "[QuizTakingPage] handleSubmit - Current userAnswers state:",
-      JSON.stringify(userAnswers)
-    );
-    console.log(
-      "[QuizTakingPage] handleSubmit - Current questions state:",
-      questions.map((q) => q._id)
-    );
 
     const answeredQuestionsCount = questions.filter(
       (q) =>
@@ -504,13 +398,8 @@ const QuizTakingPage: React.FC = () => {
 
     const answersToSubmit: ClientAnswerForSubmission[] = questions.map((q) => ({
       questionId: q._id,
-      answerGiven: userAnswers[q._id] === undefined ? null : userAnswers[q._id], // Send null for unanswered
+      answerGiven: userAnswers[q._id] || null, // Send null if no answer
     }));
-
-    console.log(
-      "[QuizTakingPage] handleSubmit - answersToSubmit:",
-      JSON.stringify(answersToSubmit)
-    );
 
     const durationInSeconds = startTimeRef.current
       ? Math.floor((Date.now() - startTimeRef.current) / 1000)
@@ -524,29 +413,15 @@ const QuizTakingPage: React.FC = () => {
     try {
       const result = await submitQuizAttempt(quizId, submissionData);
       setSubmissionResult(result);
-      console.log(
-        "[QuizTakingPage] handleSubmit: PRE - manualSubmissionCompletedRef.current:",
-        manualSubmissionCompletedRef.current
-      ); // Should be false here
       manualSubmissionCompletedRef.current = true;
-      console.log(
-        "[QuizTakingPage] handleSubmit: POST - manualSubmissionCompletedRef.current:",
-        manualSubmissionCompletedRef.current
-      ); // Should be true here
 
-      // Clear localStorage on successful explicit submission
+      // Clear localStorage for this quiz upon successful submission
       const storageKey = getLocalStorageKey(quizId);
       if (storageKey) {
         try {
           localStorage.removeItem(storageKey);
-          console.log(
-            "[QuizTakingPage] Cleared localStorage on successful submit."
-          );
         } catch (e) {
-          console.error(
-            "Error removing item from localStorage post-submit:",
-            e
-          );
+          console.error("Error clearing localStorage post-submit:", e);
         }
       }
     } catch (err: any) {
@@ -554,7 +429,6 @@ const QuizTakingPage: React.FC = () => {
       setSubmitError(
         err.response?.data?.message || "Failed to submit quiz attempt."
       );
-      // manualSubmissionCompletedRef remains false if submission fails
     } finally {
       setIsSubmitting(false);
     }
@@ -568,7 +442,6 @@ const QuizTakingPage: React.FC = () => {
     );
     if (confirmation) {
       setIsCancelling(true); // Set flag to prevent double submission from unmount
-      // submitQuizInBackground(); // This will be called by unmount logic if not submitted
       navigate("/staff/dashboard");
     }
   };
