@@ -1,27 +1,27 @@
 import mongoose, { Document, Schema, Model, Types } from "mongoose";
 // import { IUser } from "./User"; // Removed unused import
 
-// Define allowed types and categories (can be used for validation later)
 export const ITEM_TYPES = ["food", "beverage"] as const;
-export const FOOD_CATEGORIES = [
-  "appetizer",
-  "main",
-  "side",
-  "dessert",
-  "other",
-] as const;
-export const BEVERAGE_CATEGORIES = [
-  "hot",
-  "cold",
-  "alcoholic",
-  "non-alcoholic",
-  "other",
-] as const;
+// REMOVE FoodCategory, BeverageCategory types and constants
+// export const FOOD_CATEGORIES = [
+//   "appetizer",
+//   "main",
+//   "side",
+//   "dessert",
+//   "other",
+// ] as const;
+// export const BEVERAGE_CATEGORIES = [
+//   "hot",
+//   "cold",
+//   "alcoholic",
+//   "non-alcoholic",
+//   "other",
+// ] as const;
 
 export type ItemType = (typeof ITEM_TYPES)[number];
-export type FoodCategory = (typeof FOOD_CATEGORIES)[number];
-export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
-export type ItemCategory = FoodCategory | BeverageCategory;
+// export type FoodCategory = (typeof FOOD_CATEGORIES)[number];
+// export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
+// export type ItemCategory = FoodCategory | BeverageCategory; // Will just be string now
 
 // Interface representing a MenuItem document in MongoDB
 export interface IMenuItem extends Document {
@@ -30,7 +30,7 @@ export interface IMenuItem extends Document {
   price?: number;
   ingredients?: string[];
   itemType: ItemType;
-  category: string;
+  category: string; // Category will now be a simple string, not validated against a list
   menuId: Types.ObjectId;
   restaurantId: Types.ObjectId;
 
@@ -74,19 +74,20 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       required: [true, "Item category is required"],
       trim: true,
       index: true,
-      validate: {
-        validator: function (this: IMenuItem, value: string): boolean {
-          if (this.itemType === "food") {
-            return (FOOD_CATEGORIES as readonly string[]).includes(value);
-          }
-          if (this.itemType === "beverage") {
-            return (BEVERAGE_CATEGORIES as readonly string[]).includes(value);
-          }
-          return false; // Should not happen if itemType is validated
-        },
-        message: (props: { value: string }) =>
-          `'${props.value}' is not a valid category for the selected item type.`,
-      },
+      // REMOVE custom validator for category
+      // validate: {
+      //   validator: function (this: IMenuItem, value: string): boolean {
+      //     if (this.itemType === "food") {
+      //       return (FOOD_CATEGORIES as readonly string[]).includes(value);
+      //     }
+      //     if (this.itemType === "beverage") {
+      //       return (BEVERAGE_CATEGORIES as readonly string[]).includes(value);
+      //     }
+      //     return false; // Should not happen if itemType is validated
+      //   },
+      //   message: (props: { value: string }) =>
+      //     `'${props.value}' is not a valid category for the selected item type.`,
+      // },
     },
     menuId: {
       type: Schema.Types.ObjectId,

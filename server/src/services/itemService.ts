@@ -1,33 +1,7 @@
 import mongoose, { Types } from "mongoose";
-import MenuItem, {
-  IMenuItem,
-  ItemType,
-  ItemCategory,
-  ITEM_TYPES,
-  FOOD_CATEGORIES,
-  BEVERAGE_CATEGORIES,
-  FoodCategory,
-  BeverageCategory,
-} from "../models/MenuItem";
+import MenuItem, { IMenuItem, ItemType, ITEM_TYPES } from "../models/MenuItem";
 import Menu from "../models/Menu";
 import { AppError } from "../utils/errorHandler";
-
-// --- Helper Functions (kept within service scope) ---
-const isValidCategory = (
-  itemType: ItemType,
-  category: ItemCategory
-): boolean => {
-  if (itemType === "food" && FOOD_CATEGORIES.includes(category as any)) {
-    return true;
-  }
-  if (
-    itemType === "beverage" &&
-    BEVERAGE_CATEGORIES.includes(category as any)
-  ) {
-    return true;
-  }
-  return false;
-};
 
 // Interface for data passed to create/update
 // Define more strictly than route's flexible body
@@ -95,8 +69,11 @@ class ItemService {
       isVegan,
     } = data;
 
+    // Normalize category to lowercase from input data
+    const normalizedCategory = category.toLowerCase();
+
     // --- Validation within Service ---
-    if (!name || !menuId || !itemType || !category) {
+    if (!name || !menuId || !itemType || !normalizedCategory) {
       throw new AppError(
         "Item name, menu ID, type, and category are required",
         400
@@ -164,7 +141,7 @@ class ItemService {
       const newItemData: Partial<IMenuItem> = {
         name: name.trim(),
         itemType,
-        category,
+        category: normalizedCategory,
         menuId: menuObjectId,
         restaurantId: restaurantId,
         isGlutenFree: Boolean(isGlutenFree ?? false),
@@ -333,7 +310,7 @@ class ItemService {
       preparedUpdate.itemType = updateData.itemType;
     }
     if (updateData.category !== undefined)
-      preparedUpdate.category = updateData.category;
+      preparedUpdate.category = updateData.category.toLowerCase().trim();
     if (updateData.isGlutenFree !== undefined)
       preparedUpdate.isGlutenFree = Boolean(updateData.isGlutenFree);
     if (updateData.isDairyFree !== undefined)
@@ -348,57 +325,19 @@ class ItemService {
     }
 
     try {
-      const existingItem = await this.getItemById(itemObjectId, restaurantId);
-      if (!existingItem) {
+      const existingItem = await MenuItem.findById(itemObjectId).exec();
+      if (
+        !existingItem ||
+        existingItem.restaurantId.toString() !== restaurantId.toString()
+      ) {
         throw new AppError("Menu item not found or access denied", 404);
       }
 
-      // Validation for itemType and category changes:
-      // If itemType is being changed, and category is NOT explicitly being changed in this update:
-      // Then, if the existingItem.category is a STANDARD category, it must be valid for the new itemType.
-      // If existingItem.category is custom, or if category IS being explicitly changed, this specific check is bypassed.
       if (
         preparedUpdate.itemType &&
         preparedUpdate.itemType !== existingItem.itemType &&
         !preparedUpdate.category
       ) {
-        const isExistingCategoryStandardFood = FOOD_CATEGORIES.includes(
-          existingItem.category as FoodCategory
-        );
-        const isExistingCategoryStandardBeverage = BEVERAGE_CATEGORIES.includes(
-          existingItem.category as BeverageCategory
-        );
-
-        if (
-          isExistingCategoryStandardFood ||
-          isExistingCategoryStandardBeverage
-        ) {
-          // Only validate if the existing category is one of the standard types.
-          if (
-            !isValidCategory(
-              preparedUpdate.itemType,
-              existingItem.category as ItemCategory
-            )
-          ) {
-            const allowed =
-              preparedUpdate.itemType === "food"
-                ? FOOD_CATEGORIES.join(", ")
-                : BEVERAGE_CATEGORIES.join(", ");
-            throw new AppError(
-              `Existing category '${existingItem.category}' is not valid for new item type '${preparedUpdate.itemType}'. Allowed standard categories for this type: ${allowed}`,
-              400
-            );
-          }
-        }
-      }
-      // If category IS being explicitly changed (i.e., preparedUpdate.category is set),
-      // we accept the new string value. No further validation against standard lists here,
-      // as users can now type in completely custom categories.
-
-      // If itemType was changed but category was not explicitly provided in updateData,
-      // ensure preparedUpdate.category is populated with the existingItem.category.
-      // This carries over either a validated standard category (if applicable from block above) or an unvalidated custom one.
-      if (preparedUpdate.itemType && preparedUpdate.category === undefined) {
         preparedUpdate.category = existingItem.category;
       }
 
@@ -416,7 +355,10 @@ class ItemService {
       );
 
       if (!updatedItem) {
-        throw new AppError("Menu item update failed unexpectedly.", 500);
+        throw new AppError(
+          "Menu item update failed unexpectedly after checks.",
+          500
+        );
       }
 
       return updatedItem;
