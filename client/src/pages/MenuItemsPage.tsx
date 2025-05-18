@@ -114,15 +114,32 @@ const MenuItemsPage: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
+  // NEW: State for active tab
+  const [activeTab, setActiveTab] = useState<"food" | "beverage">("food");
+
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
-  // Memoize unique categories from the current menu items
-  const uniqueCategories = useMemo(() => {
-    if (!items || items.length === 0) {
-      return [];
-    }
-    const categories = items.map((item) => item.category).filter(Boolean); // Filter out empty/null categories
-    return [...new Set(categories)].sort(); // Get unique, sorted categories
+  // New: Memoize unique food and beverage categories separately
+  const uniqueFoodCategories = useMemo(() => {
+    if (!items) return [];
+    return [
+      ...new Set(
+        items
+          .filter((item) => item.itemType === "food" && item.category)
+          .map((item) => item.category!)
+      ),
+    ].sort();
+  }, [items]);
+
+  const uniqueBeverageCategories = useMemo(() => {
+    if (!items) return [];
+    return [
+      ...new Set(
+        items
+          .filter((item) => item.itemType === "beverage" && item.category)
+          .map((item) => item.category!)
+      ),
+    ].sort();
   }, [items]);
 
   // Effect to initialize editing fields when menuDetails load or change
@@ -284,21 +301,32 @@ const MenuItemsPage: React.FC = () => {
 
   // --- Data Grouping for Display ---
   // Memoize grouped items to avoid recalculation on every render
-  const _groupedItems = useMemo(() => {
-    // Prefixed
+  const groupedItemsByTypeAndCategory = useMemo(() => {
     if (!items || items.length === 0) {
-      return {};
+      return { food: {}, beverage: {} }; // Ensure structure exists
     }
 
-    // Group by itemCategory (e.g., Appetizer, Main Course, Dessert, Soft Drink)
-    return items.reduce((acc, item) => {
-      const categoryKey = item.category || "Uncategorized"; // Default for items without a category
-      if (!acc[categoryKey]) {
-        acc[categoryKey] = [];
-      }
-      acc[categoryKey].push(item);
-      return acc;
-    }, {} as Record<string, MenuItem[]>);
+    return items.reduce(
+      (acc, item) => {
+        const typeKey = item.itemType; // "food" or "beverage"
+        const categoryKey = item.category || "Uncategorized";
+
+        if (!acc[typeKey]) {
+          // This case should ideally not happen if types are always food/beverage
+          // but as a fallback, initialize it.
+          acc[typeKey] = {};
+        }
+        if (!acc[typeKey][categoryKey]) {
+          acc[typeKey][categoryKey] = [];
+        }
+        acc[typeKey][categoryKey].push(item);
+        return acc;
+      },
+      { food: {}, beverage: {} } as Record<
+        string, // "food" or "beverage"
+        Record<string, MenuItem[]> // Categories within that type
+      >
+    );
   }, [items]);
 
   // --- Toggle Category Expansion ---
@@ -362,6 +390,161 @@ const MenuItemsPage: React.FC = () => {
     }
   }, [categoryToDelete, menuId, fetchData, closeDeleteCategoryModal]);
 
+  // --- Tab Navigation UI ---
+  const renderTabs = () => (
+    <div className="mb-6 border-b border-gray-200 bg-white shadow-sm rounded-t-lg px-4 sm:px-6">
+      <nav className="-mb-px flex space-x-6 sm:space-x-8" aria-label="Tabs">
+        <button
+          type="button"
+          onClick={() => setActiveTab("food")}
+          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
+            activeTab === "food"
+              ? "border-indigo-600 text-indigo-700"
+              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
+          }`}
+          aria-current={activeTab === "food" ? "page" : undefined}
+        >
+          Food Items
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("beverage")}
+          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
+            activeTab === "beverage"
+              ? "border-indigo-600 text-indigo-700"
+              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
+          }`}
+          aria-current={activeTab === "beverage" ? "page" : undefined}
+        >
+          Beverage Items
+        </button>
+      </nav>
+    </div>
+  );
+
+  // --- Render Logic for Categorized Items (Tab Content) ---
+  const renderCategorizedItems = () => {
+    const itemsToDisplay =
+      activeTab === "food"
+        ? groupedItemsByTypeAndCategory.food
+        : groupedItemsByTypeAndCategory.beverage;
+
+    const uniqueCategoriesForTab =
+      activeTab === "food" ? uniqueFoodCategories : uniqueBeverageCategories;
+
+    const hasItemsInTab =
+      itemsToDisplay &&
+      Object.keys(itemsToDisplay).some((cat) => itemsToDisplay[cat].length > 0);
+
+    if (!hasItemsInTab) {
+      return (
+        <Card className="bg-white shadow-sm rounded-b-lg p-6 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0l-3-3m-10 3l-3-3m10 0l-4 4m-2 0l-4-4"
+            />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            No {activeTab} items in this menu yet.
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Add a new item or switch tabs to view other items.
+          </p>
+          <Button variant="primary" onClick={openAddModal} className="mt-6">
+            Add Menu Item
+          </Button>
+        </Card>
+      );
+    }
+
+    const displayCategoriesOrder =
+      uniqueCategoriesForTab.length > 0
+        ? uniqueCategoriesForTab
+        : Object.keys(itemsToDisplay).sort();
+
+    if (
+      uniqueCategoriesForTab.length === 0 &&
+      itemsToDisplay["Uncategorized"]
+    ) {
+      const idx = displayCategoriesOrder.indexOf("Uncategorized");
+      if (idx > -1) {
+        displayCategoriesOrder.splice(idx, 1);
+        displayCategoriesOrder.push("Uncategorized");
+      }
+    }
+
+    return (
+      <div className="bg-white shadow-sm rounded-b-lg p-4 sm:p-6">
+        {displayCategoriesOrder.map((category) => {
+          const itemsInCategory = itemsToDisplay[category];
+          if (!itemsInCategory || itemsInCategory.length === 0) return null;
+
+          const uniqueCategoryKey = `${activeTab}-${category}`;
+          return (
+            <div key={uniqueCategoryKey} className="mb-6 last:mb-0">
+              <div
+                className="flex justify-between items-center p-3 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100 transition-colors duration-150 border border-gray-200 shadow-sm"
+                onClick={() => toggleCategory(uniqueCategoryKey)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ")
+                    toggleCategory(uniqueCategoryKey);
+                }}
+                aria-expanded={!!expandedCategories[uniqueCategoryKey]}
+                aria-controls={`category-items-${uniqueCategoryKey}`}
+              >
+                <h3 className="text-lg font-medium text-gray-700 flex items-center">
+                  {toTitleCase(category)}
+                  {expandedCategories[uniqueCategoryKey] ? (
+                    <ChevronUpIcon className="h-5 w-5 ml-2 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="h-5 w-5 ml-2 text-gray-500" />
+                  )}
+                </h3>
+                {category !== "Uncategorized" && (
+                  <Button
+                    variant="destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeleteCategoryModal(category);
+                    }}
+                    className="text-xs z-10 relative px-2 py-1"
+                    aria-label={`Delete ${category} category`}
+                  >
+                    <TrashIcon className="h-4 w-4 mr-1 inline-block" /> Delete
+                  </Button>
+                )}
+              </div>
+              {expandedCategories[uniqueCategoryKey] && (
+                <div
+                  id={`category-items-${uniqueCategoryKey}`}
+                  className="mt-1 p-3 border border-gray-200 border-t-0 rounded-b-md bg-white shadow-inner"
+                >
+                  <MenuItemList
+                    items={itemsInCategory}
+                    onEdit={openEditModal}
+                    onDelete={openDeleteModal}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // --- Render Logic ---
   if (loading && !menuDetails) {
     return (
@@ -419,111 +602,6 @@ const MenuItemsPage: React.FC = () => {
       </div>
     );
   }
-
-  // Render categorized items
-  const renderCategorizedItems = () => {
-    if (!items || items.length === 0) {
-      return (
-        <Card className="bg-white shadow-lg rounded-xl p-6 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              vectorEffect="non-scaling-stroke"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0l-3-3m-10 3l-3-3m10 0l-4 4m-2 0l-4-4"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            No items in this menu yet.
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Get started by adding a new item.
-          </p>
-          <Button variant="primary" onClick={openAddModal} className="mt-6">
-            Add Menu Item
-          </Button>
-        </Card>
-      );
-    }
-
-    const categorized = items.reduce((acc, item) => {
-      const category = item.category || "Uncategorized";
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(item);
-      return acc;
-    }, {} as Record<string, MenuItem[]>);
-
-    // Ensure uniqueCategories are up-to-date for rendering order
-    const displayCategoriesOrder =
-      uniqueCategories.length > 0
-        ? uniqueCategories
-        : Object.keys(categorized).sort();
-    if (displayCategoriesOrder.length === 0 && categorized["Uncategorized"]) {
-      displayCategoriesOrder.push("Uncategorized"); // Ensure "Uncategorized" is shown if it's the only one
-    }
-
-    return displayCategoriesOrder.map((category) => (
-      <Card
-        key={category}
-        className="bg-white shadow-lg rounded-xl mb-6 overflow-hidden" // Added overflow-hidden for clean collapse
-      >
-        <div
-          className="flex justify-between items-center p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors duration-150"
-          onClick={() => toggleCategory(category)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") toggleCategory(category);
-          }}
-          aria-expanded={!!expandedCategories[category]}
-          aria-controls={`category-items-${category}`}
-        >
-          <h3 className="text-xl font-semibold text-gray-700 flex items-center">
-            {toTitleCase(category)}
-            {expandedCategories[category] ? (
-              <ChevronUpIcon className="h-5 w-5 ml-2 text-gray-500" />
-            ) : (
-              <ChevronDownIcon className="h-5 w-5 ml-2 text-gray-500" />
-            )}
-          </h3>
-          {category !== "Uncategorized" && (
-            <Button
-              variant="destructive"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent toggleCategory when clicking delete
-                openDeleteCategoryModal(category);
-              }}
-              className="text-xs px-2 py-1 z-10 relative" // Ensure button is clickable over the div
-              aria-label={`Delete ${category} category`}
-            >
-              <TrashIcon className="h-4 w-4 mr-1 inline-block" /> Delete
-            </Button>
-          )}
-        </div>
-        {expandedCategories[category] && (
-          <div
-            id={`category-items-${category}`}
-            className="p-4 sm:p-6 border-t border-gray-200"
-          >
-            <MenuItemList
-              items={categorized[category]}
-              onEdit={openEditModal}
-              onDelete={openDeleteModal}
-            />
-          </div>
-        )}
-      </Card>
-    ));
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -585,6 +663,9 @@ const MenuItemsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Render tabs */}
+        {renderTabs()}
+
         {/* Render categorized items or placeholder */}
         {!loading && renderCategorizedItems()}
       </main>
@@ -600,7 +681,7 @@ const MenuItemsPage: React.FC = () => {
           menuId={menuId ?? ""}
           allItemsInMenu={items}
           restaurantId={restaurantId ?? ""}
-          availableCategories={uniqueCategories}
+          availableCategories={uniqueFoodCategories}
         />
       )}
 
