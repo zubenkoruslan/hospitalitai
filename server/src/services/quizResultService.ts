@@ -6,6 +6,22 @@ import User from "../models/User";
 import { AppError } from "../utils/errorHandler";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 
+// Copied from quizService.ts - TODO: Move to a shared types file
+export interface PlainIQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  description?: string;
+  restaurantId: Types.ObjectId;
+  sourceQuestionBankIds: Types.ObjectId[];
+  totalUniqueQuestionsInSourceSnapshot: number;
+  numberOfQuestionsPerAttempt: number;
+  isAvailable?: boolean;
+  averageScore?: number | null;
+  targetRoles?: Types.ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Interface for the data returned by submitAnswers
 interface _QuizSubmissionResult {
   message: string;
@@ -46,7 +62,7 @@ export class QuizResultService {
         "_id title description createdAt numberOfQuestionsPerAttempt"
       )
         .sort({ createdAt: -1 })
-        .lean();
+        .lean<PlainIQuiz[]>();
 
       const userResults = await QuizResult.find(
         // Still uses QuizResult

@@ -136,9 +136,8 @@ quizResultSchema.index({ restaurantId: 1, userId: 1 });
 // Application logic should handle preventing duplicate in-progress attempts if needed.
 
 // Create and export the QuizResult model
-const QuizResult: Model<IQuizResult> = mongoose.model<IQuizResult>(
-  "QuizResult",
-  quizResultSchema
-);
+const QuizResult: Model<IQuizResult> =
+  mongoose.models.QuizResult ||
+  mongoose.model<IQuizResult>("QuizResult", quizResultSchema);
 
 export default QuizResult;

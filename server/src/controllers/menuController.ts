@@ -254,6 +254,46 @@ export const deleteCategoryAndReassignItems = async (
   }
 };
 
+// --- Update Menu Activation Status ---
+export const updateMenuActivationStatusHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { menuId } = req.params;
+    const { isActive } = req.body;
+    const restaurantId = req.user?.restaurantId;
+
+    if (!restaurantId) {
+      return next(new AppError("User not associated with a restaurant.", 403));
+    }
+
+    if (typeof isActive !== "boolean") {
+      return next(
+        new AppError("isActive field must be a boolean and is required.", 400)
+      );
+    }
+
+    // menuId validation is assumed to be handled by middleware (e.g., validateMenuIdParam)
+
+    const updatedMenu = await MenuService.updateMenuActivationStatus(
+      menuId,
+      new mongoose.Types.ObjectId(restaurantId),
+      isActive
+    );
+
+    // The service throws a 404 if not found, so no need to check !updatedMenu here
+    res.status(200).json({
+      success: true,
+      message: `Menu status updated to ${isActive ? "active" : "inactive"}.`,
+      data: updatedMenu,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Placeholder for other menu controller functions if this is a new file
 // export const createMenu = async (req: Request, res: Response, next: NextFunction) => { ... };
 // export const getMenu = async (req: Request, res: Response, next: NextFunction) => { ... };

@@ -37,9 +37,8 @@ const restaurantSchema = new Schema<IRestaurant>(
 );
 
 // Create and export the Restaurant model
-const Restaurant: Model<IRestaurant> = mongoose.model<IRestaurant>(
-  "Restaurant",
-  restaurantSchema
-);
+const Restaurant: Model<IRestaurant> =
+  mongoose.models.Restaurant ||
+  mongoose.model<IRestaurant>("Restaurant", restaurantSchema);
 
 export default Restaurant;

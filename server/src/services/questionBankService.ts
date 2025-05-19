@@ -7,6 +7,7 @@ import QuestionModel from "../models/QuestionModel";
 // } from "./questionService";
 import { AppError } from "../utils/errorHandler";
 import mongoose from "mongoose";
+import MenuModel from "../models/MenuModel"; // Import MenuModel
 
 // Define an interface for the data expected by createQuestionBankService
 // This should align with what the controller will pass from req.body
@@ -284,8 +285,8 @@ export const createQuestionBankFromMenuService = async (
     restaurantId,
     menuId,
     selectedCategoryNames,
-    generateAiQuestions: _generateAiQuestions,
-    aiParams: _aiParams,
+    generateAiQuestions: _generateAiQuestions, // Renamed to avoid conflict
+    aiParams: _aiParams, // Renamed to avoid conflict
   } = data;
 
   // Validate basic inputs
@@ -295,6 +296,21 @@ export const createQuestionBankFromMenuService = async (
   if (!mongoose.Types.ObjectId.isValid(menuId)) {
     throw new AppError("Invalid Menu ID format.", 400);
   }
+
+  // === BEGIN ADDED VALIDATION ===
+  const menu = await MenuModel.findOne({
+    _id: menuId,
+    restaurantId: restaurantId,
+    isActive: true,
+  }).lean();
+
+  if (!menu) {
+    throw new AppError(
+      `Active menu with ID ${menuId} not found for restaurant ${restaurantId}. Cannot create question bank.`,
+      404
+    );
+  }
+  // === END ADDED VALIDATION ===
 
   const useTransactions = process.env.NODE_ENV !== "development"; // Example condition
   let session: mongoose.ClientSession | null = null;

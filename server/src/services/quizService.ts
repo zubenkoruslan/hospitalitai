@@ -31,6 +31,23 @@ export interface IPopulatedQuiz extends Omit<IQuiz, "targetRoles"> {
   targetRoles?: IRole[];
 }
 
+// Plain interface for lean Quiz objects
+export interface PlainIQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  description?: string;
+  restaurantId: Types.ObjectId;
+  sourceQuestionBankIds: Types.ObjectId[];
+  totalUniqueQuestionsInSourceSnapshot: number;
+  numberOfQuestionsPerAttempt: number;
+  isAvailable?: boolean;
+  averageScore?: number | null;
+  targetRoles?: Types.ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
+  // Ensure all data fields from IQuiz are here, without Document methods
+}
+
 // ADDED: Interface for creating quiz from banks
 export interface CreateQuizFromBanksData {
   title: string;
@@ -449,15 +466,13 @@ export class QuizService {
   static async getQuizForTaking(
     quizId: Types.ObjectId,
     restaurantId: Types.ObjectId
-  ): Promise<IQuiz> {
+  ): Promise<PlainIQuiz> {
     try {
       const quiz = await QuizModel.findOne({
         _id: quizId,
         restaurantId: restaurantId,
         isAvailable: true, // Staff should only be able to take available quizzes
-      })
-        // .populate("questions") // REMOVED: Questions are not stored directly in Quiz definition
-        .lean();
+      }).lean<PlainIQuiz>(); // Specify lean type
 
       if (!quiz) {
         throw new AppError(
@@ -467,7 +482,7 @@ export class QuizService {
       }
       // The service now returns the quiz definition.
       // The actual questions for the attempt will be selected by startQuizAttemptService.
-      return quiz as IQuiz; // Cast as IQuiz after lean
+      return quiz; // No cast needed, quiz is PlainIQuiz
     } catch (error: any) {
       console.error(`Error fetching quiz ${quizId} for taking:`, error);
       if (error instanceof AppError) throw error; // Re-throw 404
@@ -677,7 +692,7 @@ export class QuizService {
     quizId: Types.ObjectId
   ): Promise<QuestionForQuizAttempt[]> {
     // 1. Fetch the Quiz definition
-    const quiz = await QuizModel.findById(quizId).lean();
+    const quiz = await QuizModel.findById(quizId).lean<PlainIQuiz>();
 
     if (!quiz || !quiz.isAvailable) {
       console.error(
@@ -783,7 +798,7 @@ export class QuizService {
     attemptData: QuizAttemptSubmitData // Defined in QuizService or quizTypes.ts
   ): Promise<ServerSubmitAttemptResponse> {
     // 1. Fetch Quiz and StaffQuizProgress
-    const quiz = await QuizModel.findById(quizId).lean();
+    const quiz = await QuizModel.findById(quizId).lean<PlainIQuiz>();
     if (!quiz) {
       throw new AppError("Quiz definition not found.", 404);
     }

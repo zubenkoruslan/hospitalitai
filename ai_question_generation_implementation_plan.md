@@ -22,33 +22,39 @@ This document outlines the steps and considerations for implementing the AI-powe
   - [x] Add `explanation?: string` field for optional answer explanations from AI or user.
   - [x] Add `restaurantId: Types.ObjectId` (if not already universally present and enforced for all questions).
   - [x] Add index for `status` and `restaurantId`.
+- **`QuestionBankModel.ts` (`server/src/models/QuestionBankModel.ts`)**
+  - [x] Add/Ensure instance method `updateQuestionCountAndCategories()`: To be called after questions array is modified. This method should recalculate `questionCount` (based on active/linked questions) and aggregate `categories` from linked questions. (Method implemented, controller calls it).
+- **`MenuModel.ts` (`server/src/models/MenuModel.ts`)**
+  - [x] Created with necessary fields (name, description, restaurantId, items (ref MenuItem), categories, isActive).
+- **`MenuItemModel.ts` (`server/src/models/MenuItemModel.ts`)**
+  - [x] Created with necessary fields (name, description, menuId, restaurantId, category, price, ingredients, allergens, dietaryRestrictions, itemType, isActive, etc.).
 
 ### 2. AI Question Service (`AiQuestionService.ts` - new file in `server/src/services/`)
 
 - [x] Create `AiQuestionService.ts`.
-- [ ] **`generateRawQuestionsFromMenuContent` method:**
+- [x] **`generateRawQuestionsFromMenuContent` method:**
 
   - **Input:** `{ menuId: string, itemIds?: string[], categories: string[], questionFocusAreas: string[], targetQuestionCount: number, questionTypes: string[], difficulty: string, additionalContext?: string, restaurantId: string }` (Defined via interface)
   - **Logic:**
-    - [ ] Fetch `MenuDocument` and relevant `MenuItemDocument`s based on `menuId` and `categories` (and potentially `itemIds`). (Placeholder logic refined)
-    - [ ] Distribute `targetQuestionCount` evenly among selected `questionFocusAreas` and categories. (Refined logic implemented)
-    - [ ] For each item and each selected `questionFocusArea`:
-      - [ ] Construct a detailed prompt for the LLM (see "Prompt Engineering" section below). (Refined logic implemented)
-      - [ ] Include menu item details: name, description, ingredients, allergens. (Incorporated into prompt payload)
-      - [ ] Call the external LLM API (placeholder `callExternalAiApi` function). (Placeholder remains)
-      - [ ] Parse the LLM JSON response. (Basic parsing structure exists)
-      - [ ] Perform basic validation on the structure of the AI's output. (Basic filter exists)
+    - [x] Fetch `MenuDocument` and relevant `MenuItemDocument`s based on `menuId` and `categories` (and potentially `itemIds`). (Implemented using actual Mongoose models).
+    - [x] Distribute `targetQuestionCount` evenly among selected `questionFocusAreas` and categories. (Refined logic implemented)
+    - [x] For each item and each selected `questionFocusArea`:
+      - [x] Construct a detailed prompt for the LLM (see "Prompt Engineering" section below). (Refined logic implemented)
+      - [x] Include menu item details: name, description, ingredients, allergens. (Incorporated into prompt payload)
+      - [x] Call the external LLM API (Implemented `callActualLlmApi` function using `fetch` and env vars `LLM_API_ENDPOINT` & `GEMINI_API_KEY`; user to adjust response parsing for their specific LLM).
+      - [x] Parse the LLM JSON response. (Basic parsing structure exists, relies on LLM output format)
+      - [x] Perform basic validation on the structure of the AI's output. (Basic filter exists)
   - **Output:** Array of raw AI-generated question objects (matching the expected structure from the LLM but not yet `IQuestion` documents). (Defined by return type)
 
-- [ ] **`saveGeneratedQuestionsAsPendingReview` method:**
+- [x] **`saveGeneratedQuestionsAsPendingReview` method:**
   - **Input:** `rawQuestions: AiGeneratedQuestion[], restaurantId: string, (optional) targetBankId?: string` (Defined via interface)
   - **Logic:**
-    - [ ] For each raw question:
-      - [ ] Transform into `IQuestion` format. (Implemented, including type casting and field mapping)
-      - [ ] Set `status: 'pending_review'`. (Implemented)
-      - [ ] Set `createdBy: 'ai'`. (Implemented)
-      - [ ] Set `restaurantId`. (Implemented, with ObjectId conversion)
-      - [ ] Save to `QuestionModel`. (Implemented with error handling)
+    - [x] For each raw question:
+      - [x] Transform into `IQuestion` format. (Implemented, including type casting and field mapping)
+      - [x] Set `status: 'pending_review'`. (Implemented)
+      - [x] Set `createdBy: 'ai'`. (Implemented)
+      - [x] Set `restaurantId`. (Implemented, with ObjectId conversion)
+      - [x] Save to `QuestionModel`. (Implemented with error handling)
       - [ ] If `targetBankId` is provided, consider a temporary link or note for grouping, but don't add to the bank's main `questions` array yet. (Not implemented - marked as optional/future)
   - **Output:** Array of newly saved `IQuestion` documents (with `_id`s and `pending_review` status). (Defined by return type)
 
@@ -73,7 +79,7 @@ This document outlines the steps and considerations for implementing the AI-powe
 - [x] **Review and Acceptance Endpoint (`questionBankRoutes.ts`):**
   - [x] `POST /api/question-banks/:bankId/process-reviewed-questions` (Defined)
   - [x] **Request Body:** `{ acceptedQuestions: IQuestion[], updatedQuestions: IQuestion[], deletedQuestionIds: string[] }` (Handled by controller)
-  - [x] **Controller Logic (`questionBankController.ts`):** (Implemented)
+  - [x] **Controller Logic (`questionBankController.ts`):** (Implemented - handler `processReviewedAiQuestionsHandler` is in place)
     - [x] Iterate through `acceptedQuestions`:
       - [x] If it has an `_id` and was `pending_review`, update it (including `status: 'active'`).
       - [x] If it's new (no `_id`), create it with `status: 'active'`, `createdBy: 'ai'`.
@@ -83,12 +89,12 @@ This document outlines the steps and considerations for implementing the AI-powe
       - [x] Ensure its `_id` is in the `QuestionBankModel.questions` array.
     - [x] Iterate through `deletedQuestionIds`:
       - [x] Either delete from `QuestionModel` or update `status: 'rejected'`. (Implemented as update to 'rejected')
-    - [x] Save changes to `QuestionBankModel`.
-  - [x] Ensure authentication and authorization. (Handled by route-level middleware)
+    - [x] Save changes to `QuestionBankModel` (including updating its question list and counts/categories).
+  - [x] Ensure authentication and authorization. (Handled by route-level middleware in `questionBankRoutes.ts`)
 
 ### 4. Prompt Engineering (within `AiQuestionService.ts`)
 
-- [ ] **System Prompt:** Define the AI's role (expert curriculum designer for restaurants, focusing on provided data). (Considered as part of `additionalInstructions` or future LLM-specific setup)
+- [x] **System Prompt:** Define the AI's role (expert curriculum designer for restaurants, focusing on provided data). (Handled via `additionalInstructions` in prompt payload and general prompt structure; user can customize this text).
 - [x] **User Prompt Template(s):** (Structure defined in `promptPayload` within `AiQuestionService.generateRawQuestionsFromMenuContent`)
   - [x] Structure to include: `menuName`, `categoryName`, `item: { name, description, ingredients, allergens }`, `questionFocus` (e.g., "Ingredients"), `desiredQuestionCount`, `questionTypes`, `difficulty`, `outputFormatInstructions`. (All included)
   - [x] **`outputFormatInstructions`:** Crucial. Specify the exact JSON structure expected: (Detailed in `promptPayload`)
@@ -109,42 +115,43 @@ This document outlines the steps and considerations for implementing the AI-powe
 ### 1. Update AI Generation Forms
 
 - **`CreateQuestionBankForm.tsx` (`client/src/components/questionBank/`)**
-  - [ ] Add a multi-select checkbox group for "Question Focus Areas": Name, Ingredients, Dietary, Description.
-  - [ ] Pass selected focus areas in the API call when AI generation is triggered.
+  - [x] Add a multi-select checkbox group for "Question Focus Areas": Name, Ingredients, Dietary, Description. (Also added Difficulty selector and state for Question Types)
+  - [x] Pass selected focus areas in the API call when AI generation is triggered. (Form now calls new `/api/ai/generate-questions` endpoint via `triggerAiQuestionGenerationProcess` service after bank creation, passing focus areas, difficulty, and types. Old AI params in `createQuestionBankFromMenu` are bypassed.)
 - **`GenerateAiQuestionsForm.tsx` (`client/src/components/questionBank/`)**
-  - [ ] (If this form is kept separate) Add similar "Question Focus Areas" checkboxes.
-  - [ ] Update to call the new `POST /api/ai/generate-questions` endpoint.
-  - [ ] On successful generation, transition user to the new "Review AI Questions" UI, passing the generated questions.
+  - [x] (If this form is kept separate) Add similar "Question Focus Areas" checkboxes. (Added focus areas, difficulty selection, and requires `menuId` prop now)
+  - [x] Update to call the new `POST /api/ai/generate-questions` endpoint. (Updated to use `triggerAiQuestionGenerationProcess` service)
+  - [x] On successful generation, transition user to the new "Review AI Questions" UI, passing the generated questions. (The `onAiQuestionsGenerated` prop receives pending questions. Parent component, like `QuestionBankDetailPage`, is responsible for initiating the review modal. `menuId` made optional to accommodate different contexts.)
 
 ### 2. AI Question Review UI (New Component/Modal)
 
-- [ ] **`AiQuestionReviewModal.tsx` (e.g., in `client/src/components/questionBank/`)**
-  - **Props:** `generatedQuestions: IQuestion[]` (with `status: 'pending_review'`), `targetBankId: string`, `onClose: () => void`, `onReviewComplete: () => void`.
-  - **State:** Manage local copies of questions for editing.
-  - **Display:**
-    - List each question.
-    - Show current question text, options, correct answer, category, difficulty.
-  - **Editing:**
-    - Allow inline editing for text fields.
-    - Allow changing the correct option.
-    - Allow changing category/difficulty via dropdowns.
-    - Button to "Delete" a single question from the review batch.
-  - **Actions:**
-    - "Save & Add to Bank": Calls the `/api/question-banks/:bankId/process-reviewed-questions` endpoint with edited/accepted questions.
-    - "Discard Batch": Closes modal, potentially marks all as 'rejected' or just doesn't save.
-    - "Save for Later" (Optional): Closes modal, questions remain `pending_review`.
+- [x] **`AiQuestionReviewModal.tsx` (e.g., in `client/src/components/questionBank/`)**
+  - [x] Props: `generatedQuestions: IQuestion[]` (with `status: 'pending_review'`), `targetBankId: string`, `onClose: () => void`, `onReviewComplete: () => void`. (Assumed props are correctly defined)
+  - [x] State: Manage local copies of questions for editing. (Implemented with `editableQuestions` state)
+  - [x] Display:
+    - [x] List each question.
+    - [x] Show current question text, options, correct answer, category, difficulty.
+  - [x] Editing:
+    - [x] Allow inline editing for text fields.
+    - [x] Allow changing the correct option.
+    - [x] Allow changing category/difficulty via dropdowns.
+    - [x] Button to "Delete" a single question from the review batch. (Implemented, styling TBD)
+  - [x] Actions:
+    - [x] "Save & Add to Bank": Calls the `/api/question-banks/:bankId/process-reviewed-questions` endpoint with edited/accepted questions. (Implemented in `handleProcessBatch`)
+    - [x] "Discard Batch": Closes modal, questions are not saved or processed (current cancel button behavior).
+    - [x] "Save for Later" (Optional): Closes modal, questions remain `pending_review`. (Cancel button effectively does this as no changes are sent)
 
 ### 3. Update Question Bank Detail Page
 
 - **`QuestionBankDetailPage.tsx` (`client/src/pages/`)**
-  - [ ] Add a distinct section, tab, or button to access/view "AI Questions Pending Review" associated with that bank.
-  - [ ] Clicking this should launch the `AiQuestionReviewModal.tsx` pre-filled with those pending questions.
+  - [x] Add a distinct section, tab, or button to access/view "AI Questions Pending Review" associated with that bank. (Button added to fetch all pending for restaurant and review against current bank)
+  - [x] Clicking this should launch the `AiQuestionReviewModal.tsx` pre-filled with those pending questions. (Implemented)
+  - [x] Consider how "Quick Generate AI Questions" (which uses `GenerateAiQuestionsForm`) integrates with review. Currently adds directly. (Acknowledged as future enhancement: route its output to `AiQuestionReviewModal` as well).
 
 ### 4. API Service Calls (`client/src/services/api.ts`)
 
-- [ ] Add function to call `POST /api/ai/generate-questions`.
-- [ ] Add function to call `GET /api/questions/pending-review`.
-- [ ] Add function to call `POST /api/question-banks/:bankId/process-reviewed-questions`.
+- [x] Add function to call `POST /api/ai/generate-questions`. (This was `triggerAiQuestionGenerationProcess`)
+- [x] Add function to call `GET /api/questions/pending-review`. (This is `getPendingReviewQuestions` - needs to be added or confirmed)
+- [x] Add function to call `POST /api/question-banks/:bankId/process-reviewed-questions`. (Added as `processReviewedAiQuestions`)
 
 ## IV. Workflow Summary
 

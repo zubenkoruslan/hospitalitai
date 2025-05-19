@@ -1,7 +1,19 @@
+import dotenv from "dotenv";
+import path from "path"; // Import the path module
+
+// Configure dotenv to load .env file from the server directory AT THE VERY TOP
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+// --- TEMPORARY DEBUGGING REMOVED ---
+// console.log(
+//   "[DEBUG] GEMINI_API_KEY from process.env (after dotenv.config()):",
+//   process.env.GEMINI_API_KEY
+// );
+// --- TEMPORARY DEBUGGING REMOVED ---
+
 import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import morgan from "morgan";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -18,8 +30,6 @@ import questionRoutes from "./routes/questionRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { roleRouter } from "./routes/roleRoutes";
 import aiRoutes from "./routes/aiRoutes";
-
-dotenv.config();
 
 const app: Express = express();
 

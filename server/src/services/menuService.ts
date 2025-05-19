@@ -263,7 +263,7 @@ class MenuService {
   static async getAllMenus(restaurantId: Types.ObjectId): Promise<IMenu[]> {
     try {
       // Use lean() for performance as we only read data
-      const menus = await Menu.find({ restaurantId }).lean();
+      const menus = await Menu.find({ restaurantId, isActive: true }).lean();
       return menus;
     } catch (error: any) {
       console.error("Error fetching all menus in service:", error);
@@ -442,6 +442,45 @@ class MenuService {
       throw new AppError("Failed to delete menu and associated items.", 500);
     } finally {
       session.endSession();
+    }
+  }
+
+  /**
+   * Updates the isActive status of a menu.
+   *
+   * @param menuId - The ID of the menu to update.
+   * @param restaurantId - The ID of the restaurant owning the menu.
+   * @param isActive - The new activation status (true or false).
+   * @returns A promise resolving to the updated menu document.
+   * @throws {AppError} If the menu is not found or doesn't belong to the restaurant (404),
+   *                    or if any unexpected database error occurs (500).
+   */
+  static async updateMenuActivationStatus(
+    menuId: string | Types.ObjectId,
+    restaurantId: Types.ObjectId,
+    isActive: boolean
+  ): Promise<IMenu | null> {
+    const menuObjectId =
+      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
+
+    try {
+      const updatedMenu = await Menu.findOneAndUpdate(
+        { _id: menuObjectId, restaurantId: restaurantId },
+        { $set: { isActive: isActive } },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedMenu) {
+        throw new AppError(
+          "Menu not found or access denied for this operation.",
+          404
+        );
+      }
+      return updatedMenu;
+    } catch (error: any) {
+      console.error("Error updating menu activation status in service:", error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update menu activation status.", 500);
     }
   }
 

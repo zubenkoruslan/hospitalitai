@@ -10,9 +10,20 @@ import StaffQuizProgress, {
 } from "../models/StaffQuizProgress";
 import QuizAttempt, { IQuizAttempt } from "../models/QuizAttempt";
 import { IQuizAttemptSummary } from "../types/quizTypes";
-import RoleModel from "../models/RoleModel";
+import RoleModel, { IRole } from "../models/RoleModel";
 
 // Define interfaces for return types to improve clarity
+
+// Plain interface for lean Role objects
+export interface PlainIRole {
+  _id: Types.ObjectId;
+  name: string;
+  description?: string;
+  restaurantId: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+  // Ensure all data fields from IRole are here, without Document methods
+}
 
 // NEW interface for individual quiz progress summary
 interface QuizProgressSummary {
@@ -104,7 +115,7 @@ class StaffService {
         if (staffMember.assignedRoleId) {
           const roleDoc = await RoleModel.findById(staffMember.assignedRoleId)
             .select("name")
-            .lean();
+            .lean<PlainIRole>();
           if (roleDoc && roleDoc.name) {
             currentProfessionalRole = roleDoc.name;
           }
@@ -500,55 +511,51 @@ class StaffService {
     assignedRoleId: Types.ObjectId | null,
     restaurantId: Types.ObjectId
   ): Promise<Omit<IUser, "password"> | null> {
-    const staffObjectId = new Types.ObjectId(staffId);
+    const staffObjectId =
+      typeof staffId === "string" ? new Types.ObjectId(staffId) : staffId;
 
     try {
-      let professionalRoleToSet: string | null = null;
+      const staffMember = await User.findOne({
+        _id: staffObjectId,
+        restaurantId: restaurantId,
+      });
+
+      if (!staffMember) {
+        throw new AppError("Staff member not found in this restaurant.", 404);
+      }
+
+      let professionalRoleToSet: string | undefined = undefined;
+
       if (assignedRoleId) {
-        const roleDoc = await RoleModel.findById(assignedRoleId).lean();
-        if (roleDoc) {
+        // Fetch the role name to set it on the User document
+        const roleDoc = await RoleModel.findById(assignedRoleId)
+          .select("name")
+          .lean<PlainIRole>(); // Typed lean
+        if (roleDoc && roleDoc.name) {
           professionalRoleToSet = roleDoc.name;
         } else {
-          // Role not found, maybe throw an error or set professionalRole to a default/null
-          // For now, if role ID is given but role not found, we won't set professional role.
-          // This scenario should ideally be prevented by frontend validation or by ensuring role exists.
+          // If roleDoc is not found or has no name, it implies an issue (e.g., role deleted after selection)
+          // Depending on desired behavior, either throw error or proceed without setting professionalRole
           console.warn(
-            `Role with ID ${assignedRoleId} not found when trying to set professionalRole.`
+            `Role with ID ${assignedRoleId} not found or has no name during staff update.`
           );
+          // For now, let's proceed, allowing assignedRoleId to be set but professionalRole might be stale or empty
         }
       }
 
-      const updateOperation: any = {};
-      if (assignedRoleId) {
-        updateOperation.$set = {
-          assignedRoleId: assignedRoleId,
-          professionalRole: professionalRoleToSet, // Set professionalRole based on assigned role name
-        };
-      } else {
-        updateOperation.$unset = { assignedRoleId: "" };
-        updateOperation.$set = { professionalRole: null }; // Clear professionalRole when unassigning
-      }
+      staffMember.assignedRoleId = assignedRoleId || undefined; // Set to ObjectId or undefined if null
+      staffMember.professionalRole = professionalRoleToSet; // Set based on fetched role name or undefined
 
-      const updatedStaff = await User.findOneAndUpdate(
-        {
-          _id: staffObjectId,
-          restaurantId: restaurantId,
-        },
-        updateOperation,
-        { new: true, runValidators: true }
-      ).select("-password");
+      const updatedStaff = await staffMember.save();
 
-      if (!updatedStaff) {
-        throw new AppError(
-          "Staff member not found or not part of the restaurant.",
-          404
-        );
-      }
-      return updatedStaff;
+      // Return a lean version of the user object, excluding the password
+      const { password, ...staffDetailsWithoutPassword } =
+        updatedStaff.toObject() as IUser;
+      return staffDetailsWithoutPassword as Omit<IUser, "password">;
     } catch (error) {
+      console.error("Error updating staff assigned role in service:", error);
       if (error instanceof AppError) throw error;
-      console.error(`Error updating staff assigned role: ${error}`);
-      throw new AppError(`Error updating staff assigned role: ${error}`, 500);
+      throw new AppError("Failed to update staff member's assigned role.", 500);
     }
   }
 

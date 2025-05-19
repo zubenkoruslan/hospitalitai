@@ -253,7 +253,8 @@ export const removeQuestionFromBank = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { bankId, questionId } = req.params; // Assuming questionId will be part of the route path
+    const { bankId, questionId } = req.params; // Assuming questionId is also in params for RESTfulness
+    // If questionId is in body: const { questionId } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -262,88 +263,102 @@ export const removeQuestionFromBank = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    // Service function will validate bankId and questionId formats
-    const updatedBank = await QuestionBankService.removeQuestionFromBankService(
+    // const { shouldRemoveQuestions } = req.body; // This was likely the source of the 4th param
+
+    const result = await QuestionBankService.removeQuestionFromBankService(
       bankId,
       restaurantId,
       questionId
+      // shouldRemoveQuestions // Removed 4th argument
     );
 
-    // removeQuestionFromBankService throws specific AppErrors for not found, etc.
-    // If we reach here, the operation was successful.
+    if (!result) {
+      return next(
+        new AppError(
+          `Failed to remove question. Bank ${bankId} or question ${questionId} not found, or question not in bank.`,
+          404
+        )
+      );
+    }
 
     res.status(200).json({
       status: "success",
-      message: "Question removed from bank successfully.",
-      data: updatedBank,
+      message: "Question removed from bank successfully.", // Static message
+      data: result, // result is the updated IQuestionBank
+      // removedQuestionsCount: result.removedQuestionsCount, // IQuestionBank does not have this
     });
   } catch (error) {
     next(error);
   }
 };
 
+// Create a question bank from a menu with optional AI question generation
 export const createQuestionBankFromMenu = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { user } = req;
-    if (!user || user.role !== "restaurant" || !user.restaurantId) {
-      return next(
-        new AppError("User not authorized or restaurant ID missing", 403)
-      );
-    }
-
     const {
       name,
       description,
       menuId,
-      selectedCategoryNames,
+      selectedCategoryNames, // Ensure this is what client sends
       generateAiQuestions,
       aiParams,
-    } = req.body as Omit<CreateQuestionBankFromMenuData, "restaurantId">;
+    } = req.body;
 
-    if (
-      !menuId ||
-      !selectedCategoryNames ||
-      !Array.isArray(selectedCategoryNames) ||
-      selectedCategoryNames.length === 0
-    ) {
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    // Validate required fields
+    if (!name || !menuId || !selectedCategoryNames) {
       return next(
         new AppError(
-          "Menu ID and at least one selected category name are required.",
+          "Missing required fields: name, menuId, and selectedCategoryNames are required.",
           400
         )
       );
     }
+    if (!mongoose.Types.ObjectId.isValid(menuId)) {
+      return next(new AppError("Invalid menu ID format.", 400));
+    }
 
-    const serviceData: CreateQuestionBankFromMenuData = {
+    const bankData: QuestionBankService.CreateQuestionBankFromMenuData = {
+      // Corrected Type
       name,
       description,
-      restaurantId: user.restaurantId as mongoose.Types.ObjectId,
-      menuId: menuId as unknown as mongoose.Types.ObjectId,
+      restaurantId,
+      menuId: new mongoose.Types.ObjectId(menuId),
       selectedCategoryNames,
       generateAiQuestions,
       aiParams,
     };
 
-    const newBank = await QuestionBankService.createQuestionBankFromMenuService(
-      serviceData
+    const result = await QuestionBankService.createQuestionBankFromMenuService(
+      // Corrected service call if it was createQuestionBankFromMenu
+      bankData
+      // req.user.restaurantId // This was likely an error if bankData already contains restaurantId
     );
+
+    // If service returns null or throws error for not found, it will be caught by general error handler
+    // or specific checks within service. Controller assumes success if no error is thrown.
+
     res.status(201).json({
-      message: "Question bank created successfully from menu.",
-      data: newBank,
+      status: "success",
+      message: "Question bank created successfully from menu.", // Static message
+      data: result, // result is IQuestionBank
     });
   } catch (error) {
-    if (error instanceof AppError) {
-      return next(error);
-    }
-    console.error("Error in createQuestionBankFromMenu controller:", error);
-    return next(new AppError("Failed to create question bank from menu.", 500));
+    next(error);
   }
 };
 
+// Get Question Bank by ID (already exists, shown for context if needed)
 export const getQuestionBankById = async (
   req: Request,
   res: Response,
@@ -351,7 +366,6 @@ export const getQuestionBankById = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-
     if (!req.user || !req.user.restaurantId) {
       return next(
         new AppError("User not authenticated or restaurantId missing", 401)
@@ -359,7 +373,6 @@ export const getQuestionBankById = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    // Validate bankId format
     if (!mongoose.Types.ObjectId.isValid(bankId)) {
       return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
     }
@@ -387,7 +400,7 @@ export const getQuestionBankById = async (
   }
 };
 
-// Controller to add a category to a question bank
+// Add a category to a Question Bank
 export const addCategoryToQuestionBank = async (
   req: Request,
   res: Response,
@@ -404,53 +417,103 @@ export const addCategoryToQuestionBank = async (
     }
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    if (!mongoose.Types.ObjectId.isValid(bankId)) {
-      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
+    if (!categoryName || typeof categoryName !== "string") {
+      return next(new AppError("Category name is required.", 400));
     }
 
-    if (
-      !categoryName ||
-      typeof categoryName !== "string" ||
-      categoryName.trim() === ""
-    ) {
+    const result = await QuestionBankService.addCategoryToQuestionBankService(
+      bankId,
+      restaurantId,
+      categoryName
+    );
+
+    if (!result) {
       return next(
         new AppError(
-          "Category name must be a non-empty string and provided in the request body.",
-          400
+          `Question bank not found with ID: ${bankId} for this restaurant, or category already exists / update failed.`,
+          404 // Or 400 if category already exists and that's an error
         )
       );
     }
 
-    const updatedBank =
-      await QuestionBankService.addCategoryToQuestionBankService(
-        bankId,
-        restaurantId,
-        categoryName.trim()
-      );
-
-    // The service throws a 404 if bank is not found, so we don't need to re-check here.
-    // If updatedBank is null for other reasons (though service aims to throw), it would be an issue.
-
     res.status(200).json({
       status: "success",
-      message: "Category added to question bank successfully.",
-      data: updatedBank,
+      message: "Category added to question bank successfully.", // Static message
+      data: result, // result is IQuestionBank
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Controller to remove a category from a question bank
+// Remove a category from a Question Bank (and optionally its questions)
 export const removeCategoryFromQuestionBank = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { bankId, categoryName: categoryNameFromParams } = req.params; // categoryName from URL
-    // For consistency, let's expect categoryName in params, matching the DELETE route structure.
-    // If it were from body: const { categoryName: categoryNameFromBody } = req.body;
+    const { bankId } = req.params;
+    const { categoryName } = req.body; // Or req.params if categoryName is part of URL
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    if (!categoryName) {
+      return next(new AppError("Category name is required.", 400));
+    }
+
+    const result =
+      await QuestionBankService.removeCategoryFromQuestionBankService(
+        bankId,
+        restaurantId,
+        categoryName
+        // Ensure no 4th argument here if that was the TS2554 error source
+      );
+
+    if (!result) {
+      return next(
+        new AppError(
+          `Question bank not found with ID: ${bankId}, or category not found.`,
+          404
+        )
+      );
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Category removed from question bank successfully.", // Static message
+      data: result, // result is IQuestionBank
+      // removedQuestionsCount: result.removedQuestionsCount, // IQuestionBank does not have this
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+interface ProcessReviewedQuestionsBody {
+  acceptedQuestions: Partial<IQuestion>[]; // Questions to make active and add to bank
+  updatedQuestions: Partial<IQuestion & { _id: string }>[]; // Questions (likely pending) that were edited, to make active and add/confirm in bank
+  deletedQuestionIds: string[]; // Question IDs (from pending batch) to mark as 'rejected'
+}
+
+// Controller to process reviewed AI questions
+export const processReviewedAiQuestionsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId } = req.params;
+    const {
+      acceptedQuestions = [],
+      updatedQuestions = [],
+      deletedQuestionIds = [],
+    }: ProcessReviewedQuestionsBody = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -460,245 +523,165 @@ export const removeCategoryFromQuestionBank = async (
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
     if (!mongoose.Types.ObjectId.isValid(bankId)) {
-      return next(new AppError(`Invalid bank ID format: ${bankId}`, 400));
+      return next(new AppError("Invalid Question Bank ID format.", 400));
     }
 
-    const categoryName = categoryNameFromParams; // Use the one from params
-
-    if (
-      !categoryName ||
-      typeof categoryName !== "string" ||
-      categoryName.trim() === ""
-    ) {
-      // This validation might be redundant if Express routing already ensures categoryName is present
-      // but good for robustness if param might be missing or empty despite route structure.
-      return next(
-        new AppError(
-          "Category name must be a non-empty string and provided in the URL path.",
-          400
-        )
-      );
-    }
-
-    const updatedBank =
-      await QuestionBankService.removeCategoryFromQuestionBankService(
-        bankId,
-        restaurantId,
-        categoryName.trim()
-      );
-
-    // Service throws 404 if bank not found.
-
-    res.status(200).json({
-      status: "success",
-      message: "Category removed from question bank successfully.",
-      data: updatedBank, // Contains the bank state *after* removal.
-      // If category wasn't there, $pull does nothing, bank is returned as is.
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const processReviewedAiQuestionsHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { bankId } = req.params;
-    const { acceptedQuestions, updatedQuestions, deletedQuestionIds } =
-      req.body as {
-        acceptedQuestions: IQuestion[];
-        updatedQuestions: IQuestion[];
-        deletedQuestionIds: string[];
-      };
-
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
-    const mongoBankId = new mongoose.Types.ObjectId(bankId);
-
-    // 1. Validate Bank exists and belongs to the user's restaurant
-    const questionBank = await QuestionBankModel.findOne({
-      _id: mongoBankId,
-      restaurantId: restaurantId,
+    const bank = await QuestionBankModel.findOne({
+      _id: bankId,
+      restaurantId,
     });
 
-    if (!questionBank) {
+    if (!bank) {
       return next(
         new AppError(
-          `Question bank not found with ID: ${bankId} for your restaurant.`,
+          `Question Bank with ID ${bankId} not found for this restaurant.`,
           404
         )
       );
     }
 
-    const processedQuestionIds: mongoose.Types.ObjectId[] = [];
-    const errors: { questionId?: string; message: string }[] = [];
+    const questionIdsToAddToBank = new Set<string>(
+      bank.questions.map((q) => q.toString())
+    );
+    const questionsToSave: mongoose.Document<unknown, {}, IQuestion>[] = [];
 
-    // 2. Process acceptedQuestions (new or pending_review questions to make active)
-    if (acceptedQuestions && acceptedQuestions.length > 0) {
-      for (const qData of acceptedQuestions) {
-        try {
-          let questionToSave: IQuestion;
-          if (qData._id) {
-            // Existing pending question being accepted/updated
-            const existingQuestion = await QuestionModel.findOneAndUpdate(
-              {
-                _id: qData._id,
-                restaurantId: restaurantId,
-                status: "pending_review",
-                createdBy: "ai",
-              },
-              {
-                ...qData,
-                status: "active",
-                restaurantId: restaurantId,
-                _id: qData._id,
-              }, // Ensure restaurantId is part of update
-              { new: true, runValidators: true }
-            );
-            if (!existingQuestion) {
-              errors.push({
-                questionId: qData._id.toString(),
-                message:
-                  "Failed to find or update pending question for acceptance.",
-              });
-              continue;
-            }
-            questionToSave = existingQuestion;
-          } else {
-            // Brand new question (e.g., user added one during review)
-            const newQ = new QuestionModel({
-              ...qData,
-              restaurantId: restaurantId,
-              status: "active",
-              createdBy: "ai", // Or 'manual' if user can create brand new ones here
-            });
-            questionToSave = await newQ.save();
-          }
-          processedQuestionIds.push(questionToSave._id);
-        } catch (err: any) {
-          errors.push({
-            questionId: qData._id?.toString(),
-            message: `Error accepting question: ${err.message}`,
-          });
-        }
-      }
-    }
-
-    // 3. Process updatedQuestions (existing pending questions that were modified)
-    // This logic is largely covered by acceptedQuestions if they pass the full IQuestion object.
-    // If updatedQuestions only contains partial updates for already pending items, this section would be different.
-    // For now, assuming updatedQuestions are full IQuestion objects from pending_review, similar to accepted.
-    if (updatedQuestions && updatedQuestions.length > 0) {
-      for (const qData of updatedQuestions) {
-        if (!qData._id) {
-          errors.push({ message: "Updated question is missing an _id." });
-          continue;
-        }
-        try {
-          const updatedQ = await QuestionModel.findOneAndUpdate(
-            {
-              _id: qData._id,
-              restaurantId: restaurantId,
-              status: "pending_review",
-              createdBy: "ai",
-            },
-            { ...qData, status: "active", restaurantId: restaurantId }, // Ensure all necessary fields are set
-            { new: true, runValidators: true }
-          );
-          if (!updatedQ) {
-            errors.push({
-              questionId: qData._id.toString(),
-              message: "Failed to find or update pending question.",
-            });
-            continue;
-          }
-          processedQuestionIds.push(updatedQ._id);
-        } catch (err: any) {
-          errors.push({
-            questionId: qData._id.toString(),
-            message: `Error updating question: ${err.message}`,
-          });
-        }
-      }
-    }
-
-    // 4. Process deletedQuestionIds (mark as 'rejected' or delete)
-    if (deletedQuestionIds && deletedQuestionIds.length > 0) {
-      for (const id of deletedQuestionIds) {
-        try {
-          // Option 1: Mark as rejected
-          const result = await QuestionModel.findOneAndUpdate(
-            {
-              _id: new mongoose.Types.ObjectId(id),
-              restaurantId: restaurantId,
-              createdBy: "ai",
-            }, // ensure it was an AI question for this restaurant
-            { status: "rejected" },
-            { new: true }
-          );
-          // Option 2: Actually delete
-          // await QuestionModel.deleteOne({ _id: id, restaurantId: restaurantId });
-          if (
-            !result &&
-            (acceptedQuestions?.find((q) => q._id?.toString() === id) ||
-              updatedQuestions?.find((q) => q._id?.toString() === id))
-          ) {
-            // If it was just accepted/updated, don't mark as error for deletion if not found as pending
-          } else if (!result) {
-            errors.push({
-              questionId: id,
-              message:
-                "Failed to find AI question to mark as rejected or it was already processed.",
-            });
-          }
-        } catch (err: any) {
-          errors.push({
-            questionId: id,
-            message: `Error deleting/rejecting question: ${err.message}`,
-          });
-        }
-      }
-    }
-
-    // 5. Update Question Bank with new, unique question IDs
-    if (processedQuestionIds.length > 0) {
-      const uniqueNewQuestionIds = processedQuestionIds.filter(
-        (id) =>
-          !questionBank.questions.some((existingId) => existingId.equals(id))
+    // Process deleted questions (mark as 'rejected')
+    if (deletedQuestionIds.length > 0) {
+      await QuestionModel.updateMany(
+        { _id: { $in: deletedQuestionIds }, restaurantId },
+        { $set: { status: "rejected" } }
       );
-      if (uniqueNewQuestionIds.length > 0) {
-        questionBank.questions.push(...uniqueNewQuestionIds);
-        await questionBank.save();
+      // Remove from bank's list if they were somehow there
+      deletedQuestionIds.forEach((id) => questionIdsToAddToBank.delete(id));
+    }
+
+    // Process updated questions
+    for (const qData of updatedQuestions) {
+      if (!qData._id || !mongoose.Types.ObjectId.isValid(qData._id)) {
+        console.warn(
+          "Skipping update for question with invalid/missing _id:",
+          qData
+        );
+        continue;
+      }
+      const question = await QuestionModel.findOne({
+        _id: qData._id,
+        restaurantId,
+      });
+      if (question) {
+        Object.assign(question, qData); // Apply updates from qData
+        question.status = "active"; // Ensure status is active
+        question.restaurantId = restaurantId; // Ensure restaurantId
+        question.createdBy = question.createdBy || "ai"; // Preserve original creator or default to 'ai'
+        questionsToSave.push(question);
+        questionIdsToAddToBank.add(question._id.toString());
+      } else {
+        console.warn(`Question with _id ${qData._id} not found for update.`);
       }
     }
 
-    if (errors.length > 0) {
-      // Partial success if some questions were processed but errors occurred
-      return res.status(207).json({
-        status: "partial_success",
-        message: "AI questions processed with some errors.",
-        processedCount: processedQuestionIds.length,
-        data: questionBank,
-        errors,
+    // Process accepted questions
+    for (const qData of acceptedQuestions) {
+      if (qData._id && mongoose.Types.ObjectId.isValid(qData._id)) {
+        // Existing pending question being accepted
+        const question = await QuestionModel.findOne({
+          _id: qData._id,
+          restaurantId,
+        });
+        if (question) {
+          // If it was pending_review or rejected, update it.
+          if (
+            question.status === "pending_review" ||
+            question.status === "rejected"
+          ) {
+            Object.assign(question, qData); // Apply any edits made during review
+            question.status = "active";
+            question.restaurantId = restaurantId;
+            question.createdBy = question.createdBy || "ai";
+            questionsToSave.push(question);
+            questionIdsToAddToBank.add(question._id.toString());
+          } else if (question.status === "active") {
+            // If already active but somehow in accepted list, ensure it's in bank.
+            questionIdsToAddToBank.add(question._id.toString());
+          }
+        } else {
+          console.warn(`Accepted question with _id ${qData._id} not found.`);
+        }
+      } else {
+        // New question created during review (less likely for AI, but supported by plan)
+        const newQuestionDocument = new QuestionModel({
+          ...qData,
+          status: "active",
+          createdBy: "ai", // Or derive if possible, defaulting to 'ai' for this handler
+          restaurantId,
+        });
+        questionsToSave.push(newQuestionDocument);
+        // ID will be generated on save, add after save.
+      }
+    }
+
+    // Save all new/updated questions
+    if (questionsToSave.length > 0) {
+      // Mongoose `bulkSave` saves an array of documents, good for performance.
+      // It will insert new documents and update existing ones if they have an _id and version key.
+      await QuestionModel.bulkSave(questionsToSave);
+
+      // Add IDs of newly created questions to the set for bank update
+      questionsToSave.forEach((doc) => {
+        // After bulkSave, documents should have their _ids if they were new.
+        if (doc && doc._id && !questionIdsToAddToBank.has(doc._id.toString())) {
+          questionIdsToAddToBank.add(doc._id.toString());
+        }
       });
     }
 
+    // Update the bank with the final list of question IDs
+    bank.questions = Array.from(questionIdsToAddToBank).map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+
+    // Recalculate categories and questionCount
+    // This assumes a method on the QuestionBankModel schema or a pre-save hook handles this.
+    // If not, this logic needs to be implemented here or in a service.
+    if (typeof (bank as any).updateQuestionCountAndCategories === "function") {
+      await (bank as any).updateQuestionCountAndCategories();
+    } else {
+      // Fallback or warning if method doesn't exist
+      console.warn(
+        "bank.updateQuestionCountAndCategories() method not found. Count and categories might be stale."
+      );
+      // Basic recalculation (consider moving to a model method or pre-save hook)
+      bank.questionCount = bank.questions.length;
+      const activeQuestionsInBank = await QuestionModel.find({
+        _id: { $in: bank.questions },
+        status: "active",
+      });
+      const categories = new Set<string>();
+      activeQuestionsInBank.forEach((q) =>
+        q.categories.forEach((cat) => categories.add(cat))
+      );
+      bank.categories = Array.from(categories);
+    }
+    await bank.save();
+
     res.status(200).json({
       status: "success",
-      message: "AI questions processed and added to bank successfully.",
-      data: questionBank,
+      message: "Reviewed questions processed successfully.",
+      data: bank,
     });
   } catch (error) {
-    if (error instanceof mongoose.Error.CastError) {
-      return next(new AppError(`Invalid ID format: ${error.message}`, 400));
+    console.error("Error in processReviewedAiQuestionsHandler:", error);
+    if (error instanceof AppError) {
+      next(error);
+    } else if (error instanceof mongoose.Error.ValidationError) {
+      next(new AppError(`Validation Error: ${error.message}`, 400));
+    } else {
+      next(
+        new AppError(
+          "An internal server error occurred while processing reviewed questions.",
+          500
+        )
+      );
     }
-    next(error);
   }
 };

@@ -40,6 +40,7 @@ RoleSchema.index({ name: 1, restaurantId: 1 }, { unique: true });
 // Pre-save hook for validation or other logic can be added here if needed
 // RoleSchema.pre<IRole>('save', async function (next) { ... });
 
-const RoleModel = mongoose.model<IRole>("Role", RoleSchema);
+const RoleModel =
+  mongoose.models.Role || mongoose.model<IRole>("Role", RoleSchema);
 
 export default RoleModel;

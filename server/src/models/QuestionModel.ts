@@ -120,9 +120,8 @@ QuestionSchema.path("options").validate(function (
 },
 "Incorrect number of correct options set for the question type. Single-answer MCQs and True/False must have exactly one correct option. Multi-answer MCQs must have at least one.");
 
-const QuestionModel: Model<IQuestion> = mongoose.model<IQuestion>(
-  "Question",
-  QuestionSchema
-);
+const QuestionModel: Model<IQuestion> =
+  mongoose.models.Question ||
+  mongoose.model<IQuestion>("Question", QuestionSchema);
 
 export default QuestionModel;

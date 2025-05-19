@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import AiQuestionService from "../services/AiQuestionService";
-import { AppError } from "../utils/AppError"; // Assuming you have an AppError utility
+import { AppError } from "../utils/errorHandler"; // Corrected path
 
 interface GenerateQuestionsRequestBody {
   menuId: string;

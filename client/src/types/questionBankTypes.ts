@@ -96,3 +96,15 @@ export interface UpdateQuestionClientData {
   categories?: string[];
   difficulty?: "easy" | "medium" | "hard";
 }
+
+// Payload for the new AI Question Generation Process via /api/ai/generate-questions
+export interface NewAiQuestionGenerationParams {
+  menuId: string;
+  categories: string[];
+  questionFocusAreas: string[];
+  targetQuestionCount: number;
+  questionTypes: string[];
+  difficulty: string;
+  additionalContext?: string; // Optional
+  itemIds?: string[]; // Optional
+}

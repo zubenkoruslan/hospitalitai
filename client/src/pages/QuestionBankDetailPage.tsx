@@ -7,12 +7,16 @@ import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
 import GenerateAiQuestionsForm from "../components/questionBank/GenerateAiQuestionsForm";
+import AiQuestionReviewModal from "../components/questionBank/AiQuestionReviewModal";
 import Modal from "../components/common/Modal";
 import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
+import { getPendingReviewQuestions } from "../services/api";
+import { getMenusByRestaurant as fetchRestaurantMenus } from "../services/api";
+import { IMenuClient } from "../types/menuTypes";
 
 // Simple component to display a single question - to be expanded
 const QuestionListItem: React.FC<{
@@ -94,6 +98,23 @@ const QuestionBankDetailPage: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<IQuestion | null>(
     null
   );
+
+  // State for AI Question Review Modal
+  const [isAiReviewModalOpen, setIsAiReviewModalOpen] = useState(false);
+  const [questionsForAiReview, setQuestionsForAiReview] = useState<IQuestion[]>(
+    []
+  );
+  const [isLoadingPendingQuestions, setIsLoadingPendingQuestions] =
+    useState(false);
+
+  // State for menu selection for AI Generation
+  const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
+  const [selectedMenuForAi, setSelectedMenuForAi] = useState<string | null>(
+    null
+  );
+  const [isMenuSelectionModalOpen, setIsMenuSelectionModalOpen] =
+    useState(false);
+  const [isLoadingMenusForAi, setIsLoadingMenusForAi] = useState(false);
 
   const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
     fetchQuestionBankById,
@@ -242,6 +263,85 @@ const QuestionBankDetailPage: React.FC = () => {
     handleCloseEditQuestionModal();
   };
 
+  const handleOpenGenerateAiQuestions = async () => {
+    if (!currentQuestionBank) {
+      setPageError("Restaurant context is missing.");
+      return;
+    }
+    setIsLoadingMenusForAi(true);
+    setPageError(null);
+    try {
+      const menus = await fetchRestaurantMenus(
+        currentQuestionBank.restaurantId
+      );
+      const activeMenus = menus;
+
+      if (activeMenus.length === 0) {
+        setPageError(
+          "No active menus found for your restaurant. AI Question generation requires an active menu."
+        );
+        setIsLoadingMenusForAi(false);
+        return;
+      }
+
+      setAvailableMenus(activeMenus);
+
+      if (activeMenus.length === 1) {
+        setSelectedMenuForAi(activeMenus[0]._id);
+        setShowGenerateAiQuestionsModal(true);
+      } else {
+        // Multiple active menus, prompt user to select
+        setIsMenuSelectionModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Error fetching menus for AI generation:", err);
+      setPageError(getErrorMessage(err));
+    }
+    setIsLoadingMenusForAi(false);
+  };
+
+  const handleMenuSelectForAi = (menuId: string) => {
+    setSelectedMenuForAi(menuId);
+    setIsMenuSelectionModalOpen(false);
+    setShowGenerateAiQuestionsModal(true);
+  };
+
+  // Handler to open AI Question Review Modal
+  const handleOpenAiReviewModal = async () => {
+    if (!bankId) {
+      setPageError("Bank ID is missing, cannot initiate review.");
+      return;
+    }
+    setIsLoadingPendingQuestions(true);
+    setPageError(null);
+    try {
+      const pendingQuestions = await getPendingReviewQuestions();
+      if (pendingQuestions && pendingQuestions.length > 0) {
+        setQuestionsForAiReview(pendingQuestions);
+        setIsAiReviewModalOpen(true);
+      } else {
+        // Show a message if no pending questions, maybe a toast/notification later
+        alert(
+          "No AI-generated questions are currently pending review for this restaurant."
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching pending AI questions:", err);
+      setPageError(getErrorMessage(err));
+    } finally {
+      setIsLoadingPendingQuestions(false);
+    }
+  };
+
+  const handleCloseAiReviewModal = () => {
+    setIsAiReviewModalOpen(false);
+    setQuestionsForAiReview([]);
+    // Re-fetch bank details in case questions were added to it
+    if (bankId) {
+      fetchQuestionBankById(bankId);
+    }
+  };
+
   if (isLoading && !currentQuestionBank) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -354,7 +454,7 @@ const QuestionBankDetailPage: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Manage Questions
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
               variant="primary"
               onClick={() => setShowAddManualQuestionModal(true)}
@@ -364,10 +464,27 @@ const QuestionBankDetailPage: React.FC = () => {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => setShowGenerateAiQuestionsModal(true)}
+              onClick={handleOpenGenerateAiQuestions}
               className="w-full"
+              disabled={isLoadingMenusForAi}
             >
-              Generate AI Questions
+              {isLoadingMenusForAi ? (
+                <LoadingSpinner />
+              ) : (
+                "Generate AI Questions"
+              )}
+            </Button>
+            <Button
+              onClick={handleOpenAiReviewModal}
+              variant="secondary"
+              className="w-full md:w-auto"
+              disabled={isLoadingPendingQuestions}
+            >
+              {isLoadingPendingQuestions ? (
+                <LoadingSpinner />
+              ) : (
+                "Review Pending AI Questions"
+              )}
             </Button>
           </div>
         </Card>
@@ -433,20 +550,70 @@ const QuestionBankDetailPage: React.FC = () => {
           </Modal>
         )}
 
-        {showGenerateAiQuestionsModal && (
+        {showGenerateAiQuestionsModal && selectedMenuForAi && bankId && (
           <Modal
             isOpen={showGenerateAiQuestionsModal}
-            onClose={() => setShowGenerateAiQuestionsModal(false)}
+            onClose={() => {
+              setShowGenerateAiQuestionsModal(false);
+              setSelectedMenuForAi(null);
+            }}
             title="Generate Questions with AI"
           >
-            {bankId && (
-              <GenerateAiQuestionsForm
-                bankId={bankId}
-                bankCategories={currentQuestionBank?.categories || []}
-                onAiQuestionsGenerated={handleAiQuestionsGenerated}
-                onCloseRequest={() => setShowGenerateAiQuestionsModal(false)}
-              />
-            )}
+            <GenerateAiQuestionsForm
+              bankId={bankId}
+              menuId={selectedMenuForAi}
+              bankCategories={currentQuestionBank?.categories || []}
+              onAiQuestionsGenerated={handleAiQuestionsGenerated}
+              onCloseRequest={() => {
+                setShowGenerateAiQuestionsModal(false);
+                setSelectedMenuForAi(null);
+              }}
+            />
+          </Modal>
+        )}
+
+        {isMenuSelectionModalOpen && (
+          <Modal
+            isOpen={isMenuSelectionModalOpen}
+            onClose={() => setIsMenuSelectionModalOpen(false)}
+            title="Select Menu for AI Question Generation"
+            size="md"
+          >
+            <div className="p-4">
+              <p className="text-sm text-gray-700 mb-4">
+                Multiple active menus found. Please select which menu to use as
+                context for AI question generation.
+              </p>
+              {availableMenus.length === 0 && !isLoadingMenusForAi && (
+                <p className="text-sm text-gray-500">
+                  No active menus available.
+                </p>
+              )}
+              {isLoadingMenusForAi && (
+                <LoadingSpinner message="Loading menus..." />
+              )}
+              <ul className="space-y-2 max-h-60 overflow-y-auto">
+                {availableMenus.map((menu) => (
+                  <li key={menu._id}>
+                    <Button
+                      variant="secondary"
+                      className="w-full text-left justify-start"
+                      onClick={() => handleMenuSelectForAi(menu._id)}
+                    >
+                      {menu.name}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 flex justify-end">
+                <Button
+                  variant="primary"
+                  onClick={() => setIsMenuSelectionModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </Modal>
         )}
 
@@ -493,6 +660,16 @@ const QuestionBankDetailPage: React.FC = () => {
               onClose={handleCloseEditQuestionModal}
             />
           </Modal>
+        )}
+
+        {isAiReviewModalOpen && bankId && (
+          <AiQuestionReviewModal
+            isOpen={isAiReviewModalOpen}
+            generatedQuestions={questionsForAiReview}
+            targetBankId={bankId}
+            onClose={handleCloseAiReviewModal}
+            onReviewComplete={handleCloseAiReviewModal}
+          />
         )}
       </main>
     </div>

@@ -66,4 +66,7 @@ const QuizSchema: Schema<IQuiz> = new Schema(
   }
 );
 
-export default mongoose.model<IQuiz>("Quiz", QuizSchema);
+const QuizModel =
+  mongoose.models.Quiz || mongoose.model<IQuiz>("Quiz", QuizSchema);
+
+export default QuizModel;

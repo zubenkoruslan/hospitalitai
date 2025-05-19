@@ -1,15 +1,23 @@
 import React, { useState, FormEvent, useEffect } from "react";
 import {
-  AiGenerationClientParams,
   IQuestion,
+  NewAiQuestionGenerationParams,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
-import { generateAiQuestions as apiGenerateAiQuestions } from "../../services/api";
+import { triggerAiQuestionGenerationProcess as apiTriggerAiGeneration } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
 
+const QUESTION_FOCUS_AREAS = [
+  { id: "Name", label: "Item Name" },
+  { id: "Ingredients", label: "Ingredients" },
+  { id: "Dietary", label: "Dietary Information" },
+  { id: "Description", label: "Description Details" },
+];
+
 interface GenerateAiQuestionsFormProps {
   bankId: string;
+  menuId?: string;
   bankCategories: string[];
   onAiQuestionsGenerated: (questions: IQuestion[]) => void;
   onCloseRequest: () => void;
@@ -17,35 +25,64 @@ interface GenerateAiQuestionsFormProps {
 
 const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   bankId,
+  menuId,
   bankCategories,
   onAiQuestionsGenerated,
   onCloseRequest,
 }) => {
   const { formatErrorMessage } = useValidation();
-  const [categories, setCategories] = useState("");
+  const [categoriesInput, setCategoriesInput] = useState("");
   const [targetQuestionCount, setTargetQuestionCount] = useState<number>(5);
-  const [menuContext, setMenuContext] = useState("");
+
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
+  const [aiQuestionDifficulty, setAiQuestionDifficulty] =
+    useState<string>("medium");
+  const [aiQuestionTypes] = useState<string[]>([
+    "multiple-choice-single",
+    "true-false",
+  ]);
+
   const [formError, setFormError] = useState<string | null>(null);
   const [internalIsLoading, setInternalIsLoading] = useState(false);
 
   useEffect(() => {
     if (bankCategories && bankCategories.length > 0) {
-      setCategories(bankCategories.join(", "));
+      setCategoriesInput(bankCategories.join(", "));
     }
   }, [bankCategories]);
+
+  const handleFocusAreaChange = (focusAreaId: string) => {
+    setSelectedFocusAreas((prev) =>
+      prev.includes(focusAreaId)
+        ? prev.filter((id) => id !== focusAreaId)
+        : [...prev, focusAreaId]
+    );
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setInternalIsLoading(true);
 
-    const parsedCategories = categories
+    const parsedCategories = categoriesInput
       .split(",")
       .map((cat) => cat.trim())
       .filter((cat) => cat);
 
+    if (!menuId) {
+      setFormError(
+        "A Menu context is required for AI generation. Please select a menu."
+      );
+      setInternalIsLoading(false);
+      return;
+    }
     if (parsedCategories.length === 0) {
       setFormError("Please provide at least one category for AI generation.");
+      setInternalIsLoading(false);
+      return;
+    }
+    if (selectedFocusAreas.length === 0) {
+      setFormError("Please select at least one Question Focus Area.");
       setInternalIsLoading(false);
       return;
     }
@@ -55,20 +92,22 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       return;
     }
 
-    const data: AiGenerationClientParams = {
+    const payload: NewAiQuestionGenerationParams = {
+      menuId: menuId,
       categories: parsedCategories,
+      questionFocusAreas: selectedFocusAreas,
       targetQuestionCount,
-      menuContext: menuContext.trim() || undefined,
-      bankId: bankId,
+      questionTypes: aiQuestionTypes,
+      difficulty: aiQuestionDifficulty,
     };
 
     try {
-      const generatedQuestions = await apiGenerateAiQuestions(data);
+      const generatedQuestions = await apiTriggerAiGeneration(payload);
       if (generatedQuestions && generatedQuestions.length > 0) {
         onAiQuestionsGenerated(generatedQuestions);
       } else {
         setFormError(
-          "The AI did not generate any questions for the given criteria. Try adjusting the categories or context."
+          "The AI did not generate any questions for the given criteria. Try adjusting the input."
         );
       }
     } catch (err) {
@@ -101,8 +140,8 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         <input
           id="aiCategories"
           type="text"
-          value={categories}
-          onChange={(e) => setCategories(e.target.value)}
+          value={categoriesInput}
+          onChange={(e) => setCategoriesInput(e.target.value)}
           placeholder="e.g., Red Wine, Italian Cuisine, Allergens"
           required
           className={commonInputClass}
@@ -110,7 +149,7 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         />
         {bankCategories && bankCategories.length > 0 && (
           <p className="mt-1 text-xs text-gray-500">
-            Suggested from bank: {bankCategories.join(", ")}
+            Current bank categories (for reference): {bankCategories.join(", ")}
           </p>
         )}
       </div>
@@ -127,26 +166,55 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
             setTargetQuestionCount(parseInt(e.target.value, 10) || 1)
           }
           min="1"
-          max="20"
+          max="50"
           required
           className={commonInputClass}
           disabled={internalIsLoading}
         />
       </div>
 
-      <div>
-        <label htmlFor="menuContext" className={commonLabelClass}>
-          Additional Context / Instructions (Optional)
+      <div className="pt-2">
+        <label className={`${commonLabelClass} mb-1`}>
+          Question Focus Areas (Select at least one)
         </label>
-        <textarea
-          id="menuContext"
-          value={menuContext}
-          onChange={(e) => setMenuContext(e.target.value)}
-          rows={4}
-          placeholder="Provide context from your menu or specific topics... E.g., 'Focus on vegan items.'"
-          className={commonInputClass}
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-x-4 gap-y-2 p-2 border rounded-md bg-gray-50">
+          {QUESTION_FOCUS_AREAS.map((area) => (
+            <div key={area.id} className="flex items-center">
+              <input
+                id={`focus-${area.id}-${bankId}`}
+                type="checkbox"
+                value={area.id}
+                checked={selectedFocusAreas.includes(area.id)}
+                onChange={() => handleFocusAreaChange(area.id)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                disabled={internalIsLoading}
+              />
+              <label
+                htmlFor={`focus-${area.id}-${bankId}`}
+                className="ml-2 text-sm text-gray-600"
+              >
+                {area.label}
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <label htmlFor={`aiDifficulty-${bankId}`} className={commonLabelClass}>
+          Question Difficulty
+        </label>
+        <select
+          id={`aiDifficulty-${bankId}`}
+          value={aiQuestionDifficulty}
+          onChange={(e) => setAiQuestionDifficulty(e.target.value)}
+          className={`${commonInputClass} max-w-xs`}
           disabled={internalIsLoading}
-        />
+        >
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
       </div>
 
       <div className="flex justify-end space-x-2 pt-3">

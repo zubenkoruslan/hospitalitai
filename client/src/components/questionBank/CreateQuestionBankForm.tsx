@@ -2,20 +2,31 @@ import React, { useEffect, useState } from "react";
 import {
   CreateQuestionBankData,
   CreateQuestionBankFromMenuClientData,
-  MenuAiGenerationClientParams,
+  // MenuAiGenerationClientParams, // No longer needed
+  // NewAiQuestionGenerationParams, // No longer needed
+  // IQuestion, // No longer needed for review modal here
 } from "../../types/questionBankTypes";
-import { IMenuClient } from "../../types/menuTypes"; // IMenuWithItemsClient seems unused directly
+import { IMenuClient } from "../../types/menuTypes";
 import {
   getMenusByRestaurant,
   getMenuWithItems,
   createQuestionBankFromMenu,
   createQuestionBank as apiCreateQuestionBank,
+  // triggerAiQuestionGenerationProcess, // No longer needed
 } from "../../services/api";
 import Button from "../common/Button";
 import Card from "../common/Card";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { useAuth } from "../../context/AuthContext";
-import { useValidation } from "../../context/ValidationContext"; // Import useValidation
+import { useValidation } from "../../context/ValidationContext";
+// import AiQuestionReviewModal from "./AiQuestionReviewModal"; // No longer needed here
+
+// const QUESTION_FOCUS_AREAS = [ // No longer needed here
+//   { id: "Name", label: "Item Name" },
+//   { id: "Ingredients", label: "Ingredients" },
+//   { id: "Dietary", label: "Dietary Information" },
+//   { id: "Description", label: "Description Details" },
+// ];
 
 interface CreateQuestionBankFormProps {
   onBankCreated: () => void;
@@ -27,7 +38,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   onCancel,
 }) => {
   const { user } = useAuth();
-  const { formatErrorMessage } = useValidation(); // Get formatErrorMessage
+  const { formatErrorMessage } = useValidation();
   const restaurantId = user?.restaurantId;
 
   const [newBankName, setNewBankName] = useState("");
@@ -37,20 +48,34 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   const [selectedMenuId, setSelectedMenuId] = useState<string>("");
   const [menuCategories, setMenuCategories] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [isAiGenerationEnabled, setIsAiGenerationEnabled] = useState(false);
-  const [aiTargetQuestionCount, setAiTargetQuestionCount] =
-    useState<number>(10);
+  // const [isAiGenerationEnabled, setIsAiGenerationEnabled] = useState(false); // Removed
+  // const [aiTargetQuestionCount, setAiTargetQuestionCount] = // Removed
+  //   useState<number>(10);
   const [areAllCategoriesSelected, setAreAllCategoriesSelected] =
     useState(false);
 
+  // Removed AI generation parameter states
+  // const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
+  // const [aiQuestionDifficulty, setAiQuestionDifficulty] =
+  //   useState<string>("medium");
+  // const [aiQuestionTypes, setAiQuestionTypes] = useState<string[]>([
+  //   "multiple-choice-single",
+  //   "true-false",
+  // ]);
+
   const [isLoading, setIsLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null); // For API call errors
-  const [nameError, setNameError] = useState<string | null>(null); // For name validation
+  const [formError, setFormError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const [isLoadingMenus, setIsLoadingMenus] = useState(false);
-  const [menusError, setMenusError] = useState<string | null>(null); // Changed to string | null
+  const [menusError, setMenusError] = useState<string | null>(null);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [categoriesError, setCategoriesError] = useState<string | null>(null); // Changed to string | null
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+
+  // Removed States for AI Question Review Modal
+  // const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  // const [questionsForReview, setQuestionsForReview] = useState<IQuestion[]>([]);
+  // const [reviewTargetBankId, setReviewTargetBankId] = useState<string>("");
 
   useEffect(() => {
     const loadMenus = async () => {
@@ -116,6 +141,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
     } else {
       setAreAllCategoriesSelected(false);
     }
+    // Reset focus areas if selected categories change significantly (e.g., cleared)
+    // if (selectedCategories.length === 0) { // Removed, selectedFocusAreas no longer exists
+    //   setSelectedFocusAreas([]);
+    // }
   }, [selectedCategories, menuCategories]);
 
   const handleSelectAllCategories = (
@@ -132,29 +161,37 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
 
   const handleCreateBank = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null); // Clear previous API errors
-    setNameError(null); // Clear previous name validation error
+    setFormError(null);
+    setNameError(null);
 
     if (!newBankName.trim()) {
       setNameError("Question bank name cannot be empty.");
       return;
     }
+    // Removed AI specific validation for selectedFocusAreas
+    // if (
+    //   isAiGenerationEnabled &&
+    //   selectedFocusAreas.length === 0 &&
+    //   selectedMenuId &&
+    //   selectedCategories.length > 0
+    // ) {
+    //   setFormError(
+    //     "Please select at least one Question Focus Area for AI generation."
+    //   );
+    //   return;
+    // }
+
     setIsLoading(true);
+    // let createdBankId: string | null = null; // No longer needed to store for AI step
 
     try {
       if (selectedMenuId && selectedCategories.length > 0 && restaurantId) {
-        const aiParams: MenuAiGenerationClientParams | undefined =
-          isAiGenerationEnabled
-            ? { targetQuestionCount: aiTargetQuestionCount }
-            : undefined;
-
         const menuData: CreateQuestionBankFromMenuClientData = {
           name: newBankName.trim(),
           description: newBankDescription.trim() || undefined,
           menuId: selectedMenuId,
           selectedCategoryNames: selectedCategories,
-          generateAiQuestions: isAiGenerationEnabled,
-          aiParams,
+          generateAiQuestions: false,
         };
         await createQuestionBankFromMenu(menuData);
       } else {
@@ -164,55 +201,86 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         };
         await apiCreateQuestionBank(data);
       }
-      onBankCreated();
-    } catch (error: any) {
-      console.error("Error creating bank:", error);
-      setFormError(formatErrorMessage(error)); // Use formatted error message
+
+      // AI generation logic removed
+      // if (
+      //   createdBankId &&
+      //   isAiGenerationEnabled &&
+      //   selectedMenuId &&
+      //   selectedCategories.length > 0 &&
+      //   restaurantId &&
+      //   selectedFocusAreas.length > 0
+      // ) {
+      //   // ... AI payload and triggerAiQuestionGenerationProcess call ...
+      //   // ... logic to open AiQuestionReviewModal ...
+      // } else {
+      //    onBankCreated(); // Call onBankCreated directly
+      // }
+      onBankCreated(); // Call onBankCreated directly after successful bank creation
+    } catch (err: any) {
+      console.error("Error creating question bank:", err);
+      setFormError(formatErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Removed handleReviewComplete and handleReviewModalClose functions
+  // const handleReviewComplete = () => {
+  //   setIsReviewModalOpen(false);
+  //   setQuestionsForReview([]);
+  //   setReviewTargetBankId("");
+  //   onBankCreated(); // Call the original callback after review is complete
+  // };
+
+  // const handleReviewModalClose = () => {
+  //   setIsReviewModalOpen(false);
+  //   setQuestionsForReview([]);
+  //   setReviewTargetBankId("");
+  //   // If the user closes the modal without completing the review,
+  //   // we still consider the bank created but AI questions are just pending.
+  //   // The onBankCreated() might have been deferred, so call it now.
+  //   onBankCreated();
+  // };
+
   return (
-    <Card title="Create New Question Bank" className="mb-6">
-      <form onSubmit={handleCreateBank} className="p-4 space-y-4">
+    <Card className="w-full max-w-2xl mx-auto">
+      <h2 className="text-2xl font-semibold mb-6 text-gray-700">
+        Create New Question Bank
+      </h2>
+      <form onSubmit={handleCreateBank}>
         {formError && (
-          <div className="p-3 mb-3 text-sm text-red-700 bg-red-100 rounded-md">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-300 rounded-md">
             {formError}
           </div>
         )}
-        <div>
+
+        <div className="mb-4">
           <label
             htmlFor="bankName"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Name <span className="text-red-500">*</span>
+            Bank Name <span className="text-red-500">*</span>
           </label>
           <input
-            id="bankName"
             type="text"
+            id="bankName"
             value={newBankName}
             onChange={(e) => {
               setNewBankName(e.target.value);
-              if (nameError && e.target.value.trim()) {
-                setNameError(null); // Clear error once user starts typing valid name
-              }
+              if (nameError) setNameError(null); // Clear error on change
             }}
-            placeholder="e.g., Wine Knowledge, Cocktail Recipes"
-            required
-            className={`mt-1 block w-full px-3 py-2 border ${
+            className={`w-full px-3 py-2 border ${
               nameError ? "border-red-500" : "border-gray-300"
-            } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-            aria-invalid={!!nameError}
-            aria-describedby={nameError ? "bankName-error" : undefined}
+            } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+            placeholder="E.g., 'Wine Knowledge - Level 1'"
           />
           {nameError && (
-            <p className="mt-1 text-xs text-red-600" id="bankName-error">
-              {nameError}
-            </p>
+            <p className="mt-1 text-xs text-red-500">{nameError}</p>
           )}
         </div>
-        <div>
+
+        <div className="mb-6">
           <label
             htmlFor="bankDescription"
             className="block text-sm font-medium text-gray-700 mb-1"
@@ -223,167 +291,170 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
             id="bankDescription"
             value={newBankDescription}
             onChange={(e) => setNewBankDescription(e.target.value)}
-            placeholder="A brief description of what this question bank covers"
             rows={3}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="E.g., 'Covers basic wine types, regions, and service standards.'"
           />
         </div>
 
-        <div className="pt-2 border-t mt-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Create from Menu (Optional)
-          </h3>
-          <div>
-            <label
-              htmlFor="menuSelect"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Select a Menu
-            </label>
-            <select
-              id="menuSelect"
-              value={selectedMenuId}
-              onChange={(e) => setSelectedMenuId(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md disabled:bg-gray-100"
-              disabled={
-                isLoadingMenus || !restaurantId || user?.role !== "restaurant"
-              }
-            >
-              <option value="">-- Select a Menu --</option>
-              {menus.map((menu) => (
-                <option key={menu._id} value={menu._id}>
-                  {menu.name}
-                </option>
-              ))}
-            </select>
-            {isLoadingMenus && (
-              <p className="text-sm text-gray-500 mt-1">Loading menus...</p>
-            )}
+        {user?.role === "restaurant" && (
+          <div className="mb-6 p-4 border border-dashed border-gray-300 rounded-md">
+            <h3 className="text-lg font-medium text-gray-700 mb-3">
+              Seed Bank from Menu (Optional)
+            </h3>
+            {isLoadingMenus && <LoadingSpinner />}
             {menusError && (
-              <p className="text-sm text-red-500 mt-1">Error: {menusError}</p>
+              <p className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                Error loading menus: {menusError}
+              </p>
             )}
-            {!isLoadingMenus &&
-              menus.length === 0 &&
-              restaurantId &&
-              user?.role === "restaurant" &&
-              !menusError && (
-                <p className="text-sm text-gray-500 mt-1">
-                  No menus found for this restaurant.
-                </p>
-              )}
-          </div>
-        </div>
-
-        {selectedMenuId &&
-          !isLoadingCategories &&
-          menuCategories.length > 0 && (
-            <fieldset className="pt-2">
-              <legend className="block text-sm font-medium text-gray-700 mb-1">
-                Select Categories from Menu (for Bank & AI)
-              </legend>
-              <div className="space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md bg-white shadow-sm">
-                {/* Select All Checkbox */}
-                <label
-                  key="select-all-categories"
-                  className="flex items-center space-x-2 pb-2 border-b mb-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={areAllCategoriesSelected}
-                    onChange={handleSelectAllCategories}
-                    disabled={menuCategories.length === 0}
-                    className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
-                  />
-                  <span className="text-sm font-semibold text-gray-800">
-                    {areAllCategoriesSelected ? "Deselect All" : "Select All"}
-                  </span>
-                </label>
-                {/* End Select All Checkbox */}
-
-                {menuCategories.map((category) => (
-                  <label key={category} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      value={category}
-                      checked={selectedCategories.includes(category)}
-                      onChange={(e) => {
-                        const cat = e.target.value;
-                        setSelectedCategories((prev) =>
-                          prev.includes(cat)
-                            ? prev.filter((c) => c !== cat)
-                            : [...prev, cat]
-                        );
-                      }}
-                      className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700">{category}</span>
+            {!isLoadingMenus && !menusError && menus.length === 0 && (
+              <p className="text-sm text-gray-500">
+                No active menus found for your restaurant. You can upload menus
+                in the 'Menus' section.
+              </p>
+            )}
+            {!isLoadingMenus && !menusError && menus.length > 0 && (
+              <>
+                <div className="mb-3">
+                  <label
+                    htmlFor="menuSelect"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Select Menu
                   </label>
-                ))}
-              </div>
-              {menuCategories.length === 0 && !isLoadingCategories && (
-                <p className="text-xs text-gray-500 mt-1 px-1">
-                  No categories found for this menu, or menu not selected.
-                </p>
-              )}
-            </fieldset>
-          )}
-        {selectedMenuId && !isLoadingCategories && categoriesError && (
-          <p className="text-sm text-red-500 mt-1">
-            Error loading categories: {categoriesError}
-          </p>
-        )}
+                  <select
+                    id="menuSelect"
+                    value={selectedMenuId}
+                    onChange={(e) => setSelectedMenuId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">-- Select a Menu --</option>
+                    {menus.map((menu) => (
+                      <option key={menu._id} value={menu._id}>
+                        {menu.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-        {selectedMenuId && selectedCategories.length > 0 && (
-          <div className="pt-2 border-t mt-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={isAiGenerationEnabled}
-                onChange={(e) => setIsAiGenerationEnabled(e.target.checked)}
-                className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Generate Questions with AI for selected categories
-              </span>
-            </label>
-            {isAiGenerationEnabled && (
-              <div className="mt-2 pl-6">
-                <label
-                  htmlFor="aiTargetQuestionCount"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Number of Questions to Generate (approx.)
-                </label>
-                <input
-                  id="aiTargetQuestionCount"
-                  type="number"
-                  value={aiTargetQuestionCount}
-                  onChange={(e) =>
-                    setAiTargetQuestionCount(parseInt(e.target.value, 10) || 1)
-                  }
-                  min="1"
-                  max="50" // Example max
-                  className="mt-1 block w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-              </div>
+                {selectedMenuId && (
+                  <>
+                    {isLoadingCategories && <LoadingSpinner />}
+                    {categoriesError && (
+                      <p className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                        Error loading categories: {categoriesError}
+                      </p>
+                    )}
+                    {!isLoadingCategories &&
+                      !categoriesError &&
+                      menuCategories.length > 0 && (
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Categories from Menu
+                          </label>
+                          <div className="mb-2">
+                            <label className="inline-flex items-center">
+                              <input
+                                type="checkbox"
+                                className="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out rounded border-gray-300"
+                                checked={areAllCategoriesSelected}
+                                onChange={handleSelectAllCategories}
+                                disabled={menuCategories.length === 0}
+                              />
+                              <span className="ml-2 text-sm text-gray-600">
+                                Select All / Deselect All
+                              </span>
+                            </label>
+                          </div>
+                          <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {menuCategories.map((category) => (
+                              <label
+                                key={category}
+                                className="inline-flex items-center text-sm text-gray-600 hover:bg-gray-50 p-1 rounded"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out rounded border-gray-300"
+                                  value={category}
+                                  checked={selectedCategories.includes(
+                                    category
+                                  )}
+                                  onChange={(e) => {
+                                    const cat = e.target.value;
+                                    setSelectedCategories((prev) =>
+                                      prev.includes(cat)
+                                        ? prev.filter((c) => c !== cat)
+                                        : [...prev, cat]
+                                    );
+                                  }}
+                                />
+                                <span className="ml-2">{category}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {selectedCategories.length === 0 && (
+                            <p className="mt-1 text-xs text-gray-500">
+                              At least one category must be selected to seed the
+                              bank from this menu.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    {!isLoadingCategories &&
+                      !categoriesError &&
+                      menuCategories.length === 0 &&
+                      selectedMenuId && (
+                        <p className="text-sm text-gray-500">
+                          No categories found in the selected menu, or menu has
+                          no items.
+                        </p>
+                      )}
+                  </>
+                )}
+              </>
             )}
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-4">
+        {/* AI Generation Section Removed */}
+        {/* <div className="mb-6 p-4 border border-dashed border-indigo-300 rounded-md bg-indigo-50"> ... </div> */}
+
+        <div className="flex justify-end space-x-3 mt-8">
           <Button
             type="button"
             variant="secondary"
             onClick={onCancel}
             disabled={isLoading}
+            className="px-4 py-2"
           >
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={isLoading}>
-            {isLoading ? <LoadingSpinner /> : "Create Bank"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={
+              isLoading ||
+              !newBankName.trim() ||
+              (selectedMenuId !== "" && selectedCategories.length === 0)
+            }
+            isLoading={isLoading}
+            className="px-4 py-2"
+          >
+            {isLoading ? "Creating..." : "Create Bank"}
           </Button>
         </div>
       </form>
+
+      {/* AI Question Review Modal instantiation removed */}
+      {/* {isReviewModalOpen && questionsForReview.length > 0 && reviewTargetBankId && (
+        <AiQuestionReviewModal
+          generatedQuestions={questionsForReview}
+          targetBankId={reviewTargetBankId}
+          onClose={handleReviewModalClose}
+          onReviewComplete={handleReviewComplete}
+        />
+      )} */}
     </Card>
   );
 };

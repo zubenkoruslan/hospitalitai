@@ -104,6 +104,7 @@ import {
   AiGenerationClientParams,
   CreateQuestionBankFromMenuClientData,
   UpdateQuestionClientData,
+  NewAiQuestionGenerationParams,
 } from "../types/questionBankTypes";
 
 // Import menu types
@@ -596,6 +597,23 @@ export const getCurrentUser = async (): Promise<{
   return response.data;
 };
 
+// ADDED: Function to process reviewed AI questions for a question bank
+export const processReviewedAiQuestions = async (
+  bankId: string,
+  data: {
+    acceptedQuestions: Partial<IQuestion>[];
+    updatedQuestions: Partial<IQuestion & { _id: string }>[];
+    deletedQuestionIds: string[];
+  }
+): Promise<IQuestionBank> => {
+  const response = await api.post<{
+    status: string;
+    message: string;
+    data: IQuestionBank;
+  }>(`/question-banks/${bankId}/process-reviewed-questions`, data);
+  return response.data.data;
+};
+
 // Staff Endpoints
 
 export const getStaffList = async (
@@ -837,6 +855,27 @@ export const updateRole = async (
  */
 export const deleteRole = async (roleId: string): Promise<void> => {
   await api.delete(`/roles/${roleId}`);
+};
+
+// New function to trigger AI Question Generation via the /api/ai/generate-questions endpoint
+export const triggerAiQuestionGenerationProcess = async (
+  params: NewAiQuestionGenerationParams // This will now refer to the imported type
+): Promise<IQuestion[]> => {
+  // Assuming the backend returns the array of pending IQuestion objects
+  const response = await api.post<{ data: IQuestion[] }>(
+    `/ai/generate-questions`,
+    params
+  );
+  return response.data.data; // Adjust based on actual backend response structure
+};
+
+// Function to fetch questions pending review
+export const getPendingReviewQuestions = async (): Promise<IQuestion[]> => {
+  // Backend route GET /api/questions/pending-review uses authenticated user's restaurantId
+  const response = await api.get<{ data: IQuestion[] }>(
+    "/questions/pending-review"
+  );
+  return response.data.data; // Assuming backend wraps in a 'data' object like other question endpoints
 };
 
 // Default export

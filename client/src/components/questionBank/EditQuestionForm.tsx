@@ -87,7 +87,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     // restore the original options for that type.
     else if (
       questionType === questionToEdit.questionType &&
-      options !== questionToEdit.options
+      JSON.stringify(options) !== JSON.stringify(questionToEdit.options || []) // Compare content
     ) {
       setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
     }

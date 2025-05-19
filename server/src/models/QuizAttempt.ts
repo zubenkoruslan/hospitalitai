@@ -95,9 +95,8 @@ QuizAttemptSchema.index({ quizId: 1, staffUserId: 1 });
 // Compound index for restaurant-level aggregation/filtering of attempts
 QuizAttemptSchema.index({ restaurantId: 1, quizId: 1, attemptDate: -1 }); // For fetching recent attempts for a quiz in a restaurant
 
-const QuizAttempt: Model<IQuizAttempt> = mongoose.model<IQuizAttempt>(
-  "QuizAttempt",
-  QuizAttemptSchema
-);
+const QuizAttempt: Model<IQuizAttempt> =
+  mongoose.models.QuizAttempt ||
+  mongoose.model<IQuizAttempt>("QuizAttempt", QuizAttemptSchema);
 
 export default QuizAttempt;

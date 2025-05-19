@@ -88,4 +88,12 @@ router.delete(
   menuController.deleteCategoryAndReassignItems
 );
 
+// Route to update menu activation status
+router.patch(
+  "/:menuId/status",
+  protect, // Protect the route
+  validateMenuIdParam, // Validate menuId in params
+  menuController.updateMenuActivationStatusHandler // Corrected handler name
+);
+
 export default router;

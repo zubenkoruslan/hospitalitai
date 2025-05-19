@@ -65,6 +65,7 @@ StaffQuizProgressSchema.index({ staffUserId: 1, quizId: 1 });
 // Removed attemptMadeOnDate from this index or any other specific index
 
 const StaffQuizProgressModel: Model<IStaffQuizProgress> =
+  mongoose.models.StaffQuizProgress ||
   mongoose.model<IStaffQuizProgress>(
     "StaffQuizProgress",
     StaffQuizProgressSchema
