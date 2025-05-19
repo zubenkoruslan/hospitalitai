@@ -28,7 +28,8 @@ export interface IQuestion extends Document {
   restaurantId: Types.ObjectId;
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
-  isActive?: boolean;
+  status: "active" | "pending_review" | "rejected";
+  explanation?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -85,10 +86,17 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       enum: ["easy", "medium", "hard"],
       required: false,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
+    status: {
+      type: String,
+      enum: ["active", "pending_review", "rejected"],
+      default: "active",
       index: true,
+    },
+    explanation: {
+      type: String,
+      trim: true,
+      maxlength: [500, "Explanation cannot exceed 500 characters"],
+      required: false,
     },
   },
   { timestamps: true }

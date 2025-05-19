@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { AppError } from "../utils/errorHandler";
 import * as QuestionService from "./../services/questionService"; // Adjusted path
+import QuestionModel from "../models/QuestionModel"; // Import QuestionModel
 
 export const createQuestion = async (
   req: Request,
@@ -193,6 +194,45 @@ export const deleteQuestion = async (
       data: null,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingReviewQuestionsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
+
+    // Optional bankId query parameter if you want to filter pending questions by a temporary bank link
+    // const { bankId } = req.query;
+    // const query: any = { restaurantId, status: 'pending_review' };
+    // if (bankId && typeof bankId === 'string') {
+    //   query.tempBankId = new mongoose.Types.ObjectId(bankId); // Assuming a field like tempBankId
+    // }
+
+    const pendingQuestions = await QuestionModel.find({
+      restaurantId: restaurantId,
+      status: "pending_review",
+      createdBy: "ai", // Explicitly fetch AI-created pending questions
+    }).sort({ createdAt: -1 }); // Sort by newest first
+
+    res.status(200).json({
+      status: "success",
+      results: pendingQuestions.length,
+      data: pendingQuestions,
+    });
+  } catch (error) {
+    if (error instanceof mongoose.Error.CastError) {
+      return next(new AppError(`Invalid ID format: ${error.message}`, 400));
+    }
     next(error);
   }
 };

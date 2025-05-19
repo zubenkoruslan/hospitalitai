@@ -40,6 +40,8 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   const [isAiGenerationEnabled, setIsAiGenerationEnabled] = useState(false);
   const [aiTargetQuestionCount, setAiTargetQuestionCount] =
     useState<number>(10);
+  const [areAllCategoriesSelected, setAreAllCategoriesSelected] =
+    useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null); // For API call errors
@@ -100,8 +102,33 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
     };
     if (selectedMenuId) {
       loadCategories();
+      setAreAllCategoriesSelected(false); // Reset when menu changes
     }
   }, [selectedMenuId, formatErrorMessage]);
+
+  // Effect to sync areAllCategoriesSelected with individual selections
+  useEffect(() => {
+    if (
+      menuCategories.length > 0 &&
+      selectedCategories.length === menuCategories.length
+    ) {
+      setAreAllCategoriesSelected(true);
+    } else {
+      setAreAllCategoriesSelected(false);
+    }
+  }, [selectedCategories, menuCategories]);
+
+  const handleSelectAllCategories = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const isChecked = e.target.checked;
+    setAreAllCategoriesSelected(isChecked);
+    if (isChecked) {
+      setSelectedCategories([...menuCategories]);
+    } else {
+      setSelectedCategories([]);
+    }
+  };
 
   const handleCreateBank = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,7 +281,25 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
               <legend className="block text-sm font-medium text-gray-700 mb-1">
                 Select Categories from Menu (for Bank & AI)
               </legend>
-              <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-md">
+              <div className="space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md bg-white shadow-sm">
+                {/* Select All Checkbox */}
+                <label
+                  key="select-all-categories"
+                  className="flex items-center space-x-2 pb-2 border-b mb-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={areAllCategoriesSelected}
+                    onChange={handleSelectAllCategories}
+                    disabled={menuCategories.length === 0}
+                    className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-semibold text-gray-800">
+                    {areAllCategoriesSelected ? "Deselect All" : "Select All"}
+                  </span>
+                </label>
+                {/* End Select All Checkbox */}
+
                 {menuCategories.map((category) => (
                   <label key={category} className="flex items-center space-x-2">
                     <input
@@ -275,6 +320,11 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                   </label>
                 ))}
               </div>
+              {menuCategories.length === 0 && !isLoadingCategories && (
+                <p className="text-xs text-gray-500 mt-1 px-1">
+                  No categories found for this menu, or menu not selected.
+                </p>
+              )}
             </fieldset>
           )}
         {selectedMenuId && !isLoadingCategories && categoriesError && (

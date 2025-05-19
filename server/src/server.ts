@@ -17,6 +17,7 @@ import questionBankRoutes from "./routes/questionBankRoutes";
 import questionRoutes from "./routes/questionRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { roleRouter } from "./routes/roleRoutes";
+import aiRoutes from "./routes/aiRoutes";
 
 dotenv.config();
 
@@ -87,6 +88,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/roles", roleRouter);
+app.use("/api/ai", aiRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

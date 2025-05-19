@@ -10,6 +10,7 @@ import {
   createQuestionBankFromMenu,
   addCategoryToQuestionBank,
   removeCategoryFromQuestionBank,
+  processReviewedAiQuestionsHandler,
 } from "../controllers/questionBankController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import {
@@ -95,6 +96,14 @@ router.delete(
   validateObjectId("questionId"),
   handleValidationErrors,
   removeQuestionFromBank
+);
+
+// Route to process reviewed AI questions for a specific question bank
+router.post(
+  "/:bankId/process-reviewed-questions",
+  validateObjectId("bankId"),
+  handleValidationErrors,
+  processReviewedAiQuestionsHandler
 );
 
 export default router;

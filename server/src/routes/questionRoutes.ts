@@ -6,6 +6,7 @@ import {
   updateQuestion,
   deleteQuestion,
   generateAiQuestionsController,
+  getPendingReviewQuestionsHandler,
 } from "../controllers/questionController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import {
@@ -21,6 +22,8 @@ const router = express.Router();
 // All routes below are protected and restricted to "restaurant" role.
 router.use(protect);
 router.use(restrictTo("restaurant"));
+
+router.get("/pending-review", getPendingReviewQuestionsHandler);
 
 router.post(
   "/generate",

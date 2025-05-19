@@ -7,6 +7,8 @@ import {
   UpdateQuestionBankData as _UpdateQuestionBankData,
   CreateQuestionBankFromMenuData,
 } from "../services/questionBankService";
+import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
+import QuestionBankModel from "../models/QuestionBankModel"; // Import QuestionBankModel
 
 // Placeholder for createQuestionBank
 export const createQuestionBank = async (
@@ -494,6 +496,209 @@ export const removeCategoryFromQuestionBank = async (
       // If category wasn't there, $pull does nothing, bank is returned as is.
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const processReviewedAiQuestionsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId } = req.params;
+    const { acceptedQuestions, updatedQuestions, deletedQuestionIds } =
+      req.body as {
+        acceptedQuestions: IQuestion[];
+        updatedQuestions: IQuestion[];
+        deletedQuestionIds: string[];
+      };
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
+    const mongoBankId = new mongoose.Types.ObjectId(bankId);
+
+    // 1. Validate Bank exists and belongs to the user's restaurant
+    const questionBank = await QuestionBankModel.findOne({
+      _id: mongoBankId,
+      restaurantId: restaurantId,
+    });
+
+    if (!questionBank) {
+      return next(
+        new AppError(
+          `Question bank not found with ID: ${bankId} for your restaurant.`,
+          404
+        )
+      );
+    }
+
+    const processedQuestionIds: mongoose.Types.ObjectId[] = [];
+    const errors: { questionId?: string; message: string }[] = [];
+
+    // 2. Process acceptedQuestions (new or pending_review questions to make active)
+    if (acceptedQuestions && acceptedQuestions.length > 0) {
+      for (const qData of acceptedQuestions) {
+        try {
+          let questionToSave: IQuestion;
+          if (qData._id) {
+            // Existing pending question being accepted/updated
+            const existingQuestion = await QuestionModel.findOneAndUpdate(
+              {
+                _id: qData._id,
+                restaurantId: restaurantId,
+                status: "pending_review",
+                createdBy: "ai",
+              },
+              {
+                ...qData,
+                status: "active",
+                restaurantId: restaurantId,
+                _id: qData._id,
+              }, // Ensure restaurantId is part of update
+              { new: true, runValidators: true }
+            );
+            if (!existingQuestion) {
+              errors.push({
+                questionId: qData._id.toString(),
+                message:
+                  "Failed to find or update pending question for acceptance.",
+              });
+              continue;
+            }
+            questionToSave = existingQuestion;
+          } else {
+            // Brand new question (e.g., user added one during review)
+            const newQ = new QuestionModel({
+              ...qData,
+              restaurantId: restaurantId,
+              status: "active",
+              createdBy: "ai", // Or 'manual' if user can create brand new ones here
+            });
+            questionToSave = await newQ.save();
+          }
+          processedQuestionIds.push(questionToSave._id);
+        } catch (err: any) {
+          errors.push({
+            questionId: qData._id?.toString(),
+            message: `Error accepting question: ${err.message}`,
+          });
+        }
+      }
+    }
+
+    // 3. Process updatedQuestions (existing pending questions that were modified)
+    // This logic is largely covered by acceptedQuestions if they pass the full IQuestion object.
+    // If updatedQuestions only contains partial updates for already pending items, this section would be different.
+    // For now, assuming updatedQuestions are full IQuestion objects from pending_review, similar to accepted.
+    if (updatedQuestions && updatedQuestions.length > 0) {
+      for (const qData of updatedQuestions) {
+        if (!qData._id) {
+          errors.push({ message: "Updated question is missing an _id." });
+          continue;
+        }
+        try {
+          const updatedQ = await QuestionModel.findOneAndUpdate(
+            {
+              _id: qData._id,
+              restaurantId: restaurantId,
+              status: "pending_review",
+              createdBy: "ai",
+            },
+            { ...qData, status: "active", restaurantId: restaurantId }, // Ensure all necessary fields are set
+            { new: true, runValidators: true }
+          );
+          if (!updatedQ) {
+            errors.push({
+              questionId: qData._id.toString(),
+              message: "Failed to find or update pending question.",
+            });
+            continue;
+          }
+          processedQuestionIds.push(updatedQ._id);
+        } catch (err: any) {
+          errors.push({
+            questionId: qData._id.toString(),
+            message: `Error updating question: ${err.message}`,
+          });
+        }
+      }
+    }
+
+    // 4. Process deletedQuestionIds (mark as 'rejected' or delete)
+    if (deletedQuestionIds && deletedQuestionIds.length > 0) {
+      for (const id of deletedQuestionIds) {
+        try {
+          // Option 1: Mark as rejected
+          const result = await QuestionModel.findOneAndUpdate(
+            {
+              _id: new mongoose.Types.ObjectId(id),
+              restaurantId: restaurantId,
+              createdBy: "ai",
+            }, // ensure it was an AI question for this restaurant
+            { status: "rejected" },
+            { new: true }
+          );
+          // Option 2: Actually delete
+          // await QuestionModel.deleteOne({ _id: id, restaurantId: restaurantId });
+          if (
+            !result &&
+            (acceptedQuestions?.find((q) => q._id?.toString() === id) ||
+              updatedQuestions?.find((q) => q._id?.toString() === id))
+          ) {
+            // If it was just accepted/updated, don't mark as error for deletion if not found as pending
+          } else if (!result) {
+            errors.push({
+              questionId: id,
+              message:
+                "Failed to find AI question to mark as rejected or it was already processed.",
+            });
+          }
+        } catch (err: any) {
+          errors.push({
+            questionId: id,
+            message: `Error deleting/rejecting question: ${err.message}`,
+          });
+        }
+      }
+    }
+
+    // 5. Update Question Bank with new, unique question IDs
+    if (processedQuestionIds.length > 0) {
+      const uniqueNewQuestionIds = processedQuestionIds.filter(
+        (id) =>
+          !questionBank.questions.some((existingId) => existingId.equals(id))
+      );
+      if (uniqueNewQuestionIds.length > 0) {
+        questionBank.questions.push(...uniqueNewQuestionIds);
+        await questionBank.save();
+      }
+    }
+
+    if (errors.length > 0) {
+      // Partial success if some questions were processed but errors occurred
+      return res.status(207).json({
+        status: "partial_success",
+        message: "AI questions processed with some errors.",
+        processedCount: processedQuestionIds.length,
+        data: questionBank,
+        errors,
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "AI questions processed and added to bank successfully.",
+      data: questionBank,
+    });
+  } catch (error) {
+    if (error instanceof mongoose.Error.CastError) {
+      return next(new AppError(`Invalid ID format: ${error.message}`, 400));
+    }
     next(error);
   }
 };
