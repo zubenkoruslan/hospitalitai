@@ -26,6 +26,8 @@ import HomePage from "./pages/HomePage";
 import QuestionBankListPage from "./pages/QuestionBankListPage";
 import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
 import QuestionBankEditPage from "./pages/QuestionBankEditPage";
+import AiQuestionReviewPage from "./pages/AiQuestionReviewPage";
+import CreateQuizPage from "./pages/CreateQuizPage";
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
@@ -152,8 +154,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* REMOVED: Route for /question-banks/:bankId/edit */}
-            {/*
+            <Route
+              path="/question-banks/:bankId/review-ai-questions"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <AiQuestionReviewPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/question-banks/:bankId/edit"
               element={
@@ -162,17 +170,24 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            */}
-            {/* REMOVED: Route for generating quiz from question banks (now a modal) */}
-            {/*
             <Route
-              path="/generate-quiz"
+              path="/create-quiz"
               element={
                 <ProtectedRoute requiredRole="restaurant">
-                  <GenerateQuizPage />
+                  <CreateQuizPage />
                 </ProtectedRoute>
               }
             />
+            {/* 
+              REMOVED: Route for generating quiz from question banks (now a modal)
+              <Route
+                path="/generate-quiz"
+                element={
+                  <ProtectedRoute requiredRole="restaurant">
+                    <GenerateQuizPage />
+                  </ProtectedRoute>
+                }
+              />
             */}
 
             {/* Staff Protected Routes */}
@@ -189,6 +204,16 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="staff">
                   <QuizTakingPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Route for CreateQuizPage, ensuring correct ProtectedRoute usage */}
+            <Route
+              path="/create-quiz"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <CreateQuizPage />
                 </ProtectedRoute>
               }
             />

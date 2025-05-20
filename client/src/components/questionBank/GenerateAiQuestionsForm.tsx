@@ -32,7 +32,8 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
 }) => {
   const { formatErrorMessage } = useValidation();
   const [categoriesInput, setCategoriesInput] = useState("");
-  const [targetQuestionCount, setTargetQuestionCount] = useState<number>(5);
+  const [targetQuestionCountPerItemFocus, setTargetQuestionCountPerItemFocus] =
+    useState<number>(3);
 
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
   const [aiQuestionDifficulty, setAiQuestionDifficulty] =
@@ -86,8 +87,17 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       setInternalIsLoading(false);
       return;
     }
-    if (targetQuestionCount <= 0) {
-      setFormError("Target question count must be a positive number.");
+    if (targetQuestionCountPerItemFocus <= 0) {
+      setFormError(
+        "Target question count per item/focus must be a positive number."
+      );
+      setInternalIsLoading(false);
+      return;
+    }
+    if (targetQuestionCountPerItemFocus > 10) {
+      setFormError(
+        "Target question count per item/focus should not exceed 10."
+      );
       setInternalIsLoading(false);
       return;
     }
@@ -96,7 +106,7 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       menuId: menuId,
       categories: parsedCategories,
       questionFocusAreas: selectedFocusAreas,
-      targetQuestionCount,
+      targetQuestionCountPerItemFocus,
       questionTypes: aiQuestionTypes,
       difficulty: aiQuestionDifficulty,
     };
@@ -155,18 +165,23 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       </div>
 
       <div>
-        <label htmlFor="targetQuestionCount" className={commonLabelClass}>
-          Number of Questions to Generate
+        <label
+          htmlFor="targetQuestionCountPerItemFocus"
+          className={commonLabelClass}
+        >
+          Number of Questions per Item/Focus
         </label>
         <input
-          id="targetQuestionCount"
+          id="targetQuestionCountPerItemFocus"
           type="number"
-          value={targetQuestionCount}
+          value={targetQuestionCountPerItemFocus}
           onChange={(e) =>
-            setTargetQuestionCount(parseInt(e.target.value, 10) || 1)
+            setTargetQuestionCountPerItemFocus(
+              parseInt(e.target.value, 10) || 1
+            )
           }
           min="1"
-          max="50"
+          max="10"
           required
           className={commonInputClass}
           disabled={internalIsLoading}

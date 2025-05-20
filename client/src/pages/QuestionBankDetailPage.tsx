@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import { IQuestion, IQuestionBank } from "../types/questionBankTypes";
@@ -7,14 +7,12 @@ import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
 import GenerateAiQuestionsForm from "../components/questionBank/GenerateAiQuestionsForm";
-import AiQuestionReviewModal from "../components/questionBank/AiQuestionReviewModal";
 import Modal from "../components/common/Modal";
 import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
-import { getPendingReviewQuestions } from "../services/api";
 import { getMenusByRestaurant as fetchRestaurantMenus } from "../services/api";
 import { IMenuClient } from "../types/menuTypes";
 
@@ -49,6 +47,9 @@ const QuestionListItem: React.FC<{
             ? question.categories.join(", ")
             : "N/A"}
         </p>
+        {question.explanation && (
+          <p className="italic truncate">Explanation: {question.explanation}</p>
+        )}
       </div>
       <div className="mt-3 flex justify-end space-x-2">
         <Button
@@ -99,14 +100,6 @@ const QuestionBankDetailPage: React.FC = () => {
     null
   );
 
-  // State for AI Question Review Modal
-  const [isAiReviewModalOpen, setIsAiReviewModalOpen] = useState(false);
-  const [questionsForAiReview, setQuestionsForAiReview] = useState<IQuestion[]>(
-    []
-  );
-  const [isLoadingPendingQuestions, setIsLoadingPendingQuestions] =
-    useState(false);
-
   // State for menu selection for AI Generation
   const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
   const [selectedMenuForAi, setSelectedMenuForAi] = useState<string | null>(
@@ -154,6 +147,7 @@ const QuestionBankDetailPage: React.FC = () => {
       if (newQuestion && newQuestion._id) {
         await addQuestionToCurrentBank(newQuestion._id);
         setShowAddManualQuestionModal(false);
+        if (bankId) fetchQuestionBankById(bankId);
       } else {
         console.error(
           "New question data is invalid or missing ID after creation."
@@ -175,34 +169,18 @@ const QuestionBankDetailPage: React.FC = () => {
   const handleAiQuestionsGenerated = async (
     generatedQuestions: IQuestion[]
   ) => {
-    if (!currentQuestionBank) {
-      console.error("No current question bank to add generated questions to.");
-      setPageError("Error: No active question bank to add questions to.");
-      return;
-    }
-    setPageError(null);
-    try {
-      if (generatedQuestions && generatedQuestions.length > 0) {
-        for (const q of generatedQuestions) {
-          if (q && q._id) {
-            await addQuestionToCurrentBank(q._id);
-          }
-        }
-        setShowGenerateAiQuestionsModal(false);
-        console.log(
-          `${generatedQuestions.length} questions generated and added to the bank.`
-        );
-      } else {
-        console.log("No new AI questions were provided to add to the bank.");
-      }
-    } catch (err) {
-      console.error("Error adding AI generated questions to bank:", err);
-      setPageError(
-        `Error adding AI-generated questions to bank: ${
-          err instanceof Error ? err.message : "An unknown error occurred."
-        }`
+    setShowGenerateAiQuestionsModal(false);
+    setSelectedMenuForAi(null);
+    if (generatedQuestions && generatedQuestions.length > 0) {
+      alert(
+        `${generatedQuestions.length} AI questions generated and are pending review.`
+      );
+    } else {
+      alert(
+        "AI generation process completed, but no new questions were created or some might have failed."
       );
     }
+    if (bankId) fetchQuestionBankById(bankId);
   };
 
   // Helper to get error message
@@ -246,17 +224,9 @@ const QuestionBankDetailPage: React.FC = () => {
   };
 
   const handleQuestionUpdatedInModal = (updatedQuestion: IQuestion) => {
-    // Option 1: Optimistically update in local state (if currentQuestionBank.questions is array of IQuestion)
     if (currentQuestionBank && Array.isArray(currentQuestionBank.questions)) {
-      const _updatedQuestions = (
-        currentQuestionBank.questions as IQuestion[]
-      ).map((q) => (q._id === updatedQuestion._id ? updatedQuestion : q));
-      // This assumes useQuestionBanks hook allows direct update of currentQuestionBank or provides a setter.
-      // For now, we will rely on re-fetching the bank for simplicity.
-      // setCurrentQuestionBank({ ...currentQuestionBank, questions: _updatedQuestions });
+      // Optimistic update or re-fetch
     }
-
-    // Option 2: Re-fetch the entire bank to ensure data consistency
     if (bankId) {
       fetchQuestionBankById(bankId);
     }
@@ -290,7 +260,6 @@ const QuestionBankDetailPage: React.FC = () => {
         setSelectedMenuForAi(activeMenus[0]._id);
         setShowGenerateAiQuestionsModal(true);
       } else {
-        // Multiple active menus, prompt user to select
         setIsMenuSelectionModalOpen(true);
       }
     } catch (err) {
@@ -304,42 +273,6 @@ const QuestionBankDetailPage: React.FC = () => {
     setSelectedMenuForAi(menuId);
     setIsMenuSelectionModalOpen(false);
     setShowGenerateAiQuestionsModal(true);
-  };
-
-  // Handler to open AI Question Review Modal
-  const handleOpenAiReviewModal = async () => {
-    if (!bankId) {
-      setPageError("Bank ID is missing, cannot initiate review.");
-      return;
-    }
-    setIsLoadingPendingQuestions(true);
-    setPageError(null);
-    try {
-      const pendingQuestions = await getPendingReviewQuestions();
-      if (pendingQuestions && pendingQuestions.length > 0) {
-        setQuestionsForAiReview(pendingQuestions);
-        setIsAiReviewModalOpen(true);
-      } else {
-        // Show a message if no pending questions, maybe a toast/notification later
-        alert(
-          "No AI-generated questions are currently pending review for this restaurant."
-        );
-      }
-    } catch (err) {
-      console.error("Error fetching pending AI questions:", err);
-      setPageError(getErrorMessage(err));
-    } finally {
-      setIsLoadingPendingQuestions(false);
-    }
-  };
-
-  const handleCloseAiReviewModal = () => {
-    setIsAiReviewModalOpen(false);
-    setQuestionsForAiReview([]);
-    // Re-fetch bank details in case questions were added to it
-    if (bankId) {
-      fetchQuestionBankById(bankId);
-    }
   };
 
   if (isLoading && !currentQuestionBank) {
@@ -474,18 +407,13 @@ const QuestionBankDetailPage: React.FC = () => {
                 "Generate AI Questions"
               )}
             </Button>
-            <Button
-              onClick={handleOpenAiReviewModal}
-              variant="secondary"
-              className="w-full md:w-auto"
-              disabled={isLoadingPendingQuestions}
-            >
-              {isLoadingPendingQuestions ? (
-                <LoadingSpinner />
-              ) : (
-                "Review Pending AI Questions"
-              )}
-            </Button>
+            {bankId && (
+              <Link to={`/question-banks/${bankId}/review-ai-questions`}>
+                <Button variant="secondary" className="w-full md:w-auto">
+                  Review Pending AI Questions
+                </Button>
+              </Link>
+            )}
           </div>
         </Card>
 
@@ -660,16 +588,6 @@ const QuestionBankDetailPage: React.FC = () => {
               onClose={handleCloseEditQuestionModal}
             />
           </Modal>
-        )}
-
-        {isAiReviewModalOpen && bankId && (
-          <AiQuestionReviewModal
-            isOpen={isAiReviewModalOpen}
-            generatedQuestions={questionsForAiReview}
-            targetBankId={bankId}
-            onClose={handleCloseAiReviewModal}
-            onReviewComplete={handleCloseAiReviewModal}
-          />
         )}
       </main>
     </div>

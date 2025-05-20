@@ -7,7 +7,7 @@ interface GenerateQuestionsRequestBody {
   itemIds?: string[];
   categories: string[];
   questionFocusAreas: string[];
-  targetQuestionCount: number;
+  targetQuestionCountPerItemFocus: number;
   questionTypes: string[];
   difficulty: string;
   additionalContext?: string;
@@ -34,7 +34,7 @@ export const generateAiQuestionsHandler = async (
       menuId,
       categories,
       questionFocusAreas,
-      targetQuestionCount,
+      targetQuestionCountPerItemFocus,
       questionTypes,
       difficulty,
       additionalContext,
@@ -48,7 +48,7 @@ export const generateAiQuestionsHandler = async (
       categories.length === 0 ||
       !questionFocusAreas ||
       questionFocusAreas.length === 0 ||
-      !targetQuestionCount ||
+      !targetQuestionCountPerItemFocus ||
       !questionTypes ||
       questionTypes.length === 0 ||
       !difficulty
@@ -57,10 +57,15 @@ export const generateAiQuestionsHandler = async (
         new AppError("Missing required fields for AI question generation", 400)
       );
     }
-    if (targetQuestionCount <= 0 || targetQuestionCount > 50) {
-      // Example limit
+    if (
+      targetQuestionCountPerItemFocus <= 0 ||
+      targetQuestionCountPerItemFocus > 10
+    ) {
       return next(
-        new AppError("Target question count must be between 1 and 50", 400)
+        new AppError(
+          "Target question count per item/focus must be between 1 and 10",
+          400
+        )
       );
     }
 
@@ -68,7 +73,7 @@ export const generateAiQuestionsHandler = async (
       menuId,
       categories,
       questionFocusAreas,
-      targetQuestionCount,
+      targetQuestionCountPerItemFocus,
       questionTypes,
       difficulty,
       additionalContext,

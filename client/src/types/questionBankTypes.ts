@@ -21,6 +21,7 @@ export interface IQuestion {
   restaurantId: string;
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
+  explanation?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -102,7 +103,7 @@ export interface NewAiQuestionGenerationParams {
   menuId: string;
   categories: string[];
   questionFocusAreas: string[];
-  targetQuestionCount: number;
+  targetQuestionCountPerItemFocus: number;
   questionTypes: string[];
   difficulty: string;
   additionalContext?: string; // Optional

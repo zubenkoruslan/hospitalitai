@@ -1,3 +1,41 @@
+# Node.js and npm
 node_modules/
 .env
 dist/
+
+# IDE and editor specific
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Log files
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+build/
+
+# Optional Local Configuration
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation (ignore all .md except README.md)
+*.md
+!README.md
