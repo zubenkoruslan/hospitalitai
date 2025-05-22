@@ -100,7 +100,7 @@ const Navbar: React.FC<NavbarProps> = ({
               className="text-2xl font-bold text-slate-700 hover:text-sky-600 transition-colors duration-150 ease-in-out"
               onClick={(e) => handleNavigationClick(e, baseLinks[0].path)}
             >
-              Savvy
+              Peritus
             </Link>
           </div>
 

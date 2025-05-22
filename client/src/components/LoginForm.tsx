@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext"; // Fixed import path
 import Button from "./common/Button"; // Import Button component
 import ErrorMessage from "./common/ErrorMessage"; // Assuming ErrorMessage uses Tailwind
+import Card from "./common/Card"; // Import Card component
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState<string>("");
@@ -64,11 +65,12 @@ const LoginForm: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 sm:p-10 shadow-xl rounded-2xl">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-800">
-            Sign in to Savvy
+      <Card className="p-8 md:p-10 lg:p-12 shadow-2xl bg-white rounded-xl w-full max-w-lg">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-slate-800">
+            Sign in to Peritus
           </h2>
+          <p className="mt-2 text-sm text-slate-600">Sign in to your account</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {(componentError || authError) && (
@@ -172,7 +174,7 @@ const LoginForm: React.FC = () => {
             </Link>
           </p>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

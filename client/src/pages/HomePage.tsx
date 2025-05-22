@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import ErrorMessage from "../components/common/ErrorMessage";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 
@@ -13,7 +14,7 @@ const HomePage: React.FC = () => {
             <div className="w-full lg:w-7/12 px-4 ml-auto mr-auto text-center">
               <div>
                 <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-700 mb-6">
-                  Welcome to <span className="text-sky-600">Savvy</span>
+                  Welcome to <span className="text-sky-600">Peritus</span>
                 </h1>
                 <p className="mt-4 text-lg md:text-xl text-slate-600 mb-10">
                   The smart solution for restaurant staff training and menu
@@ -52,7 +53,7 @@ const HomePage: React.FC = () => {
               Key Features
             </h2>
             <p className="text-md md:text-lg text-slate-500 mt-2">
-              Discover how Savvy can transform your restaurant operations.
+              Discover how Peritus can transform your restaurant operations.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -171,7 +172,7 @@ const HomePage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap text-center md:text-left">
             <div className="w-full md:w-6/12 px-4 mb-8 md:mb-0">
-              <h4 className="text-3xl font-semibold text-white">Savvy</h4>
+              <h4 className="text-3xl font-semibold text-white">Peritus</h4>
               <h5 className="text-lg mt-1 mb-2 text-slate-400">
                 Empowering restaurants with smarter training.
               </h5>
@@ -239,7 +240,7 @@ const HomePage: React.FC = () => {
           <div className="flex flex-wrap items-center md:justify-between justify-center">
             <div className="w-full md:w-4/12 px-4 mx-auto text-center">
               <div className="text-sm text-slate-400 py-1">
-                Copyright © {new Date().getFullYear()} Savvy Hospitality
+                Copyright © {new Date().getFullYear()} Peritus Hospitality
                 Solutions.
               </div>
             </div>

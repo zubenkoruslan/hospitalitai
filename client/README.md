@@ -1,14 +1,14 @@
-# Savvy Frontend (Client)
+# Peritus Frontend (Client)
 
-This folder contains the frontend application for Savvy, built with React, Vite, TypeScript, and Tailwind CSS.
+This folder contains the frontend application for Peritus, built with React, Vite, TypeScript, and Tailwind CSS.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or later recommended)
-- npm (v8 or later recommended)
-- A running instance of the Savvy backend API (see `/server/README.md`)
+- Node.js (version 18.x or later recommended)
+- npm (usually comes with Node.js)
+- A running instance of the Peritus backend API (see `/server/README.md`)
 
 ### Installation
 

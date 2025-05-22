@@ -25,9 +25,9 @@ describe("HomePage", () => {
 
   test("renders the welcome heading", () => {
     const welcomeElement = screen.getByText(/Welcome to/i);
-    const savvyElement = screen.getByText(/Savvy/i);
+    const peritusElement = screen.getByText(/Peritus/i);
     expect(welcomeElement).toBeInTheDocument();
-    expect(savvyElement).toBeInTheDocument();
+    expect(peritusElement).toBeInTheDocument();
   });
 
   test("renders the sign in and create account buttons", () => {
@@ -61,11 +61,11 @@ describe("HomePage", () => {
   });
 
   test("renders the footer", () => {
-    const currentYear = new Date().getFullYear().toString();
-    const copyright = screen.getByText(
-      new RegExp(`Copyright © ${currentYear} Savvy`, "i")
+    const currentYear = new Date().getFullYear();
+    const footerElement = screen.getByText(
+      new RegExp(`Copyright © ${currentYear} Peritus`, "i")
     );
 
-    expect(copyright).toBeInTheDocument();
+    expect(footerElement).toBeInTheDocument();
   });
 });
