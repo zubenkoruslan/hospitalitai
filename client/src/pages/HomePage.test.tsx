@@ -25,9 +25,9 @@ describe("HomePage", () => {
 
   test("renders the welcome heading", () => {
     const welcomeElement = screen.getByText(/Welcome to/i);
-    const peritusElement = screen.getByText(/Peritus/i);
+    const QuizSavvyElement = screen.getByText(/QuizSavvy/i);
     expect(welcomeElement).toBeInTheDocument();
-    expect(peritusElement).toBeInTheDocument();
+    expect(QuizSavvyElement).toBeInTheDocument();
   });
 
   test("renders the sign in and create account buttons", () => {
@@ -63,7 +63,7 @@ describe("HomePage", () => {
   test("renders the footer", () => {
     const currentYear = new Date().getFullYear();
     const footerElement = screen.getByText(
-      new RegExp(`Copyright © ${currentYear} Peritus`, "i")
+      new RegExp(`Copyright © ${currentYear} QuizSavvy`, "i")
     );
 
     expect(footerElement).toBeInTheDocument();

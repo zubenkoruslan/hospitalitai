@@ -8,32 +8,34 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* Hero Section */}
-      <div className="relative pt-20 pb-24 md:pt-32 md:pb-40 flex content-center items-center justify-center bg-white shadow-sm">
+      <div className="relative pt-20 pb-24 md:pt-32 md:pb-40 flex content-center items-center justify-center bg-slate-900 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap items-center">
             <div className="w-full lg:w-7/12 px-4 ml-auto mr-auto text-center">
               <div>
-                <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-700 mb-6">
-                  Welcome to <span className="text-sky-600">Peritus</span>
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-100 mb-6">
+                  Boost Staff Knowledge.{" "}
+                  <span className="text-sky-500">Bite-Sized Quizzes.</span> Big
+                  Results.
                 </h1>
-                <p className="mt-4 text-lg md:text-xl text-slate-600 mb-10">
-                  The smart solution for restaurant staff training and menu
-                  management. Elevate your team&apos;s knowledge and improve
-                  guest experience.
+                <p className="mt-4 text-lg md:text-xl text-slate-300 mb-10">
+                  QuizSavvy empowers your restaurant or hotel staff with rapid,
+                  repeatable quizzes designed for deep learning and confident
+                  service.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                   <Link to="/login">
                     <Button
-                      variant="primary"
-                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                      variant="secondary"
+                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg text-sky-500 bg-transparent border-2 border-sky-500 hover:bg-sky-500 hover:text-slate-900 transition-colors duration-150 ease-in-out shadow-md hover:shadow-lg"
                     >
                       Sign In
                     </Button>
                   </Link>
                   <Link to="/signup">
                     <Button
-                      variant="secondary"
-                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg border-sky-500 text-sky-600 hover:bg-sky-50 transition-colors"
+                      variant="primary"
+                      className="w-full sm:w-auto px-10 py-3 text-lg rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition-colors duration-150 ease-in-out shadow-md hover:shadow-lg"
                     >
                       Create Account
                     </Button>
@@ -53,7 +55,7 @@ const HomePage: React.FC = () => {
               Key Features
             </h2>
             <p className="text-md md:text-lg text-slate-500 mt-2">
-              Discover how Peritus can transform your restaurant operations.
+              Discover how QuizSavvy can transform your restaurant operations.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -85,7 +87,7 @@ const HomePage: React.FC = () => {
             </Card>
 
             <Card className="p-6 bg-white shadow-lg rounded-xl transform hover:scale-105 transition-transform duration-300">
-              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-teal-100 text-teal-600 mx-auto shadow-md">
+              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-sky-100 text-sky-600 mx-auto shadow-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -102,17 +104,18 @@ const HomePage: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-2xl font-semibold text-slate-700 mb-3 text-center">
-                Staff Training
+                Rapid Quiz Creation
               </h3>
               <p className="text-slate-600 text-center">
-                Create custom quizzes to test your staff&apos;s knowledge and
-                track their progress. Ensure your team is knowledgeable and
-                confident about your menu.
+                Quickly generate engaging quizzes from your menu or knowledge
+                base. Peritus uses smart repetition to ensure staff deeply learn
+                and retain crucial information, leading to confident and
+                knowledgeable service.
               </p>
             </Card>
 
             <Card className="p-6 bg-white shadow-lg rounded-xl transform hover:scale-105 transition-transform duration-300">
-              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-indigo-100 text-indigo-600 mx-auto shadow-md">
+              <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-sky-100 text-sky-600 mx-auto shadow-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -132,9 +135,9 @@ const HomePage: React.FC = () => {
                 Analytics
               </h3>
               <p className="text-slate-600 text-center">
-                Track staff performance with detailed analytics. Identify
-                knowledge gaps and optimize your training to improve guest
-                satisfaction and sales.
+                Track progress and see how quick, repetitive quizzes improve
+                staff knowledge and reduce errors. Gain insights to optimize
+                training and elevate service.
               </p>
             </Card>
           </div>
@@ -142,22 +145,22 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-r from-sky-500 to-sky-600">
+      <section className="py-16 md:py-24 bg-sky-600">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap text-center justify-center">
             <div className="w-full lg:w-8/12 px-4">
               <h2 className="text-3xl md:text-4xl font-semibold text-white">
-                Ready to Elevate Your Restaurant?
+                Ready for Smarter, Faster Staff Training?
               </h2>
               <p className="text-lg md:text-xl leading-relaxed mt-4 mb-8 text-sky-100">
-                Join restaurants that are revolutionizing their staff training
-                and menu management. Start enhancing your team&apos;s knowledge
-                today.
+                Stop time-consuming manual training. Empower your team with
+                QuizSavvy's quick, effective quizzes. Sign up today and see the
+                difference.
               </p>
               <Link to="/signup">
                 <Button
                   variant="white"
-                  className="mt-4 px-10 py-3 text-lg rounded-lg shadow-md hover:shadow-lg hover:bg-slate-50 transition-all"
+                  className="mt-4 px-10 py-3 text-lg rounded-lg shadow-md hover:shadow-lg hover:bg-slate-100 text-sky-700 transition-all"
                 >
                   Create Your Account
                 </Button>
@@ -172,7 +175,7 @@ const HomePage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap text-center md:text-left">
             <div className="w-full md:w-6/12 px-4 mb-8 md:mb-0">
-              <h4 className="text-3xl font-semibold text-white">Peritus</h4>
+              <h4 className="text-3xl font-semibold text-white">QuizSavvy</h4>
               <h5 className="text-lg mt-1 mb-2 text-slate-400">
                 Empowering restaurants with smarter training.
               </h5>
@@ -240,7 +243,7 @@ const HomePage: React.FC = () => {
           <div className="flex flex-wrap items-center md:justify-between justify-center">
             <div className="w-full md:w-4/12 px-4 mx-auto text-center">
               <div className="text-sm text-slate-400 py-1">
-                Copyright © {new Date().getFullYear()} Peritus Hospitality
+                Copyright © {new Date().getFullYear()} QuizSavvy Hospitality
                 Solutions.
               </div>
             </div>

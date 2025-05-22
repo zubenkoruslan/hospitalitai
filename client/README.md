@@ -1,6 +1,6 @@
-# Peritus Frontend (Client)
+# QuizSavvy Frontend (Client)
 
-This folder contains the frontend application for Peritus, built with React, Vite, TypeScript, and Tailwind CSS.
+This folder contains the frontend application for QuizSavvy, built with React, Vite, TypeScript, and Tailwind CSS.
 
 ## Getting Started
 
@@ -8,7 +8,7 @@ This folder contains the frontend application for Peritus, built with React, Vit
 
 - Node.js (version 18.x or later recommended)
 - npm (usually comes with Node.js)
-- A running instance of the Peritus backend API (see `/server/README.md`)
+- A running instance of the QuizSavvy backend API (see `/server/README.md`)
 
 ### Installation
 
