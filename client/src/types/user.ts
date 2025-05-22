@@ -19,4 +19,5 @@ export interface ClientUserMinimal {
   role?: UserRole;
   restaurantId?: string;
   assignedRoleId?: string;
+  restaurantName?: string;
 }

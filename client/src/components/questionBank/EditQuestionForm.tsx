@@ -62,36 +62,44 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   }, [questionToEdit]);
 
   // ADDED: Effect to reset options when questionType (form state) changes from its original prop value
+  // Effect to handle option initialization/reset when questionType (form state) or questionToEdit (prop) changes.
   useEffect(() => {
-    // Only reset options if the type has actually been changed by the user from the original
-    // And not during the initial population of the form from questionToEdit
-    if (questionType !== questionToEdit.questionType) {
+    // If the currently selected questionType in the form (state) matches the original question's type (prop):
+    if (questionType === questionToEdit.questionType) {
+      // This block handles two cases:
+      // 1. Initial load: The first useEffect populates questionType and options from questionToEdit.
+      //    This effect then runs. If options are already in sync, no unnecessary setOptions call.
+      // 2. User changed type away and then changed it back to the original type.
+      // In this case, restore the original options for that type if they are not already matching.
+      if (
+        JSON.stringify(options) !== JSON.stringify(questionToEdit.options || [])
+      ) {
+        setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
+      }
+    } else {
+      // If the selected questionType in the form is DIFFERENT from the original question's type
+      // (i.e., user selected a new type from the dropdown):
+      // Reset options based on the NEWLY selected questionType.
       if (questionType === "true-false") {
         setOptions([
-          { text: "True", isCorrect: true }, // Default True to be correct
+          { text: "True", isCorrect: true }, // Default when switching TO True/False
           { text: "False", isCorrect: false },
         ]);
       } else if (
         questionType === "multiple-choice-single" ||
         questionType === "multiple-choice-multiple"
       ) {
-        // Default to 2 blank options for multiple choice types
         setOptions([
+          // Default when switching TO Multiple Choice
           { text: "", isCorrect: false },
           { text: "", isCorrect: false },
         ]);
       }
-      setFormError(null); // Clear any validation errors related to old options
+      setFormError(null); // Clear any validation errors related to the old options structure
     }
-    // If the user reverts the type back to the original type from questionToEdit,
-    // restore the original options for that type.
-    else if (
-      questionType === questionToEdit.questionType &&
-      JSON.stringify(options) !== JSON.stringify(questionToEdit.options || []) // Compare content
-    ) {
-      setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
-    }
-  }, [questionType, questionToEdit, options]); // Added options to dependency array
+  }, [questionType, questionToEdit]); // Dependencies: current form type and the original question prop.
+  // 'options' (state) is intentionally NOT a dependency here
+  // to prevent this effect from running when options are changed by user interaction (handleOptionChange).
 
   const handleOptionChange = (
     index: number,
@@ -357,7 +365,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
                 handleOptionChange(index, "text", e.target.value)
               }
               className={`${commonInputClass} flex-grow`}
-              disabled={internalIsLoading || questionType === "true-false"}
+              disabled={internalIsLoading}
             />
             {questionType !== "true-false" && (
               <button

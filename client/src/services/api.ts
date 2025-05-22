@@ -292,13 +292,18 @@ export const createQuestionBankFromMenu = async (
  * @param restaurantId - The ID of the restaurant.
  */
 export const getMenusByRestaurant = async (
-  restaurantId: string
+  restaurantId: string,
+  status?: "all" | "active" | "inactive"
 ): Promise<IMenuClient[]> => {
+  let url = `/menus/restaurant/${restaurantId}`;
+  if (status) {
+    url += `?status=${status}`;
+  }
   const response = await api.get<{
     success: boolean;
     count: number;
     data: IMenuClient[];
-  }>(`/menus/restaurant/${restaurantId}`);
+  }>(url);
   return response.data.data; // data is the array of IMenuClient
 };
 
@@ -876,6 +881,17 @@ export const getPendingReviewQuestions = async (): Promise<IQuestion[]> => {
     "/questions/pending-review"
   );
   return response.data.data; // Assuming backend wraps in a 'data' object like other question endpoints
+};
+
+export const updateMenuActivationStatus = async (
+  menuId: string,
+  isActive: boolean
+): Promise<IMenuClient> => {
+  const response = await api.patch<{ success: boolean; data: IMenuClient }>(
+    `/menus/${menuId}/status`,
+    { isActive }
+  );
+  return response.data.data;
 };
 
 // Default export

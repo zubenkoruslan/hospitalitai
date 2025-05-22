@@ -195,13 +195,9 @@ const RestaurantDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                {
-                  /* user?.restaurantName // This field is not in ClientUserMinimal
+                {user?.restaurantName
                   ? `${user.restaurantName} Dashboard`
-                  : */ user?.name
-                    ? `${user.name}'s Dashboard`
-                    : "Restaurant Dashboard"
-                }
+                  : "Restaurant Dashboard"}
               </h1>
               {user?.restaurantId && (
                 <div className="mt-2 flex items-center">

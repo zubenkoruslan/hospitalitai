@@ -4,6 +4,9 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 interface IDietaryInfo {
   allergens?: string[];
   dietaryRestrictions?: string[]; // e.g., vegan, vegetarian, gluten-free
+  isVegan?: boolean;
+  isVegetarian?: boolean;
+  isGlutenFree?: boolean;
 }
 
 // Interface for the MenuItem document
@@ -81,6 +84,18 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
         trim: true,
       },
     ],
+    isVegan: {
+      type: Boolean,
+      default: false,
+    },
+    isVegetarian: {
+      type: Boolean,
+      default: false,
+    },
+    isGlutenFree: {
+      type: Boolean,
+      default: false,
+    },
     itemType: {
       type: String,
       enum: ["food", "beverage", "other"],

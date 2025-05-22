@@ -101,7 +101,7 @@ export interface UpdateQuestionClientData {
 // Payload for the new AI Question Generation Process via /api/ai/generate-questions
 export interface NewAiQuestionGenerationParams {
   menuId: string;
-  categories: string[];
+  categoriesToFocus: string[];
   questionFocusAreas: string[];
   targetQuestionCountPerItemFocus: number;
   questionTypes: string[];

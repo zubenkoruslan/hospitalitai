@@ -5,7 +5,7 @@ import { AppError } from "../utils/errorHandler"; // Corrected path
 interface GenerateQuestionsRequestBody {
   menuId: string;
   itemIds?: string[];
-  categories: string[];
+  categoriesToFocus?: string[];
   questionFocusAreas: string[];
   targetQuestionCountPerItemFocus: number;
   questionTypes: string[];
@@ -19,6 +19,40 @@ export const generateAiQuestionsHandler = async (
   res: Response,
   next: NextFunction
 ) => {
+  // ---- START DEBUG LOGS ----
+  console.log(
+    "BACKEND: Received full req.body:",
+    JSON.stringify(req.body, null, 2)
+  );
+  if (req.body && typeof req.body === "object") {
+    console.log("BACKEND: req.body.menuId:", req.body.menuId);
+    console.log(
+      "BACKEND: req.body.categoriesToFocus:",
+      req.body.categoriesToFocus
+    );
+    console.log(
+      "BACKEND: Type of req.body.categoriesToFocus:",
+      typeof req.body.categoriesToFocus
+    );
+    if (Array.isArray(req.body.categoriesToFocus)) {
+      console.log(
+        "BACKEND: req.body.categoriesToFocus.length:",
+        req.body.categoriesToFocus.length
+      );
+    }
+    console.log("BACKEND: req.body.itemIds:", req.body.itemIds);
+    console.log(
+      "BACKEND: req.body.questionFocusAreas:",
+      req.body.questionFocusAreas
+    );
+  } else {
+    console.log(
+      "BACKEND: req.body is not an object or is undefined:",
+      req.body
+    );
+  }
+  // ---- END DEBUG LOGS ----
+
   try {
     const { user } = req; // Assuming user is attached by auth middleware
     if (!user || !user.restaurantId) {
@@ -32,7 +66,7 @@ export const generateAiQuestionsHandler = async (
 
     const {
       menuId,
-      categories,
+      categoriesToFocus,
       questionFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes,
@@ -44,8 +78,8 @@ export const generateAiQuestionsHandler = async (
     // Basic validation (more can be added with express-validator)
     if (
       !menuId ||
-      !categories ||
-      categories.length === 0 ||
+      ((!categoriesToFocus || categoriesToFocus.length === 0) &&
+        (!itemIds || itemIds.length === 0)) ||
       !questionFocusAreas ||
       questionFocusAreas.length === 0 ||
       !targetQuestionCountPerItemFocus ||
@@ -54,16 +88,19 @@ export const generateAiQuestionsHandler = async (
       !difficulty
     ) {
       return next(
-        new AppError("Missing required fields for AI question generation", 400)
+        new AppError(
+          "Missing required fields for AI question generation. Ensure categories or item IDs are provided.",
+          400
+        )
       );
     }
     if (
       targetQuestionCountPerItemFocus <= 0 ||
-      targetQuestionCountPerItemFocus > 10
+      targetQuestionCountPerItemFocus > 20
     ) {
       return next(
         new AppError(
-          "Target question count per item/focus must be between 1 and 10",
+          "Target question count per item/focus must be between 1 and 20",
           400
         )
       );
@@ -71,14 +108,14 @@ export const generateAiQuestionsHandler = async (
 
     const serviceParams = {
       menuId,
-      categories,
+      categoriesToFocus,
       questionFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes,
       difficulty,
       additionalContext,
       itemIds,
-      restaurantId: user.restaurantId.toString(), // Pass restaurantId from authenticated user
+      restaurantId: user.restaurantId.toString(),
     };
 
     // Call the service to generate raw questions (these are not saved yet, or saved as pending)

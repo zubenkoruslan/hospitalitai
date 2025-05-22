@@ -507,15 +507,25 @@ export const processReviewedAiQuestionsHandler = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  console.log("\n[ReviewCtrl DEBUG] Handler started.");
   try {
     const { bankId } = req.params;
+    console.log(`[ReviewCtrl DEBUG] Bank ID: ${bankId}`);
     const {
       acceptedQuestions = [],
       updatedQuestions = [],
       deletedQuestionIds = [],
     }: ProcessReviewedQuestionsBody = req.body;
 
+    console.log(
+      "[ReviewCtrl DEBUG] Received req.body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
     if (!req.user || !req.user.restaurantId) {
+      console.error(
+        "[ReviewCtrl DEBUG] Auth error: User or restaurantId missing."
+      );
       return next(
         new AppError("User not authenticated or restaurantId missing", 401)
       );
@@ -523,6 +533,7 @@ export const processReviewedAiQuestionsHandler = async (
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
     if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      console.error(`[ReviewCtrl DEBUG] Invalid Bank ID: ${bankId}`);
       return next(new AppError("Invalid Question Bank ID format.", 400));
     }
 
@@ -532,6 +543,7 @@ export const processReviewedAiQuestionsHandler = async (
     });
 
     if (!bank) {
+      console.error(`[ReviewCtrl DEBUG] Bank not found: ${bankId}`);
       return next(
         new AppError(
           `Question Bank with ID ${bankId} not found for this restaurant.`,
@@ -539,28 +551,39 @@ export const processReviewedAiQuestionsHandler = async (
         )
       );
     }
+    console.log(`[ReviewCtrl DEBUG] Found bank: ${bank.name}`);
 
     const questionIdsToAddToBank = new Set<string>(
       bank.questions.map((q) => q.toString())
     );
     const questionsToSave: mongoose.Document<unknown, {}, IQuestion>[] = [];
 
-    // Process deleted questions (mark as 'rejected')
     if (deletedQuestionIds.length > 0) {
+      console.log(
+        `[ReviewCtrl DEBUG] Processing ${deletedQuestionIds.length} deletedQuestionIds.`
+      );
       await QuestionModel.updateMany(
         { _id: { $in: deletedQuestionIds }, restaurantId },
         { $set: { status: "rejected" } }
       );
-      // Remove from bank's list if they were somehow there
       deletedQuestionIds.forEach((id) => questionIdsToAddToBank.delete(id));
     }
 
-    // Process updated questions
+    if (updatedQuestions.length > 0) {
+      console.log(
+        `[ReviewCtrl DEBUG] Processing ${updatedQuestions.length} updated questions.`
+      );
+    }
     for (const qData of updatedQuestions) {
+      console.log("[ReviewCtrl DEBUG] Processing updated qData (summary):", {
+        _id: qData._id,
+        textStart: qData.questionText?.substring(0, 20),
+        statusFromClient: qData.status,
+      });
       if (!qData._id || !mongoose.Types.ObjectId.isValid(qData._id)) {
         console.warn(
-          "Skipping update for question with invalid/missing _id:",
-          qData
+          "[ReviewCtrl DEBUG] Skipping update for question with invalid/missing _id:",
+          qData._id
         );
         continue;
       }
@@ -569,100 +592,155 @@ export const processReviewedAiQuestionsHandler = async (
         restaurantId,
       });
       if (question) {
-        Object.assign(question, qData); // Apply updates from qData
-        question.status = "active"; // Ensure status is active
-        question.restaurantId = restaurantId; // Ensure restaurantId
-        question.createdBy = question.createdBy || "ai"; // Preserve original creator or default to 'ai'
+        console.log(
+          `[ReviewCtrl DEBUG] Found existing question to update: ${question._id}, current status: ${question.status}`
+        );
+        Object.assign(question, qData);
+        question.status = "active";
+        console.log(
+          `[ReviewCtrl DEBUG] Setting updated question ${question._id} status to active.`
+        );
+        question.restaurantId = restaurantId;
+        question.createdBy = question.createdBy || "ai";
         questionsToSave.push(question);
         questionIdsToAddToBank.add(question._id.toString());
       } else {
-        console.warn(`Question with _id ${qData._id} not found for update.`);
+        console.warn(
+          `[ReviewCtrl DEBUG] Question with _id ${qData._id} not found for update.`
+        );
       }
     }
 
-    // Process accepted questions
+    if (acceptedQuestions.length > 0) {
+      console.log(
+        `[ReviewCtrl DEBUG] Processing ${acceptedQuestions.length} accepted questions.`
+      );
+    }
     for (const qData of acceptedQuestions) {
+      console.log("[ReviewCtrl DEBUG] Processing accepted qData (summary):", {
+        _id: qData._id,
+        textStart: qData.questionText?.substring(0, 20),
+        statusFromClient: qData.status,
+      });
       if (qData._id && mongoose.Types.ObjectId.isValid(qData._id)) {
-        // Existing pending question being accepted
         const question = await QuestionModel.findOne({
           _id: qData._id,
           restaurantId,
         });
         if (question) {
-          // If it was pending_review or rejected, update it.
+          console.log(
+            `[ReviewCtrl DEBUG] Found existing question to accept: ${question._id}, current status: ${question.status}`
+          );
           if (
             question.status === "pending_review" ||
             question.status === "rejected"
           ) {
-            Object.assign(question, qData); // Apply any edits made during review
+            Object.assign(question, qData);
             question.status = "active";
+            console.log(
+              `[ReviewCtrl DEBUG] Setting accepted question ${question._id} status to active.`
+            );
             question.restaurantId = restaurantId;
             question.createdBy = question.createdBy || "ai";
             questionsToSave.push(question);
             questionIdsToAddToBank.add(question._id.toString());
           } else if (question.status === "active") {
-            // If already active but somehow in accepted list, ensure it's in bank.
+            console.log(
+              `[ReviewCtrl DEBUG] Question ${question._id} already active, ensuring in bank.`
+            );
             questionIdsToAddToBank.add(question._id.toString());
           }
         } else {
-          console.warn(`Accepted question with _id ${qData._id} not found.`);
+          console.warn(
+            `[ReviewCtrl DEBUG] Accepted question with _id ${qData._id} not found.`
+          );
         }
       } else {
-        // New question created during review (less likely for AI, but supported by plan)
+        console.log(
+          "[ReviewCtrl DEBUG] Processing accepted qData as new question (no valid _id).",
+          {
+            textStart: qData.questionText?.substring(0, 20),
+            statusFromClient: qData.status,
+          }
+        );
         const newQuestionDocument = new QuestionModel({
           ...qData,
           status: "active",
-          createdBy: "ai", // Or derive if possible, defaulting to 'ai' for this handler
+          createdBy: "ai",
           restaurantId,
         });
         questionsToSave.push(newQuestionDocument);
-        // ID will be generated on save, add after save.
       }
     }
 
-    // Save all new/updated questions
     if (questionsToSave.length > 0) {
-      // Mongoose `bulkSave` saves an array of documents, good for performance.
-      // It will insert new documents and update existing ones if they have an _id and version key.
+      console.log(
+        `[ReviewCtrl DEBUG] Attempting to bulkSave ${questionsToSave.length} questions.`
+      );
+      for (const q of questionsToSave) {
+        // Safely access properties for logging, assuming q is a Mongoose document for IQuestion
+        const qAsIQuestion = q as any as IQuestion; // Cast to IQuestion for easier access in log
+        console.log(
+          `[ReviewCtrl DEBUG]  - Saving Q_ID: ${qAsIQuestion._id}, Status: ${
+            qAsIQuestion.status
+          }, TextStart: ${qAsIQuestion.questionText?.substring(0, 30)}`
+        );
+      }
       await QuestionModel.bulkSave(questionsToSave);
+      console.log("[ReviewCtrl DEBUG] bulkSave completed.");
 
-      // Add IDs of newly created questions to the set for bank update
       questionsToSave.forEach((doc) => {
-        // After bulkSave, documents should have their _ids if they were new.
         if (doc && doc._id && !questionIdsToAddToBank.has(doc._id.toString())) {
+          console.log(
+            `[ReviewCtrl DEBUG] Adding newly saved Q_ID ${doc._id} to bank's list.`
+          );
           questionIdsToAddToBank.add(doc._id.toString());
         }
       });
     }
 
-    // Update the bank with the final list of question IDs
-    bank.questions = Array.from(questionIdsToAddToBank).map(
+    const finalQuestionIdsForBank = Array.from(questionIdsToAddToBank).map(
       (id) => new mongoose.Types.ObjectId(id)
     );
+    console.log(
+      `[ReviewCtrl DEBUG] Final ${finalQuestionIdsForBank.length} question IDs for bank ${bank.name}:`,
+      finalQuestionIdsForBank.map((id) => id.toString())
+    );
+    bank.questions = finalQuestionIdsForBank;
 
-    // Recalculate categories and questionCount
-    // This assumes a method on the QuestionBankModel schema or a pre-save hook handles this.
-    // If not, this logic needs to be implemented here or in a service.
     if (typeof (bank as any).updateQuestionCountAndCategories === "function") {
+      console.log(
+        "[ReviewCtrl DEBUG] Calling bank.updateQuestionCountAndCategories()."
+      );
       await (bank as any).updateQuestionCountAndCategories();
     } else {
-      // Fallback or warning if method doesn't exist
       console.warn(
-        "bank.updateQuestionCountAndCategories() method not found. Count and categories might be stale."
+        "[ReviewCtrl DEBUG] bank.updateQuestionCountAndCategories() method not found. Recalculating manually."
       );
-      // Basic recalculation (consider moving to a model method or pre-save hook)
       bank.questionCount = bank.questions.length;
       const activeQuestionsInBank = await QuestionModel.find({
         _id: { $in: bank.questions },
         status: "active",
-      });
+        restaurantId: restaurantId,
+      }).lean();
       const categories = new Set<string>();
-      activeQuestionsInBank.forEach((q) =>
-        q.categories.forEach((cat) => categories.add(cat))
-      );
+      activeQuestionsInBank.forEach((q) => {
+        if (q.categories && Array.isArray(q.categories)) {
+          q.categories.forEach((cat: string) => categories.add(cat));
+        }
+      });
       bank.categories = Array.from(categories);
+      console.log(
+        `[ReviewCtrl DEBUG] Manual recalculation: count=${
+          bank.questionCount
+        }, categories=${bank.categories.join(",")}`
+      );
     }
+    console.log("[ReviewCtrl DEBUG] Saving bank changes.");
     await bank.save();
+    console.log(
+      "[ReviewCtrl DEBUG] Bank saved. Handler finished successfully."
+    );
 
     res.status(200).json({
       status: "success",

@@ -512,7 +512,7 @@ export const getUniqueValidQuestionIdsFromQuestionBanks = async (
     const validQuestions = await QuestionModel.find({
       _id: { $in: uniqueQuestionIds },
       restaurantId: restaurantId, // Ensure questions also belong to the restaurant
-      isActive: true, // Added filter for active questions
+      status: "active", // Changed from isActive: true
     })
       .select("_id")
       .lean();

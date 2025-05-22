@@ -247,15 +247,25 @@ class AuthService {
    */
   static async getCurrentUserDetails(
     userId: string | mongoose.Types.ObjectId
-  ): Promise<Omit<IUser, "password">> {
+  ): Promise<Omit<IUser, "password"> & { restaurantName?: string }> {
     try {
-      const user = await User.findById(userId).select("-password");
+      const user = await User.findById(userId).select("-password").lean();
 
       if (!user) {
         throw new AppError("User not found", 404);
       }
 
-      return user.toObject() as unknown as Omit<IUser, "password">;
+      let restaurantName: string | undefined;
+      if (user.restaurantId) {
+        const restaurant = await Restaurant.findById(user.restaurantId)
+          .select("name")
+          .lean();
+        if (restaurant) {
+          restaurantName = restaurant.name;
+        }
+      }
+
+      return { ...user, restaurantName };
     } catch (error: any) {
       console.error(`Error fetching user details for ID ${userId}:`, error);
       if (error instanceof AppError) throw error; // Re-throw specific AppErrors (e.g., 404)

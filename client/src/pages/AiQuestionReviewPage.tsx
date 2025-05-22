@@ -19,8 +19,19 @@ const ReviewQuestionItem: React.FC<{
   question: IQuestion;
   onEdit: (question: IQuestion) => void;
   onApprove: (questionId: string) => void;
+  onDelete: (questionId: string) => void;
+  isSelected: boolean;
+  onToggleSelect: (questionId: string) => void;
   isProcessing: boolean;
-}> = ({ question, onEdit, onApprove, isProcessing }) => {
+}> = ({
+  question,
+  onEdit,
+  onApprove,
+  onDelete,
+  isSelected,
+  onToggleSelect,
+  isProcessing,
+}) => {
   const formatQuestionType = (type: string) => {
     if (!type) return "N/A";
     return type
@@ -30,35 +41,47 @@ const ReviewQuestionItem: React.FC<{
   };
 
   return (
-    <Card className="bg-white shadow-lg rounded-xl p-4 mb-4 hover:shadow-xl transition-shadow duration-300">
-      <p className="font-semibold text-gray-800 mb-2">
-        {question.questionText}
-      </p>
-      <div className="text-sm text-gray-700 mb-2">
-        <strong>Type:</strong> {formatQuestionType(question.questionType)} |{" "}
-        <strong>Difficulty:</strong> {question.difficulty || "N/A"} |{" "}
-        <strong>Category:</strong> {question.categories?.join(", ") || "N/A"}
-      </div>
-      {question.options && question.options.length > 0 && (
-        <div className="mb-2">
-          <p className="text-sm font-medium text-gray-700">Options:</p>
-          <ul className="list-disc list-inside pl-4 text-sm text-gray-600">
-            {question.options.map((opt, index) => (
-              <li
-                key={index}
-                className={opt.isCorrect ? "font-semibold text-green-600" : ""}
-              >
-                {opt.text} {opt.isCorrect ? "(Correct)" : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {question.explanation && (
-        <p className="text-sm text-gray-600 italic mb-3">
-          <strong>Explanation:</strong> {question.explanation}
+    <Card className="bg-white shadow-lg rounded-xl p-4 mb-4 hover:shadow-xl transition-shadow duration-300 flex items-start space-x-3">
+      <input
+        type="checkbox"
+        className="mt-1 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+        checked={isSelected}
+        onChange={() => onToggleSelect(question._id)}
+        disabled={isProcessing}
+        aria-label={`Select question: ${question.questionText}`}
+      />
+      <div className="flex-grow">
+        <p className="font-semibold text-gray-800 mb-2">
+          {question.questionText}
         </p>
-      )}
+        <div className="text-sm text-gray-700 mb-2">
+          <strong>Type:</strong> {formatQuestionType(question.questionType)} |{" "}
+          <strong>Difficulty:</strong> {question.difficulty || "N/A"} |{" "}
+          <strong>Category:</strong> {question.categories?.join(", ") || "N/A"}
+        </div>
+        {question.options && question.options.length > 0 && (
+          <div className="mb-2">
+            <p className="text-sm font-medium text-gray-700">Options:</p>
+            <ul className="list-disc list-inside pl-4 text-sm text-gray-600">
+              {question.options.map((opt, index) => (
+                <li
+                  key={index}
+                  className={
+                    opt.isCorrect ? "font-semibold text-green-600" : ""
+                  }
+                >
+                  {opt.text} {opt.isCorrect ? "(Correct)" : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {question.explanation && (
+          <p className="text-sm text-gray-600 italic mb-3">
+            <strong>Explanation:</strong> {question.explanation}
+          </p>
+        )}
+      </div>
       <div className="mt-3 flex justify-end space-x-2">
         <Button
           variant="secondary"
@@ -76,6 +99,14 @@ const ReviewQuestionItem: React.FC<{
         >
           Approve
         </Button>
+        <Button
+          variant="secondary"
+          onClick={() => onDelete(question._id)}
+          disabled={isProcessing}
+          className="text-xs px-3 py-1 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 focus:ring-red-500"
+        >
+          Delete
+        </Button>
       </div>
     </Card>
   );
@@ -91,12 +122,21 @@ const AiQuestionReviewPage: React.FC = () => {
   const [processingStates, setProcessingStates] = useState<
     Record<string, boolean>
   >({}); // For individual question processing
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false); // For bulk actions
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [questionToEdit, setQuestionToEdit] = useState<IQuestion | null>(null);
 
-  const [isConfirmApproveAllModalOpen, setIsConfirmApproveAllModalOpen] =
+  const [isConfirmDeleteOneModalOpen, setIsConfirmDeleteOneModalOpen] =
     useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState<IQuestion | null>(
+    null
+  );
+  const [
+    isConfirmDeleteSelectedModalOpen,
+    setIsConfirmDeleteSelectedModalOpen,
+  ] = useState(false);
 
   const fetchPending = useCallback(async () => {
     setIsLoading(true);
@@ -144,6 +184,22 @@ const AiQuestionReviewPage: React.FC = () => {
     // Optionally, you could call fetchPending() again if the update is critical to re-fetch.
   };
 
+  const handleToggleSelectQuestion = (questionId: string) => {
+    setSelectedQuestionIds((prevSelected) =>
+      prevSelected.includes(questionId)
+        ? prevSelected.filter((id) => id !== questionId)
+        : [...prevSelected, questionId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedQuestionIds.length === pendingQuestions.length) {
+      setSelectedQuestionIds([]);
+    } else {
+      setSelectedQuestionIds(pendingQuestions.map((q) => q._id));
+    }
+  };
+
   const handleApproveQuestion = async (questionId: string) => {
     if (!bankId) {
       setError("Target bank ID is missing.");
@@ -168,50 +224,130 @@ const AiQuestionReviewPage: React.FC = () => {
     }
   };
 
-  const handleApproveAllVisible = async () => {
+  const handleApproveSelected = async () => {
     if (!bankId) {
       setError("Target bank ID is missing.");
       return;
     }
-    if (pendingQuestions.length === 0) {
-      alert("No questions to approve.");
+    if (selectedQuestionIds.length === 0) {
+      alert("No questions selected to approve.");
       return;
     }
 
-    setIsConfirmApproveAllModalOpen(false); // Close confirmation modal first
-
-    const questionIdsToApprove = pendingQuestions.map((q) => q._id);
-    // Set all to processing
-    const newProcessingStates: Record<string, boolean> = {};
-    questionIdsToApprove.forEach((id) => (newProcessingStates[id] = true));
-    setProcessingStates(newProcessingStates);
-
+    setIsBulkProcessing(true);
     try {
       await processReviewedAiQuestions(bankId, {
-        acceptedQuestions: questionIdsToApprove.map((id) => ({ _id: id })),
+        acceptedQuestions: selectedQuestionIds.map((id) => ({ _id: id })),
         updatedQuestions: [],
         deletedQuestionIds: [],
       });
-      setPendingQuestions([]); // Clear list as all are approved
+      setPendingQuestions((prev) =>
+        prev.filter((q) => !selectedQuestionIds.includes(q._id))
+      );
+      setSelectedQuestionIds([]);
       // Optionally, show a success message
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to approve all questions."
+        err instanceof Error
+          ? err.message
+          : "Failed to approve selected questions."
       );
-      console.error("Error approving all questions:", err);
-      // Reset processing states on error
-      const resetProcessingStates: Record<string, boolean> = {};
-      questionIdsToApprove.forEach((id) => (resetProcessingStates[id] = false));
-      setProcessingStates(resetProcessingStates);
+      console.error("Error approving selected questions:", err);
+    } finally {
+      setIsBulkProcessing(false);
     }
-    // No finally needed here for processing states if list is cleared on success
   };
 
-  const openApproveAllConfirmation = () => {
-    if (pendingQuestions.length > 0) {
-      setIsConfirmApproveAllModalOpen(true);
-    } else {
-      alert("No questions to approve.");
+  const handleDeleteQuestion = (questionId: string) => {
+    const question = pendingQuestions.find((q) => q._id === questionId);
+    if (question) {
+      setQuestionToDelete(question);
+      setIsConfirmDeleteOneModalOpen(true);
+    }
+  };
+
+  const confirmDeleteOneQuestion = async () => {
+    if (!questionToDelete || !bankId) {
+      setError("Question or Bank ID is missing for deletion.");
+      setIsConfirmDeleteOneModalOpen(false);
+      return;
+    }
+
+    setProcessingStates((prev) => ({
+      ...prev,
+      [questionToDelete._id]: true,
+    }));
+    setIsConfirmDeleteOneModalOpen(false);
+
+    try {
+      await processReviewedAiQuestions(bankId, {
+        acceptedQuestions: [],
+        updatedQuestions: [],
+        deletedQuestionIds: [questionToDelete._id],
+      });
+      setPendingQuestions((prev) =>
+        prev.filter((q) => q._id !== questionToDelete._id)
+      );
+      setSelectedQuestionIds((prev) =>
+        prev.filter((id) => id !== questionToDelete._id)
+      );
+      // Optionally, show a success message
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete question."
+      );
+      console.error("Error deleting question:", err);
+    } finally {
+      setProcessingStates((prev) => ({
+        ...prev,
+        [questionToDelete._id]: false,
+      }));
+      setQuestionToDelete(null);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedQuestionIds.length === 0) {
+      alert("No questions selected to delete.");
+      return;
+    }
+    setIsConfirmDeleteSelectedModalOpen(true);
+  };
+
+  const confirmDeleteSelectedQuestions = async () => {
+    if (!bankId) {
+      setError("Target bank ID is missing.");
+      return;
+    }
+    if (selectedQuestionIds.length === 0) {
+      // Should not happen if button is properly disabled, but good practice
+      setIsConfirmDeleteSelectedModalOpen(false);
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    setIsConfirmDeleteSelectedModalOpen(false);
+
+    try {
+      await processReviewedAiQuestions(bankId, {
+        acceptedQuestions: [],
+        updatedQuestions: [],
+        deletedQuestionIds: selectedQuestionIds,
+      });
+      setPendingQuestions((prev) =>
+        prev.filter((q) => !selectedQuestionIds.includes(q._id))
+      );
+      setSelectedQuestionIds([]);
+      // Optionally, show a success message
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete selected questions."
+      );
+      console.error("Error deleting selected questions:", err);
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -249,14 +385,55 @@ const AiQuestionReviewPage: React.FC = () => {
         )}
 
         {pendingQuestions.length > 0 && (
-          <div className="mb-6 flex justify-end">
-            <Button
-              variant="primary"
-              onClick={openApproveAllConfirmation}
-              disabled={Object.values(processingStates).some((p) => p)} // Disable if any question is processing
-            >
-              Approve All Visible ({pendingQuestions.length})
-            </Button>
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <input
+                  id="selectAllCheckbox"
+                  type="checkbox"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  checked={
+                    pendingQuestions.length > 0 &&
+                    selectedQuestionIds.length === pendingQuestions.length
+                  }
+                  onChange={handleToggleSelectAll}
+                  disabled={
+                    isBulkProcessing ||
+                    Object.values(processingStates).some((p) => p)
+                  }
+                />
+                <label
+                  htmlFor="selectAllCheckbox"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Select All ({selectedQuestionIds.length} selected)
+                </label>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="primary"
+                  onClick={handleApproveSelected}
+                  disabled={
+                    selectedQuestionIds.length === 0 ||
+                    isBulkProcessing ||
+                    Object.values(processingStates).some((p) => p)
+                  }
+                >
+                  Approve Selected
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteSelected}
+                  disabled={
+                    selectedQuestionIds.length === 0 ||
+                    isBulkProcessing ||
+                    Object.values(processingStates).some((p) => p)
+                  }
+                >
+                  Delete Selected
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -293,6 +470,9 @@ const AiQuestionReviewPage: React.FC = () => {
               question={q}
               onEdit={handleEditQuestion}
               onApprove={handleApproveQuestion}
+              onDelete={handleDeleteQuestion}
+              isSelected={selectedQuestionIds.includes(q._id)}
+              onToggleSelect={handleToggleSelectQuestion}
               isProcessing={processingStates[q._id] || false}
             />
           ))}
@@ -312,18 +492,42 @@ const AiQuestionReviewPage: React.FC = () => {
           </Modal>
         )}
 
-        {isConfirmApproveAllModalOpen && (
+        {isConfirmDeleteOneModalOpen && questionToDelete && (
           <Modal
-            isOpen={isConfirmApproveAllModalOpen}
-            onClose={() => setIsConfirmApproveAllModalOpen(false)}
-            title="Confirm Approve All"
+            isOpen={isConfirmDeleteOneModalOpen}
+            onClose={() => {
+              setIsConfirmDeleteOneModalOpen(false);
+              setQuestionToDelete(null);
+            }}
+            title="Confirm Delete Question"
             size="sm"
           >
             <ConfirmationModalContent
-              message={`Are you sure you want to approve all ${pendingQuestions.length} visible questions and add them to the bank?`}
-              onConfirm={handleApproveAllVisible}
-              onCancel={() => setIsConfirmApproveAllModalOpen(false)}
-              confirmText="Approve All"
+              message={`Are you sure you want to delete this question: "${questionToDelete.questionText}"? This action cannot be undone.`}
+              onConfirm={confirmDeleteOneQuestion}
+              onCancel={() => {
+                setIsConfirmDeleteOneModalOpen(false);
+                setQuestionToDelete(null);
+              }}
+              confirmText="Delete"
+              confirmButtonVariant="destructive"
+            />
+          </Modal>
+        )}
+
+        {isConfirmDeleteSelectedModalOpen && (
+          <Modal
+            isOpen={isConfirmDeleteSelectedModalOpen}
+            onClose={() => setIsConfirmDeleteSelectedModalOpen(false)}
+            title="Confirm Delete Selected Questions"
+            size="sm"
+          >
+            <ConfirmationModalContent
+              message={`Are you sure you want to delete ${selectedQuestionIds.length} selected question(s)? This action cannot be undone.`}
+              onConfirm={confirmDeleteSelectedQuestions}
+              onCancel={() => setIsConfirmDeleteSelectedModalOpen(false)}
+              confirmText={`Delete ${selectedQuestionIds.length} Question(s)`}
+              confirmButtonVariant="destructive"
             />
           </Modal>
         )}

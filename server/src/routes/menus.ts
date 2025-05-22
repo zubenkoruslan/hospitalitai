@@ -10,6 +10,7 @@ import {
   validateUpdateMenu,
   validateCategoryNameParam,
 } from "../middleware/validationMiddleware";
+import { body } from "express-validator";
 
 const router: Router = express.Router();
 
@@ -91,9 +92,12 @@ router.delete(
 // Route to update menu activation status
 router.patch(
   "/:menuId/status",
-  protect, // Protect the route
+  protect, // General auth
+  restrictTo("restaurant"), // Ensure user is restaurant owner
   validateMenuIdParam, // Validate menuId in params
-  menuController.updateMenuActivationStatusHandler // Corrected handler name
+  body("isActive").isBoolean().withMessage("isActive must be a boolean."), // Validate isActive in body
+  handleValidationErrors,
+  menuController.updateMenuActivationStatusHandler
 );
 
 export default router;

@@ -110,14 +110,19 @@ class StaffService {
 
       // 2. For each staff member, process roles and calculate quiz progress
       const staffWithDataPromises = staffList.map(async (staffMember) => {
-        let currentProfessionalRole = staffMember.professionalRole;
-        // If a formal role is assigned, its name should take precedence for display
-        if (staffMember.assignedRoleId) {
+        let displayProfessionalRole = staffMember.professionalRole; // Start with the actual professionalRole
+
+        // If professionalRole is not set (or empty) AND a formal role is assigned,
+        // use the assigned role's name as a fallback for display purposes.
+        if (
+          (!displayProfessionalRole || displayProfessionalRole.trim() === "") &&
+          staffMember.assignedRoleId
+        ) {
           const roleDoc = await RoleModel.findById(staffMember.assignedRoleId)
             .select("name")
             .lean<PlainIRole>();
           if (roleDoc && roleDoc.name) {
-            currentProfessionalRole = roleDoc.name;
+            displayProfessionalRole = roleDoc.name;
           }
         }
 
@@ -261,7 +266,7 @@ class StaffService {
           name: staffMember.name,
           email: staffMember.email,
           createdAt: staffMember.createdAt,
-          professionalRole: currentProfessionalRole,
+          professionalRole: displayProfessionalRole,
           assignedRoleId: staffMember.assignedRoleId,
           averageScore: averageScore,
           quizzesTaken: quizzesTaken,
@@ -524,27 +529,7 @@ class StaffService {
         throw new AppError("Staff member not found in this restaurant.", 404);
       }
 
-      let professionalRoleToSet: string | undefined = undefined;
-
-      if (assignedRoleId) {
-        // Fetch the role name to set it on the User document
-        const roleDoc = await RoleModel.findById(assignedRoleId)
-          .select("name")
-          .lean<PlainIRole>(); // Typed lean
-        if (roleDoc && roleDoc.name) {
-          professionalRoleToSet = roleDoc.name;
-        } else {
-          // If roleDoc is not found or has no name, it implies an issue (e.g., role deleted after selection)
-          // Depending on desired behavior, either throw error or proceed without setting professionalRole
-          console.warn(
-            `Role with ID ${assignedRoleId} not found or has no name during staff update.`
-          );
-          // For now, let's proceed, allowing assignedRoleId to be set but professionalRole might be stale or empty
-        }
-      }
-
       staffMember.assignedRoleId = assignedRoleId || undefined; // Set to ObjectId or undefined if null
-      staffMember.professionalRole = professionalRoleToSet; // Set based on fetched role name or undefined
 
       const updatedStaff = await staffMember.save();
 

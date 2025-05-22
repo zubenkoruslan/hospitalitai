@@ -104,8 +104,8 @@ let genAI: GoogleGenerativeAI | null = null;
 let model: GenerativeModel | null = null;
 
 // --- START Batch Configuration ---
-const AI_CALL_BATCH_SIZE = 2; // Number of AI calls to make in parallel per batch
-const DELAY_BETWEEN_BATCHES_MS = 15000; // 15 seconds delay between batches
+const AI_CALL_BATCH_SIZE = 1; // Adjusted for potentially larger category-based payloads
+const DELAY_BETWEEN_BATCHES_MS = 20000; // Adjusted for potentially larger category-based payloads
 // --- END Batch Configuration ---
 
 if (GEMINI_API_KEY) {
@@ -153,76 +153,56 @@ const _systemInstructionForQuestionGeneration = `System: You are an AI assistant
 **CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
 
 You will be provided with the following for each question generation request:
-- 'targetItem': An object containing details of the menu item for which the question is being generated (e.g., name, description, ingredients list, allergens list).
-- 'category': The menu category the targetItem belongs to.
-- 'focus': The specific aspect to generate questions about (e.g., "Name", "Ingredients", "Description", "Allergens").
-- 'questionType': The type of question to generate ("multiple-choice-single" or "true-false").
+- 'itemsInCategory': An array of objects, where each object contains details of a menu item within the target category (e.g., name, description, ingredients list, allergens).
+- 'categoryName': The menu category these items belong to.
+- 'questionFocusAreas': A list of general themes or aspects to generate questions about (e.g., ["Ingredients", "Allergens"]).
+- 'questionTypes': The types of questions to generate (e.g., ["multiple-choice-single", "true-false"]).
 - 'difficulty': The desired difficulty level ("easy", "medium", "hard").
-- 'contextualItemNames' (for MCQ distractors): An array of other item names from the same menu/category.
-- 'contextualIngredients' (for MCQ distractors): An array of ingredients found across other items in the same menu/category.
-- 'targetQuestionCount': The number of questions to generate for this specific request.
+- 'contextualItemNames' (for MCQ distractors): An array of other item names from the menu (potentially from other categories).
+- 'contextualIngredients' (for MCQ distractors): An array of ingredients found across other items on the menu.
+- 'targetQuestionCount': The total number of questions to generate for this entire batch of items in the category.
 
 General Instructions for Question Generation:
-1.  **Adherence**: Strictly adhere to the provided 'focus', 'questionType', and 'targetItem' data.
-2.  **Correctness**: The CORRECT ANSWER must always be based *only* on the information provided for the 'targetItem'.
+1.  **Adherence**: Base questions on the 'itemsInCategory'. Distribute questions among the items in the category.
+2.  **Correctness**: The CORRECT ANSWER must always be based *only* on the information provided for the specific item a question refers to.
 3.  **Clarity**: Ensure questions are grammatically correct, clear, and unambiguous.
-4.  **Explanation**: ALWAYS provide a brief 'explanation' for the correct answer, referencing the 'targetItem's' details.
-5.  **Focus Field**: Ensure the 'focus' field in your output matches the input 'focus' you were given.
-6.  **Category Field**: The 'category' field in your output MUST match the input 'category' of the 'targetItem'.
+4.  **Explanation**: ALWAYS provide a brief 'explanation' for the correct answer, referencing the relevant item\'s details.
+5.  **Focus Field**: In your output for each question, populate the 'focus' field with the primary theme of that question (e.g., "Ingredients", "Allergens", "Dietary Information"). This should align with the input 'questionFocusAreas'.
+6.  **Category Field**: The 'category' field in your output MUST match the 'categoryName' provided in the input, or if a question is very specific to an item, that item\'s original category if it differs (though typically items in the batch share the categoryName).
 7.  **Difficulty Field**: The 'difficulty' field in your output MUST match the input 'difficulty'.
+8.  **Question Distribution**: Attempt to generate a balanced set of questions covering different items within the 'itemsInCategory' and different 'questionFocusAreas', up to the 'targetQuestionCount'.
 
 Multiple Choice Questions (MCQ - 'multiple-choice-single'):
 - Provide one correct answer and three plausible but incorrect distractor options (total 4 options).
-- Distractors MUST be clearly wrong for the 'targetItem'.
-- Distractors should be distinct from the correct answer and from each other.
-- **Name Focus MCQs**:
-    - Correct Answer: The 'targetItem.name'.
-    - Question Template Idea: "The dish primarily made with [Ingredient A, Ingredient B from targetItem.ingredients] is called:"
-    - Distractors: Select three distinct names from 'contextualItemNames'. They must NOT be the 'targetItem.name'.
-- **Ingredients Focus MCQs**:
-    - Correct Answer Option: A selection of 2-4 prominent ingredients from 'targetItem.ingredients'.
-    - Question Template Idea: "Which of the following are key ingredients in [targetItem.name]?"
-    - Distractors: Create three plausible but incorrect sets of ingredients. Each set should primarily use ingredients from 'contextualIngredients', ensuring these combinations do not accurately represent the 'targetItem.ingredients'.
-- **Description Focus MCQs**:
-    - Correct Answer Option: A concise phrase accurately reflecting a key aspect of 'targetItem.description'.
-    - Question Template Idea: "Which of the following best describes [targetItem.name]?"
-    - Distractors: Three phrases that are plausible for menu items but incorrect for the 'targetItem.description'. These could be: a) a description fitting another item from 'contextualItemNames', b) an opposite characteristic, c) a vague culinary description not matching the target.
-- **Allergens Focus MCQs**:
-    - Correct Answer Option: An accurate statement about 'targetItem.allergens' (e.g., "Contains gluten and dairy", "Is listed as nut-free").
-    - Question Template Idea: "Regarding dietary information for [targetItem.name], which statement is correct?"
-    - Distractors: Three incorrect statements. These could: a) falsely claim 'targetItem' contains an allergen from 'contextualIngredients' (if it makes sense in context of allergens) or a common allergen it doesn't have, b) incorrectly state 'targetItem' is free from an allergen it contains.
+- Distractors MUST be clearly wrong for the item the question is about.
+- **Item-Specific MCQs** (e.g., focusing on one item from 'itemsInCategory'):
+    - For ingredients: "Which of the following are key ingredients in [Item Name from batch]?"
+    - For allergens: "Regarding dietary information for [Item Name from batch], which statement is correct?"
+- **Category-Wide MCQs** (e.g., comparing items in 'itemsInCategory'):
+    - "Which of these [categoryName] items is listed as vegan?"
+    - "Which item in the [categoryName] category contains [specific ingredient]?"
 
 True/False Questions ('true-false'):
-- Create a clear statement that is definitively true or false based on the 'targetItem' data.
+- Create a clear statement about a specific item from 'itemsInCategory' that is definitively true or false.
 - Provide two options: {"text": "True", "isCorrect": ...} and {"text": "False", "isCorrect": ...}.
-- **Name Focus T/F**:
-    - True statement example: "[targetItem.name] includes [Ingredient X from its list]."
-    - False statement example: "[targetItem.name] includes [Ingredient P NOT from its list]."
-- **Ingredients Focus T/F**:
-    - True statement example: "[Ingredient X, Y from targetItem.ingredients] are found in [targetItem.name]."
-    - False statement example: "[Ingredient P from targetItem.ingredients and Ingredient Q NOT from its list] are found in [targetItem.name]."
-- **Description Focus T/F**:
-    - True statement example: "The description of [targetItem.name] mentions it is '[short accurate quote/paraphrase from targetItem.description]'."
-    - False statement example: "[targetItem.name] is described as '[plausible but incorrect phrase not in targetItem.description]'."
-- **Allergens Focus T/F**:
-    - Example based on 'targetItem.allergens': If 'gluten' is listed, a TRUE statement could be "[targetItem.name] contains gluten." A FALSE statement if 'nuts' are NOT listed could be "[Item Name] contains nuts."
+- Example: "[Item Name from batch] is described as spicy." (True/False based on its description)
 
 Output Format (ensure your function call adheres to this for EACH question):
 {
   "questionText": "...",
-  "questionType": "multiple-choice-single" // or "true-false"
+  "questionType": "multiple-choice-single", // or "true-false"
   "options": [ // For T/F: [{text: "True", isCorrect: true/false}, {text: "False", isCorrect: true/false}]
     {"text": "Option A", "isCorrect": false},
     {"text": "Option B", "isCorrect": true}
     // ... up to 4 options for MCQ
   ],
-  "category": "match input category",
+  "category": "match input categoryName, or specific item\'s category if distinct and relevant",
   "difficulty": "match input difficulty",
-  "explanation": "Brief explanation of why the answer is correct, based on targetItem details.",
-  "focus": "match input focus (e.g., 'Name', 'Ingredients')"
+  "explanation": "Brief explanation of why the answer is correct, based on item details.",
+  "focus": "derived focus of the question (e.g., 'Ingredients', 'Allergens')"
 }
 
-Generate 'targetQuestionCount' questions based on these instructions.
+Generate 'targetQuestionCount' questions based on these instructions, distributing them across the provided 'itemsInCategory'.
 `;
 
 // Refactored LLM API call function using Gemini SDK
@@ -247,6 +227,7 @@ async function _callGeminiApiForQuestionGeneration(
         difficulty: "easy",
         explanation:
           "AI Service not configured. Check GEMINI_API_KEY. (Max 500 chars)",
+        focus: "Configuration",
       },
     ];
   }
@@ -355,6 +336,7 @@ async function _callGeminiApiForQuestionGeneration(
           0,
           300
         )}... See server logs. (Max 500 chars)`,
+        focus: "API Error", // Added focus here
       },
     ];
   }
@@ -363,13 +345,13 @@ async function _callGeminiApiForQuestionGeneration(
 // Interface for the parameters to generate questions, aligned with the plan
 interface GenerateQuestionsParams {
   menuId: string;
-  itemIds?: string[];
-  categories: string[];
-  questionFocusAreas: string[];
-  targetQuestionCountPerItemFocus: number;
+  itemIds?: string[]; // Optional: specific item IDs to focus on if not doing category-wide
+  categoriesToFocus?: string[]; // Categories to generate questions for. This will be the primary driver.
+  questionFocusAreas: string[]; // General themes, e.g., ["Ingredients", "Allergens"]
+  targetQuestionCountPerItemFocus: number; // Total questions to aim for per category batch
   questionTypes: string[]; // e.g., ['multiple-choice-single', 'true-false']
   difficulty: string; // e.g., 'medium'
-  additionalContext?: string;
+  additionalContext?: string; // General context, might be used to augment prompts
   restaurantId: string; // Should be Types.ObjectId but passed as string from controller
 }
 
@@ -382,6 +364,14 @@ interface RawAiGeneratedQuestion {
   difficulty: string;
   explanation?: string;
   focus?: string;
+}
+
+// This interface represents a single raw question object as expected from the AI
+interface AiCallTask {
+  userPromptString: string;
+  categoryName: string; // Name of the category for this batch
+  itemsInCategory: IMenuItem[]; // All items in this category batch
+  difficulty: string; // Difficulty for the entire batch, taken from params
 }
 
 // Helper function to safely extract ingredient names for the prompt
@@ -419,12 +409,12 @@ class AiQuestionService {
     const {
       menuId,
       itemIds: specificItemIds,
-      categories,
+      categoriesToFocus,
       questionFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes,
       difficulty,
-      additionalContext, // General context, might be used to augment prompts
+      additionalContext,
       restaurantId,
     } = params;
 
@@ -450,6 +440,7 @@ class AiQuestionService {
           difficulty: "easy",
           explanation:
             "The AI model (Gemini) could not be initialized, likely due to a missing API key or configuration issue.",
+          focus: "Configuration",
         },
       ];
     }
@@ -470,165 +461,106 @@ class AiQuestionService {
       );
     }
 
-    const categoriesToProcess =
-      categories && categories.length > 0 ? categories : menu.categories;
-    if (!categoriesToProcess || categoriesToProcess.length === 0) {
-      console.warn(
-        "[AiQuestionService] No categories specified or found on the menu to process for AI question generation."
+    const allGeneratedQuestions: RawAiGeneratedQuestion[] = [];
+    const aiCallTasks: AiCallTask[] = [];
+
+    // Prioritize category-based generation if categoriesToFocus is provided
+    if (categoriesToFocus && categoriesToFocus.length > 0) {
+      console.log(
+        `[AiQuestionService] Processing by categories: ${categoriesToFocus.join(
+          ", "
+        )}`
       );
-      return [];
-    }
+      for (const categoryName of categoriesToFocus) {
+        const itemsInCategory = await MenuItemModel.find({
+          menuId: new mongoose.Types.ObjectId(menuId),
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          category: categoryName,
+          isActive: true,
+        }).lean<IMenuItem[]>();
 
-    let itemsToProcess: IMenuItem[] = [];
+        if (itemsInCategory && itemsInCategory.length > 0) {
+          const userPromptString = await this._buildPromptForCategoryBatch({
+            categoryName,
+            itemsInCategory,
+            questionFocusAreas,
+            targetQuestionCount: targetQuestionCountPerItemFocus,
+            questionTypes,
+            difficulty,
+            menuId,
+            restaurantId,
+            additionalContext,
+          });
 
-    if (specificItemIds && specificItemIds.length > 0) {
-      for (const itemId of specificItemIds) {
-        if (!mongoose.Types.ObjectId.isValid(itemId)) {
-          console.warn(
-            `[AiQuestionService] Invalid specific itemId format: ${itemId}. Skipping.`
+          if (userPromptString) {
+            aiCallTasks.push({
+              userPromptString,
+              categoryName,
+              itemsInCategory,
+              difficulty,
+            });
+          } else {
+            console.warn(
+              `[AiQuestionService] Could not generate prompt for category: ${categoryName}. Skipping.`
+            );
+          }
+        } else {
+          console.log(
+            `[AiQuestionService] No active items found for category: ${categoryName} in menu ${menuId}.`
           );
-          continue;
         }
+      }
+    } else if (specificItemIds && specificItemIds.length > 0) {
+      // This is a simplified fallback for specific items. It will create one task per item.
+      // For a more advanced fallback, you could group these specific items by their categories
+      // and then use _buildPromptForCategoryBatch for each of those smaller, specific groups.
+      console.warn(
+        "[AiQuestionService] Categories not provided, falling back to specific item IDs. Each item will be processed individually."
+      );
+      for (const itemId of specificItemIds) {
         const itemDetail = await this._getMenuItemDetails(
           itemId,
           menuId,
           restaurantId
         );
         if (itemDetail) {
-          itemsToProcess.push(itemDetail);
+          // To use _buildPromptForCategoryBatch, we treat this single item as a category of one.
+          const categoryNameForItem = itemDetail.category || "Unknown Category"; // Define categoryNameForItem
+          const userPromptString = await this._buildPromptForCategoryBatch({
+            categoryName: categoryNameForItem, // Use defined variable
+            itemsInCategory: [itemDetail],
+            questionFocusAreas,
+            targetQuestionCount: targetQuestionCountPerItemFocus, // Or adjust this logic for single item
+            questionTypes,
+            difficulty,
+            menuId,
+            restaurantId,
+            additionalContext,
+          });
+          if (userPromptString) {
+            aiCallTasks.push({
+              userPromptString,
+              categoryName: categoryNameForItem,
+              itemsInCategory: [itemDetail],
+              difficulty,
+            });
+          }
         } else {
           console.warn(
-            `[AiQuestionService] Item with ID ${itemId} not found, not active, or not in menu ${menuId}. Skipping.`
+            `[AiQuestionService] Item with ID ${itemId} not found or not active. Skipping.`
           );
         }
-      }
-    } else if (categoriesToProcess && categoriesToProcess.length > 0) {
-      console.log(
-        `[AiQuestionService] Fetching items for categories: ${categoriesToProcess.join(
-          ", "
-        )} in menu ${menuId}`
-      );
-      const itemQuery: any = {
-        menuId: new mongoose.Types.ObjectId(menuId),
-        restaurantId: new mongoose.Types.ObjectId(restaurantId),
-        category: { $in: categoriesToProcess },
-        isActive: true,
-      };
-      try {
-        const itemsFromDb = await MenuItemModel.find(itemQuery).lean<
-          IMenuItem[]
-        >();
-        if (itemsFromDb && itemsFromDb.length > 0) {
-          itemsToProcess.push(...itemsFromDb);
-          console.log(
-            `[AiQuestionService] Found ${itemsFromDb.length} items for specified categories.`
-          );
-        } else {
-          console.log(
-            `[AiQuestionService] No items found for categories: ${categoriesToProcess.join(
-              ", "
-            )}.`
-          );
-        }
-      } catch (dbError) {
-        console.error(
-          `[AiQuestionService] Database error fetching items for categories: ${categoriesToProcess.join(
-            ", "
-          )}:`,
-          dbError
-        );
       }
     } else {
       console.warn(
-        "[AiQuestionService] No specific item IDs or categories provided to fetch items."
-      );
-    }
-
-    if (itemsToProcess.length === 0) {
-      console.log(
-        "[AiQuestionService] No items found to generate questions for."
+        "[AiQuestionService] No categories or specific item IDs provided to generate questions."
       );
       return [];
     }
 
-    const allGeneratedQuestions: RawAiGeneratedQuestion[] = [];
-
-    // 1. Create all AI call tasks (payloads)
-    interface AiCallTask {
-      userPromptString: string;
-      itemName: string;
-      focus: string;
-      category: string;
-      difficulty: string;
-    }
-    const aiCallTasks: AiCallTask[] = [];
-
-    for (const targetItem of itemsToProcess) {
-      if (!targetItem._id) {
-        console.warn(
-          "[AiQuestionService] Skipping item due to missing _id:",
-          targetItem
-        );
-        continue;
-      }
-      const targetItemIdString = targetItem._id.toString();
-
-      // Note: _getContextualData is awaited here. If this is slow and significantly different per item,
-      // it might remain a bottleneck. If context is largely shareable, further optimization is possible.
-      const { contextualItemNames, contextualIngredients } =
-        await this._getContextualData(
-          menuId,
-          targetItem.category as string,
-          targetItemIdString,
-          restaurantId
-        );
-
-      for (const focus of questionFocusAreas) {
-        for (const questionType of questionTypes) {
-          const itemDetailsForPrompt = {
-            name: targetItem.name,
-            description: targetItem.description,
-            ingredients: getIngredientNamesForPrompt(
-              targetItem.ingredients as any[] | undefined
-            ),
-            allergens: Array.isArray(targetItem.allergens)
-              ? targetItem.allergens.map(String)
-              : [],
-            price: targetItem.price,
-          };
-
-          const userPromptPayload = {
-            targetItem: itemDetailsForPrompt,
-            category: targetItem.category as string,
-            focus: focus,
-            questionType: questionType,
-            difficulty: difficulty,
-            contextualItemNames: contextualItemNames,
-            contextualIngredients: contextualIngredients,
-            targetQuestionCount: targetQuestionCountPerItemFocus,
-            additionalUserInstructions: additionalContext || "",
-          };
-
-          const userPromptString = `Generate questions based on the following data: ${JSON.stringify(
-            userPromptPayload,
-            null,
-            2
-          )}`;
-
-          aiCallTasks.push({
-            userPromptString,
-            itemName: targetItem.name || "Unknown Item",
-            focus,
-            category: targetItem.category as string,
-            difficulty,
-          });
-        }
-      }
-    }
-
     if (aiCallTasks.length === 0) {
       console.log(
-        "[AiQuestionService] No AI call tasks were created. Nothing to generate."
+        "[AiQuestionService] No AI call tasks created. Nothing to process."
       );
       return [];
     }
@@ -649,83 +581,93 @@ class AiQuestionService {
       );
 
       const batchPromises = batchTasks.map((task) => {
-        // Re-introducing IIFE for each promise in the batch
         return (async () => {
           try {
             const generatedQuestionsFromAI =
               await _callGeminiApiForQuestionGeneration(task.userPromptString);
 
             generatedQuestionsFromAI.forEach((q) => {
-              q.focus = task.focus;
-              q.category = task.category;
-              q.difficulty = task.difficulty;
+              // The AI is expected to set q.category, q.difficulty, and q.focus
+              // as per the revised system prompt and function schema.
+              // We can add fallbacks or overrides here if necessary.
+              q.category = q.category || task.categoryName; // Fallback to task's category if AI omits
+              q.difficulty = q.difficulty || task.difficulty; // Fallback to task's difficulty
+
               if (!q.explanation) {
                 q.explanation = "Explanation not provided by AI.";
               } else if (q.explanation.length > 490) {
                 q.explanation =
                   q.explanation.substring(0, 490) + "... (truncated)";
               }
+              // q.focus is expected from AI. If not provided, it remains undefined or could be set to a default.
+              // q.focus = q.focus || "General";
             });
             return generatedQuestionsFromAI;
-          } catch (error) {
+          } catch (error: any) {
+            // Added type any to error for generic handling
             console.error(
-              `[AiQuestionService] Error in AI call for item ${task.itemName}, focus ${task.focus}:`,
+              `[AiQuestionService] Error in AI call for category batch ${task.categoryName}:`,
               error
             );
+            // Return a structured error object that matches RawAiGeneratedQuestion
             return [
               {
-                questionText: `Error generating question for ${task.itemName} - ${task.focus}. See server logs.`,
-                questionType: "error-marker" as any,
+                questionText: `Error generating questions for category ${task.categoryName}. See server logs.`,
+                questionType: "error-marker" as any, // To indicate an error state
                 options: [],
-                category: task.category,
+                category: task.categoryName,
                 difficulty: task.difficulty,
-                explanation: `Generation failed for item ${
-                  task.itemName
-                }, focus ${task.focus}. Error: ${(error instanceof Error
+                explanation: `Generation failed for category batch ${
+                  task.categoryName
+                }. Error: ${(error instanceof Error
                   ? error.message
                   : String(error)
-                ).substring(0, 300)}... (Max 500 chars)`,
-                focus: task.focus,
+                ).substring(0, 300)}
+                ... (Max 500 chars)`,
+                focus: "Error",
               },
             ];
           }
-        })();
+        })(); // IIFE to handle async/await within map
       });
 
-      const batchResults = await Promise.allSettled(batchPromises);
-
-      batchResults.forEach((result) => {
-        if (result.status === "fulfilled") {
+      // Wait for all promises in the current batch to resolve
+      const results = await Promise.allSettled(batchPromises);
+      results.forEach((result) => {
+        if (result.status === "fulfilled" && result.value) {
           if (Array.isArray(result.value)) {
             allGeneratedQuestions.push(...result.value);
           } else {
+            // This case should ideally not happen if _callGeminiApiForQuestionGeneration always returns an array
+            // or the catch block returns an array.
             console.warn(
-              `[AiQuestionService] Unexpected result value from an AI call promise in batch:`,
+              `[AiQuestionService] Unexpected non-array result value from an AI call promise in batch:`,
               result.value
             );
           }
-        } else {
-          // This case should ideally be handled by the catch within the IIFE
+        } else if (result.status === "rejected") {
+          // This should be caught by the inner try/catch of the IIFE,
           // but logging here for any unexpected rejections of the IIFE promise itself.
           console.error(
             `[AiQuestionService] AI call promise in batch rejected unexpectedly:`,
             result.reason
           );
-          // Push a generic error marker if not already handled by the IIFE's catch.
+          // Push a generic error question if an entire promise rejected unexpectedly
           allGeneratedQuestions.push({
             questionText:
-              "Unexpected error during batched AI call. See server logs.",
+              "System Error: AI Question generation failed unexpectedly. Batch promise rejected. See server logs.",
             questionType: "error-marker" as any,
             options: [],
-            category: "Error",
-            difficulty: "easy",
+            category: "System Error",
+            difficulty: "unknown",
             explanation:
-              "An unexpected error occurred while processing a batch of AI requests.",
-            focus: "Unknown",
+              "A system-level error occurred during batch processing. Check server logs for details like rejection reason.",
+            focus: "System Error",
           });
         }
       });
 
+      // Delay before the next batch (if there is one)
       if (i + AI_CALL_BATCH_SIZE < aiCallTasks.length) {
         console.log(
           `[AiQuestionService] Batch processed. Waiting for ${
@@ -821,7 +763,8 @@ class AiQuestionService {
         );
         return null;
       }
-      const query: any = {
+      // const query: any = { // Replaced by mongoose.FilterQuery<IMenuItem>
+      const query: mongoose.FilterQuery<IMenuItem> = {
         _id: new mongoose.Types.ObjectId(itemId),
         isActive: true,
       };
@@ -865,7 +808,7 @@ class AiQuestionService {
         `[AiQuestionService - _getMenuItemDetails] Successfully fetched item: ${item.name}`
       );
       return item;
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `[AiQuestionService - _getMenuItemDetails] Error fetching menu item ${itemId}:`,
         error
@@ -891,7 +834,7 @@ class AiQuestionService {
       if (
         !mongoose.Types.ObjectId.isValid(menuId) ||
         !mongoose.Types.ObjectId.isValid(restaurantId) ||
-        !mongoose.Types.ObjectId.isValid(currentItemId)
+        !mongoose.Types.ObjectId.isValid(currentItemId) // currentItemId is now always expected to be valid if provided.
       ) {
         console.warn(
           "[AiQuestionService - _getContextualData] Invalid ObjectId provided."
@@ -899,7 +842,7 @@ class AiQuestionService {
         return { contextualItemNames: [], contextualIngredients: [] };
       }
 
-      const query: any = {
+      const query: mongoose.FilterQuery<IMenuItem> = {
         menuId: new mongoose.Types.ObjectId(menuId),
         restaurantId: new mongoose.Types.ObjectId(restaurantId),
         isActive: true,
@@ -947,7 +890,7 @@ class AiQuestionService {
         contextualItemNames: uniqueContextualItemNames,
         contextualIngredients: contextualIngredients,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `[AiQuestionService - _getContextualData] Error fetching contextual data for menu ${menuId}:`,
         error
@@ -955,6 +898,131 @@ class AiQuestionService {
       return { contextualItemNames: [], contextualIngredients: [] }; // Return empty on error
     }
   }
+
+  // This is the new helper function to build the prompt for a category batch.
+  private static async _buildPromptForCategoryBatch(params: {
+    categoryName: string;
+    itemsInCategory: IMenuItem[];
+    questionFocusAreas: string[];
+    targetQuestionCount: number;
+    questionTypes: string[];
+    difficulty: string;
+    menuId: string; // For fetching contextual data from other categories
+    restaurantId: string; // For fetching contextual data
+    additionalContext?: string;
+  }): Promise<string | null> {
+    const {
+      categoryName,
+      itemsInCategory,
+      questionFocusAreas,
+      targetQuestionCount,
+      questionTypes,
+      difficulty,
+      menuId,
+      restaurantId,
+      additionalContext,
+    } = params;
+
+    // Simplified item details for the prompt to manage token count.
+    // The AI will receive this as part of a JSON payload string.
+    const itemsDataForPrompt = itemsInCategory.map((item) => ({
+      name: item.name,
+      description: item.description || "N/A",
+      price:
+        item.price !== undefined && item.price !== null ? item.price : "N/A",
+      // Ensure ingredients and allergens are arrays of strings for the AI
+      ingredients: Array.isArray(item.ingredients)
+        ? item.ingredients.map(String)
+        : [],
+      allergens: Array.isArray(item.allergens)
+        ? item.allergens.map(String)
+        : [],
+      isVegan: !!item.isVegan,
+      isVegetarian: !!item.isVegetarian,
+      isGlutenFree: !!item.isGlutenFree,
+      // Add other relevant fields from IMenuItem if needed by the AI, e.g., item.category if it can differ
+    }));
+
+    // Contextual data: Fetch item names and ingredients from OTHER categories for distractors.
+    let contextualItemNames: string[] = [];
+    let contextualIngredients: string[] = [];
+
+    try {
+      const contextualItems = await MenuItemModel.find({
+        menuId: new mongoose.Types.ObjectId(menuId),
+        restaurantId: new mongoose.Types.ObjectId(restaurantId),
+        category: { $ne: categoryName }, // Exclude items from the current category
+        isActive: true,
+      })
+        .limit(50) // Limit the number of contextual items to avoid overly large context
+        .lean<IMenuItem[]>();
+
+      contextualItemNames = contextualItems.map((item) => item.name);
+      const contextualIngredientsSet = new Set<string>();
+      contextualItems.forEach((item) => {
+        if (item.ingredients && Array.isArray(item.ingredients)) {
+          // Ensure ingredients are processed correctly, similar to getIngredientNamesForPrompt
+          const currentItemIngredients = getIngredientNamesForPrompt(
+            item.ingredients as any[]
+          );
+          currentItemIngredients.forEach((ing) =>
+            contextualIngredientsSet.add(ing)
+          );
+        }
+      });
+      contextualIngredients = Array.from(contextualIngredientsSet);
+    } catch (error: any) {
+      console.error(
+        `[AiQuestionService] Error fetching contextual data for prompt generation (category: ${categoryName}):`,
+        error
+      );
+      // Proceed without contextual data if fetching fails
+    }
+
+    const payloadForSystemPrompt = {
+      categoryName: categoryName,
+      itemsInCategory: itemsDataForPrompt, // Pass the curated item details
+      questionFocusAreas: questionFocusAreas,
+      targetQuestionCount: targetQuestionCount,
+      questionTypes: questionTypes,
+      difficulty: difficulty,
+      // Limit context for prompt size. The system prompt already mentions these fields.
+      contextualItemNames: contextualItemNames.slice(0, 30),
+      contextualIngredients: contextualIngredients.slice(0, 50),
+      additionalUserInstructions: additionalContext || "", // Changed from additionalContext to match system prompt expectation
+    };
+
+    // The actual string sent to Gemini will be this payload formatted as a JSON string.
+    // The _systemInstructionForQuestionGeneration tells Gemini how to interpret this payload.
+    try {
+      return JSON.stringify(payloadForSystemPrompt);
+    } catch (error: any) {
+      console.error(
+        "[AiQuestionService] Error stringifying payload for Gemini prompt:",
+        error
+      );
+      return null;
+    }
+  }
+
+  // Old prompt builder - _buildUserPromptForItemFocus - can be removed or commented out
+  /*
+  private static async _buildUserPromptForItemFocus(params: {
+    item: IMenuItem;
+    focus: string;
+    questionTypes: string[];
+    difficulty: string;
+    menuId: string;
+    restaurantId: string;
+    targetQuestionCount: number;
+    additionalContext?: string;
+  }): Promise<string | null> {
+    // ... (implementation of the old prompt builder)
+    // This logic is now superseded by _buildPromptForCategoryBatch and the revised system prompt.
+    console.warn("[AiQuestionService] _buildUserPromptForItemFocus is deprecated and should not be called directly in category-first approach.");
+    return null; // Or throw an error
+  }
+  */
 }
 
 export default AiQuestionService;

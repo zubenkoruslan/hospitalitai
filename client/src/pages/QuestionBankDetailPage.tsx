@@ -21,7 +21,9 @@ const QuestionListItem: React.FC<{
   question: IQuestion;
   onRemove: (questionId: string) => void;
   onEdit: (question: IQuestion) => void;
-}> = ({ question, onRemove, onEdit }) => {
+  isSelected: boolean;
+  onToggleSelect: (questionId: string) => void;
+}> = ({ question, onRemove, onEdit, isSelected, onToggleSelect }) => {
   // Helper function to format question type
   const formatQuestionType = (type: string) => {
     if (!type) return "N/A";
@@ -32,26 +34,39 @@ const QuestionListItem: React.FC<{
   };
 
   return (
-    <Card className="bg-white shadow-lg rounded-xl p-4 mb-3 hover:shadow-xl transition-shadow duration-300">
-      <p className="font-semibold text-gray-800 mb-2">
-        {question.questionText}
-      </p>
-      <div className="text-xs text-gray-600 space-y-1 mb-3">
-        <p>
-          Type: {formatQuestionType(question.questionType)}
-          {question.difficulty && ` | Difficulty: ${question.difficulty}`}
+    <Card className="relative bg-gray-50 shadow-lg rounded-xl p-4 hover:shadow-xl hover:scale-[1.01] transition-all duration-300 flex items-center space-x-3">
+      {/* Checkbox on the left */}
+      <div className="flex-shrink-0">
+        <input
+          type="checkbox"
+          className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+          checked={isSelected}
+          onChange={() => onToggleSelect(question._id)}
+          aria-label={`Select question: ${question.questionText}`}
+        />
+      </div>
+      {/* Main content area (text only) to the right of checkbox */}
+      <div className="flex-grow flex flex-col pb-10">
+        {/* Question Text */}
+        <p className="text-lg font-semibold text-gray-900 mb-1">
+          {question.questionText}
         </p>
-        <p>
-          Category:{" "}
-          {question.categories && question.categories.length > 0
-            ? question.categories.join(", ")
-            : "N/A"}
+        {/* Metadata (Type, Difficulty, Category) */}
+        <p className="text-xs text-gray-500 mb-2">
+          {`Type: ${formatQuestionType(question.questionType)} | Difficulty: ${
+            question.difficulty || "N/A"
+          } | Category: ${question.categories?.join(", ") || "N/A"}`}
         </p>
+        {/* Explanation */}
         {question.explanation && (
-          <p className="italic truncate">Explanation: {question.explanation}</p>
+          <p className="text-sm text-gray-700">
+            <span className="font-medium text-gray-800">Explanation:</span>{" "}
+            {question.explanation}
+          </p>
         )}
       </div>
-      <div className="mt-3 flex justify-end space-x-2">
+      {/* Buttons container - absolutely positioned */}
+      <div className="absolute bottom-4 right-4 flex space-x-2">
         <Button
           variant="secondary"
           onClick={() => onEdit(question)}
@@ -100,6 +115,11 @@ const QuestionBankDetailPage: React.FC = () => {
     null
   );
 
+  // State for multi-select and bulk actions
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [isConfirmBulkDeleteModalOpen, setIsConfirmBulkDeleteModalOpen] =
+    useState(false);
+
   // State for menu selection for AI Generation
   const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
   const [selectedMenuForAi, setSelectedMenuForAi] = useState<string | null>(
@@ -117,6 +137,7 @@ const QuestionBankDetailPage: React.FC = () => {
     if (bankId) {
       memoizedFetchQuestionBankById(bankId);
     }
+    setSelectedQuestionIds([]); // Reset selection when bank changes
   }, [bankId, memoizedFetchQuestionBankById]);
 
   const requestRemoveQuestion = (questionId: string) => {
@@ -275,6 +296,63 @@ const QuestionBankDetailPage: React.FC = () => {
     setShowGenerateAiQuestionsModal(true);
   };
 
+  // Handlers for multi-select and bulk delete
+  const handleToggleSelectQuestion = (questionId: string) => {
+    setSelectedQuestionIds((prevSelected) =>
+      prevSelected.includes(questionId)
+        ? prevSelected.filter((id) => id !== questionId)
+        : [...prevSelected, questionId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (!currentQuestionBank || !currentQuestionBank.questions) return;
+    if (selectedQuestionIds.length === currentQuestionBank.questions.length) {
+      setSelectedQuestionIds([]);
+    } else {
+      setSelectedQuestionIds(
+        (currentQuestionBank.questions as IQuestion[]).map((q) => q._id)
+      );
+    }
+  };
+
+  const handleRequestBulkDelete = () => {
+    if (selectedQuestionIds.length > 0) {
+      setIsConfirmBulkDeleteModalOpen(true);
+    } else {
+      alert("No questions selected to delete.");
+    }
+  };
+
+  const handleCancelBulkDelete = () => {
+    setIsConfirmBulkDeleteModalOpen(false);
+  };
+
+  const executeBulkDelete = async () => {
+    if (!currentQuestionBank || selectedQuestionIds.length === 0) return;
+
+    // For now, deleting one by one. Consider a bulk API endpoint for efficiency.
+    try {
+      for (const questionId of selectedQuestionIds) {
+        await removeQuestionFromCurrentBank(questionId);
+      }
+      setSelectedQuestionIds([]); // Clear selection
+      // Optionally, re-fetch the bank to ensure UI consistency if removeQuestionFromCurrentBank doesn't update the context perfectly
+      if (bankId) fetchQuestionBankById(bankId);
+    } catch (err) {
+      console.error("Error during bulk delete:", err);
+      setPageError(
+        `Failed to delete some questions: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+      // Re-fetch to get the current state after partial failure
+      if (bankId) fetchQuestionBankById(bankId);
+    } finally {
+      setIsConfirmBulkDeleteModalOpen(false);
+    }
+  };
+
   if (isLoading && !currentQuestionBank) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -358,7 +436,7 @@ const QuestionBankDetailPage: React.FC = () => {
                 {currentQuestionBank.name}
               </h1>
               {currentQuestionBank.description && (
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 max-w-xl">
                   {currentQuestionBank.description}
                 </p>
               )}
@@ -366,7 +444,7 @@ const QuestionBankDetailPage: React.FC = () => {
             <Button
               variant="secondary"
               onClick={handleOpenEditBankModal}
-              className="mt-4 sm:mt-0"
+              className="mt-4 sm:mt-0 flex-shrink-0"
             >
               Edit Details
             </Button>
@@ -409,13 +487,47 @@ const QuestionBankDetailPage: React.FC = () => {
             </Button>
             {bankId && (
               <Link to={`/question-banks/${bankId}/review-ai-questions`}>
-                <Button variant="secondary" className="w-full md:w-auto">
+                <Button variant="secondary" className="w-full">
                   Review Pending AI Questions
                 </Button>
               </Link>
             )}
           </div>
         </Card>
+
+        {/* Multi-select controls */}
+        {currentQuestionBank.questions &&
+          (currentQuestionBank.questions as IQuestion[]).length > 0 && (
+            <div className="my-4 p-4 bg-gray-50 rounded-lg shadow flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <input
+                  id="selectAllBankQuestionsCheckbox"
+                  type="checkbox"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  checked={
+                    (currentQuestionBank.questions as IQuestion[]).length > 0 &&
+                    selectedQuestionIds.length ===
+                      (currentQuestionBank.questions as IQuestion[]).length
+                  }
+                  onChange={handleToggleSelectAll}
+                  // Consider disabling if another operation is in progress (e.g., individual delete confirmation)
+                />
+                <label
+                  htmlFor="selectAllBankQuestionsCheckbox"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Select All ({selectedQuestionIds.length} selected)
+                </label>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleRequestBulkDelete}
+                disabled={selectedQuestionIds.length === 0}
+              >
+                Delete Selected ({selectedQuestionIds.length})
+              </Button>
+            </div>
+          )}
 
         {/* Updated Questions List Card */}
         <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
@@ -451,13 +563,15 @@ const QuestionBankDetailPage: React.FC = () => {
                 </p>
               </div>
             )}
-          <div>
+          <div className="space-y-4 mt-4">
             {(currentQuestionBank.questions as IQuestion[])?.map((q) => (
               <QuestionListItem
                 key={q._id}
                 question={q}
                 onRemove={() => requestRemoveQuestion(q._id)}
                 onEdit={() => handleOpenEditQuestionModal(q)}
+                isSelected={selectedQuestionIds.includes(q._id)}
+                onToggleSelect={handleToggleSelectQuestion}
               />
             ))}
           </div>
@@ -586,6 +700,24 @@ const QuestionBankDetailPage: React.FC = () => {
               questionToEdit={editingQuestion}
               onQuestionUpdated={handleQuestionUpdatedInModal}
               onClose={handleCloseEditQuestionModal}
+            />
+          </Modal>
+        )}
+
+        {/* Confirmation Modal for Bulk Delete */}
+        {isConfirmBulkDeleteModalOpen && (
+          <Modal
+            isOpen={isConfirmBulkDeleteModalOpen}
+            onClose={handleCancelBulkDelete}
+            title="Confirm Bulk Delete"
+            size="sm"
+          >
+            <ConfirmationModalContent
+              message={`Are you sure you want to delete ${selectedQuestionIds.length} selected question(s) from this bank? This action cannot be undone.`}
+              onConfirm={executeBulkDelete}
+              onCancel={handleCancelBulkDelete}
+              confirmText={`Delete ${selectedQuestionIds.length} Question(s)`}
+              confirmButtonVariant="destructive"
             />
           </Modal>
         )}

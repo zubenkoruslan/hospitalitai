@@ -54,10 +54,16 @@ export const getMenusByRestaurant = async (
 ): Promise<void> => {
   try {
     const { restaurantId } = req.params;
+    const status = req.query.status as
+      | "all"
+      | "active"
+      | "inactive"
+      | undefined;
     // Validation handled by validateObjectId("restaurantId") in routes file
 
     const menus = await MenuService.getAllMenus(
-      new mongoose.Types.ObjectId(restaurantId)
+      new mongoose.Types.ObjectId(restaurantId),
+      status // Pass the status to the service
     );
     res.status(200).json({ success: true, count: menus.length, data: menus });
   } catch (error) {
@@ -270,12 +276,8 @@ export const updateMenuActivationStatusHandler = async (
     }
 
     if (typeof isActive !== "boolean") {
-      return next(
-        new AppError("isActive field must be a boolean and is required.", 400)
-      );
+      return next(new AppError("isActive field (boolean) is required.", 400));
     }
-
-    // menuId validation is assumed to be handled by middleware (e.g., validateMenuIdParam)
 
     const updatedMenu = await MenuService.updateMenuActivationStatus(
       menuId,
@@ -283,12 +285,12 @@ export const updateMenuActivationStatusHandler = async (
       isActive
     );
 
-    // The service throws a 404 if not found, so no need to check !updatedMenu here
-    res.status(200).json({
-      success: true,
-      message: `Menu status updated to ${isActive ? "active" : "inactive"}.`,
-      data: updatedMenu,
-    });
+    if (!updatedMenu) {
+      return next(
+        new AppError("Menu not found or not authorized to update status.", 404)
+      );
+    }
+    res.status(200).json({ success: true, data: updatedMenu });
   } catch (error) {
     next(error);
   }

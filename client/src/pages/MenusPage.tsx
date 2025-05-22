@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { createMenu, deleteMenu } from "../services/api";
+import {
+  createMenu,
+  deleteMenu,
+  updateMenuActivationStatus,
+} from "../services/api";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -12,6 +16,8 @@ import {
   PlusIcon,
   TrashIcon,
   ArrowUpTrayIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 import { useMenus } from "../hooks/useMenus";
@@ -65,6 +71,9 @@ const MenusPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] =
     useState<boolean>(false);
+  const [isTogglingMenuStatus, setIsTogglingMenuStatus] = useState<
+    string | null
+  >(null);
 
   // Form state
   const initialFormData: MenuFormData = { name: "", description: "" };
@@ -183,6 +192,25 @@ const MenusPage: React.FC = () => {
       setPageError(apiError);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleMenuStatus = async (
+    menuId: string,
+    currentIsActive: boolean
+  ) => {
+    setIsTogglingMenuStatus(menuId);
+    setPageError(null);
+    setSuccessMessage(null);
+    try {
+      await updateMenuActivationStatus(menuId, !currentIsActive);
+      refetchMenus();
+      setSuccessMessage(`Menu status updated successfully.`);
+    } catch (err: any) {
+      const apiError = formatApiError(err, "updating menu status");
+      setPageError(apiError);
+    } finally {
+      setIsTogglingMenuStatus(null);
     }
   };
 

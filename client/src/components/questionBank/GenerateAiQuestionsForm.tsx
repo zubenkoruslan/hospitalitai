@@ -104,12 +104,14 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
 
     const payload: NewAiQuestionGenerationParams = {
       menuId: menuId,
-      categories: parsedCategories,
+      categoriesToFocus: parsedCategories,
       questionFocusAreas: selectedFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes: aiQuestionTypes,
       difficulty: aiQuestionDifficulty,
     };
+
+    console.log("AI Generation Payload:", JSON.stringify(payload, null, 2));
 
     try {
       const generatedQuestions = await apiTriggerAiGeneration(payload);

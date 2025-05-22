@@ -257,13 +257,27 @@ class MenuService {
    * Retrieves all menus belonging to a specific restaurant.
    *
    * @param restaurantId - The ID of the restaurant whose menus are to be fetched.
+   * @param status - Optional status filter (all, active, inactive)
    * @returns A promise resolving to an array of menu documents.
    * @throws {AppError} If any unexpected database error occurs (500).
    */
-  static async getAllMenus(restaurantId: Types.ObjectId): Promise<IMenu[]> {
+  static async getAllMenus(
+    restaurantId: Types.ObjectId,
+    status?: "all" | "active" | "inactive"
+  ): Promise<IMenu[]> {
     try {
-      // Use lean() for performance as we only read data
-      const menus = await Menu.find({ restaurantId, isActive: true }).lean();
+      const queryConditions: mongoose.FilterQuery<IMenu> = {
+        restaurantId: restaurantId,
+      };
+
+      if (status === "active") {
+        queryConditions.isActive = true;
+      } else if (status === "inactive") {
+        queryConditions.isActive = false;
+      }
+      // If status is 'all' or undefined, no isActive filter is added, fetching all.
+
+      const menus = await Menu.find(queryConditions).lean();
       return menus;
     } catch (error: any) {
       console.error("Error fetching all menus in service:", error);
@@ -446,14 +460,12 @@ class MenuService {
   }
 
   /**
-   * Updates the isActive status of a menu.
-   *
-   * @param menuId - The ID of the menu to update.
-   * @param restaurantId - The ID of the restaurant owning the menu.
+   * Updates the activation status of a menu.
+   * @param menuId - The ID of the menu.
+   * @param restaurantId - The ID of the restaurant for authorization.
    * @param isActive - The new activation status (true or false).
-   * @returns A promise resolving to the updated menu document.
-   * @throws {AppError} If the menu is not found or doesn't belong to the restaurant (404),
-   *                    or if any unexpected database error occurs (500).
+   * @returns A promise resolving to the updated menu document or null if not found/authorized.
+   * @throws AppError on database or validation errors.
    */
   static async updateMenuActivationStatus(
     menuId: string | Types.ObjectId,
@@ -468,18 +480,18 @@ class MenuService {
         { _id: menuObjectId, restaurantId: restaurantId },
         { $set: { isActive: isActive } },
         { new: true, runValidators: true }
-      );
+      ).lean();
 
       if (!updatedMenu) {
-        throw new AppError(
-          "Menu not found or access denied for this operation.",
-          404
-        );
+        return null;
       }
-      return updatedMenu;
+      return updatedMenu as IMenu;
     } catch (error: any) {
       console.error("Error updating menu activation status in service:", error);
-      if (error instanceof AppError) throw error;
+      if (error.name === "CastError" && error.path === "_id") {
+        throw new AppError("Invalid Menu ID format.", 400);
+      }
+      // Simplified AppError call
       throw new AppError("Failed to update menu activation status.", 500);
     }
   }
