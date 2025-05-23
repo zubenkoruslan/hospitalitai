@@ -68,7 +68,7 @@ const LoginForm: React.FC = () => {
       <Card className="p-8 md:p-10 lg:p-12 shadow-2xl bg-white rounded-xl w-full max-w-lg">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-slate-800">
-            Sign in to QuizSavvy
+            Sign in to QuizCrunch
           </h2>
           <p className="mt-2 text-sm text-slate-600">Sign in to your account</p>
         </div>

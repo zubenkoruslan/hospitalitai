@@ -1,4 +1,4 @@
-# QuizSavvy: Elevate Your Restaurant & Hotel Staff Training 🚀
+# QuizCrunch: Elevate Your Restaurant & Hotel Staff Training 🚀
 
 **(Imagine your restaurant's logo here)**
 
@@ -8,17 +8,17 @@
 
 In the fast-paced hospitality industry, knowledgeable and well-trained staff are your greatest asset. But ensuring consistent training, keeping up with menu changes, and effectively onboarding new team members can be a constant challenge.
 
-**QuizSavvy is here to revolutionize how you train your team.** We provide an intelligent, easy-to-use platform designed specifically for restaurants and hotels, helping you save time, reduce errors, and empower your staff to deliver exceptional guest experiences.
+**QuizCrunch is here to revolutionize how you train your team.** We provide an intelligent, easy-to-use platform designed specifically for restaurants and hotels, helping you save time, reduce errors, and empower your staff to deliver exceptional guest experiences.
 
 ---
 
-## Transform Your Training: What QuizSavvy Offers You
+## Transform Your Training: What QuizCrunch Offers You
 
 Unlock a new era of efficiency and effectiveness in your staff development:
 
 - 🌟 **Effortless Menu & Knowledge Digitization:**
 
-  - **Smart PDF Upload:** Simply upload your existing PDF menus! QuizSavvy's intelligent engine (powered by Google's Generative AI) can parse the text and help structure your menu items, ingredients, and categories automatically.
+  - **Smart PDF Upload:** Simply upload your existing PDF menus! QuizCrunch's intelligent engine (powered by Google's Generative AI) can parse the text and help structure your menu items, ingredients, and categories automatically.
   - **Easy Menu Management:** Quickly add, edit, and update menu items, descriptions, and dietary information. Ensure your training materials always reflect your current offerings.
 
 - 🧠 **Intelligent & Automated Quiz Creation:**
@@ -44,15 +44,15 @@ Unlock a new era of efficiency and effectiveness in your staff development:
 
 ## Simple & Secure: Technology You Can Trust
 
-QuizSavvy is built with cutting-edge, reliable technology to ensure a seamless and secure experience:
+QuizCrunch is built with cutting-edge, reliable technology to ensure a seamless and secure experience:
 
-- **Modern Web Platform:** Access QuizSavvy from any computer or tablet with an internet connection. No complex software installations required.
+- **Modern Web Platform:** Access QuizCrunch from any computer or tablet with an internet connection. No complex software installations required.
 - **Secure Data Handling:** We prioritize the security of your restaurant's data and staff information with industry-standard practices, including JWT-based authentication.
 - **Reliable Performance:** Built for stability, ensuring the platform is available when you and your staff need it.
 
 ---
 
-## How QuizSavvy Works for Your Team
+## How QuizCrunch Works for Your Team
 
 **For Managers & Owners:**
 
@@ -71,7 +71,7 @@ QuizSavvy is built with cutting-edge, reliable technology to ensure a seamless a
 
 ## Getting Your Restaurant Onboard: It's Easy!
 
-We've designed QuizSavvy to be straightforward to implement:
+We've designed QuizCrunch to be straightforward to implement:
 
 1.  **Quick Setup:** We'll help you get your restaurant's account configured swiftly.
 2.  **Seamless Menu Import:** Use our unique PDF upload feature to quickly digitize your existing menus, or use our intuitive forms to build them out.
@@ -81,7 +81,7 @@ We've designed QuizSavvy to be straightforward to implement:
 
 ## For Your Technical Team: Our Commitment to Quality
 
-For those interested in the technical details, QuizSavvy is built using a modern, robust, and scalable technology stack:
+For those interested in the technical details, QuizCrunch is built using a modern, robust, and scalable technology stack:
 
 - **Core:** MERN Stack (MongoDB, Express.js, React, Node.js) ensuring a full-stack JavaScript/TypeScript environment.
 - **Frontend:** React (with Vite) for a fast, responsive user interface, styled with Tailwind CSS.
@@ -102,4 +102,4 @@ For those interested in the technical details, QuizSavvy is built using a modern
 
 ---
 
-This README is tailored for QuizSavvy. We look forward to helping your business thrive!
+This README is tailored for QuizCrunch. We look forward to helping your business thrive!

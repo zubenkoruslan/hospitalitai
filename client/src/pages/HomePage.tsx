@@ -19,7 +19,7 @@ const HomePage: React.FC = () => {
                   Results.
                 </h1>
                 <p className="mt-4 text-lg md:text-xl text-slate-300 mb-10">
-                  QuizSavvy empowers your restaurant or hotel staff with rapid,
+                  QuizCrunch empowers your restaurant or hotel staff with rapid,
                   repeatable quizzes designed for deep learning and confident
                   service.
                 </p>
@@ -55,7 +55,7 @@ const HomePage: React.FC = () => {
               Key Features
             </h2>
             <p className="text-md md:text-lg text-slate-500 mt-2">
-              Discover how QuizSavvy can transform your restaurant operations.
+              Discover how QuizCrunch can transform your restaurant operations.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -154,7 +154,7 @@ const HomePage: React.FC = () => {
               </h2>
               <p className="text-lg md:text-xl leading-relaxed mt-4 mb-8 text-sky-100">
                 Stop time-consuming manual training. Empower your team with
-                QuizSavvy's quick, effective quizzes. Sign up today and see the
+                QuizCrunch's quick, effective quizzes. Sign up today and see the
                 difference.
               </p>
               <Link to="/signup">
@@ -175,7 +175,7 @@ const HomePage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap text-center md:text-left">
             <div className="w-full md:w-6/12 px-4 mb-8 md:mb-0">
-              <h4 className="text-3xl font-semibold text-white">QuizSavvy</h4>
+              <h4 className="text-3xl font-semibold text-white">QuizCrunch</h4>
               <h5 className="text-lg mt-1 mb-2 text-slate-400">
                 Empowering restaurants with smarter training.
               </h5>
@@ -243,7 +243,7 @@ const HomePage: React.FC = () => {
           <div className="flex flex-wrap items-center md:justify-between justify-center">
             <div className="w-full md:w-4/12 px-4 mx-auto text-center">
               <div className="text-sm text-slate-400 py-1">
-                Copyright © {new Date().getFullYear()} QuizSavvy Hospitality
+                Copyright © {new Date().getFullYear()} QuizCrunch Hospitality
                 Solutions.
               </div>
             </div>

@@ -1,6 +1,6 @@
-# QuizSavvy Frontend (Client)
+# QuizCrunch Frontend (Client)
 
-This folder contains the frontend application for QuizSavvy, built with React, Vite, TypeScript, and Tailwind CSS.
+This folder contains the frontend application for QuizCrunch, built with React, Vite, TypeScript, and Tailwind CSS.
 
 ## Getting Started
 
@@ -8,7 +8,7 @@ This folder contains the frontend application for QuizSavvy, built with React, V
 
 - Node.js (version 18.x or later recommended)
 - npm (usually comes with Node.js)
-- A running instance of the QuizSavvy backend API (see `/server/README.md`)
+- A running instance of the QuizCrunch backend API (see `/server/README.md`)
 
 ### Installation
 
