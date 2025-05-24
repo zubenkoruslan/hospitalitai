@@ -20,6 +20,7 @@ import {
   FunctionCallingMode,
 } from "@google/generative-ai";
 import { AppError } from "../utils/errorHandler"; // Added AppError import
+import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
 
 // Define the schema for the function call for Gemini to generate questions
 const questionGenerationFunctionSchema: FunctionDeclaration = {
@@ -203,6 +204,50 @@ Output Format (ensure your function call adheres to this for EACH question):
 }
 
 Generate 'targetQuestionCount' questions based on these instructions, distributing them across the provided 'itemsInCategory'.
+`;
+
+// ADDED: System instruction for SOP/Policy Question Generation
+const _systemInstructionForSopQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for employee training based on Standard Operating Procedures (SOPs), policies, and instructional documents.
+
+**CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
+
+You will be provided with the following for each question generation request:
+- 'sopCategoryName': The name of the category/section from the SOP document.
+- 'sopCategoryText': The full text content of that SOP category/section.
+- 'questionTypes': The types of questions to generate (e.g., ["multiple-choice-single", "true-false"]).
+- 'difficulty': The desired difficulty level ("easy", "medium", "hard").
+- 'targetQuestionCount': The total number of questions to generate from this SOP category text.
+
+General Instructions for Question Generation:
+1.  **Adherence**: Base questions strictly on the provided 'sopCategoryText'.
+2.  **Correctness**: The CORRECT ANSWER must always be verifiable from the 'sopCategoryText'.
+3.  **Clarity**: Ensure questions are grammatically correct, clear, and unambiguous.
+4.  **Explanation**: ALWAYS provide a brief 'explanation' for the correct answer, referencing the relevant part of the 'sopCategoryText' if possible.
+5.  **Focus Field**: In your output for each question, populate the 'focus' field with a concise keyword or phrase describing the main topic of the question derived from the SOP (e.g., "Fire Extinguisher Types", "Hand Washing Steps", "Data Privacy Clause").
+6.  **Category Field**: The 'category' field in your output MUST match the 'sopCategoryName' provided in the input.
+7.  **Difficulty Field**: The 'difficulty' field in your output MUST match the input 'difficulty'.
+8.  **Question Distribution**: If the 'sopCategoryText' is long, attempt to generate questions covering different aspects of it, up to the 'targetQuestionCount'.
+
+Multiple Choice Questions (MCQ - 'multiple-choice-single'):
+- Provide one correct answer and three plausible but incorrect distractor options (total 4 options).
+- Distractors should be relevant to the SOP context but clearly incorrect according to the 'sopCategoryText'.
+
+True/False Questions ('true-false'):
+- Create a clear statement based on the 'sopCategoryText' that is definitively true or false according to that text.
+- Provide two options: {"text": "True", "isCorrect": ...} and {"text": "False", "isCorrect": ...}.
+
+Output Format (ensure your function call adheres to this for EACH question, using the existing 'extract_generated_questions' schema):
+{
+  "questionText": "...",
+  "questionType": "multiple-choice-single", // or "true-false"
+  "options": [ /* ...options... */ ],
+  "category": "match input sopCategoryName",
+  "difficulty": "match input difficulty",
+  "explanation": "Brief explanation of why the answer is correct, based on sopCategoryText.",
+  "focus": "derived focus of the question (e.g., \"Emergency Exits\")"
+}
+
+Generate 'targetQuestionCount' questions based on these instructions from the provided 'sopCategoryText'.
 `;
 
 // Refactored LLM API call function using Gemini SDK
@@ -397,6 +442,17 @@ const getIngredientNamesForPrompt = (
 
 // Helper function to introduce a delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ADDED: Interface for parameters for generating questions from SOPs
+// MOVED an exported interface outside the class definition.
+export interface GenerateQuestionsFromSopParams {
+  sopDocumentId: string;
+  selectedSopCategoryNames: string[];
+  targetQuestionCount: number;
+  questionTypes: string[]; // e.g., ['multiple-choice-single', 'true-false']
+  difficulty: string; // e.g., 'medium'
+  restaurantId: string;
+}
 
 class AiQuestionService {
   /**
@@ -1023,6 +1079,133 @@ class AiQuestionService {
     return null; // Or throw an error
   }
   */
+
+  // The interface GenerateQuestionsFromSopParams was moved out of the class.
+  // The method definition remains the same.
+  public static async generateQuestionsFromSopCategoriesService(
+    params: GenerateQuestionsFromSopParams
+  ): Promise<RawAiGeneratedQuestion[]> {
+    if (!genAI || !model) {
+      throw new AppError(
+        "AI Service not initialized. Check GEMINI_API_KEY.",
+        503
+      );
+    }
+
+    const {
+      sopDocumentId,
+      selectedSopCategoryNames,
+      targetQuestionCount,
+      questionTypes,
+      difficulty,
+      restaurantId,
+    } = params;
+
+    const objectSopDocumentId = new Types.ObjectId(sopDocumentId);
+    const objectRestaurantId = new Types.ObjectId(restaurantId);
+
+    const sopDoc = await SopDocumentModel.findOne({
+      _id: objectSopDocumentId,
+      restaurantId: objectRestaurantId,
+    }).lean<ISopDocument>();
+
+    if (!sopDoc) {
+      throw new AppError("SOP Document not found or access denied.", 404);
+    }
+
+    if (!sopDoc.categories || sopDoc.categories.length === 0) {
+      throw new AppError("SOP Document has no categories defined.", 400);
+    }
+
+    let combinedSopText = "";
+    let relevantCategoryNames: string[] = [];
+
+    for (const catName of selectedSopCategoryNames) {
+      const category = sopDoc.categories.find((c) => c.name === catName);
+      if (category && category.content) {
+        combinedSopText += `Category: ${category.name}\nText: ${category.content}\n\n`;
+        relevantCategoryNames.push(category.name);
+      } else {
+        console.warn(
+          `Category "${catName}" not found or empty in SOP Document ${sopDocumentId}. Skipping.`
+        );
+      }
+    }
+
+    if (!combinedSopText.trim()) {
+      throw new AppError(
+        "No content found in the selected SOP categories.",
+        400
+      );
+    }
+
+    const representativeCategoryName =
+      relevantCategoryNames.length > 0
+        ? relevantCategoryNames.join(", ")
+        : "SOP Content";
+
+    const userPromptString = `Please generate ${targetQuestionCount} questions of types [${questionTypes.join(
+      ", "
+    )}] with difficulty '${difficulty}'. Base the questions strictly on the following SOP content. Use "${representativeCategoryName}" as the category for the generated questions.
+
+SOP Content Start:
+${combinedSopText}
+SOP Content End.
+`;
+
+    console.log(
+      `[AiQuestionService - SOP] Sending prompt (first 500 chars):\n${userPromptString.substring(
+        0,
+        500
+      )}`
+    );
+
+    const chat = model.startChat({
+      tools: [{ functionDeclarations: [questionGenerationFunctionSchema] }],
+      systemInstruction: {
+        role: "system",
+        parts: [{ text: _systemInstructionForSopQuestionGeneration }],
+      } as any,
+    });
+
+    const result = await chat.sendMessage(userPromptString);
+    const response = result.response;
+    const functionCalls = response.functionCalls();
+
+    if (functionCalls && functionCalls.length > 0) {
+      const parsedQuestions: RawAiGeneratedQuestion[] = [];
+      for (const call of functionCalls) {
+        if (call.name === "extract_generated_questions") {
+          const questionsFromAi = (
+            call.args as { questions: RawAiGeneratedQuestion[] }
+          ).questions;
+          if (Array.isArray(questionsFromAi)) {
+            parsedQuestions.push(...questionsFromAi);
+          }
+        }
+      }
+      if (parsedQuestions.length === 0) {
+        console.warn(
+          "[AiQuestionService - SOP] AI responded with a function call, but no questions were extracted."
+        );
+        throw new AppError(
+          "The AI did not generate any questions for the given SOP criteria. Try adjusting the input.",
+          500
+        );
+      }
+      return parsedQuestions;
+    } else {
+      console.error(
+        "[AiQuestionService - SOP] AI response did not include the expected function call.",
+        response.text()
+      );
+      throw new AppError(
+        "AI response format error (SOP). Expected a function call.",
+        500
+      );
+    }
+  }
 }
 
+// MODIFIED: Export the class itself, not an instance
 export default AiQuestionService;

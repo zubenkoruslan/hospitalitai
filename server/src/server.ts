@@ -31,6 +31,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { roleRouter } from "./routes/roleRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import restaurantRoutes from "./routes/restaurantRoutes";
+import sopDocumentRoutes from "./routes/sopDocumentRoutes";
 
 const app: Express = express();
 
@@ -104,6 +105,7 @@ app.use("/api/questions", questionRoutes);
 app.use("/api/roles", roleRouter);
 app.use("/api/ai", aiRoutes);
 app.use("/api/restaurants", restaurantRoutes);
+app.use("/api/sop-documents", sopDocumentRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

@@ -19,14 +19,19 @@ import {
 
 const router = express.Router();
 
-// All routes below are protected and restricted to "restaurant" role.
-router.use(protect);
-router.use(restrictTo("restaurant"));
+router.use(protect); // Protect all routes first
 
-router.get("/pending-review", getPendingReviewQuestionsHandler);
+// More granular restrictions per route type:
+
+router.get(
+  "/pending-review",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
+  getPendingReviewQuestionsHandler
+);
 
 router.post(
   "/generate",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateGenerateAiQuestionsBody,
   handleValidationErrors,
   generateAiQuestionsController
@@ -34,19 +39,34 @@ router.post(
 
 router
   .route("/")
-  .post(validateCreateQuestionBody, handleValidationErrors, createQuestion)
-  .get(getAllQuestions); // GET all typically doesn't need body/param validation beyond auth
+  .post(
+    restrictTo("restaurantAdmin", "manager", "restaurant"),
+    validateCreateQuestionBody,
+    handleValidationErrors,
+    createQuestion
+  )
+  .get(
+    restrictTo("restaurantAdmin", "manager", "restaurant", "staff"), // Staff can view all questions from their restaurant
+    getAllQuestions
+  );
 
 router
   .route("/:questionId")
-  .get(validateObjectId("questionId"), handleValidationErrors, getQuestionById)
+  .get(
+    restrictTo("restaurantAdmin", "manager", "restaurant", "staff"), // Staff can view specific question details
+    validateObjectId("questionId"),
+    handleValidationErrors,
+    getQuestionById
+  )
   .patch(
+    restrictTo("restaurantAdmin", "manager", "restaurant"),
     validateObjectId("questionId"),
     validateUpdateQuestionBody,
     handleValidationErrors,
     updateQuestion
   )
   .delete(
+    restrictTo("restaurantAdmin", "manager", "restaurant"),
     validateObjectId("questionId"),
     handleValidationErrors,
     deleteQuestion

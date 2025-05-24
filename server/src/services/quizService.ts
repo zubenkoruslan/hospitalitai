@@ -1192,21 +1192,26 @@ export class QuizService {
     const attemptObjectId = new Types.ObjectId(attemptId);
     const requestingUserId = new Types.ObjectId(requestingUserIdString);
 
-    // Specify a more precise lean type if possible, or cast carefully later
     const attempt = await QuizAttempt.findById(attemptObjectId)
       .populate<{ quizId: Pick<IQuiz, "_id" | "title" | "restaurantId"> }>({
         path: "quizId",
         select: "_id title restaurantId",
       })
-      .lean<IQuizAttempt>(); // Use IQuizAttempt for the lean type
+      .lean<IQuizAttempt>();
 
     if (!attempt) {
       return null;
     }
 
+    // Populate the role for the requesting user
     const requestingUser = await User.findById(requestingUserId)
-      .select("role restaurantId") // Select necessary fields
-      .lean<Pick<IUser, "_id" | "role" | "restaurantId">>(); // Use a Pick type for lean user
+      .populate<{ assignedRoleId: IRole }>("assignedRoleId") // Populate the 'assignedRoleId' field
+      .select("role restaurantId assignedRoleId") // Ensure assignedRoleId is selected
+      .lean<
+        Pick<IUser, "_id" | "role" | "restaurantId" | "assignedRoleId"> & {
+          assignedRoleId?: IRole;
+        }
+      >(); // Adjust lean type
 
     if (!requestingUser) {
       throw new AppError("Requesting user not found", 404);
@@ -1215,7 +1220,7 @@ export class QuizService {
     const quizData = attempt.quizId as Pick<
       IQuiz,
       "_id" | "title" | "restaurantId"
-    >; // Cast populated quizId
+    >;
 
     // Authorization check
     let isAuthorized = false;
@@ -1226,8 +1231,16 @@ export class QuizService {
       isAuthorized = true;
     }
 
-    const userRole = requestingUser.role as unknown as IRole;
-    if (userRole?.name === "restaurantAdmin" || userRole?.name === "manager") {
+    // Use the populated role name for authorization
+    // The `requestingUser.role` is the general role string ('staff', 'restaurant')
+    // The `requestingUser.assignedRoleId` is the populated specific role from RoleModel
+    const specificRoleName = requestingUser.assignedRoleId?.name;
+
+    if (
+      requestingUser.role === "restaurant" ||
+      specificRoleName === "restaurantAdmin" ||
+      specificRoleName === "manager"
+    ) {
       if (
         quizData &&
         requestingUser.restaurantId &&
@@ -1246,25 +1259,26 @@ export class QuizService {
 
     const incorrectQuestionDetails: IncorrectQuestionDetailForAttempt[] = [];
 
-    // Iterate over questionsPresented to find incorrect ones
     if (attempt.questionsPresented && attempt.questionsPresented.length > 0) {
       for (const presentedQ of attempt.questionsPresented) {
         if (!presentedQ.isCorrect) {
-          // Check if the question was answered incorrectly
           const questionDoc = await QuestionModel.findById(
             presentedQ.questionId
-          ).lean<QuestionDocument>(); // Fetch full question doc
+          ).lean<QuestionDocument>();
+
+          let questionText: string;
+          let userAnswerText: string;
+          let correctAnswerText: string;
+          let explanation: string | undefined = undefined;
 
           if (questionDoc) {
-            let userAnswerText = "N/A";
-            let correctAnswerText = "N/A";
+            questionText = questionDoc.questionText;
+            explanation = questionDoc.explanation;
 
-            // Logic to determine userAnswerText and correctAnswerText
-            // This needs to be robust for all question types
             if (questionDoc.questionType === "true-false") {
-              // For T/F, answerGiven is usually the ID of the "True" or "False" option
-              const answeredOption = questionDoc.options.find((opt) =>
-                opt._id.equals(presentedQ.answerGiven as Types.ObjectId)
+              const userAnswerGivenStr = String(presentedQ.answerGiven);
+              const answeredOption = questionDoc.options.find(
+                (opt) => opt._id.toString() === userAnswerGivenStr
               );
               userAnswerText = answeredOption?.text || "Not answered";
               const correctOpt = questionDoc.options.find(
@@ -1275,24 +1289,30 @@ export class QuizService {
               questionDoc.questionType === "multiple-choice-single" ||
               questionDoc.questionType === "multiple-choice-multiple"
             ) {
-              const getOptionTextById = (optionId: string | Types.ObjectId) => {
-                const opt = questionDoc.options.find((o) =>
-                  o._id.equals(optionId)
+              const getOptionTextById = (optionIdToFind: any) => {
+                const optionIdStr = String(optionIdToFind);
+                const opt = questionDoc.options.find(
+                  (o) => o._id.toString() === optionIdStr
                 );
                 return opt?.text;
               };
 
               if (Array.isArray(presentedQ.answerGiven)) {
-                // For multiple-choice-multiple
                 userAnswerText = presentedQ.answerGiven
-                  .map(getOptionTextById)
+                  .map((id) => getOptionTextById(id))
                   .filter(Boolean)
                   .join(", ");
-                if (!userAnswerText) userAnswerText = "No selection";
-              } else if (presentedQ.answerGiven) {
-                // For multiple-choice-single
+                if (!userAnswerText && presentedQ.answerGiven.length > 0) {
+                  userAnswerText = "Invalid Option(s) ID";
+                } else if (!userAnswerText) {
+                  userAnswerText = "No selection";
+                }
+              } else if (
+                presentedQ.answerGiven !== null &&
+                presentedQ.answerGiven !== undefined
+              ) {
                 userAnswerText =
-                  getOptionTextById(presentedQ.answerGiven as Types.ObjectId) ||
+                  getOptionTextById(presentedQ.answerGiven) ||
                   "Invalid Option ID";
               } else {
                 userAnswerText = "Not answered";
@@ -1302,16 +1322,37 @@ export class QuizService {
                 .filter((opt) => opt.isCorrect)
                 .map((opt) => opt.text)
                 .join(", ");
+            } else {
+              userAnswerText =
+                "Answered (format not recognized for this question type)";
+              correctAnswerText =
+                "Correct answer (format not recognized for this question type)";
             }
-            // Add other types as necessary
-
-            incorrectQuestionDetails.push({
-              questionText: questionDoc.questionText,
-              userAnswer: userAnswerText,
-              correctAnswer: correctAnswerText,
-              explanation: questionDoc.explanation,
-            });
+          } else {
+            // questionDoc is null
+            questionText =
+              "Question data unavailable (it may have been deleted or is invalid).";
+            if (
+              presentedQ.answerGiven !== null &&
+              presentedQ.answerGiven !== undefined
+            ) {
+              userAnswerText =
+                "User's answer (details unavailable as original question data is missing).";
+            } else {
+              userAnswerText =
+                "Not answered (original question data is missing).";
+            }
+            correctAnswerText =
+              "Correct answer (details unavailable as original question data is missing).";
+            // explanation remains undefined
           }
+
+          incorrectQuestionDetails.push({
+            questionText: questionText,
+            userAnswer: userAnswerText,
+            correctAnswer: correctAnswerText,
+            explanation: explanation,
+          });
         }
       }
     }
@@ -1322,7 +1363,7 @@ export class QuizService {
       quizTitle: quizData.title || "Quiz Title Not Found",
       staffUserId: (attempt.staffUserId as Types.ObjectId).toString(),
       score: attempt.score,
-      totalQuestions: attempt.questionsPresented.length, // Corrected: Use length of questionsPresented
+      totalQuestions: attempt.questionsPresented.length,
       attemptDate: attempt.attemptDate,
       incorrectQuestions: incorrectQuestionDetails,
     };

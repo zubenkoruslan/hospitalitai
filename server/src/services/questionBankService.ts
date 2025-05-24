@@ -8,6 +8,7 @@ import QuestionModel from "../models/QuestionModel";
 import { AppError } from "../utils/errorHandler";
 import mongoose from "mongoose";
 import MenuModel from "../models/MenuModel"; // Import MenuModel
+import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
 
 // Define an interface for the data expected by createQuestionBankService
 // This should align with what the controller will pass from req.body
@@ -41,6 +42,16 @@ export interface CreateQuestionBankFromMenuData {
   selectedCategoryNames: string[]; // Categories from the menu to associate with the bank
   generateAiQuestions?: boolean; // Flag to trigger AI question generation
   aiParams?: MenuSpecificAiParams; // Use the new specific interface
+}
+
+// ADDED: Interface for creating a question bank from an SOP document
+export interface CreateQuestionBankFromSopData {
+  name: string;
+  description?: string;
+  restaurantId: mongoose.Types.ObjectId;
+  sopDocumentId: mongoose.Types.ObjectId;
+  selectedCategoryNames: string[]; // Names of categories from the SOP document
+  // aiParams could be added here if AI generation directly from bank creation is desired
 }
 
 // Placeholder for createQuestionBankService
@@ -526,6 +537,79 @@ export const getUniqueValidQuestionIdsFromQuestionBanks = async (
     // Depending on how critical this is, either throw or return empty/handle upstream
     throw new AppError(
       "Failed to retrieve unique question IDs from banks.",
+      500
+    );
+  }
+};
+
+// Service method to create a Question Bank from an SOP Document
+export const createBankFromSopDocumentService = async (
+  data: CreateQuestionBankFromSopData
+): Promise<IQuestionBank> => {
+  const {
+    name,
+    description,
+    restaurantId,
+    sopDocumentId,
+    selectedCategoryNames,
+  } = data;
+
+  // 1. Validate SopDocument exists and belongs to the restaurant
+  const sopDocument = await SopDocumentModel.findOne({
+    _id: sopDocumentId,
+    restaurantId: restaurantId,
+  }).lean<ISopDocument>();
+
+  if (!sopDocument) {
+    throw new AppError(
+      `SOP Document with ID ${sopDocumentId} not found or does not belong to this restaurant.`,
+      404
+    );
+  }
+
+  // 2. Validate selectedCategoryNames against the document's categories
+  const docCategoryNames = sopDocument.categories.map((cat) => cat.name);
+  for (const selectedName of selectedCategoryNames) {
+    if (!docCategoryNames.includes(selectedName)) {
+      throw new AppError(
+        `Category "${selectedName}" not found in SOP Document ${sopDocumentId}. Available categories: ${docCategoryNames.join(
+          ", "
+        )}`,
+        400
+      );
+    }
+  }
+
+  // 3. Create the new question bank
+  try {
+    const newQuestionBank = new QuestionBankModel({
+      name,
+      description,
+      restaurantId,
+      sourceType: "sop_document",
+      sourceDocumentId: sopDocumentId,
+      sourceTypeRef: "SopDocument", // Matches the Mongoose model name for ISopDocument
+      selectedCategories: selectedCategoryNames.map((name) => ({ name })),
+      questions: [], // Initially no questions
+      questionCount: 0,
+      // categories: [] // This field in QuestionBankModel is for categories derived from its own questions, initially empty.
+    });
+
+    await newQuestionBank.save();
+    return newQuestionBank;
+  } catch (error: any) {
+    if (error.code === 11000) {
+      throw new AppError(
+        `A question bank with the name "${name}" already exists for this restaurant.`,
+        409
+      );
+    }
+    if (error instanceof mongoose.Error.ValidationError) {
+      throw new AppError(`Validation Error: ${error.message}`, 400);
+    }
+    console.error("Error creating question bank from SOP document:", error);
+    throw new AppError(
+      "Failed to create question bank from SOP document.",
       500
     );
   }

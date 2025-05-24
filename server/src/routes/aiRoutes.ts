@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
   "/generate-questions",
   protect, // Ensures user is logged in
-  restrictTo("restaurant", "admin"), // Ensures user is a restaurant owner/admin or a general admin
+  restrictTo("restaurantAdmin", "manager", "restaurant", "admin"), // MODIFIED
   generateAiQuestionsHandler
 );
 

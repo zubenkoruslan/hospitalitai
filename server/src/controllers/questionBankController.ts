@@ -6,9 +6,13 @@ import {
   CreateQuestionBankData as _CreateQuestionBankData,
   UpdateQuestionBankData as _UpdateQuestionBankData,
   CreateQuestionBankFromMenuData,
+  CreateQuestionBankFromSopData,
 } from "../services/questionBankService";
 import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
 import QuestionBankModel from "../models/QuestionBankModel"; // Import QuestionBankModel
+import AiQuestionService, {
+  GenerateQuestionsFromSopParams,
+} from "../services/AiQuestionService"; // Import AiQuestionService and relevant types
 
 // Placeholder for createQuestionBank
 export const createQuestionBank = async (
@@ -761,5 +765,188 @@ export const processReviewedAiQuestionsHandler = async (
         )
       );
     }
+  }
+};
+
+// Controller to create a Question Bank from an SOP Document
+export const createQuestionBankFromSop = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { name, description, sopDocumentId, selectedCategoryNames } =
+      req.body;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    // Validate required fields
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      return next(new AppError("Question bank name is required.", 400));
+    }
+    if (!sopDocumentId || !mongoose.Types.ObjectId.isValid(sopDocumentId)) {
+      return next(new AppError("Valid SOP Document ID is required.", 400));
+    }
+    if (
+      !selectedCategoryNames ||
+      !Array.isArray(selectedCategoryNames) ||
+      selectedCategoryNames.some(
+        (cat) => typeof cat !== "string" || cat.trim() === ""
+      )
+    ) {
+      // Allow empty array for selectedCategoryNames (meaning use all/default from SOP), but if provided, must be valid strings.
+      // If an empty array is not allowed, add selectedCategoryNames.length === 0 to the condition.
+      if (selectedCategoryNames && selectedCategoryNames.length > 0) {
+        // Only validate content if array is not empty
+        return next(
+          new AppError(
+            "selectedCategoryNames must be an array of non-empty strings if provided.",
+            400
+          )
+        );
+      } else if (!selectedCategoryNames) {
+        // If undefined/null, treat as an issue if it must be at least an empty array.
+        return next(
+          new AppError(
+            "selectedCategoryNames (even if empty) is required.",
+            400
+          )
+        );
+      }
+    }
+
+    const bankData: CreateQuestionBankFromSopData = {
+      name: name.trim(),
+      description: description?.trim(),
+      restaurantId,
+      sopDocumentId: new mongoose.Types.ObjectId(sopDocumentId),
+      selectedCategoryNames: selectedCategoryNames || [], // Default to empty array if not provided
+    };
+
+    const newBank = await QuestionBankService.createBankFromSopDocumentService(
+      bankData
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "Question bank created successfully from SOP document.",
+      data: newBank,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateAiQuestionsForSopBank = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId } = req.params;
+    const { targetQuestionCount, questionTypes, difficulty } = req.body;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantIdString = req.user.restaurantId.toString();
+
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      return next(new AppError("Invalid Question Bank ID format.", 400));
+    }
+
+    const bank = await QuestionBankModel.findById(bankId);
+    if (!bank) {
+      return next(new AppError("Question Bank not found.", 404));
+    }
+    if (bank.sourceType !== "sop_document" || !bank.sourceDocumentId) {
+      return next(
+        new AppError(
+          "This Question Bank is not sourced from an SOP document.",
+          400
+        )
+      );
+    }
+    if (bank.restaurantId.toString() !== restaurantIdString) {
+      return next(
+        new AppError("Question Bank does not belong to this restaurant.", 403)
+      );
+    }
+    if (!bank.selectedCategories || bank.selectedCategories.length === 0) {
+      return next(
+        new AppError(
+          "SOP Question Bank has no selected categories to generate questions from.",
+          400
+        )
+      );
+    }
+
+    if (
+      !targetQuestionCount ||
+      typeof targetQuestionCount !== "number" ||
+      targetQuestionCount <= 0
+    ) {
+      return next(new AppError("Valid targetQuestionCount is required.", 400));
+    }
+    if (
+      !questionTypes ||
+      !Array.isArray(questionTypes) ||
+      questionTypes.length === 0 ||
+      questionTypes.some((qt) => typeof qt !== "string")
+    ) {
+      return next(
+        new AppError("questionTypes must be a non-empty array of strings.", 400)
+      );
+    }
+    if (!difficulty || typeof difficulty !== "string") {
+      return next(new AppError("Difficulty level is required.", 400));
+    }
+
+    const sopQuestionParams: GenerateQuestionsFromSopParams = {
+      sopDocumentId: bank.sourceDocumentId.toString(),
+      selectedSopCategoryNames: bank.selectedCategories.map((sc) => sc.name),
+      targetQuestionCount,
+      questionTypes,
+      difficulty,
+      restaurantId: restaurantIdString,
+    };
+
+    const rawQuestions =
+      await AiQuestionService.generateQuestionsFromSopCategoriesService(
+        sopQuestionParams
+      );
+
+    if (!rawQuestions || rawQuestions.length === 0) {
+      return next(
+        new AppError(
+          "AI failed to generate questions for the SOP content. Please review SOP content or parameters.",
+          500
+        )
+      );
+    }
+
+    const pendingQuestions =
+      await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
+        rawQuestions,
+        restaurantIdString
+      );
+
+    res.status(200).json({
+      status: "success",
+      message: `${pendingQuestions.length} questions generated from SOP and saved as pending review.`,
+      data: {
+        questionBankId: bankId,
+        pendingReviewQuestionIds: pendingQuestions.map((q: IQuestion) => q._id),
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 };

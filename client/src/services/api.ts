@@ -162,6 +162,15 @@ import { IRole } from "../types/roleTypes";
 // Auth Types (to be moved to ../types/authTypes.ts eventually)
 // For now, keeping them here to break down the change, will move next.
 
+// Import SOP types
+import {
+  ISopDocument,
+  SopDocumentUploadData,
+  SopDocumentListResponse,
+  SopDocumentDetailResponse,
+  SopDocumentStatusResponse,
+} from "../types/sopManagement"; // Import SOP types
+
 // Question Bank Endpoints
 
 /**
@@ -1028,6 +1037,79 @@ export const deleteRestaurantAccount = async (
   );
   return response.data;
 };
+
+// === SOP Document Management API ===
+
+/**
+ * Uploads a new SOP document.
+ * @param data - The title and file for the SOP document.
+ * @returns The initial SOP document data from the backend.
+ */
+export const uploadSopDocument = async (
+  data: SopDocumentUploadData
+): Promise<{
+  message: string;
+  documentId: string;
+  title: string;
+  status: string;
+}> => {
+  const formData = new FormData();
+  formData.append("title", data.title);
+  formData.append("sopDocument", data.sopDocument);
+
+  // The response from backend for upload is: { message, documentId, title, status }
+  const response = await api.post("/sop-documents/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+/**
+ * Lists all SOP documents for the current user's restaurant.
+ * @returns A promise resolving to the list of SOP documents.
+ */
+export const listSopDocuments = async (): Promise<SopDocumentListResponse> => {
+  const response = await api.get("/sop-documents");
+  return response.data;
+};
+
+/**
+ * Fetches the details of a specific SOP document.
+ * @param documentId - The ID of the SOP document.
+ * @returns A promise resolving to the SOP document details.
+ */
+export const getSopDocumentDetails = async (
+  documentId: string
+): Promise<SopDocumentDetailResponse> => {
+  const response = await api.get(`/sop-documents/${documentId}`);
+  return response.data;
+};
+
+/**
+ * Deletes a specific SOP document.
+ * @param documentId - The ID of the SOP document to delete.
+ * @returns A promise resolving when the deletion is complete.
+ */
+export const deleteSopDocument = async (documentId: string): Promise<void> => {
+  await api.delete(`/sop-documents/${documentId}`);
+  // DELETE typically returns 204 No Content, so no response.data to return here.
+};
+
+/**
+ * Fetches the processing status of a specific SOP document.
+ * @param documentId - The ID of the SOP document.
+ * @returns A promise resolving to the SOP document's status information.
+ */
+export const getSopDocumentStatus = async (
+  documentId: string
+): Promise<SopDocumentStatusResponse> => {
+  const response = await api.get(`/sop-documents/${documentId}/status`);
+  return response.data;
+};
+
+// === End SOP Document Management API ===
 
 // Default export
 export default api;

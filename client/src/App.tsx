@@ -29,6 +29,8 @@ import QuestionBankEditPage from "./pages/QuestionBankEditPage";
 import AiQuestionReviewPage from "./pages/AiQuestionReviewPage";
 import CreateQuizPage from "./pages/CreateQuizPage";
 import SettingsPage from "./pages/SettingsPage";
+import SopManagementPage from "./pages/SopManagementPage";
+import SopDocumentDetailPage from "./pages/SopDocumentDetailPage";
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
@@ -177,6 +179,22 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="restaurant">
                   <CreateQuizPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sop-management"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <SopManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sop-management/:documentId"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <SopDocumentDetailPage />
                 </ProtectedRoute>
               }
             />

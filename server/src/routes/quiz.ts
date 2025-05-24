@@ -39,7 +39,7 @@ router.use(ensureRestaurantAssociation);
  */
 router.get(
   "/",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
@@ -61,6 +61,7 @@ router.get(
  */
 router.get(
   "/count",
+  restrictTo("restaurantAdmin", "manager", "restaurant", "staff"),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
 
@@ -80,7 +81,7 @@ router.get(
  */
 router.put(
   "/:quizId",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateQuizIdParam,
   validateUpdateQuizBody,
   handleValidationErrors,
@@ -127,18 +128,27 @@ router.patch(
  */
 router.delete(
   "/:quizId",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateQuizIdParam,
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { quizId } = req.params;
     const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
-
     try {
-      await QuizService.deleteQuiz(new Types.ObjectId(quizId), restaurantId);
-      res.status(200).json({ message: "Quiz deleted successfully" });
+      const success = await QuizService.deleteQuiz(
+        new mongoose.Types.ObjectId(quizId),
+        restaurantId
+      );
+      if (!success) {
+        return next(
+          new _AppError(
+            "Quiz not found or you do not have permission to delete it.",
+            404
+          )
+        );
+      }
+      res.status(204).send(); // 204 No Content for successful deletion
     } catch (error) {
-      console.error("Error in DELETE /api/quiz/:quizId route:", error);
       next(error);
     }
   }
@@ -183,7 +193,7 @@ router.get(
  */
 router.post(
   "/from-banks",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateGenerateQuizFromBanksBody,
   handleValidationErrors,
   generateQuizFromBanksController
@@ -196,6 +206,7 @@ router.post(
  */
 router.post(
   "/:quizId/start-attempt",
+  restrictTo("restaurantAdmin", "manager", "staff", "restaurant"),
   validateQuizIdParam,
   handleValidationErrors,
   startQuizAttemptController
@@ -208,6 +219,7 @@ router.post(
  */
 router.post(
   "/:quizId/submit-attempt",
+  restrictTo("restaurantAdmin", "manager", "staff", "restaurant"),
   validateQuizIdParam,
   validateSubmitQuizAttemptBody,
   handleValidationErrors,
@@ -221,6 +233,7 @@ router.post(
  */
 router.get(
   "/:quizId/my-progress",
+  restrictTo("restaurantAdmin", "manager", "staff", "restaurant"),
   validateQuizIdParam,
   handleValidationErrors,
   getStaffQuizProgressController
@@ -233,6 +246,7 @@ router.get(
  */
 router.get(
   "/attempts/:attemptId",
+  restrictTo("restaurantAdmin", "manager", "staff", "restaurant"),
   validateObjectId("attemptId"),
   handleValidationErrors,
   getQuizAttemptDetailsController
@@ -246,7 +260,7 @@ router.get(
  */
 router.get(
   "/:quizId/restaurant-progress",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateQuizIdParam,
   handleValidationErrors,
   getRestaurantQuizStaffProgressController
@@ -259,7 +273,7 @@ router.get(
  */
 router.post(
   "/:quizId/reset-progress",
-  restrictTo("restaurant"),
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
   validateQuizIdParam,
   handleValidationErrors,
   resetQuizProgressController

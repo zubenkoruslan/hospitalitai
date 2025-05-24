@@ -56,6 +56,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const restaurantLinks = [
     { name: "Menu Management", path: "/menu" },
     { name: "Quiz Management", path: "/quiz-management" },
+    { name: "SOP Management", path: "/sop-management" },
     { name: "Staff Management", path: "/staff" },
     { name: "Quiz Results", path: "/staff-results" },
   ];
