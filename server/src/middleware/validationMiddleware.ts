@@ -682,5 +682,56 @@ export const validateCategoryNameBody: ValidationChain[] = [
     .notEmpty(),
 ];
 
+export const validateProfileUpdateRequest = [
+  body("name")
+    .optional()
+    .notEmpty()
+    .withMessage("Name cannot be empty.")
+    .trim()
+    .escape(),
+  body("email")
+    .optional()
+    .isEmail()
+    .withMessage("Must be a valid email address.")
+    .normalizeEmail(),
+  // Restaurant name update is tricky here. If a restaurant owner updates their name,
+  // it might be the user's name or the restaurant entity's name.
+  // This depends on how User and Restaurant models are linked and updated.
+  // For now, allowing it, assuming service layer handles the logic.
+  body("restaurantName")
+    .optional()
+    .notEmpty()
+    .withMessage("Restaurant name cannot be empty.")
+    .trim()
+    .escape(),
+  // Ensure at least one field is being updated
+  body().custom((value, { req }) => {
+    if (!req.body.name && !req.body.email && !req.body.restaurantName) {
+      throw new Error(
+        "At least one field (name, email, or restaurantName) must be provided for update."
+      );
+    }
+    return true;
+  }),
+];
+
+export const validatePasswordChangeRequest = [
+  body("currentPassword")
+    .notEmpty()
+    .withMessage("Current password is required.")
+    .trim(),
+  body("newPassword")
+    .notEmpty()
+    .withMessage("New password is required.")
+    .isLength({ min: 6 })
+    .withMessage("New password must be at least 6 characters long."),
+  body("confirmPassword").custom((value, { req }) => {
+    if (value !== req.body.newPassword) {
+      throw new Error("New passwords do not match.");
+    }
+    return true;
+  }),
+];
+
 // You might have other validators here...
 // Ensure the file ends correctly.

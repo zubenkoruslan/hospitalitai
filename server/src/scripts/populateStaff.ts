@@ -7,7 +7,7 @@ import { Types } from "mongoose";
 dotenv.config({ path: "./server/.env" }); // Adjust path to .env if it's in project root or server root
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const RESTAURANT_ID = "680cc041a5063e15878bd0fd";
+const RESTAURANT_ID = "6831a0f383170d8b53c45a24";
 const DEFAULT_PASSWORD = "staff123";
 const NUM_STAFF = 10;
 const PROFESSIONAL_ROLES = ["Waiter", "Senior Waiter"];

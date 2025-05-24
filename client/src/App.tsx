@@ -28,6 +28,8 @@ import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
 import QuestionBankEditPage from "./pages/QuestionBankEditPage";
 import AiQuestionReviewPage from "./pages/AiQuestionReviewPage";
 import CreateQuizPage from "./pages/CreateQuizPage";
+import SettingsPage from "./pages/SettingsPage";
+// import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
@@ -217,6 +219,24 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Shared Protected Routes */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* <Route staff-analytics route removed
+              path="/staff-analytics"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <StaffAnalyticsPage />
+                </ProtectedRoute>
+              }
+            /> */}
 
             {/* Catch-all for 404 Not Found */}
             <Route path="*" element={<div>404 Not Found</div>} />

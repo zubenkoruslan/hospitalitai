@@ -616,6 +616,14 @@ const QuizTakingPage: React.FC = () => {
                         )}
                       </p>
                     )}
+                    {q.explanation && (
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <p className="text-xs text-gray-600">
+                          <span className="font-semibold">Explanation:</span>{" "}
+                          {q.explanation}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

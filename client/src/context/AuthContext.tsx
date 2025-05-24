@@ -36,6 +36,7 @@ export interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   error: string | null;
+  fetchUser: () => Promise<void>; // Added fetchUser
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -53,6 +54,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  const fetchUser = async () => {
+    try {
+      const { user: fetchedUser } = await getCurrentUserService();
+      setUser(fetchedUser);
+    } catch (error) {
+      console.error("Failed to fetch user:", error);
+      // Potentially handle error, e.g., logout if user fetch fails critically
+      // setError("Failed to refresh user data.");
+    }
+  };
+
   useEffect(() => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem("authToken");
@@ -67,10 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             "Authorization"
           ] = `Bearer ${storedToken}`;
           setToken(storedToken);
-
-          // Fetch full user details
-          const { user: fetchedUser } = await getCurrentUserService();
-          setUser(fetchedUser);
+          await fetchUser(); // Use fetchUser here
         } catch (error) {
           console.error("Failed to initialize auth from stored token:", error);
           localStorage.removeItem("authToken");
@@ -87,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
-  }, []);
+  }, []); // Removed fetchUser from dependency array to avoid loop, initializeAuth calls it.
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -129,6 +138,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isLoading,
     error,
+    fetchUser, // Added fetchUser to context value
   };
 
   // Don't render children until the initial auth check is complete.

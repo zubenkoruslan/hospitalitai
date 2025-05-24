@@ -54,6 +54,7 @@ export interface ServerGradedQuestion {
   isCorrect: boolean;
   correctAnswer?: ServerCorrectAnswerDetails;
   options?: ServerQuestionOption[]; // The original options for this question
+  explanation?: string; // Added explanation field
 }
 
 // ADDED: Response structure for a submitted quiz attempt

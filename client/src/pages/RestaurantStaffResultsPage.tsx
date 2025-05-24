@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // import api from "../services/api"; // Removed unused direct API import
 import { useAuth } from "../context/AuthContext";
@@ -12,9 +12,28 @@ import StaffResultsFilter from "../components/staff/StaffResultsFilter"; // Impo
 import StaffResultsTable from "../components/staff/StaffResultsTable"; // Import the table component
 import Card from "../components/common/Card"; // Import Card
 // Import shared types
-import { Filters } from "../types/staffTypes";
+import { Filters, StaffMemberWithData } from "../types/staffTypes";
 // Import utility functions
 // import { formatDate } from "../utils/helpers"; // Removed formatDate
+
+import KPICard from "../components/settings/KPICard"; // Added KPICard import
+import BarChart from "../components/charts/BarChart"; // Added BarChart import
+import { ChartData } from "chart.js"; // Added ChartData import
+
+// Helper function to format percentages (moved from StaffManagement.tsx)
+const formatPercentage = (value: number | null) =>
+  value === null ? "N/A" : `${value.toFixed(1)}%`;
+
+// Helper function to calculate staff completion rate (moved from StaffManagement.tsx)
+const calculateStaffCompletionRate = (staff: StaffMemberWithData): number => {
+  if (staff.quizProgressSummaries && staff.quizProgressSummaries.length > 0) {
+    const completedCount = staff.quizProgressSummaries.filter(
+      (qps) => qps.isCompletedOverall
+    ).length;
+    return (completedCount / staff.quizProgressSummaries.length) * 100;
+  }
+  return 0;
+};
 
 // Helper Components (Assuming LoadingSpinner and ErrorMessage exist elsewhere or define here)
 // // Removed LoadingSpinner definition
@@ -62,7 +81,18 @@ const RestaurantStaffResultsPage: React.FC = () => {
     useState<string | null>(null);
 
   // Performance metrics state
-  const [showChart, setShowChart] = useState<boolean>(true);
+  const [showDistributionChart, setShowDistributionChart] =
+    useState<boolean>(true);
+
+  // KPI State (moved from StaffManagement.tsx)
+  const [totalStaff, setTotalStaff] = useState<number | null>(null);
+  const [avgQuizScore, setAvgQuizScore] = useState<number | null>(null);
+
+  // Chart Data State (moved from StaffManagement.tsx)
+  const [averageScoreChartData, setAverageScoreChartData] =
+    useState<ChartData<"bar"> | null>(null);
+  const [completionRateChartData, setCompletionRateChartData] =
+    useState<ChartData<"bar"> | null>(null);
 
   // Remove the incorrect placeholder useEffect for totalQuizzes
   /*
@@ -148,6 +178,71 @@ const RestaurantStaffResultsPage: React.FC = () => {
     return result;
   }, [staffData, filters, selectedPerformanceCategory]);
 
+  // Function to calculate and set KPIs (adapted from StaffManagement.tsx)
+  const calculateAndSetKPIs = useCallback(
+    (currentStaffList: StaffMemberWithData[]) => {
+      setTotalStaff(currentStaffList.length);
+
+      let totalScoreSum = 0;
+      let staffWithScoresCount = 0;
+      currentStaffList.forEach((staff) => {
+        if (staff.averageScore !== null && staff.averageScore !== undefined) {
+          totalScoreSum += staff.averageScore;
+          staffWithScoresCount++;
+        }
+      });
+      setAvgQuizScore(
+        staffWithScoresCount > 0 ? totalScoreSum / staffWithScoresCount : 0
+      );
+    },
+    []
+  );
+
+  // Effect to prepare KPI and chart data when staffData changes
+  useEffect(() => {
+    if (staffData && staffData.length > 0) {
+      calculateAndSetKPIs(staffData);
+
+      // Prepare chart data for BarCharts (based on all staff, not filteredAndSortedStaff)
+      // This uses staffData directly to show overall visualizations before filtering for the table.
+      const labels = staffData.map((staff) => staff.name);
+
+      const averageScores = staffData.map((staff) => staff.averageScore ?? 0);
+      setAverageScoreChartData({
+        labels,
+        datasets: [
+          {
+            label: "Average Score (%)",
+            data: averageScores,
+            backgroundColor: "rgba(75, 192, 192, 0.6)",
+            borderColor: "rgba(75, 192, 192, 1)",
+            borderWidth: 1,
+          },
+        ],
+      });
+
+      const completionRates = staffData.map((staff) =>
+        calculateStaffCompletionRate(staff)
+      );
+      setCompletionRateChartData({
+        labels,
+        datasets: [
+          {
+            label: "Completion Rate (%)",
+            data: completionRates,
+            backgroundColor: "rgba(153, 102, 255, 0.6)",
+            borderColor: "rgba(153, 102, 255, 1)",
+            borderWidth: 1,
+          },
+        ],
+      });
+    } else {
+      calculateAndSetKPIs([]); // Reset KPIs if no staff data
+      setAverageScoreChartData(null);
+      setCompletionRateChartData(null);
+    }
+  }, [staffData, calculateAndSetKPIs]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       <Navbar />
@@ -155,7 +250,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
         <div>
           <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-              Staff Quiz Results
+              Staff Quiz Results & Performance Analytics
             </h1>
           </div>
 
@@ -163,18 +258,39 @@ const RestaurantStaffResultsPage: React.FC = () => {
           {error && <ErrorMessage message={error} />}
           {!loading && !error && (
             <>
+              {/* KPIs Section */}
+              <Card className="mb-6">
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">
+                  Key Performance Indicators
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <KPICard
+                    title="Total Staff"
+                    value={totalStaff === null ? "N/A" : totalStaff.toString()}
+                    isLoading={staffLoading} // Use staffLoading for individual KPI cards
+                  />
+                  <KPICard
+                    title="Avg. Quiz Score"
+                    value={formatPercentage(avgQuizScore)}
+                    isLoading={staffLoading}
+                  />
+                </div>
+              </Card>
+
               <div className="mb-4 flex justify-end">
                 <button
-                  onClick={() => setShowChart(!showChart)}
+                  onClick={() =>
+                    setShowDistributionChart(!showDistributionChart)
+                  }
                   className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                 >
-                  {showChart
-                    ? "Hide Performance Chart"
-                    : "Show Performance Chart"}
+                  {showDistributionChart
+                    ? "Hide Overall Score Distribution"
+                    : "Show Overall Score Distribution"}
                 </button>
               </div>
 
-              {showChart && (
+              {showDistributionChart && (
                 <ScoreDistributionChart
                   staffData={staffData}
                   selectedCategory={selectedPerformanceCategory}

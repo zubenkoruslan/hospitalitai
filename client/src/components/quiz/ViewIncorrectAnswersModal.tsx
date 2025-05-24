@@ -117,6 +117,14 @@ const ViewIncorrectAnswersModal: React.FC<ViewIncorrectAnswersModalProps> = ({
                       ? q.correctAnswer.join(", ")
                       : q.correctAnswer}
                   </p>
+                  {q.explanation && (
+                    <div className="mt-2 pt-2 border-t border-slate-300">
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold">Explanation:</span>{" "}
+                        {q.explanation}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )
             )}

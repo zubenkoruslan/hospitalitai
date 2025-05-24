@@ -146,6 +146,16 @@ import {
   SignupDataClient,
 } from "../types/authTypes";
 
+// TEMPORARY: Directly import types from server for settings MVP. Refactor to shared types later.
+import {
+  UserProfileUpdateData,
+  UserAPIResponse,
+  PasswordChangeData as ServerPasswordChangeData,
+} from "../../../server/src/types/authTypes";
+// Corrected temporary imports for Restaurant types
+import { RestaurantProfileUpdateData as ServerRestaurantProfileUpdateData } from "../../../server/src/services/RestaurantService";
+import { IRestaurant as ServerIRestaurant } from "../../../server/src/models/Restaurant";
+
 // Import Role types
 import { IRole } from "../types/roleTypes";
 
@@ -892,6 +902,131 @@ export const updateMenuActivationStatus = async (
     { isActive }
   );
   return response.data.data;
+};
+
+// User Profile Endpoints
+export interface UpdateUserProfileResponse {
+  user: UserAPIResponse;
+  message: string;
+}
+
+export const updateUserProfile = async (
+  profileData: UserProfileUpdateData
+): Promise<UpdateUserProfileResponse> => {
+  const response = await api.put<UpdateUserProfileResponse>(
+    "/auth/me",
+    profileData
+  );
+  return response.data;
+};
+
+// Client specific type for password change form
+export interface PasswordChangeDataClient {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string; // Used for client-side validation
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+}
+
+export const changePassword = async (
+  passwordData: Pick<
+    ServerPasswordChangeData,
+    "currentPassword" | "newPassword"
+  >
+): Promise<ChangePasswordResponse> => {
+  const response = await api.post<ChangePasswordResponse>(
+    "/auth/change-password",
+    passwordData
+  );
+  return response.data;
+};
+
+// Restaurant Profile Endpoints
+// Client-side representation of restaurant data
+export interface ClientRestaurant {
+  _id: string;
+  name?: string;
+  owner?: string; // ObjectId as string
+  contactEmail?: string;
+  // Add other fields that are relevant to the client, ensure types are client-friendly (e.g. string for ObjectId)
+}
+
+export interface UpdateRestaurantProfileResponse {
+  restaurant: ServerIRestaurant; // Expecting full server type in raw response
+  message: string;
+}
+
+// Mapped response type
+export interface MappedUpdateRestaurantProfileResponse {
+  restaurant: ClientRestaurant;
+  message: string;
+}
+
+export const updateRestaurantProfile = async (
+  restaurantId: string,
+  profileData: ServerRestaurantProfileUpdateData
+): Promise<MappedUpdateRestaurantProfileResponse> => {
+  const response = await api.put<UpdateRestaurantProfileResponse>(
+    `/restaurants/${restaurantId}`,
+    profileData
+  );
+  // Manually map _id and other ObjectId fields to string for the client model
+  const serverRestaurant = response.data.restaurant;
+  const clientRestaurant: ClientRestaurant = {
+    ...serverRestaurant,
+    _id: serverRestaurant._id.toString(),
+    owner: serverRestaurant.owner.toString(), // Assuming owner is always present and is ObjectId
+    // Ensure any other ObjectId fields are converted to string here
+  };
+  return {
+    restaurant: clientRestaurant,
+    message: response.data.message,
+  };
+};
+
+// Staff Invitation
+export interface InviteStaffData {
+  email: string;
+  // Potentially name, professionalRole if creating user immediately
+}
+
+export interface InviteStaffResponse {
+  message: string;
+}
+
+export const inviteStaff = async (
+  restaurantId: string,
+  inviteData: InviteStaffData
+): Promise<InviteStaffResponse> => {
+  const response = await api.post<InviteStaffResponse>(
+    `/restaurants/${restaurantId}/staff/invite`,
+    inviteData
+  );
+  return response.data;
+};
+
+// Account Deletion
+export interface DeleteAccountResponse {
+  message: string;
+}
+
+// User self-deletes their account
+export const deleteUserAccount = async (): Promise<DeleteAccountResponse> => {
+  const response = await api.delete<DeleteAccountResponse>("/auth/me");
+  return response.data;
+};
+
+// Restaurant owner deletes their restaurant
+export const deleteRestaurantAccount = async (
+  restaurantId: string
+): Promise<DeleteAccountResponse> => {
+  const response = await api.delete<DeleteAccountResponse>(
+    `/restaurants/${restaurantId}`
+  );
+  return response.data;
 };
 
 // Default export

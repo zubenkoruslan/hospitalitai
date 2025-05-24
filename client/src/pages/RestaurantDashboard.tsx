@@ -1,7 +1,17 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { processPdfMenuUpload } from "../services/api"; // For menu upload
+import {
+  processPdfMenuUpload,
+  inviteStaff,
+  getStaffList,
+} from "../services/api"; // Added inviteStaff, getStaffList
 import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
@@ -10,7 +20,9 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
-import { ResultSummary } from "../types/staffTypes"; // Removed StaffMemberWithData
+import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
+import BarChart from "../components/charts/BarChart"; // Added BarChart import
+import { ChartData } from "chart.js"; // Added ChartData import
 
 // Helper function to check if a quiz is completed regardless of capitalization
 // This function uses ResultSummary, ensure it's compatible with the imported one
@@ -42,9 +54,18 @@ const RestaurantDashboard: React.FC = () => {
     fetchMenus,
   } = useMenus();
 
+  // State for Invite Staff
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [isStaffInviteLoading, setIsStaffInviteLoading] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  // Chart Data State
+  const [averageScoreChartData, setAverageScoreChartData] =
+    useState<ChartData<"bar"> | null>(null);
+
   // Keep other state
   const [copied, setCopied] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
 
   // State for menu upload
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -66,16 +87,6 @@ const RestaurantDashboard: React.FC = () => {
     return overallAverage.toFixed(1); // Display raw average score
   }, [staffData]);
 
-  const filteredStaffData = useMemo(
-    () =>
-      searchTerm.length >= 3
-        ? staffData.filter((staff) =>
-            staff.name.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        : staffData,
-    [staffData, searchTerm]
-  );
-
   // useCallback for copy handler
   const handleCopyId = useCallback(() => {
     if (user?.restaurantId) {
@@ -90,14 +101,6 @@ const RestaurantDashboard: React.FC = () => {
         });
     }
   }, [user?.restaurantId]); // Dependency: user.restaurantId
-
-  // useCallback for search handler
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchTerm(e.target.value);
-    },
-    []
-  ); // No dependency needed
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -136,6 +139,57 @@ const RestaurantDashboard: React.FC = () => {
       setIsUploading(false);
     }
   };
+
+  const handleActualInviteStaff = async (emailToInvite: string) => {
+    setInviteMessage(null);
+    setInviteError(null);
+    if (!user || !user.restaurantId) {
+      setInviteError("Cannot invite staff without restaurant information.");
+      return;
+    }
+    setIsStaffInviteLoading(true);
+    try {
+      await inviteStaff(user.restaurantId, { email: emailToInvite });
+      setInviteMessage(`Invitation sent to ${emailToInvite}.`);
+      setInviteEmail("");
+      // Optionally, refresh staffData if useStaffSummary hook doesn't auto-update on new staff
+      // This might require making staffData mutable or calling a refresh function from the hook
+    } catch (err: any) {
+      setInviteError(err.response?.data?.message || "Failed to invite staff.");
+    } finally {
+      setIsStaffInviteLoading(false);
+    }
+  };
+
+  const handleInviteFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (inviteEmail.trim()) {
+      handleActualInviteStaff(inviteEmail.trim());
+    }
+  };
+
+  // Effect to prepare chart data when staffData (from useStaffSummary) changes
+  useEffect(() => {
+    if (staffData && staffData.length > 0) {
+      const labels = staffData.map((staff) => staff.name);
+
+      const averageScores = staffData.map((staff) => staff.averageScore ?? 0);
+      setAverageScoreChartData({
+        labels,
+        datasets: [
+          {
+            label: "Average Score (%)",
+            data: averageScores,
+            backgroundColor: "rgba(75, 192, 192, 0.6)",
+            borderColor: "rgba(75, 192, 192, 1)",
+            borderWidth: 1,
+          },
+        ],
+      });
+    } else {
+      setAverageScoreChartData(null);
+    }
+  }, [staffData]);
 
   // Combine loading and error states for overall display
   const isLoading =
@@ -366,67 +420,68 @@ const RestaurantDashboard: React.FC = () => {
           </Link>
         </div>
 
-        {/* Menu Upload Section - Moved here */}
-        <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Upload New Menu (PDF)
-          </h2>
-          <div className="space-y-4">
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleFileChange}
-              ref={fileInputRef}
-              style={{ display: "none" }}
-              id="menuPdfUpload"
-            />
-            <Button
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="mb-2 w-full text-sm py-2 truncate"
-            >
-              {selectedFile ? selectedFile.name : "Select PDF File"}
-            </Button>
-            {selectedFile && (
-              <Button
-                variant="primary"
-                onClick={handleFileUpload}
-                disabled={isUploading || !selectedFile}
-                className="w-full text-sm py-2"
-              >
-                {isUploading ? <LoadingSpinner /> : "Upload Menu"}
-              </Button>
-            )}
-            {uploadMessage && (
-              <p
-                className={`mt-3 text-xs ${
-                  uploadMessage.includes("success")
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {uploadMessage}
-              </p>
-            )}
-          </div>
-        </Card>
-
-        {/* Staff List Section */}
-        <Card className="bg-white shadow-lg rounded-xl mb-8">
-          <div className="p-6">
+        {/* Actions Grid: Menu Upload and Invite Staff */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          {/* Menu Upload Section */}
+          <Card className="bg-white shadow-lg rounded-xl p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Staff Overview
+              Upload New Menu (PDF)
             </h2>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-              <div className="relative w-full sm:w-64">
+            <div className="space-y-4">
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                id="menuPdfUpload"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="mb-2 w-full text-sm py-2 truncate"
+              >
+                {selectedFile ? selectedFile.name : "Select PDF File"}
+              </Button>
+              {selectedFile && (
+                <Button
+                  variant="primary"
+                  onClick={handleFileUpload}
+                  disabled={isUploading || !selectedFile}
+                  className="w-full text-sm py-2"
+                >
+                  {isUploading ? <LoadingSpinner /> : "Upload Menu"}
+                </Button>
+              )}
+              {uploadMessage && (
+                <p
+                  className={`mt-3 text-xs ${
+                    uploadMessage.includes("success")
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {uploadMessage}
+                </p>
+              )}
+            </div>
+          </Card>
+
+          {/* Invite Staff Section */}
+          <Card className="bg-white shadow-lg rounded-xl p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Invite New Staff Member
+            </h2>
+            <form onSubmit={handleInviteFormSubmit} className="space-y-4">
+              <div className="relative w-full">
                 <input
-                  type="text"
-                  placeholder="Search staff by name..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
+                  type="email"
+                  placeholder="Enter staff member's email..."
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
                   className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  aria-label="Search staff"
+                  aria-label="Invite staff member"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <svg
@@ -444,78 +499,93 @@ const RestaurantDashboard: React.FC = () => {
                   </svg>
                 </div>
               </div>
-            </div>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={isStaffInviteLoading}
+                className="w-full text-sm py-2"
+              >
+                {isStaffInviteLoading ? <LoadingSpinner /> : "Invite Staff"}
+              </Button>
+              {inviteMessage && (
+                <p className="text-green-600 text-center mt-2">
+                  {inviteMessage}
+                </p>
+              )}
+              {inviteError && (
+                <p className="text-red-600 text-center mt-2">{inviteError}</p>
+              )}
+            </form>
+          </Card>
+        </div>
 
-            {filteredStaffData.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">
-                {searchTerm.length >= 3
-                  ? `No staff found matching "${searchTerm}".`
-                  : "No staff members found or no results available yet."}
-              </p>
-            ) : (
-              <Card className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Staff Name
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Role
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quizzes Taken
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Average Score
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredStaffData.map((staff) => {
-                        return (
-                          <tr key={staff._id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              <Link
-                                to={`/staff/${staff._id}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
-                                aria-label={`View details for ${staff.name}`}
-                              >
-                                {staff.name}
-                              </Link>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {staff.professionalRole || "-"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {`${staff.quizzesTaken ?? 0} / ${
-                                staff.assignableQuizzesCount ?? 0
-                              }`}
-                            </td>
-                            <td
-                              className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
-                                staff.averageScore === null
-                                  ? "text-gray-500"
-                                  : staff.averageScore >= 70
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              {staff.averageScore !== null
-                                ? `${staff.averageScore.toFixed(1)}%`
-                                : "-"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+        {/* Staff Performance Visualizations Section */}
+        {averageScoreChartData && staffData.length > 0 && (
+          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Staff Performance Visualizations
+            </h2>
+            <div className="mt-6 bg-white p-6 rounded-lg shadow">
+              <h3 className="text-xl font-semibold text-gray-700 mb-4">
+                Average Score by Staff
+              </h3>
+              {averageScoreChartData ? (
+                <div style={{ height: "400px", position: "relative" }}>
+                  <BarChart
+                    data={averageScoreChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          max: 110,
+                          title: {
+                            display: true,
+                            text: "Average Score (%)",
+                          },
+                          ticks: {
+                            callback: function (value, index, ticks) {
+                              if (value === 110) {
+                                return null;
+                              }
+                              return value + "%";
+                            },
+                          },
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: "Staff Member",
+                          },
+                        },
+                      },
+                    }}
+                  />
                 </div>
-              </Card>
-            )}
-          </div>
-        </Card>
+              ) : (
+                <p className="text-gray-500">
+                  No average score data to display.
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
+        {!averageScoreChartData && !staffLoading && staffData.length > 0 && (
+          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <p className="text-gray-500 text-center py-4">
+              Visualizations are being generated or no staff data available for
+              charts.
+            </p>
+          </Card>
+        )}
+        {staffData.length === 0 && !staffLoading && (
+          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <p className="text-gray-500 text-center py-4">
+              No staff data available to display performance visualizations.
+            </p>
+          </Card>
+        )}
       </main>
     </div>
   );

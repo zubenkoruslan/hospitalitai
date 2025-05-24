@@ -92,10 +92,10 @@ export interface StaffDetailsData {
 // Sort types
 export type SortField =
   | "name"
-  | "role"
-  | "quizzesTaken"
+  | "email"
   | "averageScore"
-  | "joined";
+  | "completionRate"
+  | "createdAt";
 export type SortDirection = "asc" | "desc";
 
 // Filter types

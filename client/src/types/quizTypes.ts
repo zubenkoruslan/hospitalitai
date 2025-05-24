@@ -7,6 +7,21 @@ export interface IncorrectQuestionDetail {
   questionText: string;
   userAnswer: string;
   correctAnswer: string;
+  explanation?: string;
+}
+
+// Added ClientQuestionOption type
+export interface ClientQuestionOption {
+  _id: string;
+  text: string;
+}
+
+// Added ClientCorrectAnswerDetails type
+export interface ClientCorrectAnswerDetails {
+  text?: string;
+  texts?: string[];
+  optionId?: string;
+  optionIds?: string[];
 }
 
 // From api.ts: ClientIQuiz (lines 326-339)
@@ -50,7 +65,7 @@ export interface ClientQuizAttemptDetails {
   _id: string; // Attempt ID
   quizId: string;
   quizTitle: string;
-  userId: string;
+  staffUserId: string;
   score: number;
   totalQuestions: number;
   attemptDate: string;
@@ -72,9 +87,12 @@ export interface ClientQuizAttemptSubmitData {
 // From api.ts: ClientGradedQuestion (lines 551-556)
 export interface ClientGradedQuestion {
   questionId: string;
+  questionText?: string; // Added
+  options?: ClientQuestionOption[]; // Added, using new type
   answerGiven: any;
   isCorrect: boolean;
-  correctAnswer?: any;
+  correctAnswer?: ClientCorrectAnswerDetails; // Changed type to ClientCorrectAnswerDetails
+  explanation?: string; // Added
 }
 
 // From api.ts: ClientSubmitAttemptResponse (lines 558-563)

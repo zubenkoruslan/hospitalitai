@@ -5,6 +5,7 @@ export interface IMenu extends Document {
   name: string;
   description?: string;
   restaurantId: mongoose.Types.ObjectId; // Reference to the Restaurant
+  isActive?: boolean; // Added isActive field
 }
 
 // Mongoose schema for Menu
@@ -25,6 +26,12 @@ const menuSchema = new Schema<IMenu>(
       type: Schema.Types.ObjectId,
       ref: "Restaurant", // Reference to the Restaurant model
       required: [true, "Menu must belong to a restaurant"],
+      index: true,
+    },
+    isActive: {
+      // Added isActive field to schema
+      type: Boolean,
+      default: false, // Default to false, will be set to true on creation if needed
       index: true,
     },
   },

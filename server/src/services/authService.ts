@@ -3,6 +3,11 @@ import User, { IUser } from "../models/User";
 import Restaurant, { IRestaurant } from "../models/Restaurant";
 import { AppError } from "../utils/errorHandler";
 import { Types } from "mongoose";
+import {
+  UserProfileUpdateData,
+  UserAPIResponse,
+  PasswordChangeData,
+} from "../types/authTypes";
 
 // Interface for data passed to signup methods
 interface SignupData {
@@ -18,7 +23,7 @@ interface SignupData {
 
 // Interface for the return value of loginUser
 interface LoginResponse {
-  user: Omit<IUser, "password">;
+  user: UserAPIResponse;
   restaurantName?: string;
   professionalRole?: string;
 }
@@ -195,46 +200,48 @@ class AuthService {
     passwordInput: string
   ): Promise<LoginResponse> {
     try {
-      // Find user by email, ensure professionalRole is selected
-      const user = await User.findOne({ email }).select(
-        "+password name role restaurantId email createdAt updatedAt professionalRole"
+      const userDoc = await User.findOne({ email }).select(
+        "+password name role restaurantId email createdAt updatedAt professionalRole assignedRoleId"
       );
 
-      if (!user) {
+      if (!userDoc) {
         throw new AppError("Invalid credentials", 401);
       }
 
-      // Compare password
-      const isMatch = await user.comparePassword(passwordInput);
+      const isMatch = await userDoc.comparePassword(passwordInput);
       if (!isMatch) {
         throw new AppError("Invalid credentials", 401);
       }
 
-      // Fetch restaurant name
       let restaurantName: string | undefined = undefined;
-      if (user.restaurantId) {
-        const restaurant = await Restaurant.findById(user.restaurantId).lean();
+      if (userDoc.restaurantId) {
+        const restaurant = await Restaurant.findById(
+          userDoc.restaurantId
+        ).lean();
         if (restaurant) {
           restaurantName = restaurant.name;
-        } else {
-          console.warn(
-            `User ${user.email} (ID: ${user._id}) linked to non-existent restaurant ID: ${user.restaurantId}`
-          );
         }
       }
 
-      const { password: _password, ...userObject } = user.toObject();
+      const { password: _password, ...userObject } = userDoc.toObject();
 
-      // Return all necessary fields
+      const responseUser: UserAPIResponse = {
+        ...userObject,
+        _id: userObject._id.toString(),
+        restaurantId: userObject.restaurantId?.toString(),
+        assignedRoleId: userObject.assignedRoleId?.toString(),
+        restaurantName: restaurantName,
+      };
+
       return {
-        user: userObject as unknown as Omit<IUser, "password">,
-        restaurantName,
-        professionalRole: user.professionalRole,
+        user: responseUser,
+        restaurantName: responseUser.restaurantName,
+        professionalRole: responseUser.professionalRole,
       };
     } catch (error: any) {
       console.error("Error during login:", error);
-      if (error instanceof AppError) throw error; // Re-throw specific AppErrors (e.g., 401)
-      throw new AppError("An unexpected error occurred during login.", 500); // Catch-all
+      if (error instanceof AppError) throw error;
+      throw new AppError("An unexpected error occurred during login.", 500);
     }
   }
 
@@ -247,36 +254,207 @@ class AuthService {
    */
   static async getCurrentUserDetails(
     userId: string | mongoose.Types.ObjectId
-  ): Promise<Omit<IUser, "password"> & { restaurantName?: string }> {
+  ): Promise<UserAPIResponse> {
     try {
-      const user = await User.findById(userId).select("-password").lean();
-
+      const user = await User.findById(userId).lean();
       if (!user) {
         throw new AppError("User not found", 404);
       }
 
-      let restaurantName: string | undefined;
+      let restaurantNameStr: string | undefined;
       if (user.restaurantId) {
-        const restaurant = await Restaurant.findById(user.restaurantId)
-          .select("name")
-          .lean();
+        const restaurant = await Restaurant.findById(user.restaurantId).lean();
         if (restaurant) {
-          restaurantName = restaurant.name;
+          restaurantNameStr = restaurant.name;
         }
       }
 
-      return { ...user, restaurantName };
+      const { password, __v, ...userWithoutSensitiveFields } = user;
+      return {
+        ...userWithoutSensitiveFields,
+        _id: userWithoutSensitiveFields._id.toString(),
+        restaurantId: userWithoutSensitiveFields.restaurantId?.toString(),
+        assignedRoleId: userWithoutSensitiveFields.assignedRoleId?.toString(),
+        restaurantName: restaurantNameStr,
+      };
     } catch (error: any) {
-      console.error(`Error fetching user details for ID ${userId}:`, error);
-      if (error instanceof AppError) throw error; // Re-throw specific AppErrors (e.g., 404)
-      // Handle potential CastError for invalid ObjectId format
-      if (error.name === "CastError") {
-        throw new AppError("Invalid user ID format.", 400);
+      console.error("Error fetching user details:", error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to fetch user details.", 500);
+    }
+  }
+
+  static async updateUserProfile(
+    userId: string | mongoose.Types.ObjectId,
+    profileData: UserProfileUpdateData
+  ): Promise<UserAPIResponse> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const user = await User.findById(userId).session(session);
+      if (!user) {
+        throw new AppError("User not found to update.", 404);
       }
-      throw new AppError(
-        "An unexpected error occurred while fetching user details.",
-        500
-      );
+
+      // Update basic user fields
+      if (profileData.name) {
+        user.name = profileData.name;
+      }
+      if (profileData.email) {
+        if (profileData.email !== user.email) {
+          const existingUserWithNewEmail = await User.findOne({
+            email: profileData.email,
+          }).session(session);
+          if (
+            existingUserWithNewEmail &&
+            existingUserWithNewEmail._id.toString() !== userId.toString()
+          ) {
+            throw new AppError("This email address is already in use.", 409);
+          }
+        }
+        user.email = profileData.email;
+      }
+
+      let restaurantNameUpdated: string | undefined = undefined;
+      if (
+        user.role === "restaurant" &&
+        profileData.restaurantName &&
+        user.restaurantId
+      ) {
+        const restaurant = await Restaurant.findById(user.restaurantId).session(
+          session
+        );
+        if (restaurant) {
+          if (restaurant.name !== profileData.restaurantName) {
+            restaurant.name = profileData.restaurantName;
+            await restaurant.save({ session });
+          }
+          restaurantNameUpdated = restaurant.name;
+        }
+      }
+
+      await user.save({ session });
+      await session.commitTransaction();
+
+      const { password, __v, ...userObject } = user.toObject();
+
+      if (!restaurantNameUpdated && user.restaurantId) {
+        const restaurant = await Restaurant.findById(user.restaurantId).lean();
+        if (restaurant) restaurantNameUpdated = restaurant.name;
+      }
+
+      return {
+        ...userObject,
+        _id: userObject._id.toString(),
+        restaurantId: userObject.restaurantId?.toString(),
+        assignedRoleId: userObject.assignedRoleId?.toString(),
+        restaurantName: restaurantNameUpdated,
+      };
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.error("Error updating user profile:", error);
+      if (error instanceof AppError) throw error;
+      if (error.code === 11000 && error.keyPattern?.email) {
+        throw new AppError("This email address is already in use.", 409);
+      }
+      throw new AppError("Failed to update user profile.", 500);
+    } finally {
+      session.endSession();
+    }
+  }
+
+  static async changeUserPassword(
+    userId: string | mongoose.Types.ObjectId,
+    currentPasswordInput: string,
+    newPasswordInput: string
+  ): Promise<void> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      // Fetch user and select password field explicitly as it's normally excluded.
+      const user = await User.findById(userId)
+        .select("+password")
+        .session(session);
+      if (!user) {
+        throw new AppError("User not found.", 404);
+      }
+
+      // Verify current password
+      const isMatch = await user.comparePassword(currentPasswordInput);
+      if (!isMatch) {
+        throw new AppError("Incorrect current password.", 401); // 401 Unauthorized or 400 Bad Request
+      }
+
+      // Set new password (pre-save hook will hash it)
+      user.password = newPasswordInput;
+      await user.save({ session });
+
+      await session.commitTransaction();
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.error("Error changing user password:", error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to change password.", 500);
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Deletes a user's account.
+   * If the user is a restaurant owner, deletion might be restricted or have cascading effects.
+   * @param userId The ID of the user to delete.
+   * @param userRole The role of the user.
+   * @param userRestaurantId The restaurantId of the user, if any.
+   */
+  static async deleteUserAccount(
+    userId: string | mongoose.Types.ObjectId,
+    userRole?: string, // from req.user.role
+    userRestaurantId?: string | mongoose.Types.ObjectId // from req.user.restaurantId
+  ): Promise<void> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const user = await User.findById(userId).session(session);
+      if (!user) {
+        throw new AppError("User not found.", 404);
+      }
+
+      if (user.role === "restaurant") {
+        // For MVP, prevent restaurant owner from deleting their user account directly.
+        // They should delete their restaurant first, which might handle user cleanup or re-assignment.
+        // Or, this method could be expanded to handle restaurant/staff cleanup.
+        const restaurantCount = await Restaurant.countDocuments({
+          owner: userId,
+        }).session(session);
+        if (restaurantCount > 0) {
+          throw new AppError(
+            "Restaurant owner cannot delete account directly. Please delete your restaurant(s) first or transfer ownership.",
+            403 // Forbidden
+          );
+        }
+        // If they own no restaurants (e.g. restaurant was deleted separately), they can delete their user record.
+      }
+
+      // If user is staff, or an owner with no restaurants, proceed with deletion.
+      // Additional logic could be: remove staff from their restaurant's staff list if applicable (though User.restaurantId is the main link)
+      // For now, just deleting the user document.
+      await User.findByIdAndDelete(userId).session(session);
+
+      // TODO: Add more sophisticated cleanup if needed:
+      // - Invalidate JWT tokens
+      // - Remove from any other associated collections (e.g., quiz attempts, if not cascaded by schema)
+      // - If staff, notify restaurant owner (optional)
+
+      await session.commitTransaction();
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.error("Error deleting user account:", error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to delete user account.", 500);
+    } finally {
+      session.endSession();
     }
   }
 

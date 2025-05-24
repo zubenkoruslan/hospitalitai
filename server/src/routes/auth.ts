@@ -14,9 +14,16 @@ import {
   validateSignupRequest,
   handleValidationErrors,
   validateLoginRequest,
+  validateProfileUpdateRequest,
+  validatePasswordChangeRequest,
 } from "../middleware/validationMiddleware";
 import { AppError } from "../utils/errorHandler";
-import { AuthPayload, SignupData } from "../types/authTypes"; // Added import
+import {
+  AuthPayload,
+  SignupData,
+  UserProfileUpdateData,
+  PasswordChangeData,
+} from "../types/authTypes"; // Added UserProfileUpdateData and PasswordChangeData
 
 const router: Router = express.Router();
 
@@ -151,12 +158,29 @@ router.post(
       );
 
       // Create JWT payload
+      let jwtRestaurantId: mongoose.Types.ObjectId | undefined = undefined;
+      if (user.restaurantId) {
+        try {
+          jwtRestaurantId = new mongoose.Types.ObjectId(
+            user.restaurantId.toString()
+          );
+        } catch (e) {
+          // Handle cases where user.restaurantId might be an invalid string for ObjectId
+          console.error(
+            "Invalid restaurantId format for JWT payload:",
+            user.restaurantId,
+            e
+          );
+          // Depending on policy, you might throw an error or proceed without restaurantId in JWT
+        }
+      }
+
       const payload: AuthPayload = {
-        userId: user._id as mongoose.Types.ObjectId,
+        userId: new mongoose.Types.ObjectId(user._id.toString()), // Ensure _id is ObjectId
         role: user.role,
         name: user.name,
-        restaurantId: user.restaurantId,
-        restaurantName: restaurantName,
+        restaurantId: jwtRestaurantId, // Use the converted ObjectId
+        restaurantName: user.restaurantName, // AuthService.loginUser returns user with restaurantName
         professionalRole: user.professionalRole,
       };
 
@@ -194,6 +218,112 @@ router.get(
 
       // Send user details (password is already excluded by the service)
       res.status(200).json({ user });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   PUT /api/auth/me
+ * @desc    Update current logged in user's profile details (name, email, restaurantName)
+ * @access  Private
+ */
+router.put(
+  "/me",
+  protect, // Ensures req.user is populated
+  validateProfileUpdateRequest, // Added validation for profile update
+  handleValidationErrors, // Handles any validation errors
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new AppError("Authentication error: User ID not found.", 401);
+      }
+
+      const profileData = req.body as UserProfileUpdateData;
+
+      // Call service to update user details
+      // The service should handle logic like: if user is restaurant owner, can they update restaurantName via this?
+      // Or should restaurantName update be a separate endpoint /api/restaurants/:id ?
+      // For now, assume AuthService.updateUserProfile handles this logic.
+      const updatedUser = await AuthService.updateUserProfile(
+        userId,
+        profileData
+      );
+
+      // Send updated user details (password should already be excluded by the service)
+      res
+        .status(200)
+        .json({ user: updatedUser, message: "Profile updated successfully." });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   POST /api/auth/change-password
+ * @desc    Change current logged in user's password
+ * @access  Private
+ */
+router.post(
+  "/change-password",
+  protect, // Ensures req.user is populated
+  validatePasswordChangeRequest, // Added validation for password change
+  handleValidationErrors, // Handles any validation errors
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new AppError("Authentication error: User ID not found.", 401);
+      }
+
+      const { currentPassword, newPassword } = req.body as PasswordChangeData;
+
+      // Call service to change password
+      await AuthService.changeUserPassword(
+        userId,
+        currentPassword,
+        newPassword
+      );
+
+      res.status(200).json({ message: "Password changed successfully." });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   DELETE /api/auth/me
+ * @desc    Delete current logged in user's account
+ * @access  Private
+ */
+router.delete(
+  "/me",
+  protect, // Ensures req.user is populated
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new AppError("Authentication error: User ID not found.", 401);
+      }
+
+      // Call service to delete user account
+      // This service method needs to handle implications, e.g., if a restaurant owner deletes their account,
+      // what happens to the restaurant and its staff? For now, focus on basic user deletion.
+      // If it's a staff member, they should just be removed.
+      // If it's an owner, it's more complex (cascade delete restaurant and staff, or prevent?)
+      // For MVP, let's assume AuthService.deleteUserAccount handles this logic.
+      await AuthService.deleteUserAccount(
+        userId,
+        req.user?.role,
+        req.user?.restaurantId
+      );
+
+      // TODO: Consider what happens to the JWT token on the client. It should be invalidated.
+      res.status(200).json({ message: "Account deleted successfully." });
     } catch (error) {
       next(error);
     }

@@ -5,6 +5,7 @@ export interface IRestaurant extends Document {
   _id: mongoose.Types.ObjectId; // Explicitly define _id type
   name: string;
   owner: mongoose.Types.ObjectId; // Reference to the User who owns/created the restaurant
+  contactEmail?: string; // Added contactEmail
   // staff: mongoose.Types.ObjectId[]; // REMOVED: Array of User IDs who are staff members
 }
 
@@ -23,6 +24,14 @@ const restaurantSchema = new Schema<IRestaurant>(
       ref: "User", // Reference to the User model
       required: [true, "Restaurant must have an owner"],
       index: true, // Index for quicker lookup by owner
+    },
+    contactEmail: {
+      // Added contactEmail to schema
+      type: String,
+      trim: true,
+      // Basic email validation, could use a regex or validator library for more robustness
+      match: [/.+\@.+\..+/, "Please fill a valid email address"],
+      maxlength: [100, "Contact email cannot exceed 100 characters"],
     },
     // staff: [ // REMOVED
     //   {

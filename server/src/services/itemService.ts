@@ -17,6 +17,7 @@ interface ItemData {
   isDairyFree?: boolean;
   isVegetarian?: boolean;
   isVegan?: boolean;
+  isActive?: boolean;
 }
 
 interface ItemUpdateData {
@@ -67,6 +68,7 @@ class ItemService {
       isDairyFree,
       isVegetarian,
       isVegan,
+      isActive,
     } = data;
 
     // Normalize category to lowercase from input data
@@ -148,6 +150,7 @@ class ItemService {
         isDairyFree: Boolean(isDairyFree ?? false),
         isVegetarian: Boolean(isVegetarian ?? false),
         isVegan: Boolean(isVegan ?? false),
+        isActive: isActive !== undefined ? isActive : true,
       };
       if (description !== undefined && typeof description === "string") {
         newItemData.description = description.trim();

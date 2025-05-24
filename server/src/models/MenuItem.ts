@@ -33,6 +33,7 @@ export interface IMenuItem extends Document {
   category: string; // Category will now be a simple string, not validated against a list
   menuId: Types.ObjectId;
   restaurantId: Types.ObjectId;
+  isActive?: boolean;
 
   // NEW Dietary Fields
   isGlutenFree: boolean;
@@ -120,6 +121,11 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
     isVegan: {
       type: Boolean,
       default: false,
+      index: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
       index: true,
     },
   },

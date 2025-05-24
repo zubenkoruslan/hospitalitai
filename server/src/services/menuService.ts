@@ -22,6 +22,7 @@ import {
 interface MenuData {
   name: string;
   description?: string;
+  isActive?: boolean;
 }
 
 // Interface for data used by Gemini for structured extraction
@@ -220,7 +221,7 @@ class MenuService {
     restaurantId: Types.ObjectId,
     session?: mongoose.ClientSession
   ): Promise<IMenu> {
-    const { name, description } = data;
+    const { name, description, isActive } = data;
     const trimmedName = name.trim();
 
     try {
@@ -240,6 +241,7 @@ class MenuService {
       const newMenuData: Partial<IMenu> = {
         name: trimmedName,
         restaurantId: restaurantId,
+        isActive: isActive !== undefined ? isActive : true,
       };
       if (description) newMenuData.description = description.trim();
 
@@ -609,17 +611,18 @@ class MenuService {
             (originalFileName
               ? path.parse(originalFileName).name.replace(/_/g, " ").trim()
               : "Imported Menu");
-          const menuDataForCreate = {
+          const menuDataForCreate: MenuData = {
             name: aiMenuName.substring(0, 100),
             description: `Menu parsed from ${
               originalFileName || "uploaded PDF"
             } by AI.`.substring(0, 500),
+            isActive: true,
           };
 
           const createdMenu = await MenuService.createMenu(
             menuDataForCreate,
             restaurantId,
-            session // Pass session to createMenu
+            session
           );
 
           if (

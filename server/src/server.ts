@@ -30,6 +30,7 @@ import questionRoutes from "./routes/questionRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { roleRouter } from "./routes/roleRoutes";
 import aiRoutes from "./routes/aiRoutes";
+import restaurantRoutes from "./routes/restaurantRoutes";
 
 const app: Express = express();
 
@@ -72,6 +73,9 @@ app.use(express.urlencoded({ extended: true }));
 const uri: string =
   process.env.MONGODB_URI || "mongodb://localhost:27017/hospitality-training";
 
+// ONLY FOR DEBUGGING - Log the URI being used
+console.log("Attempting to connect to MongoDB with URI:", uri);
+
 // Only connect if not in a test environment
 if (process.env.NODE_ENV !== "test") {
   (async () => {
@@ -99,6 +103,7 @@ app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/roles", roleRouter);
 app.use("/api/ai", aiRoutes);
+app.use("/api/restaurants", restaurantRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

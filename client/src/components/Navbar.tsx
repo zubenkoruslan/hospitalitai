@@ -155,21 +155,25 @@ const Navbar: React.FC<NavbarProps> = ({
                       to={baseLinks[0].path}
                       className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out"
                       onClick={(e) => {
-                        if (
-                          isBlockingNavigation &&
-                          onAttemptBlockedNavigation
-                        ) {
-                          const proceed = onAttemptBlockedNavigation();
-                          if (!proceed) {
-                            e.preventDefault();
-                            return;
-                          }
-                        }
+                        handleNavigationClick(e, baseLinks[0].path);
                         setIsDropdownOpen(false);
                       }}
                     >
                       Dashboard
                     </NavLink>
+
+                    {/* Settings Link */}
+                    <NavLink
+                      to="/settings"
+                      className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out"
+                      onClick={(e) => {
+                        handleNavigationClick(e, "/settings");
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      Settings
+                    </NavLink>
+
                     <button
                       onClick={() => {
                         if (

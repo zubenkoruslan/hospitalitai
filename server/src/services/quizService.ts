@@ -85,6 +85,7 @@ export interface IncorrectQuestionDetailForAttempt {
   questionText: string;
   userAnswer: string; // Textual representation of user's answer
   correctAnswer: string; // Textual representation of correct answer
+  explanation?: string; // Added explanation field
 }
 
 export interface QuizAttemptDetailsWithIncorrects {
@@ -910,6 +911,7 @@ export class QuizService {
         answerGiven: submittedQ.answerGiven,
         isCorrect,
         correctAnswer: correctAnswerDetails,
+        explanation: fullQuestion.explanation,
       });
     }
 
@@ -1181,122 +1183,148 @@ export class QuizService {
     requestingUserIdString: string
   ): Promise<QuizAttemptDetailsWithIncorrects | null> {
     if (!mongoose.Types.ObjectId.isValid(attemptId)) {
-      throw new AppError("Invalid attempt ID format.", 400);
+      throw new AppError("Invalid attempt ID format", 400);
     }
+    if (!mongoose.Types.ObjectId.isValid(requestingUserIdString)) {
+      throw new AppError("Invalid user ID format", 400);
+    }
+
     const attemptObjectId = new Types.ObjectId(attemptId);
     const requestingUserId = new Types.ObjectId(requestingUserIdString);
 
+    // Specify a more precise lean type if possible, or cast carefully later
     const attempt = await QuizAttempt.findById(attemptObjectId)
       .populate<{ quizId: Pick<IQuiz, "_id" | "title" | "restaurantId"> }>({
         path: "quizId",
         select: "_id title restaurantId",
       })
-      .lean<IQuizAttempt | null>();
+      .lean<IQuizAttempt>(); // Use IQuizAttempt for the lean type
 
     if (!attempt) {
       return null;
     }
 
-    // Authorization check: User must be the one who took the attempt or a restaurant admin of that restaurant
-    const restaurantIdOfAttempt = (
-      attempt.quizId as Pick<IQuiz, "restaurantId">
-    ).restaurantId;
     const requestingUser = await User.findById(requestingUserId)
-      .select("role restaurantId")
-      .lean<Pick<IUser, "role" | "restaurantId"> | null>();
+      .select("role restaurantId") // Select necessary fields
+      .lean<Pick<IUser, "_id" | "role" | "restaurantId">>(); // Use a Pick type for lean user
 
     if (!requestingUser) {
-      throw new AppError("Requesting user not found.", 404);
+      throw new AppError("Requesting user not found", 404);
     }
 
-    const isOwnerOfAttempt =
-      attempt.staffUserId.toString() === requestingUserIdString;
-    const isAdminOfRestaurant =
-      requestingUser.role === "restaurant" &&
-      requestingUser.restaurantId?.toString() ===
-        restaurantIdOfAttempt.toString();
+    const quizData = attempt.quizId as Pick<
+      IQuiz,
+      "_id" | "title" | "restaurantId"
+    >; // Cast populated quizId
 
-    if (!isOwnerOfAttempt && !isAdminOfRestaurant) {
+    // Authorization check
+    let isAuthorized = false;
+    if (
+      requestingUser._id.toString() ===
+      (attempt.staffUserId as Types.ObjectId).toString()
+    ) {
+      isAuthorized = true;
+    }
+
+    const userRole = requestingUser.role as unknown as IRole;
+    if (userRole?.name === "restaurantAdmin" || userRole?.name === "manager") {
+      if (
+        quizData &&
+        requestingUser.restaurantId &&
+        quizData.restaurantId.equals(requestingUser.restaurantId)
+      ) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
       throw new AppError(
         "You are not authorized to view this quiz attempt.",
         403
       );
     }
 
-    const incorrectQuestionsDetails: IncorrectQuestionDetailForAttempt[] = [];
+    const incorrectQuestionDetails: IncorrectQuestionDetailForAttempt[] = [];
+
+    // Iterate over questionsPresented to find incorrect ones
     if (attempt.questionsPresented && attempt.questionsPresented.length > 0) {
       for (const presentedQ of attempt.questionsPresented) {
         if (!presentedQ.isCorrect) {
+          // Check if the question was answered incorrectly
           const questionDoc = await QuestionModel.findById(
             presentedQ.questionId
-          )
-            .select("questionText options questionType")
-            .lean<Pick<
-              IQuestion,
-              "questionText" | "options" | "questionType"
-            > | null>();
+          ).lean<QuestionDocument>(); // Fetch full question doc
+
           if (questionDoc) {
+            let userAnswerText = "N/A";
             let correctAnswerText = "N/A";
-            const correctOption = questionDoc.options.find(
-              (opt) => opt.isCorrect
-            );
-            if (correctOption) {
-              correctAnswerText = correctOption.text;
+
+            // Logic to determine userAnswerText and correctAnswerText
+            // This needs to be robust for all question types
+            if (questionDoc.questionType === "true-false") {
+              // For T/F, answerGiven is usually the ID of the "True" or "False" option
+              const answeredOption = questionDoc.options.find((opt) =>
+                opt._id.equals(presentedQ.answerGiven as Types.ObjectId)
+              );
+              userAnswerText = answeredOption?.text || "Not answered";
+              const correctOpt = questionDoc.options.find(
+                (opt) => opt.isCorrect
+              );
+              correctAnswerText = correctOpt?.text || "Error: Correct N/A";
             } else if (
-              questionDoc.questionType === "true-false" &&
-              questionDoc.options.length === 2
+              questionDoc.questionType === "multiple-choice-single" ||
+              questionDoc.questionType === "multiple-choice-multiple"
             ) {
-              // Fallback logic for true/false if isCorrect is not explicitly on options
-              // This part might need refinement based on actual data structure.
-            }
+              const getOptionTextById = (optionId: string | Types.ObjectId) => {
+                const opt = questionDoc.options.find((o) =>
+                  o._id.equals(optionId)
+                );
+                return opt?.text;
+              };
 
-            let userAnswerText = String(presentedQ.answerGiven); // Default to the ID if lookup fails
-            if (questionDoc.options && presentedQ.answerGiven) {
               if (Array.isArray(presentedQ.answerGiven)) {
-                // Handle multiple-choice-multiple if answerGiven is an array of IDs
-                const selectedOptionsTexts = presentedQ.answerGiven.map(
-                  (ansId) => {
-                    const opt = questionDoc.options.find(
-                      (o) => o._id.toString() === String(ansId)
-                    );
-                    return opt ? opt.text : String(ansId); // Fallback to ID if option not found
-                  }
-                );
-                userAnswerText = selectedOptionsTexts.join(", ");
+                // For multiple-choice-multiple
+                userAnswerText = presentedQ.answerGiven
+                  .map(getOptionTextById)
+                  .filter(Boolean)
+                  .join(", ");
+                if (!userAnswerText) userAnswerText = "No selection";
+              } else if (presentedQ.answerGiven) {
+                // For multiple-choice-single
+                userAnswerText =
+                  getOptionTextById(presentedQ.answerGiven as Types.ObjectId) ||
+                  "Invalid Option ID";
               } else {
-                // Handle single-select (true-false, multiple-choice-single)
-                const userAnswerOption = questionDoc.options.find(
-                  (opt) => opt._id.toString() === String(presentedQ.answerGiven)
-                );
-                if (userAnswerOption) {
-                  userAnswerText = userAnswerOption.text;
-                }
+                userAnswerText = "Not answered";
               }
-            }
 
-            incorrectQuestionsDetails.push({
+              correctAnswerText = questionDoc.options
+                .filter((opt) => opt.isCorrect)
+                .map((opt) => opt.text)
+                .join(", ");
+            }
+            // Add other types as necessary
+
+            incorrectQuestionDetails.push({
               questionText: questionDoc.questionText,
-              userAnswer: userAnswerText, // Use the resolved text
+              userAnswer: userAnswerText,
               correctAnswer: correctAnswerText,
+              explanation: questionDoc.explanation,
             });
-          } else {
-            console.error(
-              `[QuizService.getQuizAttemptDetails] Question ${presentedQ.questionId} (marked incorrect in attempt) NOT FOUND in QuestionModel for attempt ${attempt._id}`
-            );
           }
         }
       }
     }
 
     return {
-      _id: (attempt._id as Types.ObjectId).toString(),
-      quizId: (attempt.quizId as { _id: Types.ObjectId })._id.toString(),
-      quizTitle: (attempt.quizId as { title: string }).title,
-      staffUserId: attempt.staffUserId.toString(),
+      _id: attempt._id.toString(),
+      quizId: quizData._id.toString(),
+      quizTitle: quizData.title || "Quiz Title Not Found",
+      staffUserId: (attempt.staffUserId as Types.ObjectId).toString(),
       score: attempt.score,
-      totalQuestions: attempt.questionsPresented?.length || 0,
+      totalQuestions: attempt.questionsPresented.length, // Corrected: Use length of questionsPresented
       attemptDate: attempt.attemptDate,
-      incorrectQuestions: incorrectQuestionsDetails,
+      incorrectQuestions: incorrectQuestionDetails,
     };
   }
 
