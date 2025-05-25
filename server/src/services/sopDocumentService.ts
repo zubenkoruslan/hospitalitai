@@ -1,14 +1,22 @@
-import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel";
+import SopDocumentModel, {
+  ISopDocument,
+  ISopCategory,
+} from "../models/SopDocumentModel";
 import { AppError } from "../utils/errorHandler";
 import mongoose, { Types } from "mongoose";
 import fs from "fs-extra"; // For file system operations
 import path from "path"; // For path manipulation
 import pdf from "pdf-parse"; // For PDF parsing
 import mammoth from "mammoth"; // For DOCX parsing
+import { AICategorizationService } from "./aiCategorizationService"; // Import the new service
 // import fs from 'fs-extra'; // For file system operations
 // import path from 'path'; // For path manipulation
 // import pdf from 'pdf-parse'; // For PDF parsing
 // import mammoth from 'mammoth'; // For DOCX parsing
+
+// Placeholder for your AI Categorization Service client
+// You'll need to implement this service to call your chosen AI model (e.g., OpenAI, Gemini, etc.)
+// Example: import { aiCategorizationService } from './aiCategorizationService';
 
 // Define a type for the file object expected from multer or similar middleware
 interface UploadedFile {
@@ -22,6 +30,89 @@ interface UploadedFile {
   size: number;
 }
 
+const AI_PROMPT_FOR_SOP = `
+You are an AI assistant tasked with intelligently segmenting and categorizing Standard Operating Procedure (SOP) documents into a HIERARCHICAL structure. Your goal is to break down the provided SOP text into logical main sections and potentially nested sub-sections, each with a descriptive title and its corresponding content.
+
+**Input:**
+You will receive a single string containing the full extracted text content of an SOP document. This text may use various heading levels (e.g., H1, H2, H3) or numbering schemes (e.g., 1., 1.1, 1.1.1, A., a.) to denote structure.
+
+**Task:**
+1.  Analyze the entire SOP text to understand its structure and hierarchy.
+2.  Identify distinct main sections and any nested sub-sections within them.
+3.  For each identified section or sub-section:
+    a.  Determine a concise and meaningful title (category name). This title should ideally be derived from existing headings in the text. Preserve the hierarchical relationship in your output.
+    b.  Extract all the text content that *directly* belongs to this specific section/sub-section, excluding content that belongs to its own children sub-sections.
+4.  Ensure that all substantive parts of the SOP document are allocated to a category or sub-category.
+
+**Output Format:**
+Return your analysis as a JSON array of *top-level* category objects. Each category object must have the following properties:
+-   "name": The title of the category/section (string).
+-   "content": The text content directly belonging to this category (string). If a category primarily serves as a container for sub-categories and has no direct content other than its heading, this can be a brief introductory sentence or an empty string.
+-   "subCategories": An OPTIONAL array of category objects, following this same structure recursively, for any sub-sections found under this category. If no sub-sections, omit this field or provide an empty array.
+
+Example of Hierarchical Output:
+[
+  {
+    "name": "Chapter 1: Introduction",
+    "content": "This SOP outlines the procedures for...",
+    "subCategories": [
+      {
+        "name": "1.1 Purpose of this SOP",
+        "content": "The primary purpose is to ensure safety and efficiency...",
+        "subCategories": [] // Or omit if no further nesting
+      },
+      {
+        "name": "1.2 Scope",
+        "content": "This SOP applies to all kitchen staff..."
+      }
+    ]
+  },
+  {
+    "name": "Chapter 2: Safety Protocols",
+    "content": "General safety guidelines are as follows.", // Parent content
+    "subCategories": [
+      {
+        "name": "2.1 Fire Safety",
+        "content": "Detailed fire safety measures..."
+      },
+      {
+        "name": "2.2 Equipment Handling",
+        "content": "Proper handling of kitchen equipment...",
+        "subCategories": [
+          {
+            "name": "2.2.1 Knife Safety",
+            "content": "Specific rules for knife handling..."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Appendix A: Forms",
+    "content": "This section contains all relevant forms."
+    // No subCategories for this one implies it's a flat section
+  }
+]
+
+**Guidelines for Categorization:**
+*   **Hierarchical Structure:** Pay close attention to heading levels (H1, H2, H3, etc.), numbering (1., 1.1, A., a.), and indentation to determine the hierarchy. Your output JSON MUST reflect this hierarchy using the "subCategories" array.
+*   **Content Specificity:** The "content" field for a category should only contain text that directly belongs to it, not the aggregated text of its sub-categories. If a heading primarily introduces sub-sections, its direct "content" might be minimal or empty.
+*   **Prioritize Existing Structure:** Use existing headings from the text as category/sub-category names whenever possible. Adapt them to be concise if necessary.
+*   **Title Conciseness:** Category names should be descriptive but not overly long (e.g., aim for 1-7 words).
+*   **Comprehensive Coverage:** Aim to categorize all relevant procedural text. Minor introductory phrases or concluding remarks might be grouped with adjacent logical sections.
+*   **Handling Short/Unstructured Documents:** If a document is very short or has no discernible internal structure, it might result in a single top-level category with no sub-categories, or a few top-level categories.
+*   **Avoid Over-Fragmentation:** Do not create excessively deep or numerous tiny sub-categories unless the document structure clearly dictates it. Group related minor points appropriately.
+*   **Table of Contents/Index:** If the input text includes a table of contents or an index, do not treat these as procedural content sections themselves. Focus on the main body of the SOP.
+
+**What to Avoid:**
+*   Flattening the hierarchy: If the document has sub-sections, represent them in the "subCategories" array.
+*   Creating categories with empty or non-substantive content unless they are parent categories whose content is entirely within their sub-categories.
+*   Titles that are too long or are full sentences.
+*   Losing any part of the original document's substantive text.
+
+Think step-by-step to identify logical breaks and the hierarchical relationships between them. Your understanding of common SOP and document structures will be beneficial.
+`;
+
 export class SopDocumentService {
   /**
    * Handles the initial upload and creation of an SOP document entry.
@@ -29,12 +120,14 @@ export class SopDocumentService {
    * @param fileData - The uploaded file object (e.g., from multer).
    * @param restaurantId - The ID of the restaurant uploading the document.
    * @param title - The user-defined title for the document.
+   * @param description - Optional description for the document.
    * @returns The created SopDocument database entry.
    */
   static async handleDocumentUpload(
     fileData: UploadedFile,
     restaurantId: Types.ObjectId,
-    title: string
+    title: string,
+    description?: string
   ): Promise<ISopDocument> {
     let fileType: ISopDocument["fileType"] = "txt"; // Default
     if (fileData.mimetype === "application/pdf") {
@@ -62,6 +155,7 @@ export class SopDocumentService {
       restaurantId,
       status: "uploaded", // Initial status
       categories: [],
+      description,
     });
 
     try {
@@ -134,156 +228,88 @@ export class SopDocumentService {
       doc.status = "categorizing";
       await doc.save();
 
-      // New Categorization Logic
+      // --- AI-Powered Categorization Logic ---
       if (extractedText && extractedText.trim().length > 0) {
-        const lines = extractedText.split("\n");
-        const generatedCategories: Array<{ name: string; content: string }> =
-          [];
-        let currentContentLines: string[] = [];
-        let currentCategoryName: string = "Overview"; // Default for content before the first heading
+        try {
+          const aiGeneratedCategories =
+            await AICategorizationService.categorizeText(
+              extractedText,
+              AI_PROMPT_FOR_SOP
+            );
 
-        const isLikelyHeading = (
-          lineContent: string,
-          prevLineContent?: string,
-          nextLineContent?: string
-        ): boolean => {
-          const trimmedLine = lineContent.trim();
-          if (!trimmedLine) return false;
-
-          const words = trimmedLine.split(/s+/);
-          if (words.length === 0 || words.length > 10) return false;
-
-          // Ends with sentence punctuation (common for non-headings in lists, but generally headings don't)
-          if (/[.!?;]$/.test(trimmedLine)) {
-            // Allow if it looks like "1. Heading." or "A) Heading."
-            if (!/^s*(\d+.\.|[A-Za-z]\)).\S+/.test(trimmedLine)) {
-              return false;
-            }
-          }
-          if (/,$/.test(trimmedLine)) return false; // Headings rarely end with a comma
-
-          const isAllCaps =
-            trimmedLine === trimmedLine.toUpperCase() &&
-            /[A-Z]/.test(trimmedLine);
-          const isTitleCase =
-            words.every(
-              (w) => /^[A-Z]/.test(w) || !/[a-zA-Z]/.test(w) || /^d+$/.test(w)
-            ) &&
-            words.length >= 1 &&
-            /[a-zA-Z]/.test(trimmedLine);
-
-          // Pattern: Number/Letter followed by . or ) e.g., "1.", "A)", "i." Also allowing "Section 1" type patterns
-          const isNumberedOrLetteredListHeading =
-            /^s*((\d{1,2}(\.\d{1,2})*[.)]?)|([A-Za-z][.)])|([ivxlcdm]+[.)]?))\\s+/i.test(
-              trimmedLine
-            ) || /^section\s+\d+/i.test(trimmedLine);
-          if (isNumberedOrLetteredListHeading && words.length <= 12)
-            return true;
-
-          if (isAllCaps && trimmedLine.length >= 3 && words.length <= 7)
-            return true; // Min 3 chars for ALL CAPS
-          if (isTitleCase && words.length <= 7 && words.length >= 1)
-            return true; // Min 1 word for Title Case
-
-          const prevIsEmpty =
-            prevLineContent !== undefined && prevLineContent.trim() === "";
-          const nextIsEmpty =
-            nextLineContent !== undefined && nextLineContent.trim() === "";
-
-          if (words.length <= 7 && !/[.!?,;:]$/.test(trimmedLine)) {
-            if (prevIsEmpty && nextIsEmpty) return true; // Isolated line
-            if (prevIsEmpty && words.length <= 5) return true; // Preceded by empty, fairly short
-            if (nextIsEmpty && words.length <= 5) return true; // Followed by empty, fairly short
-          }
-
-          // A line with only a few words, no punctuation, often a heading.
           if (
-            words.length <= 4 &&
-            !/[.!?,;:\(\)]/.test(trimmedLine) &&
-            /[a-zA-Z]/.test(trimmedLine)
-          )
-            return true;
-
-          return false;
-        };
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const prevLine = i > 0 ? lines[i - 1] : undefined;
-          const nextLine = i < lines.length - 1 ? lines[i + 1] : undefined;
-
-          if (isLikelyHeading(line, prevLine, nextLine)) {
-            if (currentContentLines.join("\n").trim().length > 0) {
-              generatedCategories.push({
-                name: currentCategoryName,
-                content: currentContentLines.join("\n").trim(),
-              });
-            }
-            currentCategoryName = line.trim();
-            currentContentLines = [];
-          } else {
-            currentContentLines.push(line);
-          }
-        }
-
-        if (currentContentLines.join("\n").trim().length > 0) {
-          generatedCategories.push({
-            name: currentCategoryName,
-            content: currentContentLines.join("\n").trim(),
-          });
-        }
-
-        if (
-          generatedCategories.length > 0 &&
-          generatedCategories.some((c) => c.content.length > 0)
-        ) {
-          if (
-            generatedCategories.length === 1 &&
-            generatedCategories[0].name === "Overview"
+            aiGeneratedCategories &&
+            aiGeneratedCategories.length > 0 &&
+            aiGeneratedCategories.some(
+              (c) => c.content && c.content.trim().length > 0
+            )
           ) {
-            generatedCategories[0].name = "Full Document Content";
-          }
-          // Filter out categories with names that are too long (likely not headings)
-          // or content that is too short (likely just whitespace or minor artifacts)
-          doc.categories = generatedCategories.filter(
-            (c) => c.name.length <= 100 && c.content.length > 10
-          );
+            // Optional: Add further validation or filtering on AI results if needed
+            doc.categories = aiGeneratedCategories.filter(
+              (c) =>
+                c.name &&
+                c.name.length <= 150 &&
+                c.content &&
+                c.content.length >= 10
+            );
 
-          if (doc.categories.length === 0) {
-            // If filtering removed everything, fallback
+            if (doc.categories.length === 0) {
+              // Fallback if AI results are filtered out or empty
+              console.warn(
+                `AI categorization for doc ${doc._id} resulted in empty or invalid categories after filtering. Falling back.`
+              );
+              doc.categories = [
+                {
+                  name: "Full Document Content",
+                  content: extractedText.trim(),
+                },
+              ];
+            }
+          } else {
+            console.warn(
+              `AI categorization for doc ${doc._id} returned no valid categories. Falling back.`
+            );
             doc.categories = [
               { name: "Full Document Content", content: extractedText.trim() },
             ];
           }
-        } else {
-          doc.categories = [
-            { name: "Full Document Content", content: extractedText.trim() },
-          ];
-        }
-
-        if (doc.categories.length === 0) {
-          // Final fallback
+        } catch (aiError: any) {
+          console.error(
+            `AI categorization failed for SopDocument ${doc._id}:`,
+            aiError
+          );
+          doc.status = "error";
+          doc.errorMessage = `AI categorization failed: ${
+            aiError.message || "Unknown AI error"
+          }`;
+          // Fallback to full document content if AI fails
           doc.categories = [
             {
               name: "Full Document Content",
               content:
                 extractedText.trim() ||
-                "No meaningful content could be categorized.",
+                "Content extraction failed or AI error.",
             },
           ];
         }
       } else {
+        // No text extracted, or text is empty
         doc.categories = [
           {
             name: "Full Document Content",
-            content: "No text was extracted from the document.",
+            content:
+              "No text was extracted from the document, or the document is empty.",
           },
         ];
       }
-      // End New Categorization Logic
+      // --- End AI-Powered Categorization Logic ---
 
-      doc.status = "processed";
-      doc.errorMessage = undefined; // Clear any previous error message
+      // If no error occurred during AI categorization, set status to processed
+      if (doc.status !== "error") {
+        doc.status = "processed";
+        doc.errorMessage = undefined; // Clear any previous error message
+      }
+
       await doc.save();
       console.log(
         `SopDocument ${doc._id} processed and categorized successfully.`
@@ -412,7 +438,7 @@ export class SopDocumentService {
     status: string;
     message?: string;
     title?: string;
-    uploadedAt?: Date;
+    uploadedAt?: Date; // Frontend should format this Date object as needed (e.g., DD/MM/YYYY)
   } | null> {
     try {
       const document = await SopDocumentModel.findOne(
@@ -439,4 +465,346 @@ export class SopDocumentService {
   }
 
   // TODO: Add other service methods (get, list, delete, updateCategories)
+}
+
+// --- NEW METHODS FOR EDITING ---
+
+export class SopDocumentEditService {
+  // Tentatively placing in a new class for clarity, can be merged later
+  /**
+   * Updates the main title of an SOP document.
+   */
+  static async updateSopDocumentTitle(
+    documentId: Types.ObjectId,
+    newTitle: string,
+    restaurantId: Types.ObjectId
+  ): Promise<ISopDocument | null> {
+    try {
+      const document = await SopDocumentModel.findOneAndUpdate(
+        { _id: documentId, restaurantId },
+        { $set: { title: newTitle, updatedAt: new Date() } }, // Ensure updatedAt is manually updated if not relying on Mongoose hook for this specific operation
+        { new: true }
+      );
+      if (!document) {
+        throw new AppError(
+          "Document not found or not authorized to update.",
+          404
+        );
+      }
+      return document;
+    } catch (error: any) {
+      console.error(
+        `Error updating SOP document title for ${documentId}:`,
+        error
+      );
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update SOP document title.", 500);
+    }
+  }
+
+  /**
+   * Updates the description of an SOP document.
+   */
+  static async updateSopDocumentDescription(
+    documentId: Types.ObjectId,
+    newDescription: string,
+    restaurantId: Types.ObjectId
+  ): Promise<ISopDocument | null> {
+    try {
+      const document = await SopDocumentModel.findOneAndUpdate(
+        { _id: documentId, restaurantId },
+        { $set: { description: newDescription, updatedAt: new Date() } },
+        { new: true }
+      );
+      if (!document) {
+        throw new AppError(
+          "Document not found or not authorized to update description.",
+          404
+        );
+      }
+      return document;
+    } catch (error: any) {
+      console.error(
+        `Error updating SOP document description for ${documentId}:`,
+        error
+      );
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update SOP document description.", 500);
+    }
+  }
+
+  /**
+   * Adds a new category or subcategory to an SOP document.
+   * @param documentId ID of the SOP document.
+   * @param parentCategoryId ID of the parent category (null if adding a top-level category).
+   * @param categoryData Object containing { name: string, content: string } for the new category.
+   * @param restaurantId ID of the restaurant for ownership verification.
+   */
+  static async addCategoryToSop(
+    documentId: Types.ObjectId,
+    parentCategoryId: string | null,
+    categoryData: { name: string; content: string },
+    restaurantId: Types.ObjectId
+  ): Promise<ISopDocument | null> {
+    try {
+      const document = await SopDocumentModel.findOne({
+        _id: documentId,
+        restaurantId,
+      });
+      if (!document) {
+        throw new AppError("Document not found or not authorized.", 404);
+      }
+
+      const newCategory = {
+        _id: new mongoose.Types.ObjectId(), // Generate new ID for the category
+        name: categoryData.name,
+        content: categoryData.content,
+        subCategories: [],
+      };
+
+      let updateQuery;
+      if (parentCategoryId) {
+        // Adding as a subcategory - this requires finding the parent category within the potentially nested array
+        // and pushing to its subCategories. This is complex with MongoDB's positional operators
+        // for deeply nested arrays. A common approach is to fetch the document, modify in code, then save.
+        // Or use arrayFilters for targeted updates if nesting is not too deep or path is known.
+
+        // For simplicity in this pass, we'll assume we need to manually find and update.
+        // A more robust solution might involve a recursive helper function.
+        const parentCategoryPath = SopDocumentEditService.findCategoryPath(
+          document.categories,
+          parentCategoryId
+        );
+        if (!parentCategoryPath) {
+          throw new AppError("Parent category not found.", 404);
+        }
+        updateQuery = {
+          $push: { [parentCategoryPath + ".subCategories"]: newCategory },
+        };
+      } else {
+        // Adding as a top-level category
+        updateQuery = { $push: { categories: newCategory } };
+      }
+
+      const updatedDocument = await SopDocumentModel.findOneAndUpdate(
+        { _id: documentId, restaurantId }, // Ensure restaurantId for security
+        { ...updateQuery, $set: { updatedAt: new Date() } },
+        { new: true }
+      );
+
+      if (!updatedDocument) {
+        // This might happen if the initial findOneAndUpdate in a more complex scenario fails to match
+        throw new AppError("Failed to add category to document.", 500);
+      }
+      return updatedDocument;
+    } catch (error: any) {
+      console.error(`Error adding category to SOP ${documentId}:`, error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to add category.", 500);
+    }
+  }
+
+  /**
+   * Updates an existing category or subcategory within an SOP document.
+   * @param documentId ID of the SOP document.
+   * @param categoryId ID of the category/subcategory to update.
+   * @param updates Object containing { name?: string, content?: string }.
+   * @param restaurantId ID of the restaurant.
+   */
+  static async updateSopCategory(
+    documentId: Types.ObjectId,
+    categoryId: string,
+    updates: { name?: string; content?: string },
+    restaurantId: Types.ObjectId
+  ): Promise<ISopDocument | null> {
+    try {
+      // Finding and updating a specific subdocument by _id in a nested array structure is complex.
+      // MongoDB arrayFilters are powerful here.
+      const document = await SopDocumentModel.findOne({
+        _id: documentId,
+        restaurantId,
+      });
+      if (!document) {
+        throw new AppError("Document not found or not authorized.", 404);
+      }
+
+      // Create an object for $set operation, filtering out undefined values
+      const fieldsToUpdate: Record<string, any> = {};
+      if (updates.name !== undefined)
+        fieldsToUpdate[`categories.$[cat].name`] = updates.name;
+      if (updates.content !== undefined)
+        fieldsToUpdate[`categories.$[cat].content`] = updates.content;
+
+      // This needs to be extended for subCategories recursively
+      // For deeply nested updates, recursively building arrayFilters or fetching and modifying in app code might be needed.
+      // Example for first-level category:
+      let updateResult = await SopDocumentModel.updateOne(
+        {
+          _id: documentId,
+          restaurantId,
+          "categories._id": new mongoose.Types.ObjectId(categoryId),
+        },
+        { $set: fieldsToUpdate },
+        {
+          arrayFilters: [
+            { "cat._id": new mongoose.Types.ObjectId(categoryId) },
+          ],
+        }
+      );
+
+      // If not updated, try searching in subCategories (this is a simplified one-level deep search)
+      // A true recursive update would require a more sophisticated approach.
+      if (updateResult.modifiedCount === 0) {
+        const subFieldsToUpdate: Record<string, any> = {};
+        if (updates.name !== undefined)
+          subFieldsToUpdate[`categories.$[].subCategories.$[subcat].name`] =
+            updates.name;
+        if (updates.content !== undefined)
+          subFieldsToUpdate[`categories.$[].subCategories.$[subcat].content`] =
+            updates.content;
+
+        updateResult = await SopDocumentModel.updateOne(
+          {
+            _id: documentId,
+            restaurantId,
+            "categories.subCategories._id": new mongoose.Types.ObjectId(
+              categoryId
+            ),
+          },
+          { $set: subFieldsToUpdate },
+          {
+            arrayFilters: [
+              { "subcat._id": new mongoose.Types.ObjectId(categoryId) },
+            ],
+          }
+        );
+      }
+
+      // Add more levels or a recursive update function if deeper nesting is common.
+
+      if (updateResult.modifiedCount === 0 && updateResult.matchedCount > 0) {
+        // Found but not modified, perhaps data is the same
+        console.log(
+          `Category ${categoryId} found but not modified (data might be the same).`
+        );
+      } else if (updateResult.matchedCount === 0) {
+        throw new AppError("Category not found within the document.", 404);
+      }
+
+      // Manually set updatedAt
+      await SopDocumentModel.updateOne(
+        { _id: documentId },
+        { $set: { updatedAt: new Date() } }
+      );
+
+      return SopDocumentModel.findById(documentId); // Re-fetch the document to return the updated state
+    } catch (error: any) {
+      console.error(
+        `Error updating category ${categoryId} in SOP ${documentId}:`,
+        error
+      );
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update category.", 500);
+    }
+  }
+
+  /**
+   * Deletes a category or subcategory from an SOP document.
+   * @param documentId ID of the SOP document.
+   * @param categoryId ID of the category/subcategory to delete.
+   * @param restaurantId ID of the restaurant.
+   */
+  static async deleteSopCategory(
+    documentId: Types.ObjectId,
+    categoryId: string,
+    restaurantId: Types.ObjectId
+  ): Promise<ISopDocument | null> {
+    try {
+      const categoryObjectId = new mongoose.Types.ObjectId(categoryId);
+
+      const document = await SopDocumentModel.findOne({
+        _id: documentId,
+        restaurantId,
+      });
+
+      if (!document) {
+        throw new AppError("Document not found or not authorized.", 404);
+      }
+
+      // Helper function to recursively remove a category
+      const removeCategoryRecursive = (
+        categories: ISopCategory[],
+        idToRemove: Types.ObjectId
+      ): boolean => {
+        for (let i = categories.length - 1; i >= 0; i--) {
+          const category = categories[i];
+          if (category._id && category._id.equals(idToRemove)) {
+            categories.splice(i, 1); // Remove the category from the array
+            return true; // Category found and removed
+          }
+          if (category.subCategories && category.subCategories.length > 0) {
+            if (removeCategoryRecursive(category.subCategories, idToRemove)) {
+              return true; // Category found and removed in a sub-level
+            }
+          }
+        }
+        return false; // Category not found at this level
+      };
+
+      const categoryWasRemoved = removeCategoryRecursive(
+        document.categories,
+        categoryObjectId
+      );
+
+      if (!categoryWasRemoved) {
+        // Category not found, could mean it was already deleted or ID is incorrect.
+        // Depending on desired behavior, could throw an error or just return the document.
+        // For now, let's assume if it's not found, it might have been already deleted.
+        console.log(
+          `Category ${categoryId} not found for deletion, possibly already deleted.`
+        );
+        // To ensure client gets an updated document if other concurrent changes happened, re-fetch.
+        // However, if no change was made because category wasn't found, returning current document is fine.
+        // Or we can check if anything changed in the categories array.
+        // For simplicity, if not removed, we return the document as is (or re-fetch to be safe).
+        // Let's try to save and see if mongoose detects a change.
+      }
+
+      document.updatedAt = new Date();
+      const updatedDocument = await document.save();
+
+      return updatedDocument;
+    } catch (error: any) {
+      console.error(
+        `Error deleting category ${categoryId} from SOP ${documentId}:`,
+        error
+      );
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to delete category.", 500);
+    }
+  }
+
+  // Helper function to find path to a category (simplified for addCategoryToSop)
+  private static findCategoryPath(
+    categories: ISopCategory[],
+    categoryId: string
+  ): string | null {
+    for (let i = 0; i < categories.length; i++) {
+      const cat = categories[i];
+      if (cat._id?.toString() === categoryId) {
+        return `categories.${i}`;
+      }
+      if (cat.subCategories && cat.subCategories.length > 0) {
+        for (let j = 0; j < cat.subCategories.length; j++) {
+          const subCat = cat.subCategories[j];
+          if (subCat._id?.toString() === categoryId) {
+            return `categories.${i}.subCategories.${j}`;
+            // This needs to be recursive for deeper levels
+          }
+          // Add recursive call here for deeper search
+        }
+      }
+    }
+    return null;
+  }
 }

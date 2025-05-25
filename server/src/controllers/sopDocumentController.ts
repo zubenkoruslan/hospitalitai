@@ -21,7 +21,7 @@ export class SopDocumentController {
       if (!req.file) {
         throw new AppError("No file uploaded.", 400);
       }
-      const { title } = req.body;
+      const { title, description } = req.body;
       if (!title || typeof title !== "string" || title.trim() === "") {
         throw new AppError("Valid document title is required.", 400);
       }
@@ -37,7 +37,8 @@ export class SopDocumentController {
       const document = await SopDocumentService.handleDocumentUpload(
         req.file,
         restaurantObjectId,
-        title.trim()
+        title.trim(),
+        description?.trim()
       );
 
       res.status(201).json({
@@ -81,13 +82,11 @@ export class SopDocumentController {
       const documents = await SopDocumentService.listRestaurantSopDocuments(
         restaurantObjectId
       );
-      res
-        .status(200)
-        .json({
-          status: "success",
-          results: documents.length,
-          data: documents,
-        });
+      res.status(200).json({
+        status: "success",
+        results: documents.length,
+        data: documents,
+      });
     } catch (error) {
       next(error);
     }

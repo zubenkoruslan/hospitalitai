@@ -32,6 +32,7 @@ import { roleRouter } from "./routes/roleRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import restaurantRoutes from "./routes/restaurantRoutes";
 import sopDocumentRoutes from "./routes/sopDocumentRoutes";
+import sopDocumentEditRoutes from "./routes/sopDocumentEditRoutes"; // Import new edit routes
 
 const app: Express = express();
 
@@ -106,6 +107,7 @@ app.use("/api/roles", roleRouter);
 app.use("/api/ai", aiRoutes);
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/sop-documents", sopDocumentRoutes);
+app.use("/api/sop-documents", sopDocumentEditRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

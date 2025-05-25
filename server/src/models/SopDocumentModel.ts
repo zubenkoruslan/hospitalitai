@@ -2,10 +2,12 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 // Interface for individual categories within an SOP document
 export interface ISopCategory {
+  _id?: Types.ObjectId; // Optional: Mongoose might add this if not _id: false, let's allow it
   name: string;
   content: string;
   startOffset?: number; // Optional: Character offset in the full extracted text
   endOffset?: number; // Optional: Character offset in the full extracted text
+  subCategories?: ISopCategory[]; // Recursive definition for sub-categories
 }
 
 // Interface for the SopDocument document
@@ -22,28 +24,34 @@ export interface ISopDocument extends Document {
   extractedText?: string; // Full text extracted from the document (can be large)
   categories: ISopCategory[];
   errorMessage?: string; // To store any error message during processing
+  description?: string; // Added description
 }
 
-const SopCategorySchema: Schema<ISopCategory> = new Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Category name is required"],
-      trim: true,
-    },
-    content: {
-      type: String,
-      required: [true, "Category content is required"],
-    },
-    startOffset: {
-      type: Number,
-    },
-    endOffset: {
-      type: Number,
-    },
+const SopCategorySchema: Schema<ISopCategory> = new Schema({
+  name: {
+    type: String,
+    required: [true, "Category name is required"],
+    trim: true,
   },
-  { _id: false } // No separate _id for category subdocuments
-);
+  content: {
+    type: String,
+    required: [true, "Category content is required"],
+  },
+  startOffset: {
+    type: Number,
+  },
+  endOffset: {
+    type: Number,
+  },
+});
+
+// Must define the schema before referencing it recursively
+SopCategorySchema.add({
+  subCategories: {
+    type: [SopCategorySchema],
+    default: [],
+  },
+});
 
 const SopDocumentSchema: Schema<ISopDocument> = new Schema(
   {
@@ -55,6 +63,10 @@ const SopDocumentSchema: Schema<ISopDocument> = new Schema(
     originalFileName: {
       type: String,
       required: [true, "Original file name is required"],
+    },
+    description: {
+      type: String,
+      trim: true,
     },
     storagePath: {
       type: String,
