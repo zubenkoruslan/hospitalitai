@@ -39,3 +39,6 @@ build/
 # Documentation (ignore all .md except README.md)
 *.md
 !README.md
+
+# Application Data (e.g. local database files)
+data/
