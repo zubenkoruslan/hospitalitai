@@ -16,14 +16,15 @@ In the fast-paced hospitality industry, knowledgeable and well-trained staff are
 
 Unlock a new era of efficiency and effectiveness in your staff development:
 
-- 🌟 **Effortless Menu & Knowledge Digitization:**
+- 🌟 **Effortless Knowledge Base Digitization:**
 
-  - **Smart PDF Upload:** Simply upload your existing PDF menus! QuizCrunch's intelligent engine (powered by Google's Generative AI) can parse the text and help structure your menu items, ingredients, and categories automatically.
-  - **Easy Menu Management:** Quickly add, edit, and update menu items, descriptions, and dietary information. Ensure your training materials always reflect your current offerings.
+  - **Smart PDF Upload (Menus & SOPs):** Simply upload your existing PDF menus and Standard Operating Procedure (SOP) documents! QuizCrunch's intelligent engine (powered by Google's Generative AI) can parse the text and help structure your menu items, SOP content, and categorize information automatically.
+  - **Easy Content Management:** Quickly add, edit, and update menu items, SOP sections, descriptions, and dietary information. Ensure your training materials always reflect your current offerings and procedures.
 
-- 🧠 **Intelligent & Automated Quiz Creation:**
+- 🧠 **Intelligent & Automated Quiz Creation (from Menus & SOPs):**
 
-  - **Save Hours of Manual Work:** Generate relevant quiz questions directly from your digitized menus and knowledge bases with a few clicks.
+  - **Save Hours of Manual Work:** Generate relevant quiz questions directly from your digitized menus and SOP documents with a few clicks. Create comprehensive Question Banks tailored to specific knowledge areas.
+  - **AI-Powered & Manual Options:** Leverage AI for a rapid first draft of questions from your SOPs and menus, or opt to create question banks manually for full control.
   - **Customizable Quizzes:** While AI gives you a head start, you always have full control to manually create, edit, and fine-tune quizzes to meet your specific training needs.
 
 - 📚 **Consistent & Engaging Learning for Staff:**
@@ -57,8 +58,9 @@ QuizCrunch is built with cutting-edge, reliable technology to ensure a seamless 
 **For Managers & Owners:**
 
 - **Menu Mastery:** Easily upload PDF menus or manually input items. Keep your digital menu accurate with simple editing tools.
+- **SOP & Procedural Training:** Digitize your Standard Operating Procedures. Create question banks (manually or via AI assistance) and quizzes to ensure staff are knowledgeable about critical operational standards, safety protocols, and service procedures.
 - **Staff Supervision:** Manage staff accounts, assign roles, and oversee their training journey.
-- **Quiz Control:** Create quizzes from scratch, leverage AI suggestions based on your menus, or refine existing quizzes. Activate quizzes to make them available to your team.
+- **Quiz Control:** Create quizzes from scratch, leverage AI suggestions based on your menus and SOPs, or refine existing quizzes. Activate quizzes to make them available to your team.
 - **Performance Overview:** Access dashboards to track completion rates, average scores, and identify areas where further training might be beneficial.
 
 **For Your Valued Staff:**
@@ -89,7 +91,7 @@ For those interested in the technical details, QuizCrunch is built using a moder
 - **Database:** MongoDB for flexible and scalable data storage.
 - **Language:** TypeScript used across the stack for enhanced code quality and maintainability.
 - **Authentication:** Secure JWT (JSON Web Tokens) for managing user sessions.
-- **AI Capabilities:** Leverages Google's Generative AI for intelligent features like PDF menu parsing.
+- **AI Capabilities:** Leverages Google's Generative AI for intelligent features like PDF menu and SOP document parsing, and AI-powered question generation from this content.
 - **API Routes:** Our backend offers a comprehensive set of RESTful APIs for managing:
   - `/api/auth`: User authentication and registration.
   - `/api/menus`: Menu creation, updates, and retrieval.
