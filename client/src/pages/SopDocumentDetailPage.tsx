@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ISopDocument, ISopCategory } from "../types/sopManagement"; // Adjusted path
+import { ISopDocument, ISopCategory } from "../types/sopTypes"; // Changed path
 import {
   getSopDocumentDetails,
   updateSopDocumentTitle,
@@ -58,12 +58,11 @@ const SopDocumentDetailPage: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-          const response = await getSopDocumentDetails(documentId);
-          // Assuming backend returns { data: ISopDocument } consistent with SopDocumentDetailResponse
-          setDocument(response.data);
-          if (response.data) {
-            setNewTitle(response.data.title); // Initialize newTitle for editing
-            setNewDescription(response.data.description || ""); // Initialize newDescription
+          const responseDoc = await getSopDocumentDetails(documentId);
+          setDocument(responseDoc);
+          if (responseDoc) {
+            setNewTitle(responseDoc.title);
+            setNewDescription(responseDoc.description || "");
           }
         } catch (err: any) {
           console.error(`Failed to fetch SOP document ${documentId}:`, err);
@@ -474,11 +473,14 @@ const SopDocumentDetailPage: React.FC = () => {
                 colorClass:
                   document.status === "processed"
                     ? "text-green-600"
-                    : document.status === "error"
+                    : document.status === "processing_error"
                     ? "text-red-600"
                     : "text-yellow-600",
               },
-              { label: "File Type", value: document.fileType.toUpperCase() },
+              {
+                label: "File Type",
+                value: (document.fileType || "N/A").toUpperCase(),
+              },
               {
                 label: "Uploaded At",
                 value: document.uploadedAt
@@ -510,7 +512,7 @@ const SopDocumentDetailPage: React.FC = () => {
             ))}
           </div>
 
-          {document.errorMessage && document.status === "error" && (
+          {document.errorMessage && document.status === "processing_error" && (
             <div className="m-6 md:m-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">
               <h3 className="text-lg font-semibold mb-1">Processing Error:</h3>
               <p className="text-sm">{document.errorMessage}</p>
@@ -560,9 +562,9 @@ const SopDocumentDetailPage: React.FC = () => {
                   This document may not have been processed yet, or it has no
                   structured content.
                 </p>
-                {(document.status === "uploaded" ||
-                  document.status === "parsing" ||
-                  document.status === "categorizing") && (
+                {(document.status === "pending_upload" ||
+                  document.status === "pending_processing" ||
+                  document.status === "processing") && (
                   <p className="mt-2 text-sm text-blue-600">
                     Processing is currently in progress.
                   </p>
@@ -571,9 +573,9 @@ const SopDocumentDetailPage: React.FC = () => {
             )}
           </div>
 
-          {(document.status === "uploaded" ||
-            document.status === "parsing" ||
-            document.status === "categorizing") &&
+          {(document.status === "pending_upload" ||
+            document.status === "pending_processing" ||
+            document.status === "processing") &&
             document.categories.length === 0 && (
               <div className="p-6 md:p-8 mt-0 border-t border-slate-200">
                 <div className="p-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg flex items-center">

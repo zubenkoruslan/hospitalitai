@@ -38,6 +38,10 @@ export interface ISopDocumentListItem
   categoryCount: number; // Example: derived or summarized data for list
   categories: Pick<ISopCategory, "name">[]; // Just names for quick view
   description?: string; // Added description
+  // Fields for Question Bank generation status
+  questionGenerationStatus?: "NONE" | "PENDING" | "COMPLETED" | "FAILED"; // Mirroring QuestionGenerationStatus from sopTypes.ts
+  questionBankId?: string; // Link to the generated question bank
+  errorMessage?: string; // To display if questionGenerationStatus is FAILED (can reuse existing errorMessage if it applies here)
 }
 
 // Type for uploading a new SOP document (title + file)

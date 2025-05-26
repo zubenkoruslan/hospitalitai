@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ISopCategory } from "../../types/sopManagement"; // Adjust path as needed
+import { ISopCategory } from "../../types/sopTypes"; // Changed path
 import {
   ChevronDownIcon,
   ChevronUpIcon,

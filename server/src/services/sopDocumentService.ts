@@ -334,16 +334,23 @@ export class SopDocumentService {
   /**
    * Lists all SOP documents for a given restaurant.
    * @param restaurantId - The ID of the restaurant.
+   * @param status - Optional status filter.
    * @returns An array of SOP documents.
    */
   static async listRestaurantSopDocuments(
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId,
+    status?: string
   ): Promise<ISopDocument[]> {
     try {
-      // Exclude extractedText and categories content for list view to keep payload small
-      return await SopDocumentModel.find({ restaurantId })
-        .select("-extractedText -categories.content")
+      const query: any = { restaurantId };
+      if (status) {
+        query.status = status;
+      }
+
+      const documents = await SopDocumentModel.find(query)
+        .select("-extractedText -storagePath")
         .sort({ uploadedAt: -1 });
+      return documents;
     } catch (error: any) {
       console.error(
         `Error listing SOP documents for restaurant ${restaurantId}:`,

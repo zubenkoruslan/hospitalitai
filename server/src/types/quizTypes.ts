@@ -14,7 +14,8 @@ export interface IQuizAttemptSummary {
 export interface GenerateQuizFromBanksRequestBody {
   title: string;
   description?: string;
-  questionBankIds: string[];
+  questionBankIds?: string[]; // Made optional as per validation logic
+  sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
   targetRoles?: string[];
 }

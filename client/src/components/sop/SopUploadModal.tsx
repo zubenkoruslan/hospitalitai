@@ -1,4 +1,4 @@
-import React, { useState, useCallback, FormEvent } from "react";
+import React, { useState, useCallback, FormEvent, memo } from "react";
 import Modal from "../common/Modal";
 import { useDropzone } from "react-dropzone";
 import { ArrowUpTrayIcon, XMarkIcon } from "@heroicons/react/24/outline";
@@ -32,7 +32,7 @@ const SopUploadModal: React.FC<SopUploadModalProps> = ({
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "application/pdf": [".pdf"],
@@ -42,8 +42,6 @@ const SopUploadModal: React.FC<SopUploadModalProps> = ({
       "text/markdown": [".md"],
     },
     maxFiles: 1,
-    noClick: true, // We will use a custom button to open the dialog
-    noKeyboard: true,
   });
 
   const handleSubmit = async (e: FormEvent) => {
@@ -144,61 +142,55 @@ const SopUploadModal: React.FC<SopUploadModalProps> = ({
           </label>
           <div
             {...getRootProps()}
-            className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 ${
-              isDragActive ? "border-indigo-500" : "border-slate-300"
-            } border-dashed rounded-md cursor-pointer hover:border-indigo-400 transition-colors duration-150 ease-in-out`}
+            tabIndex={0}
+            className={`p-6 py-10 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors duration-200 ease-in-out
+              ${
+                isDragActive
+                  ? "border-sky-500 bg-sky-50"
+                  : "border-slate-300 hover:border-slate-400 bg-slate-50"
+              }
+              ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <input {...getInputProps()} />
-            <div className="space-y-1 text-center">
-              <ArrowUpTrayIcon
-                className={`mx-auto h-12 w-12 ${
-                  isDragActive ? "text-indigo-600" : "text-slate-400"
-                }`}
-              />
-              {file ? (
-                <div className="text-sm text-slate-600">
-                  <p className="font-semibold">{file.name}</p>
-                  <p className="text-xs">
-                    ({(file.size / 1024).toFixed(2)} KB)
-                  </p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFile(null);
-                    }}
-                    className="mt-1 text-xs text-red-500 hover:text-red-700 font-medium items-center inline-flex"
-                  >
-                    <XMarkIcon className="h-3 w-3 mr-1" /> Remove file
-                  </button>
-                </div>
-              ) : isDragActive ? (
-                <p className="text-sm text-indigo-600 font-semibold">
-                  Drop the file here ...
-                </p>
-              ) : (
-                <p className="text-sm text-slate-600">
-                  <span
-                    className="font-semibold text-indigo-600 hover:text-indigo-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      open();
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") open();
-                    }}
-                  >
-                    Upload a file
-                  </span>{" "}
-                  or drag and drop
-                </p>
-              )}
-              <p className="text-xs text-slate-500">
-                PDF, DOCX, TXT, MD up to 10MB
-              </p>
-            </div>
+            <ArrowUpTrayIcon
+              className={`mx-auto h-12 w-12 mb-3 ${
+                isDragActive ? "text-sky-600" : "text-slate-400"
+              }`}
+            />
+            <p
+              className={`text-sm font-medium ${
+                isDragActive ? "text-sky-700" : "text-slate-700"
+              }`}
+            >
+              {file
+                ? file.name
+                : isDragActive
+                ? "Drop the file here..."
+                : "Drag & drop your SOP file here, or click to select"}
+            </p>
+            {file && (
+              <div className="mt-1 text-xs text-slate-500">
+                <span>({(file.size / 1024).toFixed(2)} KB) </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                  }}
+                  className="ml-2 text-red-500 hover:text-red-700 font-medium items-center inline-flex"
+                  aria-label="Remove selected file"
+                >
+                  <XMarkIcon className="h-3 w-3 mr-0.5" /> Remove
+                </button>
+              </div>
+            )}
+            <p
+              className={`text-xs mt-1 ${
+                isDragActive ? "text-sky-600" : "text-slate-500"
+              }`}
+            >
+              PDF, DOCX, TXT, MD up to 10MB
+            </p>
           </div>
         </div>
       </form>
@@ -206,4 +198,4 @@ const SopUploadModal: React.FC<SopUploadModalProps> = ({
   );
 };
 
-export default SopUploadModal;
+export default memo(SopUploadModal);

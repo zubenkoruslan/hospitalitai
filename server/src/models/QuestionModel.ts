@@ -26,6 +26,7 @@ export interface IQuestion extends Document {
   options: Types.Array<IOption>;
   categories: string[];
   restaurantId: Types.ObjectId;
+  questionBankId: Types.ObjectId;
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
   status: "active" | "pending_review" | "rejected";
@@ -74,6 +75,12 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Restaurant",
       required: true,
+      index: true,
+    },
+    questionBankId: {
+      type: Schema.Types.ObjectId,
+      ref: "QuestionBank",
+      required: [true, "Question bank ID is required"],
       index: true,
     },
     createdBy: {

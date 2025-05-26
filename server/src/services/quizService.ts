@@ -25,10 +25,19 @@ import {
   ServerCorrectAnswerDetails,
 } from "../types/quizTypes"; // Ensured import
 import { ServerQuestionOption } from "../types/questionTypes"; // CHANGED
+import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added SOP Document Model import
 
 // Define a type for Quiz with populated targetRoles
 export interface IPopulatedQuiz extends Omit<IQuiz, "targetRoles"> {
   targetRoles?: IRole[];
+}
+
+// Define a type for Quiz with populated targetRoles AND sopDocument
+export interface IPopulatedQuizWithSop
+  extends Omit<IQuiz, "targetRoles" | "sopDocumentId"> {
+  targetRoles?: IRole[];
+  sopDocumentId?: Pick<ISopDocument, "_id" | "title"> | null; // For populated SOP doc
+  // We will manually map sopDocumentId.title to sopDocumentTitle for the client.
 }
 
 // Plain interface for lean Quiz objects
@@ -53,10 +62,10 @@ export interface CreateQuizFromBanksData {
   title: string;
   description?: string;
   restaurantId: Types.ObjectId;
-  questionBankIds: string[]; // or Types.ObjectId[] depending on what the service expects
+  questionBankIds?: string[]; // Made optional, one of bankIds or sopDocId is needed
+  sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
-  targetRoles?: Types.ObjectId[]; // ADDED: For assigning roles during quiz creation
-  // createdBy?: Types.ObjectId; // Optional
+  targetRoles?: Types.ObjectId[];
 }
 
 // New interface for progress with average score
@@ -500,14 +509,35 @@ export class QuizService {
    */
   static async getAllQuizzesForRestaurant(
     restaurantId: Types.ObjectId
-  ): Promise<IPopulatedQuiz[]> {
+  ): Promise<any[]> {
+    // Return type will be IQuiz + sopDocumentTitle manually added
     try {
-      return await QuizModel.find({ restaurantId })
+      const quizzes = await QuizModel.find({ restaurantId })
         .populate<{ targetRoles: IRole[] }>({
           path: "targetRoles",
-          select: "_id name description", // Ensure _id is selected for IRole
+          select: "_id name description",
         })
-        .lean<IPopulatedQuiz[]>(); // Use lean with the new type
+        .populate<{
+          sopDocumentId: Pick<ISopDocument, "_id" | "title"> | null;
+        }>({
+          path: "sopDocumentId",
+          select: "_id title", // Select only id and title of the SOP Document
+        })
+        .lean<IPopulatedQuizWithSop[]>(); // Use new lean type
+
+      // Manually map sopDocumentId.title to sopDocumentTitle for client compatibility
+      return quizzes.map((quiz) => {
+        const clientQuiz = { ...quiz } as any; // Start with the lean quiz object
+        if (quiz.sopDocumentId && quiz.sopDocumentId.title) {
+          clientQuiz.sopDocumentTitle = quiz.sopDocumentId.title;
+          // Keep sopDocumentId as an ID string for the client if needed
+          clientQuiz.sopDocumentId = quiz.sopDocumentId._id.toString();
+        } else if (quiz.sopDocumentId) {
+          // If sopDocumentId was an ID but didn't populate (e.g. doc deleted)
+          clientQuiz.sopDocumentId = quiz.sopDocumentId.toString();
+        }
+        return clientQuiz;
+      });
     } catch (error) {
       console.error("Error fetching quizzes for restaurant:", error);
       throw new AppError("Failed to fetch quizzes.", 500);
@@ -598,84 +628,94 @@ export class QuizService {
       description,
       restaurantId,
       questionBankIds,
+      sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
       targetRoles,
     } = data;
 
-    // 1. Validate questionBankIds and fetch them to ensure they exist and belong to the restaurant
-    const banks = await QuestionBankModel.find({
-      _id: {
-        $in: questionBankIds.map((id) => new mongoose.Types.ObjectId(id)),
-      },
-      restaurantId: restaurantId,
-    }).populate<{ questions: QuestionDocument[] }>("questions");
+    let actualBankIdsToUse: string[] = [];
+    let derivedSopDocumentId: Types.ObjectId | null = null;
 
-    if (!banks || banks.length !== questionBankIds.length) {
+    if (sourceSopDocumentId) {
+      const sopDoc = await SopDocumentModel.findById(
+        sourceSopDocumentId
+      ).lean();
+      if (!sopDoc) {
+        throw new AppError("SOP Document not found.", 404);
+      }
+      if (!sopDoc.questionBankId) {
+        throw new AppError(
+          "SOP Document does not have an associated question bank.",
+          400
+        );
+      }
+      actualBankIdsToUse = [sopDoc.questionBankId.toString()];
+      derivedSopDocumentId = sopDoc._id; // Store the ObjectId of the SOP doc
+    } else if (questionBankIds && questionBankIds.length > 0) {
+      actualBankIdsToUse = questionBankIds;
+    } else {
+      throw new AppError(
+        "Either Question Bank IDs or an SOP Document ID must be provided.",
+        400
+      );
+    }
+
+    if (actualBankIdsToUse.length === 0) {
+      throw new AppError(
+        "No question banks specified or derived for quiz creation.",
+        400
+      );
+    }
+
+    // Validate that all specified question banks belong to the restaurant
+    const banks = await QuestionBankModel.find({
+      _id: { $in: actualBankIdsToUse.map((id) => new Types.ObjectId(id)) },
+      restaurantId: restaurantId,
+    }).lean();
+
+    if (banks.length !== actualBankIdsToUse.length) {
       throw new AppError(
         "One or more question banks not found or do not belong to this restaurant.",
         404
       );
     }
 
-    // 2. Calculate totalUniqueQuestionsInSourceSnapshot
-    const uniqueQuestionIdsFromSource =
-      await getUniqueValidQuestionIdsFromQuestionBanks(
-        questionBankIds.map((id) => new mongoose.Types.ObjectId(id)),
-        restaurantId
-      );
-    const totalUniqueQuestionsInSourceSnapshot =
-      uniqueQuestionIdsFromSource.length;
+    const validQuestionIds = await getUniqueValidQuestionIdsFromQuestionBanks(
+      actualBankIdsToUse.map((id) => new Types.ObjectId(id)),
+      new Types.ObjectId(restaurantId)
+    );
 
-    // 3. Validate numberOfQuestionsPerAttempt against totalUniqueQuestionsInSourceSnapshot
-    if (numberOfQuestionsPerAttempt > totalUniqueQuestionsInSourceSnapshot) {
+    if (validQuestionIds.length === 0) {
       throw new AppError(
-        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total number of unique active questions available in the selected banks (${totalUniqueQuestionsInSourceSnapshot}).`,
+        "No questions found in the selected question bank(s).",
         400
       );
     }
-    if (numberOfQuestionsPerAttempt <= 0) {
+    if (numberOfQuestionsPerAttempt > validQuestionIds.length) {
       throw new AppError(
-        "Number of questions per attempt must be greater than 0.",
+        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total number of available unique questions (${validQuestionIds.length}).`,
         400
       );
     }
 
-    // 4. Create the new quiz
     const newQuiz = new QuizModel({
       title,
       description,
       restaurantId,
-      sourceQuestionBankIds: questionBankIds.map(
-        (id) => new mongoose.Types.ObjectId(id)
+      sourceQuestionBankIds: actualBankIdsToUse.map(
+        (id) => new Types.ObjectId(id)
       ),
+      sopDocumentId: derivedSopDocumentId, // Set sopDocumentId if derived
+      totalUniqueQuestionsInSourceSnapshot: validQuestionIds.length,
       numberOfQuestionsPerAttempt,
-      totalUniqueQuestionsInSourceSnapshot,
-      isAvailable: false, // CHANGED: Default to not available
       targetRoles: targetRoles
-        ? targetRoles.map((id) => new mongoose.Types.ObjectId(id))
-        : [], // Ensure targetRoles is an array
+        ? targetRoles.map((id) => new Types.ObjectId(id))
+        : [],
+      isAvailable: true, // Default to available
     });
 
-    try {
-      await newQuiz.save();
-      return newQuiz;
-    } catch (error: any) {
-      if (error.code === 11000) {
-        // Duplicate key error (e.g. if unique index on title + restaurantId)
-        throw new AppError(
-          "A quiz with this title already exists for your restaurant.",
-          409
-        );
-      }
-      if (error instanceof mongoose.Error.ValidationError) {
-        throw new AppError(`Validation Error: ${error.message}`, 400);
-      }
-      console.error(
-        "Error saving new quiz in generateQuizFromBanksService:",
-        error
-      );
-      throw new AppError("Failed to create quiz from question banks.", 500);
-    }
+    await newQuiz.save();
+    return newQuiz.toObject() as IQuiz; // Return plain object
   }
 
   /**

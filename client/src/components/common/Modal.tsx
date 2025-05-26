@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useRef } from "react";
+import React, { ReactNode, useEffect, useRef, memo } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -18,6 +18,7 @@ const Modal: React.FC<ModalProps> = ({
   size = "md", // Default size
 }) => {
   const modalRef = useRef<HTMLDivElement>(null); // Ref for the modal content
+  const prevIsOpenRef = useRef<boolean>(); // Ref to track previous isOpen state
 
   // Handle Escape key press for closing the modal
   useEffect(() => {
@@ -29,11 +30,14 @@ const Modal: React.FC<ModalProps> = ({
 
     if (isOpen) {
       document.addEventListener("keydown", handleKeyDown);
-      // Set initial focus to the modal container or a specific element
-      // For simplicity, focusing the modal content div itself.
-      // A more robust solution might focus the first interactive element or the close button.
-      modalRef.current?.focus();
+      // Only focus if the modal just opened
+      if (!prevIsOpenRef.current && modalRef.current) {
+        modalRef.current.focus();
+      }
     }
+
+    // Update previous isOpen state *after* checking it
+    prevIsOpenRef.current = isOpen;
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
@@ -152,7 +156,7 @@ const Modal: React.FC<ModalProps> = ({
   );
 };
 
-export default Modal;
+export default memo(Modal);
 
 // Add animation styles if not already globally defined
 // Consider moving these to a global CSS file if used elsewhere

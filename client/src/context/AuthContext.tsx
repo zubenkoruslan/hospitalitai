@@ -8,7 +8,7 @@ import React, {
 // import axios from "axios"; // Not directly used now, api instance is used
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api";
+import api from "../services/api"; // Reverted to default import
 import {
   login as loginService,
   getCurrentUser as getCurrentUserService,

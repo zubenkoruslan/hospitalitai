@@ -8,23 +8,24 @@ export interface ISelectedSopCategory {
 }
 
 export interface IQuestionBank extends Document {
+  _id: Types.ObjectId;
   name: string;
   description?: string;
-  categories: string[]; // Aggregated from questions within this bank
-  questionCount: number; // Actual count of questions in the 'questions' array
-  targetQuestionCount?: number; // Optional target for generation or desired size
-  questions: Types.ObjectId[];
-  restaurantId: Types.ObjectId;
-
-  // Fields for SOP Document sourced banks
-  sourceType?: "menu" | "sop_document"; // Type of source for the question bank
-  sourceDocumentId?: Types.ObjectId; // ID of either Menu or SopDocument
-  sourceTypeRef?: "Menu" | "SopDocument"; // Model name for refPath
-  selectedCategories?: ISelectedSopCategory[]; // Names of categories selected from the SOP document
-
-  createdAt?: Date;
-  updatedAt?: Date;
+  restaurantId: Types.ObjectId; // Reference to the Restaurant model
+  sourceType: "SOP" | "MENU" | "MANUAL";
+  sourceSopDocumentId?: Types.ObjectId | null; // Nullable, for SOP source
+  sourceSopDocumentTitle?: string; // Denormalized for easier display, populated by service layer
+  sourceMenuId?: Types.ObjectId | null; // Nullable, for Menu source
+  sourceMenuName?: string; // Denormalized for easier display
+  categories: string[];
+  questions: Types.ObjectId[]; // Array of question IDs belonging to this bank
+  questionCount: number; // Denormalized: count of questions in this bank
+  // createdBy: Types.ObjectId; // Consider adding user who created it
+  // updatedBy?: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
   updateQuestionCountAndCategories: () => Promise<void>; // Declare instance method
+  updateQuestionCount: () => Promise<void>; // ADDED: Declare instance method for simple count update
 }
 
 // ADDED: Schema for selected SOP categories
@@ -44,28 +45,44 @@ const QuestionBankSchema: Schema<IQuestionBank> = new Schema(
       type: String,
       required: [true, "Question bank name is required"],
       trim: true,
-      maxlength: [200, "Name cannot exceed 200 characters"],
-      index: true, // Added index for faster searching by name for a restaurant
     },
     description: {
       type: String,
       trim: true,
-      maxlength: [1000, "Description cannot exceed 1000 characters"],
+    },
+    restaurantId: {
+      type: Schema.Types.ObjectId,
+      ref: "Restaurant",
+      required: [true, "Restaurant ID is required"],
+      index: true,
+    },
+    sourceType: {
+      type: String,
+      required: [true, "Source type is required"],
+      enum: ["SOP", "MENU", "MANUAL"],
+    },
+    sourceSopDocumentId: {
+      type: Schema.Types.ObjectId,
+      ref: "SopDocument",
+      default: null,
+    },
+    sourceSopDocumentTitle: {
+      // For easier display on frontend without extra lookups
+      type: String,
+      trim: true,
+    },
+    sourceMenuId: {
+      type: Schema.Types.ObjectId,
+      ref: "Menu", // Assuming Menu model exists
+      default: null,
+    },
+    sourceMenuName: {
+      type: String,
+      trim: true,
     },
     categories: {
       type: [String],
       default: [],
-    },
-    questionCount: {
-      // Actual count, calculated by the instance method
-      type: Number,
-      default: 0,
-      min: [0, "Question count cannot be negative"],
-    },
-    targetQuestionCount: {
-      type: Number,
-      min: [0, "Target question count cannot be negative"],
-      // default: 0, // No default, can be undefined
     },
     questions: [
       {
@@ -73,34 +90,24 @@ const QuestionBankSchema: Schema<IQuestionBank> = new Schema(
         ref: "Question",
       },
     ],
-    restaurantId: {
-      type: Schema.Types.ObjectId,
-      ref: "Restaurant",
-      required: true,
-      index: true,
+    questionCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
-    // Fields for SOP Document sourced banks
-    sourceType: {
-      type: String,
-      enum: ["menu", "sop_document"],
-      // required: true // Make required if all banks must have a source type
-    },
-    sourceDocumentId: {
-      type: Schema.Types.ObjectId,
-      refPath: "sourceTypeRef",
-      // required: function() { return !!this.sourceType; } // Require if sourceType is present
-    },
-    sourceTypeRef: {
-      type: String,
-      enum: ["Menu", "SopDocument"], // Must match Mongoose model names
-      // required: function() { return !!this.sourceType; } // Require if sourceType is present
-    },
-    selectedCategories: {
-      type: [SelectedSopCategorySchema],
-      default: undefined, // Default to undefined so it's not an empty array unless specified
-    },
+    // createdBy: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "User", // Assuming User model exists
+    //   required: true,
+    // },
+    // updatedBy: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "User",
+    // },
   },
-  { timestamps: true }
+  {
+    timestamps: true, // Automatically add createdAt and updatedAt fields
+  }
 );
 
 // Method to update question count and aggregated categories
@@ -131,13 +138,24 @@ QuestionBankSchema.methods.updateQuestionCountAndCategories = async function (
   // This method modifies the document. The caller is responsible for saving.
 };
 
-// Compound index for typical queries
+// Method to update questionCount. Could also update categories if needed.
+// This should be called after adding/removing questions from this bank.
+QuestionBankSchema.methods.updateQuestionCount = async function (
+  this: IQuestionBank
+) {
+  const count = await mongoose
+    .model("Question")
+    .countDocuments({ questionBankId: this._id });
+  this.questionCount = count;
+  // Potentially re-aggregate categories here too if they are dynamic based on questions
+  await this.save();
+};
+
+// Index for efficient querying by restaurant
 QuestionBankSchema.index({ restaurantId: 1, name: 1 });
-// Consider an index if querying by sourceType and sourceDocumentId is common
-QuestionBankSchema.index(
-  { restaurantId: 1, sourceType: 1, sourceDocumentId: 1 },
-  { sparse: true }
-);
+QuestionBankSchema.index({ restaurantId: 1, sourceType: 1 });
+QuestionBankSchema.index({ sourceSopDocumentId: 1 }, { sparse: true }); // Sparse if not all banks have SOPs
+QuestionBankSchema.index({ sourceMenuId: 1 }, { sparse: true }); // Sparse if not all banks have Menus
 
 const QuestionBankModel: Model<IQuestionBank> =
   mongoose.models.QuestionBank ||

@@ -10,13 +10,14 @@ import {
   changePassword,
   updateRestaurantProfile,
   deleteRestaurantAccount,
-} from "../../services/api";
+  PasswordChangeDataClient,
+} from "../../services/api.ts";
 
 // Context
 import { useAuth } from "../../context/AuthContext";
 
 // Types from API service
-import { PasswordChangeDataClient } from "../../services/api";
+// PasswordChangeDataClient is now imported directly above
 
 const RestaurantSettings: React.FC = () => {
   const { user, fetchUser, logout } = useAuth();

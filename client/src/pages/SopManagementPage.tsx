@@ -1,10 +1,13 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
+import React, {
+  useState,
+  useEffect,
+  ChangeEvent,
+  FormEvent,
+  useCallback,
+} from "react";
+import { ISopDocument, SopDocumentUploadData } from "../types/sopTypes"; // Use ISopDocument from sopTypes
 import {
-  ISopDocumentListItem, // Using the slimmer list item type
-  SopDocumentUploadData,
-} from "../types/sopManagement"; // Corrected path
-import {
-  listSopDocuments,
+  listRestaurantSopDocuments, // Changed from listSopDocuments
   uploadSopDocument,
   deleteSopDocument, // Added deleteSopDocument
   // getSopDocumentStatus // Might need this later for status polling
@@ -24,12 +27,15 @@ import {
   EyeIcon,
   ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline"; // Example icons
+import { useAuth } from "../context/AuthContext"; // Added for restaurantId
 
 const SopManagementPage: React.FC = () => {
-  const [sopDocuments, setSopDocuments] = useState<ISopDocumentListItem[]>([]);
+  const [sopDocuments, setSopDocuments] = useState<ISopDocument[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate(); // Initialize useNavigate
+  const { user } = useAuth(); // Get user from AuthContext
+  const restaurantId = user?.restaurantId; // Get restaurantId
 
   // Modal and Upload State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -42,13 +48,19 @@ const SopManagementPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
+    if (!restaurantId) {
+      setError("Restaurant information not available. Cannot load SOPs.");
+      setSopDocuments([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const response = await listSopDocuments();
-      // Assuming backend returns { data: ISopDocumentListItem[] } consistent with SopDocumentListResponse
-      setSopDocuments(response.data);
+      // listRestaurantSopDocuments in api.ts should return Promise<ISopDocument[]>
+      const responseData = await listRestaurantSopDocuments();
+      setSopDocuments(responseData || []);
     } catch (err: any) {
       console.error("Failed to fetch SOP documents:", err);
       setError(
@@ -56,84 +68,90 @@ const SopManagementPage: React.FC = () => {
           err.message ||
           "Failed to load SOP documents."
       );
+      setSopDocuments([]); // Clear documents on error
     }
     setIsLoading(false);
-  };
+  }, [restaurantId]);
 
   useEffect(() => {
     fetchDocuments();
+  }, [fetchDocuments]);
+
+  const handleUploadSop = useCallback(
+    async (title: string, description: string, file: File) => {
+      if (!title.trim() || !file) {
+        setUploadError("Please provide both a title and a file."); // Should be caught by modal, but good backup
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadError(null);
+      setUploadSuccess(null);
+
+      // SopDocumentUploadData now includes description
+      const uploadData: SopDocumentUploadData = {
+        title: title.trim(),
+        description: description.trim(),
+        sopDocument: file,
+      };
+
+      try {
+        const response = await uploadSopDocument(uploadData);
+        setUploadSuccess(
+          `Document "${response.document.title}" uploaded successfully. It will be processed shortly.`
+        );
+        fetchDocuments(); // Refresh the list
+        setIsUploadModalOpen(false); // Close modal on success
+      } catch (err: any) {
+        console.error("Failed to upload SOP document:", err);
+        setUploadError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to upload document."
+        );
+        // Do not close modal on error, let user see the error in modal
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [fetchDocuments]
+  );
+
+  const handleDeleteSopDocument = useCallback(
+    async (documentId: string, documentTitle: string) => {
+      if (
+        !window.confirm(`Are you sure you want to delete "${documentTitle}"?`)
+      ) {
+        return;
+      }
+      setDeletingId(documentId);
+      setDeleteError(null);
+      setDeleteSuccess(null);
+      try {
+        await deleteSopDocument(documentId);
+        setDeleteSuccess(`Document "${documentTitle}" deleted.`);
+        // Refresh the list by filtering out the deleted document
+        setSopDocuments((prevDocs) =>
+          prevDocs.filter((doc) => doc._id !== documentId)
+        );
+      } catch (err: any) {
+        console.error(`Failed to delete SOP document ${documentId}:`, err);
+        setDeleteError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to delete document."
+        );
+      }
+      setDeletingId(null);
+    },
+    []
+  );
+
+  // Memoized onClose handler for the modal
+  const handleModalClose = useCallback(() => {
+    setIsUploadModalOpen(false);
+    setUploadError(null); // Clear upload error when modal is manually closed
   }, []);
-
-  const handleUploadSop = async (
-    title: string,
-    description: string,
-    file: File
-  ) => {
-    if (!title.trim() || !file) {
-      setUploadError("Please provide both a title and a file."); // Should be caught by modal, but good backup
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadError(null);
-    setUploadSuccess(null);
-
-    // SopDocumentUploadData now includes description
-    const uploadData: SopDocumentUploadData = {
-      title: title.trim(),
-      description: description.trim(),
-      sopDocument: file,
-    };
-
-    try {
-      const response = await uploadSopDocument(uploadData);
-      setUploadSuccess(
-        `Document "${response.title}" uploaded successfully. It will be processed shortly.`
-      );
-      fetchDocuments(); // Refresh the list
-      setIsUploadModalOpen(false); // Close modal on success
-    } catch (err: any) {
-      console.error("Failed to upload SOP document:", err);
-      setUploadError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to upload document."
-      );
-      // Do not close modal on error, let user see the error in modal
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDeleteSopDocument = async (
-    documentId: string,
-    documentTitle: string
-  ) => {
-    if (
-      !window.confirm(`Are you sure you want to delete "${documentTitle}"?`)
-    ) {
-      return;
-    }
-    setDeletingId(documentId);
-    setDeleteError(null);
-    setDeleteSuccess(null);
-    try {
-      await deleteSopDocument(documentId);
-      setDeleteSuccess(`Document "${documentTitle}" deleted.`);
-      // Refresh the list by filtering out the deleted document
-      setSopDocuments((prevDocs) =>
-        prevDocs.filter((doc) => doc._id !== documentId)
-      );
-    } catch (err: any) {
-      console.error(`Failed to delete SOP document ${documentId}:`, err);
-      setDeleteError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to delete document."
-      );
-    }
-    setDeletingId(null);
-  };
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -214,7 +232,6 @@ const SopManagementPage: React.FC = () => {
                     {[
                       "Title",
                       "Description",
-                      "Type",
                       "Status",
                       "Uploaded At",
                       "Actions",
@@ -222,7 +239,9 @@ const SopManagementPage: React.FC = () => {
                       <th
                         key={header}
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                        className={`px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider ${
+                          header === "Actions" ? "text-right" : "text-left"
+                        }`}
                       >
                         {header}
                       </th>
@@ -247,24 +266,23 @@ const SopManagementPage: React.FC = () => {
                           <span className="italic text-slate-400">N/A</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                        {doc.fileType ? doc.fileType.toUpperCase() : "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             doc.status === "processed"
                               ? "bg-green-100 text-green-800"
-                              : doc.status === "error"
-                              ? "bg-red-100 text-red-800"
-                              : doc.status === "uploaded" ||
-                                doc.status === "parsing" ||
-                                doc.status === "categorizing"
+                              : doc.status === "processing" ||
+                                doc.status === "pending_processing" ||
+                                doc.status === "pending_upload"
                               ? "bg-yellow-100 text-yellow-800"
+                              : doc.status === "processing_error"
+                              ? "bg-red-100 text-red-800"
+                              : doc.status === "archived"
+                              ? "bg-gray-100 text-gray-800"
                               : "bg-slate-100 text-slate-800"
                           }`}
                         >
-                          {doc.status}
+                          {doc.status.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
@@ -276,16 +294,6 @@ const SopManagementPage: React.FC = () => {
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/sop-management/${doc._id}`);
-                          }}
-                          className="text-indigo-600 hover:text-indigo-900 transition-colors duration-150 ease-in-out p-1 rounded-md hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          title="View Document"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -333,10 +341,7 @@ const SopManagementPage: React.FC = () => {
       {isUploadModalOpen && (
         <SopUploadModal
           isOpen={isUploadModalOpen}
-          onClose={() => {
-            setIsUploadModalOpen(false);
-            setUploadError(null); // Clear upload error when modal is manually closed
-          }}
+          onClose={handleModalClose}
           onUpload={handleUploadSop}
           isUploading={isUploading}
           uploadError={uploadError}

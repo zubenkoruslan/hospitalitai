@@ -23,6 +23,7 @@ import SuccessNotification from "../components/common/SuccessNotification";
 import Card from "../components/common/Card";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent"; // For delete confirmations
 import Modal from "../components/common/Modal"; // A generic Modal component will be useful
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // Import chevron icons
 
 // Question Bank Components (Modals/Forms)
 import CreateQuestionBankForm from "../components/questionBank/CreateQuestionBankForm";
@@ -37,6 +38,9 @@ import QuizList from "../components/quiz/QuizList"; // Re-use existing QuizList
 import StaffQuizProgressModal from "../components/quiz/StaffQuizProgressModal"; // Added import
 import EditQuizModal from "../components/quiz/EditQuizModal"; // ADDED: Import EditQuizModal
 
+// Define SourceType for filter
+type QuestionBankSourceFilterType = "ALL" | "SOP" | "MENU" | "MANUAL";
+
 const QuizAndBankManagementPage: React.FC = () => {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId;
@@ -45,10 +49,22 @@ const QuizAndBankManagementPage: React.FC = () => {
   const [questionBanks, setQuestionBanks] = useState<IQuestionBank[]>([]);
   const [quizzes, setQuizzes] = useState<ClientIQuiz[]>([]);
 
+  // Add state for question bank filter
+  const [questionBankSourceFilter, setQuestionBankSourceFilter] =
+    useState<QuestionBankSourceFilterType>("ALL");
+
+  // State for Question Bank list visibility animation during filtering
+  const [isQuestionBankListVisible, setIsQuestionBankListVisible] =
+    useState<boolean>(true);
+
   const [isLoadingBanks, setIsLoadingBanks] = useState<boolean>(false);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // State for Question Banks section expansion
+  const [isQuestionBanksExpanded, setIsQuestionBanksExpanded] =
+    useState<boolean>(true);
 
   // Modal States - Question Banks
   const [isCreateBankModalOpen, setIsCreateBankModalOpen] = useState(false);
@@ -114,6 +130,16 @@ const QuizAndBankManagementPage: React.FC = () => {
     }
   }, []);
 
+  // Filtered Question Banks based on questionBankSourceFilter
+  const filteredQuestionBanks = React.useMemo(() => {
+    if (questionBankSourceFilter === "ALL") {
+      return questionBanks;
+    }
+    return questionBanks.filter(
+      (bank) => bank.sourceType === questionBankSourceFilter
+    );
+  }, [questionBanks, questionBankSourceFilter]);
+
   const fetchQuizzesList = useCallback(async () => {
     setIsLoadingQuizzes(true);
     setError(null);
@@ -148,10 +174,22 @@ const QuizAndBankManagementPage: React.FC = () => {
   }, [error, successMessage, staffProgressError]);
 
   // --- Handlers for Question Banks ---
-  const handleCreateBankSuccess = () => {
+  const handleCreateBankSuccess = (details: {
+    bankId: string;
+    sourceType: string;
+    generationMethod?: string;
+  }) => {
     setSuccessMessage("Question bank created successfully!");
     setIsCreateBankModalOpen(false);
-    fetchBanks();
+    fetchBanks(); // Refresh the list
+    if (
+      details.sourceType === "sop" &&
+      details.generationMethod === "manual" &&
+      details.bankId
+    ) {
+      // Navigate to manage questions page for this newly created manual SOP bank
+      navigate(`/question-banks/${details.bankId}`);
+    }
   };
 
   // const handleEditBankSuccess = (updatedBank: IQuestionBank) => { // Removed unused function
@@ -315,32 +353,45 @@ const QuizAndBankManagementPage: React.FC = () => {
     setIsEditQuizModalOpen(true);
   };
 
+  const handleQuestionBankFilterChange = (
+    type: QuestionBankSourceFilterType
+  ) => {
+    setIsQuestionBankListVisible(false); // Start fade out
+    setTimeout(() => {
+      setQuestionBankSourceFilter(type); // Change filter
+      setIsQuestionBankListVisible(true); // Start fade in with new content
+    }, 300); // Match this duration with CSS transition duration
+  };
+
   // Helper to render Question Bank List (Simplified for now)
   const renderQuestionBankList = () => {
-    if (isLoadingBanks && !questionBanks.length) return <LoadingSpinner />;
-    if (!questionBanks.length && !error && !isLoadingBanks)
+    if (isLoadingBanks) {
+      return <LoadingSpinner message="Loading question banks..." />;
+    }
+    // Use filteredQuestionBanks here
+    if (filteredQuestionBanks.length === 0) {
       return (
-        <Card className="p-4 text-center text-gray-500">
-          No question banks found. Create one to get started!
-        </Card>
+        <p className="text-center text-gray-500 py-4">
+          No question banks found{" "}
+          {questionBankSourceFilter !== "ALL"
+            ? `for filter: ${questionBankSourceFilter}`
+            : ""}
+          .
+        </p>
       );
+    }
+
     return (
-      <div className="space-y-4">
-        {isLoadingBanks && questionBanks.length > 0 && (
-          <div className="my-4 flex justify-center">
-            <LoadingSpinner />
-          </div>
-        )}
-        {questionBanks.map((bank) => (
-          <Card
-            key={bank._id}
-            className="bg-white shadow-lg rounded-xl p-4 md:p-5 hover:shadow-xl transition-shadow duration-300"
-          >
-            <div className="flex flex-col md:flex-row justify-between md:items-start gap-3 md:gap-4">
+      <ul className="divide-y divide-gray-200">
+        {filteredQuestionBanks.map((bank) => (
+          <li key={bank._id} className="px-4 py-4 sm:px-6">
+            <div className="flex items-center justify-between">
               <div className="flex-grow">
-                <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-1">
-                  {bank.name}
-                </h3>
+                <div className="flex items-center mb-1">
+                  <h3 className="text-lg md:text-xl font-semibold text-gray-800">
+                    {bank.name}
+                  </h3>
+                </div>
                 <p className="text-sm text-gray-600 mb-3 pr-0 md:pr-4">
                   {bank.description || (
                     <span className="italic text-gray-400">
@@ -349,17 +400,22 @@ const QuizAndBankManagementPage: React.FC = () => {
                   )}
                 </p>
 
+                {/* Display SOP Title if applicable */}
+                {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    <span className="font-medium">Linked SOP:</span>{" "}
+                    {bank.sourceSopDocumentTitle}
+                  </p>
+                )}
+                {/* Display Menu Name if applicable */}
+                {bank.sourceType === "MENU" && bank.sourceMenuName && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    <span className="font-medium">Linked Menu:</span>{" "}
+                    {bank.sourceMenuName}
+                  </p>
+                )}
+
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                  <div className="flex items-center">
-                    <span className="font-medium text-gray-600 mr-1">
-                      Categories:
-                    </span>
-                    <span>
-                      {bank.categories.join(", ") || (
-                        <span className="italic text-gray-400">N/A</span>
-                      )}
-                    </span>
-                  </div>
                   <div className="flex items-center">
                     <span className="font-medium text-gray-600 mr-1">
                       Questions:
@@ -390,9 +446,9 @@ const QuizAndBankManagementPage: React.FC = () => {
                 </Button>
               </div>
             </div>
-          </Card>
+          </li>
         ))}
-      </div>
+      </ul>
     );
   };
 
@@ -416,9 +472,30 @@ const QuizAndBankManagementPage: React.FC = () => {
 
         <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4 md:mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">
-              Question Banks
-            </h2>
+            <div
+              className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors duration-150 ease-in-out"
+              onClick={() =>
+                setIsQuestionBanksExpanded(!isQuestionBanksExpanded)
+              }
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setIsQuestionBanksExpanded(!isQuestionBanksExpanded);
+                }
+              }}
+              aria-expanded={isQuestionBanksExpanded}
+              aria-controls="question-banks-content"
+            >
+              <h2 className="text-2xl font-semibold text-gray-800 mr-3">
+                Question Banks
+              </h2>
+              {isQuestionBanksExpanded ? (
+                <ChevronUpIcon className="h-6 w-6 text-gray-700" />
+              ) : (
+                <ChevronDownIcon className="h-6 w-6 text-gray-700" />
+              )}
+            </div>
             <Button
               variant="primary"
               onClick={() => setIsCreateBankModalOpen(true)}
@@ -427,7 +504,44 @@ const QuizAndBankManagementPage: React.FC = () => {
               Create New Question Bank
             </Button>
           </div>
-          {renderQuestionBankList()}
+          {isQuestionBanksExpanded && (
+            <div id="question-banks-content">
+              {/* Filter UI for Question Banks */}
+              <div className="mb-4 flex justify-start items-center space-x-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Filter by source:
+                </span>
+                {(
+                  [
+                    "ALL",
+                    "SOP",
+                    "MENU",
+                    "MANUAL",
+                  ] as QuestionBankSourceFilterType[]
+                ).map((type) => (
+                  <Button
+                    key={type}
+                    variant={
+                      questionBankSourceFilter === type
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onClick={() => handleQuestionBankFilterChange(type)}
+                    className="px-2.5 py-1.5 text-xs"
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
+                  </Button>
+                ))}
+              </div>
+              <Card
+                className={`transition-opacity duration-300 ease-in-out ${
+                  isQuestionBankListVisible ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {renderQuestionBankList()}
+              </Card>
+            </div>
+          )}
         </div>
 
         <div className="bg-white shadow-lg rounded-xl p-6 mb-6">

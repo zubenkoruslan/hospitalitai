@@ -97,12 +97,11 @@ api.interceptors.response.use(
 // Import question bank types
 import {
   IQuestionBank,
-  CreateQuestionBankData,
+  CreateQuestionBankClientData,
   UpdateQuestionBankData,
   IQuestion,
   NewQuestionClientData,
   AiGenerationClientParams,
-  CreateQuestionBankFromMenuClientData,
   UpdateQuestionClientData,
   NewAiQuestionGenerationParams,
 } from "../types/questionBankTypes";
@@ -118,6 +117,9 @@ import {
   StaffDetailsData,
   Filters as StaffFilters, // Added alias if Filters is too generic
   ClientStaffMemberQuizProgressDetails, // ADDED IMPORT
+  // IStaff, // Commenting out - not found in staffTypes.ts
+  // StaffCreationData, // Commenting out - not found in staffTypes.ts
+  // StaffUpdateData, // Commenting out - not found in staffTypes.ts
 } from "../types/staffTypes";
 
 // Import User types (assuming a simple one for now)
@@ -160,14 +162,19 @@ import { IRestaurant as ServerIRestaurant } from "../../../server/src/models/Res
 import { IRole } from "../types/roleTypes";
 
 // Import SOP types
+import // ISopDocumentListItem, // Assuming this might be from the old sopManagement and not used by new functions
+// SopDocumentListResponse, // ^
+// SopDocumentDetailResponse, // ^
+// SopDocumentStatusResponse, // ^
+"../types/sopManagement"; // Commenting out old sopManagement imports if types are now in sopTypes
+
+// Import from sopTypes - consolidated import
 import {
   ISopDocument,
-  ISopDocumentListItem,
-  SopDocumentUploadData,
-  SopDocumentListResponse,
-  SopDocumentDetailResponse,
-  SopDocumentStatusResponse,
-} from "../types/sopManagement"; // Import SOP types
+  SopDocumentStatus,
+  SopDocumentUploadData, // Added SopDocumentUploadData here
+} from "../types/sopTypes";
+// Remove: import { ISopDocument as ISopDocumentType } from "../types/sopTypes"; // Removed duplicate/aliased import
 
 // Question Bank Endpoints
 
@@ -184,7 +191,7 @@ export const getQuestionBanks = async (): Promise<IQuestionBank[]> => {
  * @param data - The data for the new question bank.
  */
 export const createQuestionBank = async (
-  data: CreateQuestionBankData
+  data: CreateQuestionBankClientData
 ): Promise<IQuestionBank> => {
   const response = await api.post<{ data: IQuestionBank }>(
     "/question-banks",
@@ -293,7 +300,7 @@ export const generateAiQuestions = async (
 
 // Create a new question bank from a menu
 export const createQuestionBankFromMenu = async (
-  data: CreateQuestionBankFromMenuClientData
+  data: CreateQuestionBankClientData
 ): Promise<IQuestionBank> => {
   const response = await api.post<{
     message: string;
@@ -869,7 +876,7 @@ export const triggerAiQuestionGenerationProcess = async (
 // Function to fetch questions pending review
 export const getPendingReviewQuestions = async (): Promise<IQuestion[]> => {
   // Backend route GET /api/questions/pending-review uses authenticated user's restaurantId
-  const response = await api.get<{ data: IQuestion[] }>(
+  const response = await api.post<{ data: IQuestion[] }>(
     "/questions/pending-review"
   );
   return response.data.data; // Assuming backend wraps in a 'data' object like other question endpoints
@@ -926,6 +933,15 @@ export const changePassword = async (
   return response.data;
 };
 
+/**
+ * Deletes the currently authenticated user's account.
+ * @returns A promise resolving to an object with a message.
+ */
+export const deleteUserAccount = async (): Promise<{ message: string }> => {
+  const response = await api.delete<{ message: string }>("/auth/me");
+  return response.data;
+};
+
 // Restaurant Profile Endpoints
 // Client-side representation of restaurant data
 export interface ClientRestaurant {
@@ -969,6 +985,20 @@ export const updateRestaurantProfile = async (
   };
 };
 
+/**
+ * Deletes a restaurant account.
+ * @param restaurantId - The ID of the restaurant to delete.
+ * @returns A promise resolving to an object with a message.
+ */
+export const deleteRestaurantAccount = async (
+  restaurantId: string // Added a comment here
+): Promise<{ message: string }> => {
+  const response = await api.delete<{ message: string }>(
+    `/restaurants/${restaurantId}`
+  );
+  return response.data;
+};
+
 // Staff Invitation
 export interface InviteStaffData {
   email: string;
@@ -979,35 +1009,15 @@ export interface InviteStaffResponse {
   message: string;
 }
 
+/**
+ * Invites a new staff member to the restaurant.
+ * @param data - The email of the staff member to invite.
+ * @returns A promise resolving to the server response message.
+ */
 export const inviteStaff = async (
-  restaurantId: string,
-  inviteData: InviteStaffData
+  data: InviteStaffData
 ): Promise<InviteStaffResponse> => {
-  const response = await api.post<InviteStaffResponse>(
-    `/restaurants/${restaurantId}/staff/invite`,
-    inviteData
-  );
-  return response.data;
-};
-
-// Account Deletion
-export interface DeleteAccountResponse {
-  message: string;
-}
-
-// User self-deletes their account
-export const deleteUserAccount = async (): Promise<DeleteAccountResponse> => {
-  const response = await api.delete<DeleteAccountResponse>("/auth/me");
-  return response.data;
-};
-
-// Restaurant owner deletes their restaurant
-export const deleteRestaurantAccount = async (
-  restaurantId: string
-): Promise<DeleteAccountResponse> => {
-  const response = await api.delete<DeleteAccountResponse>(
-    `/restaurants/${restaurantId}`
-  );
+  const response = await api.post<InviteStaffResponse>("/staff/invite", data);
   return response.data;
 };
 
@@ -1015,26 +1025,23 @@ export const deleteRestaurantAccount = async (
 
 /**
  * Uploads a new SOP document.
- * @param data - The title and file for the SOP document.
+ * @param data - The title, file, and optional description for the SOP document.
  * @returns The initial SOP document data from the backend.
  */
 export const uploadSopDocument = async (
   data: SopDocumentUploadData
 ): Promise<{
   message: string;
-  documentId: string;
-  title: string;
-  status: string;
-  description?: string;
+  document: ISopDocument;
 }> => {
   const formData = new FormData();
   formData.append("title", data.title);
-  formData.append("sopDocument", data.sopDocument);
   if (data.description) {
     formData.append("description", data.description);
   }
+  // Corrected: Assuming SopDocumentUploadData has a field like 'sopDocument' for the file
+  formData.append("sopDocument", data.sopDocument); // Changed from data.sopDocumentFile
 
-  // The response from backend for upload is: { message, documentId, title, status, description? }
   const response = await api.post("/sop-documents/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
@@ -1047,10 +1054,23 @@ export const uploadSopDocument = async (
  * Lists all SOP documents for the current user's restaurant.
  * @returns A promise resolving to the list of SOP documents.
  */
-export const listSopDocuments = async (): Promise<SopDocumentListResponse> => {
-  const response = await api.get("/sop-documents");
-  return response.data;
-};
+export const listRestaurantSopDocuments =
+  async (): // restaurantId: string // No longer needed as backend uses authenticated user's restaurantId
+  Promise<ISopDocument[]> => {
+    // Corrected endpoint: GET /api/sop-documents (restaurantId implicitly handled by backend)
+    // Backend will use req.user.restaurantId from the auth token.
+    const response = await api.get<{ data: ISopDocument[] }>(`/sop-documents`);
+    // Adjust response data access based on your actual API structure.
+    // Common patterns: response.data.data, response.data.documents, or just response.data if it's the array itself.
+    if (response.data && Array.isArray((response.data as any).data)) {
+      return (response.data as any).data;
+    }
+    if (Array.isArray(response.data)) {
+      // Fallback if response.data is the array directly
+      return response.data as ISopDocument[];
+    }
+    return []; // Default to empty array if data is not in expected format
+  };
 
 /**
  * Fetches the details of a specific SOP document.
@@ -1059,9 +1079,11 @@ export const listSopDocuments = async (): Promise<SopDocumentListResponse> => {
  */
 export const getSopDocumentDetails = async (
   documentId: string
-): Promise<SopDocumentDetailResponse> => {
-  const response = await api.get(`/sop-documents/${documentId}`);
-  return response.data;
+): Promise<ISopDocument> => {
+  const response = await api.get<{ data: ISopDocument }>(
+    `/sop-documents/${documentId}`
+  );
+  return response.data.data || response.data; // Adjust based on actual API response structure
 };
 
 /**
@@ -1071,58 +1093,127 @@ export const getSopDocumentDetails = async (
  */
 export const deleteSopDocument = async (documentId: string): Promise<void> => {
   await api.delete(`/sop-documents/${documentId}`);
-  // DELETE typically returns 204 No Content, so no response.data to return here.
 };
 
 /**
- * Fetches the processing status of a specific SOP document.
- * @param documentId The ID of the SOP document.
- * @returns A promise that resolves to the document status details.
+ * Function to list SOP documents for a restaurant, filtered for question bank creation.
+ * @param restaurantId The ID of the restaurant.
+ * @returns A promise resolving to a list of processed SOP documents.
  */
-export const getSopDocumentStatus = async (
-  documentId: string
-): Promise<{
-  _id?: string;
-  title?: string;
-  uploadedAt?: Date; // Matches updated type
-  status: string; // SopDocumentStatus type would be better if strictly enforced from backend string enums
-  message?: string;
-}> => {
-  // Assuming the backend returns { data: { status, message, title, uploadedAt } }
+export const listSopDocumentsFiltered = async (
+  restaurantId: string // Kept for now, might be useful for client-side logic even if not sent to API
+): Promise<ISopDocument[]> => {
   const response = await api.get<{
-    data: {
-      _id?: string;
-      title?: string;
-      uploadedAt?: Date; // Expect Date directly or ISO string parseable by new Date()
-      status: string;
-      message?: string;
-    };
-  }>(`/sop-documents/${documentId}/status`);
-  return response.data.data; // Return the nested data object
+    data?: ISopDocument[];
+    documents?: ISopDocument[]; // For flexibility if backend changes wrapper key
+    // Or if the backend returns the array directly:
+    // ISopDocument[]
+  }>("/sop-documents", { params: { status: "processed" } }); // Corrected endpoint and params usage
+
+  // Adjust access to response.data based on your actual API structure.
+  // Assuming the backend returns an object with a 'data' or 'documents' key containing the array.
+  if (response.data && Array.isArray((response.data as any).data)) {
+    return (response.data as any).data;
+  }
+  if (response.data && Array.isArray((response.data as any).documents)) {
+    return (response.data as any).documents;
+  }
+  // Fallback if response.data is the array itself (less common for consistent APIs)
+  if (Array.isArray(response.data)) {
+    return response.data as ISopDocument[];
+  }
+  return [];
 };
 
-// --- SOP Document Editing Endpoints ---
+/**
+ * Triggers AI question generation for a specific SOP document.
+ * @param sopDocumentId The ID of the SOP document.
+ * @returns The updated SOP document with status PENDING or an error.
+ */
+export const triggerSopQuestionGeneration = async (
+  sopDocumentId: string
+): Promise<ISopDocument> => {
+  const response = await api.post<{
+    message: string;
+    sopDocument: ISopDocument;
+  }>(`/sop-documents/${sopDocumentId}/generate-questions`);
+  return response.data.sopDocument;
+};
 
 /**
- * Updates the title of an SOP document.
- * @param documentId The ID of the document.
- * @param title The new title.
+ * Data for creating a new SOP category.
+ */
+interface NewSopCategoryData {
+  name: string;
+  content: string;
+  parentCategoryId?: string | null;
+}
+
+/**
+ * Adds a category to a specific SOP document.
+ * @param documentId The ID of the SOP document.
+ * @param categoryData The data for the new category (name, content, parentCategoryId).
  * @returns The updated SOP document.
  */
-export const updateSopDocumentTitle = async (
+export const addSopCategory = async (
   documentId: string,
-  title: string
+  categoryData: NewSopCategoryData
 ): Promise<ISopDocument> => {
-  const response = await api.put<{
-    status: string;
-    data: ISopDocument;
-  }>(`/sop-documents/${documentId}/title`, { title });
-  return response.data.data;
+  const response = await api.post<{
+    message: string;
+    document: ISopDocument;
+  }>(`/sop-documents/${documentId}/categories`, categoryData);
+  return response.data.document;
 };
 
 /**
- * Updates the description of an SOP document.
- * @param documentId The ID of the document.
+ * Deletes a category from a specific SOP document.
+ * @param documentId The ID of the SOP document.
+ * @param categoryId The ID of the category to delete.
+ * @returns The updated SOP document.
+ */
+export const deleteSopCategory = async (
+  documentId: string,
+  categoryId: string
+): Promise<ISopDocument> => {
+  const response = await api.delete<{
+    message: string;
+    document: ISopDocument;
+  }>(`/sop-documents/${documentId}/categories/${categoryId}`);
+  return response.data.document;
+};
+
+/**
+ * Data for updating an existing SOP category.
+ */
+interface UpdateSopCategoryData {
+  name?: string;
+  content?: string;
+  parentCategoryId?: string | null; // Allow moving category
+}
+
+/**
+ * Updates a category within a specific SOP document.
+ * @param documentId The ID of the SOP document.
+ * @param categoryId The ID of the category to update.
+ * @param categoryData The data to update the category with.
+ * @returns The updated SOP document.
+ */
+export const updateSopCategory = async (
+  documentId: string,
+  categoryId: string,
+  categoryData: UpdateSopCategoryData
+): Promise<ISopDocument> => {
+  const response = await api.patch<{
+    message: string;
+    document: ISopDocument;
+  }>(`/sop-documents/${documentId}/categories/${categoryId}`, categoryData);
+  return response.data.document;
+};
+
+/**
+ * Updates the description of a specific SOP document.
+ * @param documentId The ID of the SOP document.
  * @param description The new description.
  * @returns The updated SOP document.
  */
@@ -1130,71 +1221,29 @@ export const updateSopDocumentDescription = async (
   documentId: string,
   description: string
 ): Promise<ISopDocument> => {
-  const response = await api.put<{
-    status: string;
-    data: ISopDocument;
-  }>(`/sop-documents/${documentId}/description`, { description });
-  return response.data.data;
+  const response = await api.patch<{
+    message: string;
+    document: ISopDocument;
+  }>(`/sop-documents/${documentId}`, { description });
+  return response.data.document;
 };
 
 /**
- * Adds a category to an SOP document.
- * @param documentId The ID of the document.
- * @param categoryData Contains name, content, and optional parentCategoryId.
+ * Updates the title of a specific SOP document.
+ * @param documentId The ID of the SOP document.
+ * @param title The new title.
  * @returns The updated SOP document.
  */
-export const addSopCategory = async (
+export const updateSopDocumentTitle = async (
   documentId: string,
-  categoryData: {
-    name: string;
-    content: string;
-    parentCategoryId?: string | null;
-  }
+  title: string
 ): Promise<ISopDocument> => {
-  const response = await api.post<{
-    status: string;
-    data: ISopDocument;
-  }>(`/sop-documents/${documentId}/categories`, categoryData);
-  return response.data.data;
+  const response = await api.patch<{
+    message: string;
+    document: ISopDocument;
+  }>(`/sop-documents/${documentId}`, { title });
+  return response.data.document;
 };
 
-/**
- * Updates an existing category in an SOP document.
- * @param documentId The ID of the document.
- * @param categoryId The ID of the category to update.
- * @param updates Contains the name and/or content to update.
- * @returns The updated SOP document.
- */
-export const updateSopCategory = async (
-  documentId: string,
-  categoryId: string,
-  updates: { name?: string; content?: string }
-): Promise<ISopDocument> => {
-  const response = await api.put<{
-    status: string;
-    data: ISopDocument;
-  }>(`/sop-documents/${documentId}/categories/${categoryId}`, updates);
-  return response.data.data;
-};
-
-/**
- * Deletes a category from an SOP document.
- * @param documentId The ID of the document.
- * @param categoryId The ID of the category to delete.
- * @returns The updated SOP document (backend returns the full document post-update).
- */
-export const deleteSopCategory = async (
-  documentId: string,
-  categoryId: string
-): Promise<ISopDocument> => {
-  const response = await api.delete<{
-    status: string;
-    data: ISopDocument;
-  }>(`/sop-documents/${documentId}/categories/${categoryId}`);
-  return response.data.data;
-};
-
-// === End SOP Document Management API ===
-
-// Default export
+// Make the Axios instance available as a default export
 export default api;

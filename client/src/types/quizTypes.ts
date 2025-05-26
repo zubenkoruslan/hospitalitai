@@ -31,6 +31,8 @@ export interface ClientIQuiz {
   description?: string;
   restaurantId: string;
   sourceQuestionBankIds: string[];
+  sopDocumentId?: string; // Added for SOP source
+  sopDocumentTitle?: string; // Added for SOP source title
   totalUniqueQuestionsInSourceSnapshot?: number;
   numberOfQuestionsPerAttempt: number;
   isAvailable?: boolean;
@@ -44,7 +46,8 @@ export interface ClientIQuiz {
 export interface GenerateQuizFromBanksClientData {
   title: string;
   description?: string;
-  questionBankIds: string[];
+  questionBankIds?: string[]; // Made optional
+  sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
   targetRoles?: string[]; // Added for target roles selection
 }

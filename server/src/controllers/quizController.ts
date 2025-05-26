@@ -22,6 +22,7 @@ export const generateQuizFromBanksController = async (
       title,
       description,
       questionBankIds,
+      sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
       targetRoles,
     } = req.body as GenerateQuizFromBanksRequestBody;
@@ -40,6 +41,7 @@ export const generateQuizFromBanksController = async (
       description,
       restaurantId,
       questionBankIds,
+      sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
       targetRoles: targetRoles
         ? targetRoles.map((id) => new mongoose.Types.ObjectId(id))

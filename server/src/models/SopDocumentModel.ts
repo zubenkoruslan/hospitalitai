@@ -10,6 +10,14 @@ export interface ISopCategory {
   subCategories?: ISopCategory[]; // Recursive definition for sub-categories
 }
 
+// Enum for Question Generation Status
+export enum QuestionGenerationStatus {
+  NONE = "NONE",
+  PENDING = "PENDING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
 // Interface for the SopDocument document
 export interface ISopDocument extends Document {
   _id: Types.ObjectId;
@@ -25,6 +33,9 @@ export interface ISopDocument extends Document {
   categories: ISopCategory[];
   errorMessage?: string; // To store any error message during processing
   description?: string; // Added description
+  // Fields for question bank integration
+  questionGenerationStatus: QuestionGenerationStatus;
+  questionBankId?: Types.ObjectId | null; // Nullable reference to QuestionBank
 }
 
 const SopCategorySchema: Schema<ISopCategory> = new Schema({
@@ -98,6 +109,18 @@ const SopDocumentSchema: Schema<ISopDocument> = new Schema(
     },
     errorMessage: {
       type: String,
+    },
+    // Fields for question bank integration
+    questionGenerationStatus: {
+      type: String,
+      enum: Object.values(QuestionGenerationStatus),
+      default: QuestionGenerationStatus.NONE,
+    },
+    questionBankId: {
+      type: Schema.Types.ObjectId,
+      ref: "QuestionBank",
+      default: null,
+      index: true, // Add index if you query by this often
     },
   },
   {

@@ -26,18 +26,23 @@ export interface IQuestion {
   updatedAt: string;
 }
 
-// Corresponds to QuestionBankModel.ts on the backend
+// Main interface for a Question Bank document on the client-side
 export interface IQuestionBank {
   _id: string;
   name: string;
   description?: string;
-  restaurantId: string;
-  questions: IQuestion[] | string[]; // Can be populated or just IDs
+  restaurantId: string; // Assuming this is always populated or available
+  sourceType: "SOP" | "MENU" | "MANUAL"; // Added sourceType
+  sourceSopDocumentId?: string | null; // Added for SOP source
+  sourceSopDocumentTitle?: string; // Added for SOP source, if backend provides it
+  sourceMenuId?: string | null; // Added for Menu source
+  sourceMenuName?: string; // Added for Menu source, if backend provides it
+  categories: string[];
+  questions: string[]; // Array of question IDs
   questionCount: number;
-  categories: string[]; // Aggregate from questions
-  createdBy: string; // User ID
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string; // Date as string
+  updatedAt: string; // Date as string
+  // createdBy?: string; // Optional: if you need to display who created it
 }
 
 // For creating a new question bank
@@ -64,18 +69,34 @@ export interface AiGenerationClientParams {
 
 // Specific AI params for creating bank from menu (subset of AiGenerationClientParams)
 export interface MenuAiGenerationClientParams {
-  targetQuestionCount: number;
-  geminiModelName?: string;
+  targetQuestionCount?: number;
+  // geminiModelName?: string;
+  // selectedFocusAreas?: string[];
+  // difficultyLevel?: string;
+  // questionTypes?: string[];
 }
 
-// Data for creating a question bank from a menu
-export interface CreateQuestionBankFromMenuClientData {
+// This will be the main type for creating any question bank from the client
+export interface CreateQuestionBankClientData {
   name: string;
   description?: string;
-  menuId: string; // Menu ObjectId as string
-  selectedCategoryNames: string[];
-  generateAiQuestions?: boolean;
-  aiParams?: MenuAiGenerationClientParams;
+  restaurantId: string; // Assuming client always knows this now
+
+  sourceType: "MANUAL" | "MENU" | "SOP"; // Changed to uppercase
+
+  // For Menu source
+  sourceMenuId?: string;
+  // selectedCategoryNames from menu are effectively the bank's initial categories
+  categories?: string[]; // Used by menu and SOP source types for initial categories
+
+  // For SOP source
+  sourceSopDocumentId?: string;
+  generationMethod?: "ai" | "manual"; // Specific to SOP source
+
+  // Note: AI generation parameters for menu (like targetQuestionCount)
+  // are not directly part of this top-level type anymore.
+  // If createQuestionBankFromMenu service on backend handles AI params,
+  // they would be passed there, not to the generic /question-banks endpoint directly.
 }
 
 // For creating an individual question manually (client-side)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import Modal from "../common/Modal"; // Assuming Modal is in common
-import { ISopCategory } from "../../types/sopManagement";
+import { ISopCategory } from "../../types/sopTypes";
 
 export interface CategoryFormData {
   name: string;
@@ -35,7 +35,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       if ((mode === "edit" || mode === "addSub") && initialData) {
         if (mode === "edit") {
           setName(initialData.name);
-          setContent(initialData.content);
+          setContent(initialData.content || "");
         } else {
           // 'addSub' - parent's data is initialData, new subcategory is blank
           setName("");

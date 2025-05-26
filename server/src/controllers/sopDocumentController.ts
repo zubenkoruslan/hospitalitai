@@ -79,8 +79,13 @@ export class SopDocumentController {
       const restaurantObjectId = new mongoose.Types.ObjectId(
         req.user.restaurantId
       );
+
+      // Get status from query parameters
+      const status = req.query.status as string | undefined;
+
       const documents = await SopDocumentService.listRestaurantSopDocuments(
-        restaurantObjectId
+        restaurantObjectId,
+        status // Pass status to the service method
       );
       res.status(200).json({
         status: "success",

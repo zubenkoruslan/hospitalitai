@@ -296,17 +296,44 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                       htmlFor={`modal-bank-${bank._id}`}
                       className="ml-3 flex-1 cursor-pointer"
                     >
+                      <div className="flex items-center">
+                        <span
+                          className={`block text-sm font-medium ${
+                            isLoading || isLoadingBanks || isLoadingRoles
+                              ? "text-slate-400"
+                              : "text-slate-800"
+                          }`}
+                        >
+                          {bank.name}
+                        </span>
+                        {bank.sourceType === "SOP" && (
+                          <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                            SOP Based
+                          </span>
+                        )}
+                      </div>
                       <span
-                        className={`block text-sm font-medium ${
+                        className={`block text-xs ${
                           isLoading || isLoadingBanks || isLoadingRoles
                             ? "text-slate-400"
-                            : "text-slate-800"
+                            : "text-slate-600"
                         }`}
                       >
-                        {bank.name} (
-                        {bank.questions?.length || bank.questionCount || 0}{" "}
+                        ({bank.questions?.length || bank.questionCount || 0}{" "}
                         questions)
                       </span>
+                      {bank.sourceType === "SOP" &&
+                        bank.sourceSopDocumentTitle && (
+                          <p
+                            className={`text-xs mt-0.5 ${
+                              isLoading || isLoadingBanks || isLoadingRoles
+                                ? "text-slate-400"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            SOP: {bank.sourceSopDocumentTitle}
+                          </p>
+                        )}
                       {bank.description && (
                         <p
                           className={`text-xs mt-0.5 ${

@@ -253,31 +253,59 @@ export const validateGenerateQuizFromBanksBody: ValidationChain[] = [
     .isString()
     .trim()
     .notEmpty(), // If provided, it cannot be empty
-  body(
-    "questionBankIds",
-    "questionBankIds must be an array of at least one valid MongoDB ObjectId string"
-  )
-    .isArray({ min: 1 })
-    .withMessage(
-      "At least one question bank ID must be provided in the array."
-    ),
+
+  // Validate sourceSopDocumentId if provided
+  body("sourceSopDocumentId")
+    .optional()
+    .isMongoId()
+    .withMessage("sourceSopDocumentId must be a valid MongoDB ObjectId string"),
+
+  // Conditional validation for questionBankIds
+  body("questionBankIds")
+    .optional() // Make it optional at the top level
+    .isArray()
+    .withMessage("questionBankIds must be an array if provided")
+    .custom((value, { req }) => {
+      const sourceSopId = req.body.sourceSopDocumentId;
+      const bankIds = value;
+
+      if (sourceSopId) {
+        // If sourceSopDocumentId is present, questionBankIds is truly optional (can be empty or not provided)
+        if (bankIds && bankIds.length > 0) {
+          // If bankIds are also provided with SOP ID, they might be ignored by service, or could be an error.
+          // For now, let's allow it, service will prioritize SOP ID.
+          // Or, throw new Error('Cannot provide both sourceSopDocumentId and questionBankIds.');
+        }
+        return true;
+      }
+      // If sourceSopDocumentId is NOT present, questionBankIds becomes mandatory and must not be empty
+      if (!bankIds || bankIds.length === 0) {
+        throw new Error(
+          "Either sourceSopDocumentId or a non-empty array of questionBankIds must be provided."
+        );
+      }
+      return true;
+    }),
   body(
     "questionBankIds.*",
     "Each questionBankId must be a valid MongoDB ObjectId string"
-  ).isMongoId(),
+  ) // This will only run if questionBankIds is an array and not empty
+    .if(
+      body("questionBankIds").exists({ checkFalsy: false }).isArray({ min: 1 })
+    ) // Ensure it's an array with items before validating elements
+    .isMongoId(),
+
   body(
     "numberOfQuestionsPerAttempt",
     "numberOfQuestionsPerAttempt is required and must be a positive integer"
   )
     .isInt({ min: 1 })
     .toInt(),
-  // Added validation for targetRoles during quiz generation from banks
   body("targetRoles")
     .optional()
     .isArray()
     .withMessage("targetRoles must be an array of role IDs"),
   body("targetRoles.*")
-    // .optional() // Not needed here, if targetRoles is present, its elements are validated
     .isMongoId()
     .withMessage(
       "Each targetRole ID in targetRoles must be a valid MongoDB ObjectId string"
@@ -393,6 +421,14 @@ export const validateCreateQuestionBankBody: ValidationChain[] = [
     .optional()
     .isString()
     .trim(),
+  body(
+    "restaurantId",
+    "Restaurant ID is required and must be a valid MongoDB ObjectId"
+  ).isMongoId(),
+  body(
+    "sourceType",
+    "Source type is required and must be one of SOP, MENU, MANUAL"
+  ).isIn(["SOP", "MENU", "MANUAL"]),
   body("categories", "Categories must be an array of strings")
     .optional()
     .isArray(),
@@ -408,6 +444,28 @@ export const validateCreateQuestionBankBody: ValidationChain[] = [
     .optional()
     .isInt({ min: 1 })
     .toInt(),
+
+  // Conditional validation for SOP source
+  body("sourceSopDocumentId")
+    .if(body("sourceType").equals("SOP"))
+    .isMongoId()
+    .withMessage(
+      "sourceSopDocumentId is required and must be a valid MongoDB ObjectId for SOP sourceType"
+    ),
+  body("generationMethod")
+    .if(body("sourceType").equals("SOP"))
+    .isIn(["AI", "MANUAL"])
+    .withMessage(
+      "generationMethod is required and must be 'AI' or 'MANUAL' for SOP sourceType"
+    ),
+
+  // Conditional validation for MENU source
+  body("sourceMenuId")
+    .if(body("sourceType").equals("MENU"))
+    .isMongoId()
+    .withMessage(
+      "sourceMenuId is required and must be a valid MongoDB ObjectId for MENU sourceType"
+    ),
 ];
 
 export const validateUpdateQuestionBankBody: ValidationChain[] = [

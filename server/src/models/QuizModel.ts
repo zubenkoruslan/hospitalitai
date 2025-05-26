@@ -6,6 +6,7 @@ export interface IQuiz extends Document {
   description: string;
   restaurantId: Types.ObjectId;
   sourceQuestionBankIds: Types.ObjectId[];
+  sopDocumentId?: Types.ObjectId | null;
   totalUniqueQuestionsInSourceSnapshot: number;
   numberOfQuestionsPerAttempt: number;
   isAvailable?: boolean;
@@ -38,6 +39,11 @@ const QuizSchema: Schema<IQuiz> = new Schema(
         ref: "QuestionBank",
       },
     ],
+    sopDocumentId: {
+      type: Schema.Types.ObjectId,
+      ref: "SopDocument",
+      required: false,
+    },
     totalUniqueQuestionsInSourceSnapshot: {
       type: Number,
       default: 0,

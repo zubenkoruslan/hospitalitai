@@ -1,5 +1,9 @@
 import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel";
-import QuestionModel from "../models/QuestionModel";
+import QuestionModel, {
+  IQuestion,
+  QuestionType,
+  IOption,
+} from "../models/QuestionModel";
 // import MenuItemModel, { IMenuItem } from "../models/MenuItem"; // This line should be removed
 // import { // This block should be removed
 //   generateAiQuestionsService,
@@ -7,8 +11,12 @@ import QuestionModel from "../models/QuestionModel";
 // } from "./questionService";
 import { AppError } from "../utils/errorHandler";
 import mongoose from "mongoose";
-import MenuModel from "../models/MenuModel"; // Import MenuModel
-import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
+import MenuModel, { IMenu } from "../models/MenuModel"; // Added IMenu import
+import SopDocumentModel, {
+  ISopDocument,
+  QuestionGenerationStatus,
+} from "../models/SopDocumentModel"; // Added import for SopDocumentModel
+import { generateQuestionsFromSopText, IGeneratedQuestion } from "./aiService";
 
 // Define an interface for the data expected by createQuestionBankService
 // This should align with what the controller will pass from req.body
@@ -18,6 +26,7 @@ export interface CreateQuestionBankData {
   categories?: string[]; // Made categories optional
   targetQuestionCount?: number; // Added targetQuestionCount
   restaurantId: mongoose.Types.ObjectId; // Assuming restaurantId will be passed by controller
+  sourceType?: "MANUAL" | "SOP" | "MENU"; // Added optional sourceType
 }
 
 // Define an interface for the data expected by updateQuestionBankService
@@ -52,6 +61,34 @@ export interface CreateQuestionBankFromSopData {
   sopDocumentId: mongoose.Types.ObjectId;
   selectedCategoryNames: string[]; // Names of categories from the SOP document
   // aiParams could be added here if AI generation directly from bank creation is desired
+}
+
+// Interface for data passed to createQuestionBankFromSOP
+interface BankDetails {
+  name: string;
+  description?: string;
+  categories?: string[];
+  restaurantId: string;
+}
+
+// Interface for the structure of options when creating new questions
+interface NewOption {
+  text: string;
+  isCorrect: boolean;
+  _id?: mongoose.Types.ObjectId;
+}
+
+// Interface for the structure of questions when creating new questions
+interface NewQuestion {
+  questionText: string;
+  options: NewOption[];
+  questionType: QuestionType;
+  categories: string[];
+  restaurantId: mongoose.Types.ObjectId;
+  questionBankId: mongoose.Types.ObjectId;
+  createdBy: "ai" | "manual";
+  status: "active" | "pending_review" | "rejected";
+  explanation?: string;
 }
 
 // Placeholder for createQuestionBankService
@@ -309,7 +346,7 @@ export const createQuestionBankFromMenuService = async (
   }
 
   // === BEGIN ADDED VALIDATION ===
-  const menu = await MenuModel.findOne({
+  const menu = await MenuModel.findOne<IMenu>({
     _id: menuId,
     restaurantId: restaurantId,
     isActive: true,
@@ -336,6 +373,9 @@ export const createQuestionBankFromMenuService = async (
       name,
       description: description || "",
       restaurantId,
+      sourceType: "MENU", // Set sourceType to MENU
+      sourceMenuId: menu._id, // Use menu._id (it's an ObjectId)
+      sourceMenuName: menu.name, // Use the fetched menu's name
       categories: selectedCategoryNames, // Set categories from selected menu categories
       questions: [], // Initialize with no questions
       createdBy: restaurantId, // Assuming the user creating it owns the restaurant
@@ -586,13 +626,11 @@ export const createBankFromSopDocumentService = async (
       name,
       description,
       restaurantId,
-      sourceType: "sop_document",
-      sourceDocumentId: sopDocumentId,
-      sourceTypeRef: "SopDocument", // Matches the Mongoose model name for ISopDocument
-      selectedCategories: selectedCategoryNames.map((name) => ({ name })),
+      sourceType: "SOP",
+      sourceSopDocumentId: sopDocumentId,
+      categories: selectedCategoryNames,
       questions: [], // Initially no questions
       questionCount: 0,
-      // categories: [] // This field in QuestionBankModel is for categories derived from its own questions, initially empty.
     });
 
     await newQuestionBank.save();
@@ -613,4 +651,197 @@ export const createBankFromSopDocumentService = async (
       500
     );
   }
+};
+
+/**
+ * Processes the AI question generation asynchronously.
+ * This function is intended to be called without awaiting its completion from the main request flow.
+ */
+async function processAiQuestionGeneration(
+  questionBank: IQuestionBank,
+  sopDocument: ISopDocument,
+  numberOfQuestions: number = 10
+) {
+  try {
+    if (!sopDocument.extractedText) {
+      console.error(`SOP document ${sopDocument._id} has no extracted text.`);
+      // Ensure sopDocument is saved if modified before throwing
+      sopDocument.questionGenerationStatus = QuestionGenerationStatus.FAILED;
+      sopDocument.errorMessage =
+        "SOP document has no extracted text for question generation.";
+      await sopDocument.save();
+      throw new AppError(
+        "SOP document has no extracted text for question generation.",
+        400
+      );
+    }
+
+    const generatedAiQuestions: IGeneratedQuestion[] =
+      await generateQuestionsFromSopText(
+        sopDocument.extractedText,
+        numberOfQuestions
+      );
+
+    if (generatedAiQuestions && generatedAiQuestions.length > 0) {
+      const questionsToCreate: NewQuestion[] = generatedAiQuestions.map(
+        (gq) => ({
+          questionText: gq.questionText,
+          // Ensure options are plain objects, Mongoose handles _id for subdocuments if not provided
+          options: gq.options.map((opt) => ({
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+          })),
+          questionType: "multiple-choice-single",
+          categories: questionBank.categories || [], // Use categories from the bank
+          restaurantId: new mongoose.Types.ObjectId(
+            questionBank.restaurantId.toString()
+          ),
+          questionBankId: questionBank._id,
+          createdBy: "ai",
+          status: "active",
+        })
+      );
+
+      await QuestionModel.insertMany(questionsToCreate);
+
+      // Fetch the bank again to ensure we have the latest version and correct Mongoose instance
+      const bankToUpdate = await QuestionBankModel.findById(questionBank._id);
+      if (bankToUpdate) {
+        // updateQuestionCount is defined in QuestionBankModel.ts and should be available
+        await bankToUpdate.updateQuestionCount();
+      } else {
+        console.error(
+          `Failed to find question bank ${questionBank._id} for updating count after AI generation`
+        );
+        // If bank cannot be found, it's a critical issue, SOP status might remain PENDING incorrectly.
+        // Consider how to handle this scenario. For now, the SOP status update below will proceed.
+      }
+    } else {
+      console.log(
+        `AI generated no questions for SOP: ${sopDocument.title}, Bank: ${questionBank.name}`
+      );
+      // If no questions are generated, it might still be considered 'COMPLETED' in terms of process,
+      // but the bank will be empty. This depends on desired behavior.
+    }
+
+    // Update SOP document status regardless of whether questions were generated (if process didn't error out)
+    sopDocument.questionGenerationStatus = QuestionGenerationStatus.COMPLETED;
+    sopDocument.errorMessage = undefined; // Clear previous error message if any
+    await sopDocument.save();
+    console.log(
+      `AI Question generation process finished for SOP: ${sopDocument.title}, Bank: ${questionBank.name}. Status: ${sopDocument.questionGenerationStatus}`
+    );
+  } catch (error) {
+    console.error(
+      `Error during AI question generation for SOP ${sopDocument._id} (Bank ${questionBank._id}):`,
+      error
+    );
+
+    // Ensure sopDocument is a Mongoose document before trying to save
+    const currentSopDoc = await SopDocumentModel.findById(sopDocument._id);
+    if (currentSopDoc) {
+      currentSopDoc.questionGenerationStatus = QuestionGenerationStatus.FAILED;
+      if (error instanceof AppError) {
+        currentSopDoc.errorMessage = `AI Generation Error: ${error.message}`;
+      } else if (error instanceof Error) {
+        currentSopDoc.errorMessage = `AI Generation Error: ${error.message}`;
+      } else {
+        currentSopDoc.errorMessage =
+          "An unknown error occurred during AI question generation.";
+      }
+      await currentSopDoc.save();
+    } else {
+      console.error(
+        `Failed to find SOP document ${sopDocument._id} to mark as FAILED after AI error.`
+      );
+    }
+  }
+}
+
+export const createQuestionBankFromSOP = async (
+  bankDetails: BankDetails,
+  sopDocumentId: string,
+  generationMethod: "AI" | "MANUAL" = "MANUAL"
+): Promise<IQuestionBank> => {
+  const sopDocument = await SopDocumentModel.findById(sopDocumentId);
+  if (!sopDocument) {
+    throw new AppError(`SOP Document with ID ${sopDocumentId} not found`, 404);
+  }
+
+  if (
+    sopDocument.questionBankId &&
+    (sopDocument.questionGenerationStatus ===
+      QuestionGenerationStatus.PENDING ||
+      sopDocument.questionGenerationStatus ===
+        QuestionGenerationStatus.COMPLETED)
+  ) {
+    throw new AppError(
+      `SOP ${sopDocument.title} is already linked to an active or completed question bank (${sopDocument.questionBankId}). Please resolve or use a different SOP.`,
+      409
+    );
+  }
+
+  const questionBank = new QuestionBankModel({
+    name: bankDetails.name,
+    description: bankDetails.description,
+    restaurantId: bankDetails.restaurantId,
+    sourceType: "SOP",
+    sourceSopDocumentId: sopDocument._id,
+    sourceSopDocumentTitle: sopDocument.title,
+    categories: bankDetails.categories || [],
+    questions: [],
+    questionCount: 0,
+  });
+
+  await questionBank.save();
+
+  sopDocument.questionBankId = questionBank._id;
+  sopDocument.errorMessage = undefined; // Clear any previous errors
+
+  if (generationMethod === "AI") {
+    sopDocument.questionGenerationStatus = QuestionGenerationStatus.PENDING;
+    await sopDocument.save();
+
+    // Intentionally not awaiting processAiQuestionGeneration
+    processAiQuestionGeneration(questionBank, sopDocument).catch(
+      async (initiationError) => {
+        console.error(
+          `Critical failure initiating AI question generation for SOP ${sopDocument._id}, Bank ${questionBank._id}:`,
+          initiationError
+        );
+        // This catch is for errors in processAiQuestionGeneration *itself* or its immediate invocation,
+        // not for errors *within* the async AI process (which handles its own SOP status updates).
+        // However, if the initiation fails so badly that processAiQuestionGeneration doesn't even start to update status,
+        // we should mark the SOP as FAILED here.
+        try {
+          const freshSopDoc = await SopDocumentModel.findById(sopDocument._id);
+          if (
+            freshSopDoc &&
+            freshSopDoc.questionGenerationStatus ===
+              QuestionGenerationStatus.PENDING
+          ) {
+            freshSopDoc.questionGenerationStatus =
+              QuestionGenerationStatus.FAILED;
+            freshSopDoc.errorMessage =
+              "Failed to start AI question generation process due to an unexpected error.";
+            await freshSopDoc.save();
+          }
+        } catch (saveErr) {
+          console.error(
+            `Error saving SOP document ${sopDocument._id} after AI initiation failure:`,
+            saveErr
+          );
+        }
+      }
+    );
+
+    return questionBank;
+  } else if (generationMethod === "MANUAL") {
+    sopDocument.questionGenerationStatus = QuestionGenerationStatus.NONE;
+    await sopDocument.save();
+    return questionBank;
+  }
+
+  // This should ideally not be reached if generationMethod is validated at route level
+  throw new AppError("Invalid question generation method specified.", 400);
 };

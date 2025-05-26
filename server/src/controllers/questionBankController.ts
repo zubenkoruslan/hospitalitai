@@ -9,48 +9,176 @@ import {
   CreateQuestionBankFromSopData,
 } from "../services/questionBankService";
 import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
-import QuestionBankModel from "../models/QuestionBankModel"; // Import QuestionBankModel
+import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel"; // Import QuestionBankModel and IQuestionBank
 import AiQuestionService, {
   GenerateQuestionsFromSopParams,
 } from "../services/AiQuestionService"; // Import AiQuestionService and relevant types
+import asyncHandler from "express-async-handler"; // Assuming you use this for cleaner async routes
+import { validationResult } from "express-validator";
+import { body } from "express-validator";
+
+// Validation rules for creating a question bank
+export const validateCreateQuestionBank = [
+  body("name").trim().notEmpty().withMessage("Bank name is required."),
+  body("sourceType")
+    .isIn(["SOP", "MENU", "MANUAL"])
+    .withMessage("Invalid sourceType."),
+  body("restaurantId")
+    .isMongoId()
+    .withMessage("Valid restaurantId is required."),
+  // Conditional validation for SOP
+  body("sourceSopDocumentId")
+    .if(body("sourceType").equals("SOP"))
+    .isMongoId()
+    .withMessage("Valid sourceSopDocumentId is required for SOP type."),
+  body("generationMethod")
+    .if(body("sourceType").equals("SOP"))
+    .isIn(["AI", "MANUAL"])
+    .withMessage("Invalid generationMethod for SOP type."),
+  // Conditional validation for MENU (example)
+  body("sourceMenuId")
+    .if(body("sourceType").equals("MENU"))
+    .isMongoId()
+    .withMessage("Valid sourceMenuId is required for MENU type."),
+  // Optional fields
+  body("description").optional().trim(),
+  body("categories")
+    .optional()
+    .isArray()
+    .withMessage("Categories must be an array of strings."),
+  body("categories.*").optional().isString().trim(),
+];
 
 // Placeholder for createQuestionBank
-export const createQuestionBank = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { name, description, categories, targetQuestionCount } = req.body;
-
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
+export const createQuestionBank = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array() });
+      return;
     }
-    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
-    const bankData: QuestionBankService.CreateQuestionBankData = {
+    const {
       name,
       description,
-      categories: categories || [],
-      targetQuestionCount,
+      sourceType,
+      sourceSopDocumentId,
+      sourceMenuId,
+      categories,
+      generationMethod: rawGenerationMethod,
       restaurantId,
+    } = req.body;
+
+    // Determine the actual generationMethod, defaulting to MANUAL for SOP if not provided
+    let generationMethod: "AI" | "MANUAL" | undefined = rawGenerationMethod;
+    if (sourceType === "SOP" && rawGenerationMethod === undefined) {
+      generationMethod = "MANUAL";
+    }
+
+    // const userId = (req as any).user?._id; // Example: Get userId if available from auth middleware
+
+    const bankDetails = {
+      name,
+      description: description || undefined,
+      categories: categories || [],
+      restaurantId,
+      // userId, // Pass if your service/model expects it
     };
 
-    const newBank = await QuestionBankService.createQuestionBankService(
-      bankData
-    );
+    let newBank: IQuestionBank;
 
-    res.status(201).json({
-      status: "success",
-      message: "Question bank created successfully.",
-      data: newBank,
-    });
-  } catch (error) {
-    next(error);
+    try {
+      if (sourceType === "SOP") {
+        if (!sourceSopDocumentId) {
+          return next(
+            new AppError(
+              "sourceSopDocumentId is required for SOP sourceType.",
+              400
+            )
+          );
+        }
+        if (generationMethod !== "AI" && generationMethod !== "MANUAL") {
+          return next(
+            new AppError(
+              "Invalid or missing generationMethod for SOP sourceType. Must be 'AI' or 'MANUAL'.",
+              400
+            )
+          );
+        }
+        newBank = await QuestionBankService.createQuestionBankFromSOP(
+          bankDetails,
+          sourceSopDocumentId,
+          generationMethod // Now guaranteed to be 'AI' or 'MANUAL'
+        );
+      } else if (sourceType === "MENU") {
+        if (!sourceMenuId) {
+          return next(
+            new AppError("sourceMenuId is required for MENU sourceType.", 400)
+          );
+        }
+        // Ensure restaurantId from body is a mongoose.Types.ObjectId
+        // The validation middleware should ensure restaurantId is present and valid.
+        // The service expects restaurantId and menuId as mongoose.Types.ObjectId.
+        // The controller receives them as strings from req.body initially.
+        // We need to ensure they are correctly typed if the service strictly requires ObjectId.
+        // However, Mongoose often handles string-to-ObjectId conversion for query parameters.
+        // Let's assume the service or Mongoose handles the conversion for now,
+        // or that validation middleware ensures correct type/format.
+
+        newBank = await QuestionBankService.createQuestionBankFromMenuService({
+          name: bankDetails.name,
+          description: bankDetails.description,
+          restaurantId: bankDetails.restaurantId, // Assuming this is correctly populated and typed
+          menuId: sourceMenuId, // This comes from req.body, service expects ObjectId
+          selectedCategoryNames: bankDetails.categories, // This is categories from req.body
+          // generateAiQuestions and aiParams are omitted for now (defaults to no AI generation)
+        });
+      } else if (sourceType === "MANUAL") {
+        // For MANUAL, we primarily use name, description, categories, and restaurantId.
+        // The sourceType will be explicitly set.
+        const manualBankData: QuestionBankService.CreateQuestionBankData = {
+          name: bankDetails.name,
+          description: bankDetails.description,
+          categories: bankDetails.categories,
+          restaurantId: bankDetails.restaurantId, // Ensure this is correctly typed as ObjectId
+          sourceType: "MANUAL", // Explicitly set sourceType
+        };
+        newBank = await QuestionBankService.createQuestionBankService(
+          manualBankData
+        );
+      } else {
+        // This case should ideally be caught by express-validator's isIn check
+        return next(new AppError("Invalid sourceType specified.", 400));
+      }
+
+      res.status(201).json({
+        message: `Question bank '${newBank.name}' created successfully. ${
+          sourceType === "SOP" && generationMethod === "AI"
+            ? "AI question generation initiated."
+            : ""
+        }`.trim(),
+        data: newBank,
+      });
+      return;
+    } catch (error) {
+      // Catch errors from the service layer (e.g., AppError, or other operational errors)
+      if (error instanceof AppError) {
+        return next(error);
+      }
+      // For unexpected errors
+      console.error(
+        "Unexpected error in createQuestionBank controller:",
+        error
+      );
+      return next(
+        new AppError(
+          "An unexpected error occurred while creating the question bank.",
+          500
+        )
+      );
+    }
   }
-};
+);
 
 // Placeholder for getAllQuestionBanks
 export const getAllQuestionBanks = async (
@@ -866,7 +994,7 @@ export const generateAiQuestionsForSopBank = async (
     if (!bank) {
       return next(new AppError("Question Bank not found.", 404));
     }
-    if (bank.sourceType !== "sop_document" || !bank.sourceDocumentId) {
+    if (bank.sourceType !== "SOP" || !bank.sourceSopDocumentId) {
       return next(
         new AppError(
           "This Question Bank is not sourced from an SOP document.",
@@ -879,7 +1007,7 @@ export const generateAiQuestionsForSopBank = async (
         new AppError("Question Bank does not belong to this restaurant.", 403)
       );
     }
-    if (!bank.selectedCategories || bank.selectedCategories.length === 0) {
+    if (!bank.categories || bank.categories.length === 0) {
       return next(
         new AppError(
           "SOP Question Bank has no selected categories to generate questions from.",
@@ -910,8 +1038,8 @@ export const generateAiQuestionsForSopBank = async (
     }
 
     const sopQuestionParams: GenerateQuestionsFromSopParams = {
-      sopDocumentId: bank.sourceDocumentId.toString(),
-      selectedSopCategoryNames: bank.selectedCategories.map((sc) => sc.name),
+      sopDocumentId: bank.sourceSopDocumentId.toString(),
+      selectedSopCategoryNames: bank.categories,
       targetQuestionCount,
       questionTypes,
       difficulty,
