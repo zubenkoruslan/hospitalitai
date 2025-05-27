@@ -266,6 +266,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         sourceType: "SOP",
         sourceSopDocumentId: selectedSopDocumentId,
         categories: selectedSopCategories, // These are SOP category names
+        generationMethod: "MANUAL", // ADDED: Default to MANUAL for now
       };
     } else {
       setFormError("Invalid source type selected.");

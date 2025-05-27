@@ -20,10 +20,10 @@ export interface IQuestion {
   categories: string[]; // From MenuItem categories or custom
   restaurantId: string;
   createdBy: "ai" | "manual";
-  difficulty?: "easy" | "medium" | "hard";
   explanation?: string;
   createdAt: string;
   updatedAt: string;
+  status: "active" | "pending_review" | "rejected";
 }
 
 // Main interface for a Question Bank document on the client-side
@@ -55,6 +55,7 @@ export interface CreateQuestionBankData {
 export interface UpdateQuestionBankData {
   name?: string;
   description?: string;
+  categories?: string[]; // ADDED: To allow updating categories
   // questionIds?: string[]; // For managing questions within a bank later
 }
 
@@ -91,7 +92,7 @@ export interface CreateQuestionBankClientData {
 
   // For SOP source
   sourceSopDocumentId?: string;
-  generationMethod?: "ai" | "manual"; // Specific to SOP source
+  generationMethod?: "AI" | "MANUAL"; // MODIFIED to uppercase
 
   // Note: AI generation parameters for menu (like targetQuestionCount)
   // are not directly part of this top-level type anymore.
@@ -103,10 +104,9 @@ export interface CreateQuestionBankClientData {
 export interface NewQuestionClientData {
   questionText: string;
   questionType: QuestionType;
-  options: Omit<IOption, "_id">[]; // Options for a new question won't have _id
+  options: Omit<IOption, "_id">[];
   categories: string[];
-  difficulty?: "easy" | "medium" | "hard";
-  // restaurantId and createdBy are added by the backend or service layer calling createQuestion
+  questionBankId: string;
 }
 
 // For updating an individual question (client-side)
@@ -116,17 +116,17 @@ export interface UpdateQuestionClientData {
   questionType?: QuestionType;
   options?: Omit<IOption, "_id">[]; // Options might be entirely new or have existing _ids for merging on backend (if supported)
   categories?: string[];
-  difficulty?: "easy" | "medium" | "hard";
+  explanation?: string; // Ensure explanation is present
 }
 
 // Payload for the new AI Question Generation Process via /api/ai/generate-questions
 export interface NewAiQuestionGenerationParams {
+  bankId: string; // ADDED: To link generated questions to the correct bank
   menuId: string;
   categoriesToFocus: string[];
   questionFocusAreas: string[];
   targetQuestionCountPerItemFocus: number;
   questionTypes: string[];
-  difficulty: string;
-  additionalContext?: string; // Optional
-  itemIds?: string[]; // Optional
+  additionalContext?: string;
+  itemIds?: string[];
 }

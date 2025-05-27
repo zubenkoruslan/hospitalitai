@@ -7,7 +7,7 @@ import {
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { updateQuestion as apiUpdateQuestion } from "../../services/api";
+import { updateQuestion } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
 
@@ -36,15 +36,16 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   const [questionType, setQuestionType] = useState<QuestionType>(
     questionToEdit.questionType
   );
-  const [options, setOptions] = useState<Array<Partial<IOption>>>(
-    // Deep copy options to avoid mutating prop
-    JSON.parse(JSON.stringify(questionToEdit.options || []))
+  // Use IOption[] for state to preserve _id for existing options
+  const [options, setOptions] = useState<IOption[]>(
+    JSON.parse(JSON.stringify(questionToEdit.options || [])) // Keep full IOption objects
   );
-  const [categories, setCategories] = useState(
-    (questionToEdit.categories || []).join(", ")
-  );
-  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "">(
-    questionToEdit.difficulty || ""
+  const [categories, setCategories] = useState<string[]>([
+    ...questionToEdit.categories,
+  ]);
+  const [categoryInput, setCategoryInput] = useState("");
+  const [explanation, setExplanation] = useState(
+    questionToEdit.explanation || ""
   );
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -54,9 +55,9 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   useEffect(() => {
     setQuestionText(questionToEdit.questionText);
     setQuestionType(questionToEdit.questionType);
-    setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
-    setCategories((questionToEdit.categories || []).join(", "));
-    setDifficulty(questionToEdit.difficulty || "");
+    setOptions(JSON.parse(JSON.stringify(questionToEdit.options || []))); // Keep full IOption
+    setCategories([...questionToEdit.categories]);
+    setExplanation(questionToEdit.explanation || "");
     setFormError(null); // Clear previous errors
     setInternalIsLoading(false); // Reset loading state
   }, [questionToEdit]);
@@ -64,61 +65,46 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   // ADDED: Effect to reset options when questionType (form state) changes from its original prop value
   // Effect to handle option initialization/reset when questionType (form state) or questionToEdit (prop) changes.
   useEffect(() => {
-    // If the currently selected questionType in the form (state) matches the original question's type (prop):
-    if (questionType === questionToEdit.questionType) {
-      // This block handles two cases:
-      // 1. Initial load: The first useEffect populates questionType and options from questionToEdit.
-      //    This effect then runs. If options are already in sync, no unnecessary setOptions call.
-      // 2. User changed type away and then changed it back to the original type.
-      // In this case, restore the original options for that type if they are not already matching.
-      if (
-        JSON.stringify(options) !== JSON.stringify(questionToEdit.options || [])
-      ) {
-        setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
-      }
+    if (questionToEdit.questionType === questionType) {
+      // If type hasn't changed, keep existing options initially
+      setOptions(JSON.parse(JSON.stringify(questionToEdit.options || [])));
     } else {
-      // If the selected questionType in the form is DIFFERENT from the original question's type
-      // (i.e., user selected a new type from the dropdown):
-      // Reset options based on the NEWLY selected questionType.
+      // If type has changed, reset options appropriately
       if (questionType === "true-false") {
         setOptions([
-          { text: "True", isCorrect: true }, // Default when switching TO True/False
+          { text: "True", isCorrect: true },
           { text: "False", isCorrect: false },
         ]);
-      } else if (
-        questionType === "multiple-choice-single" ||
-        questionType === "multiple-choice-multiple"
-      ) {
+      } else {
         setOptions([
-          // Default when switching TO Multiple Choice
-          { text: "", isCorrect: false },
+          { text: "", isCorrect: true },
           { text: "", isCorrect: false },
         ]);
       }
-      setFormError(null); // Clear any validation errors related to the old options structure
     }
-  }, [questionType, questionToEdit]); // Dependencies: current form type and the original question prop.
-  // 'options' (state) is intentionally NOT a dependency here
-  // to prevent this effect from running when options are changed by user interaction (handleOptionChange).
+    // Only run when questionType changes, or when the initial questionToEdit.questionType influences reset
+  }, [questionType, questionToEdit.questionType]); // questionToEdit.options removed from deps
 
   const handleOptionChange = (
     index: number,
-    field: keyof Omit<IOption, "_id">, // Allow changing text & isCorrect
+    field: keyof IOption,
     value: string | boolean
   ) => {
-    const newOptions = JSON.parse(JSON.stringify(options)); // Deep copy
-    (newOptions[index] as any)[field] = value;
-
-    // If single choice (radio button behavior), uncheck other options
+    const newOptions = options.map((option, i) => {
+      if (i === index) {
+        // For new options, _id might be undefined. For existing, it's preserved.
+        return { ...option, [field]: value } as IOption;
+      }
+      return option;
+    });
     if (
-      (questionType === "multiple-choice-single" ||
-        questionType === "true-false") && // MODIFIED: Included 'true-false'
+      questionType === "multiple-choice-single" &&
       field === "isCorrect" &&
       value === true
     ) {
-      newOptions.forEach((opt: Partial<IOption>, i: number) => {
+      newOptions.forEach((option, i) => {
         if (i !== index) {
-          opt.isCorrect = false;
+          option.isCorrect = false;
         }
       });
     }
@@ -127,7 +113,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 
   const addOption = () => {
     if (questionType !== "true-false" && options.length < 6) {
-      setOptions([...options, { text: "", isCorrect: false }]);
+      setOptions([...options, { text: "", isCorrect: false } as IOption]);
     }
   };
 
@@ -189,18 +175,16 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         return;
       }
     }
-    if (categories.trim() === "") {
+    if (categories.length === 0) {
       setFormError("Please provide at least one category.");
       return;
     }
 
     const updateData: UpdateQuestionClientData = {};
-    const parsedCategories = categories
-      .split(",")
-      .map((cat) => cat.trim())
-      .filter((cat) => cat);
 
-    // Check if questionType has changed
+    if (questionText.trim() !== questionToEdit.questionText) {
+      updateData.questionText = questionText.trim();
+    }
     if (questionType !== questionToEdit.questionType) {
       updateData.questionType = questionType;
       // As per backend logic, if type changes, options must be sent.
@@ -232,17 +216,14 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
       }
     }
 
-    if (questionText.trim() !== questionToEdit.questionText) {
-      updateData.questionText = questionText.trim();
-    }
     if (
-      JSON.stringify(parsedCategories.sort()) !==
-      JSON.stringify(questionToEdit.categories.sort())
+      JSON.stringify(categories.sort()) !==
+      JSON.stringify([...questionToEdit.categories].sort())
     ) {
-      updateData.categories = parsedCategories;
+      updateData.categories = categories;
     }
-    if ((difficulty || null) !== (questionToEdit.difficulty || null)) {
-      updateData.difficulty = difficulty || undefined;
+    if ((explanation || null) !== (questionToEdit.explanation || null)) {
+      updateData.explanation = explanation || undefined;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -253,7 +234,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 
     setInternalIsLoading(true);
     try {
-      const updatedQuestion = await apiUpdateQuestion(
+      const updatedQuestion = await updateQuestion(
         questionToEdit._id,
         updateData
       );
@@ -270,7 +251,6 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   const commonInputClass =
     "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-200 disabled:text-gray-700";
   const commonLabelClass = "block text-sm font-medium text-gray-700";
-  const difficultyLevels = ["easy", "medium", "hard"];
 
   return (
     // This form will typically be rendered inside a Modal component.
@@ -353,14 +333,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
             <input
               type="text"
               placeholder={`Option ${index + 1}`}
-              value={
-                opt.text ||
-                (questionType === "true-false"
-                  ? index === 0
-                    ? "True"
-                    : "False"
-                  : "")
-              }
+              value={opt.text || ""}
               onChange={(e) =>
                 handleOptionChange(index, "text", e.target.value)
               }
@@ -403,8 +376,10 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         <input
           id={`editCategories-${questionToEdit._id}`}
           type="text"
-          value={categories}
-          onChange={(e) => setCategories(e.target.value)}
+          value={categories.join(", ")}
+          onChange={(e) =>
+            setCategories(e.target.value.split(", ").map((c) => c.trim()))
+          }
           placeholder="e.g., Appetizers, Wines, Safety Procedures"
           required
           className={commonInputClass}
@@ -414,25 +389,20 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 
       <div>
         <label
-          htmlFor={`editDifficulty-${questionToEdit._id}`}
+          htmlFor={`editExplanation-${questionToEdit._id}`}
           className={commonLabelClass}
         >
-          Difficulty (Optional)
+          Explanation (Optional, supports Markdown for lists/formatting)
         </label>
-        <select
-          id={`editDifficulty-${questionToEdit._id}`}
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as any)}
+        <textarea
+          id={`editExplanation-${questionToEdit._id}`}
+          value={explanation}
+          onChange={(e) => setExplanation(e.target.value)}
+          rows={3}
           className={commonInputClass}
           disabled={internalIsLoading}
-        >
-          <option value="">Select Difficulty</option>
-          {difficultyLevels.map((level) => (
-            <option key={level} value={level}>
-              {level.charAt(0).toUpperCase() + level.slice(1)}
-            </option>
-          ))}
-        </select>
+          placeholder="Provide a brief explanation for the correct answer(s)."
+        />
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

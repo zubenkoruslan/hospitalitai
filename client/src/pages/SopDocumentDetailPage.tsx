@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ISopDocument, ISopCategory } from "../types/sopTypes"; // Changed path
 import {
   getSopDocumentDetails,
@@ -22,10 +22,15 @@ import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
+  SparklesIcon,
+  InformationCircleIcon,
+  EyeIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline"; // Example icons for future edit/delete functionality
 
 const SopDocumentDetailPage: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
+  const navigate = useNavigate();
   const [document, setDocument] = useState<ISopDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +53,6 @@ const SopDocumentDetailPage: React.FC = () => {
   const [parentCategoryIdForModal, setParentCategoryIdForModal] = useState<
     string | null
   >(null); // Explicit parent ID for 'addSub'
-
-  // TODO: Add state for managing category edit modals/forms
-  // e.g., const [editingCategory, setEditingCategory] = useState<ISopCategory | null>(null);
 
   useEffect(() => {
     if (documentId) {
@@ -484,7 +486,7 @@ const SopDocumentDetailPage: React.FC = () => {
               {
                 label: "Uploaded At",
                 value: document.uploadedAt
-                  ? format(new Date(document.uploadedAt), "dd MMM yyyy, p")
+                  ? format(new Date(document.uploadedAt), "MMM yyyy")
                   : "N/A",
               },
               {
@@ -525,14 +527,19 @@ const SopDocumentDetailPage: React.FC = () => {
               <h2 className="text-2xl font-semibold text-slate-700">
                 Document Content & Categories
               </h2>
-              <button
-                onClick={handleAddTopLevelCategory}
-                className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
-              >
-                <PlusIcon className="h-5 w-5 mr-1.5" />
-                Add Category
-              </button>
+              <div className="flex items-center space-x-3">
+                {" "}
+                {/* Container for buttons */}
+                <button
+                  onClick={handleAddTopLevelCategory}
+                  className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                >
+                  <PlusIcon className="h-5 w-5 mr-1.5" />
+                  Add Category
+                </button>
+              </div>
             </div>
+
             {document.categories && document.categories.length > 0 ? (
               <RecursiveCategoryList
                 categories={document.categories}

@@ -167,15 +167,14 @@ const mockOnClose = jest.fn();
 const mockOnBankQuestionsUpdated = jest.fn();
 
 const baseMockBank: IQuestionBank = {
-  // Renamed to baseMockBank for clarity in tests
   _id: "bank1",
   name: "Test Bank",
   description: "A bank for testing",
   restaurantId: "res123",
-  questions: [],
-  questionCount: 2, // This might need to be dynamic based on mockQuestions
+  questions: [], // This will be populated by mockQuestions in most tests
+  questionCount: 0, // Set to 0, will be updated based on questions in renderManageQuestionsModal
   categories: ["General", "Specifics"],
-  createdBy: "user1",
+  sourceType: "MANUAL", // Added sourceType as it's required
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -187,10 +186,10 @@ const mockQuestions: IQuestion[] = [
     questionType: "multiple-choice-single",
     options: [{ text: "A", isCorrect: true }],
     categories: ["General"],
-    difficulty: "easy",
     restaurantId: "res123",
     createdBy: "manual",
-    createdAt: new Date().toISOString(), // So we can sort by this
+    status: "active",
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
@@ -199,10 +198,10 @@ const mockQuestions: IQuestion[] = [
     questionType: "true-false",
     options: [{ text: "True", isCorrect: true }],
     categories: ["Specifics"],
-    difficulty: "medium",
     restaurantId: "res123",
     createdBy: "ai",
-    createdAt: new Date(Date.now() - 100000).toISOString(), // Ensure different createdAt for sorting tests
+    status: "pending_review",
+    createdAt: new Date(Date.now() - 100000).toISOString(),
     updatedAt: new Date().toISOString(),
   },
 ];

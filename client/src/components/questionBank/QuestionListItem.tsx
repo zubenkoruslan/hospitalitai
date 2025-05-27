@@ -38,13 +38,6 @@ const QuestionListItem: React.FC<QuestionListItemProps> = ({
                 {question.categories.join(", ") || "N/A"}
               </span>
             </span>
-            <span>|</span>
-            <span>
-              Difficulty:{" "}
-              <span className="font-medium text-slate-600">
-                {question.difficulty || "N/A"}
-              </span>
-            </span>
           </div>
         </div>
         <div className="flex space-x-2 shrink-0">

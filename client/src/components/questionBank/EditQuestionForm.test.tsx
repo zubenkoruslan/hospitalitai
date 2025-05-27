@@ -25,7 +25,7 @@ const mockQuestionMultipleChoice: IQuestion = {
   categories: ["Math", "Arithmetic"],
   restaurantId: "rest1",
   createdBy: "manual",
-  difficulty: "easy",
+  status: "active",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -41,7 +41,7 @@ const mockQuestionTrueFalse: IQuestion = {
   categories: ["General", "Nature"],
   restaurantId: "rest1",
   createdBy: "manual",
-  difficulty: "easy",
+  status: "pending_review",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -90,9 +90,6 @@ describe("EditQuestionForm", () => {
     );
     expect(screen.getByLabelText(/Categories/i)).toHaveValue(
       mockQuestionMultipleChoice.categories.join(", ")
-    );
-    expect(screen.getByLabelText(/Difficulty/i)).toHaveValue(
-      mockQuestionMultipleChoice.difficulty
     );
 
     mockQuestionMultipleChoice.options.forEach((opt) => {
@@ -149,22 +146,6 @@ describe("EditQuestionForm", () => {
         mockQuestionMultipleChoice._id,
         expect.objectContaining({
           categories: ["NewCat1", "NewCat2"],
-        })
-      );
-    });
-  });
-
-  test("allows changing difficulty", async () => {
-    renderComponent();
-    const difficultySelect = screen.getByLabelText(/Difficulty/i);
-    fireEvent.change(difficultySelect, { target: { value: "hard" } });
-
-    fireEvent.click(screen.getByRole("button", { name: /Save Changes/i }));
-    await waitFor(() => {
-      expect(mockApiUpdateQuestion).toHaveBeenCalledWith(
-        mockQuestionMultipleChoice._id,
-        expect.objectContaining({
-          difficulty: "hard",
         })
       );
     });

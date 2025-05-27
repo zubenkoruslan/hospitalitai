@@ -287,10 +287,7 @@ const SopManagementPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                         {doc.uploadedAt
-                          ? format(
-                              new Date(doc.uploadedAt),
-                              "dd MMM yyyy, hh:mm a"
-                            )
+                          ? format(new Date(doc.uploadedAt), "MMM yyyy")
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">

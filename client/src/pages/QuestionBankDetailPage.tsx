@@ -11,6 +11,7 @@ import Modal from "../components/common/Modal";
 import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
+import GenerateAiQuestionsFormSop from "../components/questionBank/GenerateAiQuestionsFormSop";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { getMenusByRestaurant as fetchRestaurantMenus } from "../services/api";
@@ -52,11 +53,11 @@ const QuestionListItem: React.FC<{
           {question.questionText}
         </p>
         {/* Metadata (Type, Difficulty, Category) */}
-        <p className="text-xs text-gray-500 mb-2">
-          {`Type: ${formatQuestionType(question.questionType)} | Difficulty: ${
-            question.difficulty || "N/A"
-          } | Category: ${question.categories?.join(", ") || "N/A"}`}
-        </p>
+        <div className="text-xs text-gray-500">
+          {`Type: ${formatQuestionType(question.questionType)} | `}
+          {/* `Difficulty: ${question.difficulty || "N/A"} | ` REMOVED */}
+          {`Category: ${question.categories.join(", ")}`}
+        </div>
         {/* Explanation */}
         {question.explanation && (
           <p className="text-sm text-gray-700">
@@ -129,6 +130,12 @@ const QuestionBankDetailPage: React.FC = () => {
     useState(false);
   const [isLoadingMenusForAi, setIsLoadingMenusForAi] = useState(false);
 
+  // ADDED: State for SOP AI Generation Modal
+  const [showGenerateSopAiModal, setShowGenerateSopAiModal] = useState(false);
+
+  // ADDED: State for categories section expansion
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+
   const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
     fetchQuestionBankById,
   ]);
@@ -139,6 +146,11 @@ const QuestionBankDetailPage: React.FC = () => {
     }
     setSelectedQuestionIds([]); // Reset selection when bank changes
   }, [bankId, memoizedFetchQuestionBankById]);
+
+  // ADDED: Function to toggle category expansion
+  const toggleCategoriesExpand = () => {
+    setIsCategoriesExpanded((prev) => !prev);
+  };
 
   const requestRemoveQuestion = (questionId: string) => {
     if (!bankId || !currentQuestionBank) return;
@@ -254,40 +266,62 @@ const QuestionBankDetailPage: React.FC = () => {
     handleCloseEditQuestionModal();
   };
 
+  // MODIFIED: This handler now routes to different modals based on bank source type
   const handleOpenGenerateAiQuestions = async () => {
     if (!currentQuestionBank) {
-      setPageError("Restaurant context is missing.");
+      setPageError("Question bank details not loaded.");
       return;
     }
-    setIsLoadingMenusForAi(true);
     setPageError(null);
-    try {
-      const menus = await fetchRestaurantMenus(
-        currentQuestionBank.restaurantId
-      );
-      const activeMenus = menus;
 
-      if (activeMenus.length === 0) {
-        setPageError(
-          "No active menus found for your restaurant. AI Question generation requires an active menu."
-        );
-        setIsLoadingMenusForAi(false);
-        return;
-      }
-
-      setAvailableMenus(activeMenus);
-
-      if (activeMenus.length === 1) {
-        setSelectedMenuForAi(activeMenus[0]._id);
+    if (currentQuestionBank.sourceType === "MENU") {
+      // UPDATED LOGIC: If sourceMenuId exists, use it directly
+      if (currentQuestionBank.sourceMenuId) {
+        setSelectedMenuForAi(currentQuestionBank.sourceMenuId);
         setShowGenerateAiQuestionsModal(true);
       } else {
-        setIsMenuSelectionModalOpen(true);
+        // Existing logic: Fetch menus if no sourceMenuId is linked
+        setIsLoadingMenusForAi(true);
+        try {
+          const menus = await fetchRestaurantMenus(
+            currentQuestionBank.restaurantId
+          );
+          const activeMenus = menus;
+
+          if (activeMenus.length === 0) {
+            setPageError(
+              "No active menus found for your restaurant. AI Question generation for menu-based banks requires an active menu."
+            );
+            setIsLoadingMenusForAi(false);
+            return;
+          }
+          setAvailableMenus(activeMenus);
+          if (activeMenus.length === 1) {
+            setSelectedMenuForAi(activeMenus[0]._id);
+            setShowGenerateAiQuestionsModal(true);
+          } else {
+            setIsMenuSelectionModalOpen(true);
+          }
+        } catch (err) {
+          console.error("Error fetching menus for AI generation:", err);
+          setPageError(getErrorMessage(err));
+        } finally {
+          setIsLoadingMenusForAi(false);
+        }
       }
-    } catch (err) {
-      console.error("Error fetching menus for AI generation:", err);
-      setPageError(getErrorMessage(err));
+    } else if (currentQuestionBank.sourceType === "SOP") {
+      if (!currentQuestionBank.sourceSopDocumentId) {
+        setPageError(
+          "This SOP-based question bank is not linked to a specific SOP document. Cannot generate AI questions."
+        );
+        return;
+      }
+      setShowGenerateSopAiModal(true); // Open the new/dedicated modal for SOPs
+    } else {
+      setPageError(
+        "AI question generation is not supported for this type of question bank."
+      );
     }
-    setIsLoadingMenusForAi(false);
   };
 
   const handleMenuSelectForAi = (menuId: string) => {
@@ -310,9 +344,7 @@ const QuestionBankDetailPage: React.FC = () => {
     if (selectedQuestionIds.length === currentQuestionBank.questions.length) {
       setSelectedQuestionIds([]);
     } else {
-      setSelectedQuestionIds(
-        (currentQuestionBank.questions as IQuestion[]).map((q) => q._id)
-      );
+      setSelectedQuestionIds([...currentQuestionBank.questions]);
     }
   };
 
@@ -414,51 +446,129 @@ const QuestionBankDetailPage: React.FC = () => {
 
   // Main content rendering if bank is loaded
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100">
       <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        {/* Back Link - Placed above title */}
+      <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+        {/* ADDED: Back Button */}
         <div className="mb-4">
-          <Button
-            variant="secondary"
-            onClick={() => navigate("/quiz-management")}
-            className="text-sm"
-          >
-            &larr; Back to Quiz & Bank Management
-          </Button>
-        </div>
-
-        {/* Updated Page Title Header */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                {currentQuestionBank.name}
-              </h1>
-              {currentQuestionBank.description && (
-                <p className="mt-2 text-sm text-gray-600 max-w-xl">
-                  {currentQuestionBank.description}
-                </p>
-              )}
-            </div>
-            <Button
-              variant="secondary"
-              onClick={handleOpenEditBankModal}
-              className="mt-4 sm:mt-0 flex-shrink-0"
-            >
-              Edit Details
+          <Link to="/quiz-management">
+            <Button variant="secondary" className="text-sm">
+              &larr; Back to Quiz & Bank Management
             </Button>
-          </div>
+          </Link>
         </div>
 
         {pageError && (
-          <div className="mb-4">
-            <ErrorMessage
-              message={pageError}
-              onDismiss={() => setPageError(null)}
-            />
+          <div
+            className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4"
+            role="alert"
+          >
+            <p className="font-bold">Error</p>
+            <p>{pageError}</p>
           </div>
         )}
+
+        {/* Bank Header */}
+        <Card className="mb-6 p-5 shadow-lg rounded-xl bg-white relative">
+          <div className="flex flex-col sm:flex-row justify-between items-start">
+            <div className="flex-grow mb-4 sm:mb-0 pr-4">
+              <h1 className="text-3xl font-bold text-gray-800">
+                {currentQuestionBank.name}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {currentQuestionBank.questions.length} questions
+                {currentQuestionBank.sourceType === "MENU" &&
+                  currentQuestionBank.sourceMenuName && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      Menu: {currentQuestionBank.sourceMenuName}
+                    </span>
+                  )}
+                {currentQuestionBank.sourceType === "SOP" &&
+                  currentQuestionBank.sourceSopDocumentTitle && (
+                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                      SOP: {currentQuestionBank.sourceSopDocumentTitle}
+                    </span>
+                  )}
+                {currentQuestionBank.sourceType === "MANUAL" && (
+                  <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                    Manual
+                  </span>
+                )}
+              </p>
+              {currentQuestionBank.description && (
+                <p className="text-gray-600 mt-2 text-sm">
+                  {currentQuestionBank.description}
+                </p>
+              )}
+              {/* Display Bank Categories and Edit Button */}
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div
+                  className="flex justify-between items-center mb-1 cursor-pointer hover:bg-gray-50 p-1 -m-1 rounded"
+                  onClick={toggleCategoriesExpand}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) =>
+                    (e.key === "Enter" || e.key === " ") &&
+                    toggleCategoriesExpand()
+                  }
+                  aria-expanded={isCategoriesExpanded}
+                  aria-controls="bank-categories-content"
+                >
+                  <h3 className="text-md font-semibold text-gray-700">
+                    Bank Categories:
+                  </h3>
+                  {/* Chevron Icon */}
+                  <svg
+                    className={`w-5 h-5 text-gray-500 transform transition-transform duration-200 ${
+                      isCategoriesExpanded ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
+                  </svg>
+                </div>
+                {isCategoriesExpanded && (
+                  <div id="bank-categories-content">
+                    {currentQuestionBank.categories &&
+                    currentQuestionBank.categories.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {currentQuestionBank.categories.map((cat) => (
+                          <span
+                            key={cat}
+                            className="px-2.5 py-1 bg-sky-100 text-sky-700 text-xs font-medium rounded-full"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic mt-1">
+                        No categories assigned to this bank.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="absolute top-5 right-5 flex-shrink-0">
+              <Button
+                variant="secondary"
+                onClick={handleOpenEditBankModal}
+                className="text-xs"
+              >
+                Edit Details
+              </Button>
+            </div>
+          </div>
+        </Card>
 
         {/* Updated Action Buttons Card for Questions */}
         <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6">
@@ -485,19 +595,23 @@ const QuestionBankDetailPage: React.FC = () => {
                 "Generate AI Questions"
               )}
             </Button>
-            {bankId && (
-              <Link to={`/question-banks/${bankId}/review-ai-questions`}>
-                <Button variant="secondary" className="w-full">
-                  Review Pending AI Questions
-                </Button>
-              </Link>
-            )}
+            {/* ADDED: Review Pending AI Questions Button */}
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate(`/question-banks/${bankId}/review-ai-questions`)
+              }
+              className="w-full"
+              // Optionally disable if there are no pending questions, though this requires extra state/logic
+            >
+              Review Pending AI Questions
+            </Button>
           </div>
         </Card>
 
         {/* Multi-select controls */}
         {currentQuestionBank.questions &&
-          (currentQuestionBank.questions as IQuestion[]).length > 0 && (
+          currentQuestionBank.questions.length > 0 && (
             <div className="my-4 p-4 bg-gray-50 rounded-lg shadow flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <input
@@ -505,9 +619,9 @@ const QuestionBankDetailPage: React.FC = () => {
                   type="checkbox"
                   className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                   checked={
-                    (currentQuestionBank.questions as IQuestion[]).length > 0 &&
+                    currentQuestionBank.questions.length > 0 &&
                     selectedQuestionIds.length ===
-                      (currentQuestionBank.questions as IQuestion[]).length
+                      currentQuestionBank.questions.length
                   }
                   onChange={handleToggleSelectAll}
                   // Consider disabling if another operation is in progress (e.g., individual delete confirmation)
@@ -564,55 +678,64 @@ const QuestionBankDetailPage: React.FC = () => {
               </div>
             )}
           <div className="space-y-4 mt-4">
-            {(currentQuestionBank.questions as IQuestion[])?.map((q) => (
-              <QuestionListItem
-                key={q._id}
-                question={q}
-                onRemove={() => requestRemoveQuestion(q._id)}
-                onEdit={() => handleOpenEditQuestionModal(q)}
-                isSelected={selectedQuestionIds.includes(q._id)}
-                onToggleSelect={handleToggleSelectQuestion}
-              />
-            ))}
+            {(currentQuestionBank.questions as unknown as IQuestion[])?.map(
+              (q: IQuestion) => (
+                <QuestionListItem
+                  key={q._id}
+                  question={q}
+                  onRemove={() => requestRemoveQuestion(q._id)}
+                  onEdit={() => handleOpenEditQuestionModal(q)}
+                  isSelected={selectedQuestionIds.includes(q._id)}
+                  onToggleSelect={handleToggleSelectQuestion}
+                />
+              )
+            )}
           </div>
         </Card>
 
         {/* Modals */}
-        {showAddManualQuestionModal && (
+        {showAddManualQuestionModal && bankId && (
           <Modal
             isOpen={showAddManualQuestionModal}
             onClose={() => setShowAddManualQuestionModal(false)}
-            title="Add New Question Manually"
+            title="Add New Manual Question"
           >
             <AddManualQuestionForm
               onQuestionAdded={handleManualQuestionSubmit}
               onCloseRequest={() => setShowAddManualQuestionModal(false)}
-              initialBankCategories={currentQuestionBank?.categories || []}
+              initialBankCategories={currentQuestionBank.categories}
+              questionBankId={bankId}
             />
           </Modal>
         )}
 
-        {showGenerateAiQuestionsModal && selectedMenuForAi && bankId && (
-          <Modal
-            isOpen={showGenerateAiQuestionsModal}
-            onClose={() => {
-              setShowGenerateAiQuestionsModal(false);
-              setSelectedMenuForAi(null);
-            }}
-            title="Generate Questions with AI"
-          >
-            <GenerateAiQuestionsForm
-              bankId={bankId}
-              menuId={selectedMenuForAi}
-              bankCategories={currentQuestionBank?.categories || []}
-              onAiQuestionsGenerated={handleAiQuestionsGenerated}
-              onCloseRequest={() => {
+        {showGenerateAiQuestionsModal &&
+          currentQuestionBank &&
+          selectedMenuForAi && (
+            <Modal
+              isOpen={showGenerateAiQuestionsModal}
+              onClose={() => {
                 setShowGenerateAiQuestionsModal(false);
                 setSelectedMenuForAi(null);
               }}
-            />
-          </Modal>
-        )}
+              title="Generate AI Questions for this Bank"
+            >
+              <GenerateAiQuestionsForm
+                bankId={currentQuestionBank._id}
+                menuId={selectedMenuForAi}
+                onAiQuestionsGenerated={handleAiQuestionsGenerated}
+                onCloseRequest={() => {
+                  setShowGenerateAiQuestionsModal(false);
+                  setSelectedMenuForAi(null);
+                }}
+                initialCategories={
+                  currentQuestionBank.sourceType === "MENU"
+                    ? currentQuestionBank.categories
+                    : undefined
+                }
+              />
+            </Modal>
+          )}
 
         {isMenuSelectionModalOpen && (
           <Modal
@@ -721,6 +844,42 @@ const QuestionBankDetailPage: React.FC = () => {
             />
           </Modal>
         )}
+
+        {/* ADDED: Modal for SOP AI Question Generation */}
+        {showGenerateSopAiModal &&
+          currentQuestionBank &&
+          currentQuestionBank.sourceType === "SOP" &&
+          currentQuestionBank.sourceSopDocumentId && (
+            <Modal
+              isOpen={showGenerateSopAiModal}
+              onClose={() => setShowGenerateSopAiModal(false)}
+              title={`Generate AI Questions from SOP: ${
+                currentQuestionBank.sourceSopDocumentTitle || "SOP Document"
+              }`}
+            >
+              <GenerateAiQuestionsFormSop
+                bankId={currentQuestionBank._id}
+                bankName={currentQuestionBank.name}
+                sopDocumentId={currentQuestionBank.sourceSopDocumentId}
+                sopDocumentTitle={currentQuestionBank.sourceSopDocumentTitle}
+                existingBankCategories={currentQuestionBank.categories}
+                onQuestionsGenerated={(newQuestions) => {
+                  setShowGenerateSopAiModal(false);
+                  if (newQuestions && newQuestions.length > 0) {
+                    alert(
+                      `${newQuestions.length} AI questions generated from SOP and added to this bank.`
+                    );
+                  } else {
+                    alert(
+                      "SOP AI generation completed, but no new questions were created or some might have failed."
+                    );
+                  }
+                  if (bankId) fetchQuestionBankById(bankId);
+                }}
+                onCloseRequest={() => setShowGenerateSopAiModal(false)}
+              />
+            </Modal>
+          )}
       </main>
     </div>
   );

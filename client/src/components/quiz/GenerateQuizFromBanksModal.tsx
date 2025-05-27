@@ -38,6 +38,12 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null); // For errors fetching banks
 
+  // ADDED: State for bank filter text
+  const [bankFilterText, setBankFilterText] = useState<string>("");
+
+  // ADDED: State for source type filter
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>("ALL");
+
   // State for roles
   const [availableRoles, setAvailableRoles] = useState<IRole[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
@@ -159,6 +165,19 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
     setIsLoading(false);
   };
 
+  // Create a derived state for filtered banks
+  const filteredBanks = availableBanks.filter((bank) => {
+    const matchesText =
+      bank.name.toLowerCase().includes(bankFilterText.toLowerCase()) ||
+      (bank.description &&
+        bank.description.toLowerCase().includes(bankFilterText.toLowerCase()));
+
+    const matchesSourceType =
+      sourceTypeFilter === "ALL" || bank.sourceType === sourceTypeFilter;
+
+    return matchesText && matchesSourceType;
+  });
+
   const formId = "generate-quiz-form";
 
   const footerContent = (
@@ -271,6 +290,44 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
               Select Question Banks <span className="text-red-500">*</span>
             </legend>
 
+            {/* ADDED: Filter input for question banks */}
+            {!isLoadingBanks && availableBanks.length > 0 && (
+              <div className="my-3">
+                <input
+                  type="text"
+                  placeholder="Filter banks by name or description..."
+                  value={bankFilterText}
+                  onChange={(e) => setBankFilterText(e.target.value)}
+                  className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                  disabled={isLoading || isLoadingBanks || isLoadingRoles}
+                />
+              </div>
+            )}
+
+            {/* ADDED: Filter by Source Type Dropdown */}
+            {!isLoadingBanks && availableBanks.length > 0 && (
+              <div className="my-3">
+                <label
+                  htmlFor="sourceTypeFilter"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  Filter by Source Type:
+                </label>
+                <select
+                  id="sourceTypeFilter"
+                  value={sourceTypeFilter}
+                  onChange={(e) => setSourceTypeFilter(e.target.value)}
+                  className="mt-1 block w-full pl-3 pr-10 py-3 text-base border-slate-300 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm rounded-lg shadow-sm disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                  disabled={isLoading || isLoadingBanks || isLoadingRoles}
+                >
+                  <option value="ALL">All Sources</option>
+                  <option value="SOP">SOP</option>
+                  <option value="MENU">Menu</option>
+                  <option value="MANUAL">Manual</option>
+                </select>
+              </div>
+            )}
+
             {!isLoadingBanks && availableBanks.length === 0 && !fetchError && (
               <p className="text-slate-500 text-sm py-3">
                 No question banks available. You can create them in the
@@ -279,51 +336,73 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
             )}
             {!isLoadingBanks && availableBanks.length > 0 && (
               <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
-                {availableBanks.map((bank) => (
-                  <div
-                    key={bank._id}
-                    className="flex items-start p-3 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
-                  >
-                    <input
-                      type="checkbox"
-                      id={`modal-bank-${bank._id}`}
-                      checked={selectedBankIds.includes(bank._id)}
-                      onChange={() => handleBankSelectionChange(bank._id)}
-                      className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
-                      disabled={isLoading || isLoadingBanks || isLoadingRoles} // Disable if either is loading
-                    />
-                    <label
-                      htmlFor={`modal-bank-${bank._id}`}
-                      className="ml-3 flex-1 cursor-pointer"
+                {filteredBanks.length > 0 ? ( // Use filteredBanks here
+                  filteredBanks.map((bank) => (
+                    <div
+                      key={bank._id}
+                      className="flex items-start p-2 bg-white rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors duration-150 ease-in-out"
                     >
-                      <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`modal-bank-${bank._id}`}
+                        checked={selectedBankIds.includes(bank._id)}
+                        onChange={() => handleBankSelectionChange(bank._id)}
+                        className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 mt-1 cursor-pointer disabled:opacity-50"
+                        disabled={isLoading || isLoadingBanks || isLoadingRoles} // Disable if either is loading
+                      />
+                      <label
+                        htmlFor={`modal-bank-${bank._id}`}
+                        className="ml-3 flex-1 cursor-pointer"
+                      >
+                        <div className="flex items-center">
+                          <span
+                            className={`block text-sm font-medium ${
+                              isLoading || isLoadingBanks || isLoadingRoles
+                                ? "text-slate-400"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            {bank.name}
+                          </span>
+                          {bank.sourceType === "SOP" && (
+                            <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                              SOP Based
+                            </span>
+                          )}
+                          {bank.sourceType === "MENU" && (
+                            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                              Menu Based
+                            </span>
+                          )}
+                          {bank.sourceType === "MANUAL" && (
+                            <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                              Manual Entry
+                            </span>
+                          )}
+                        </div>
                         <span
-                          className={`block text-sm font-medium ${
+                          className={`block text-xs ${
                             isLoading || isLoadingBanks || isLoadingRoles
                               ? "text-slate-400"
-                              : "text-slate-800"
+                              : "text-slate-600"
                           }`}
                         >
-                          {bank.name}
+                          ({bank.questions?.length || bank.questionCount || 0}{" "}
+                          questions)
                         </span>
-                        {bank.sourceType === "SOP" && (
-                          <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                            SOP Based
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`block text-xs ${
-                          isLoading || isLoadingBanks || isLoadingRoles
-                            ? "text-slate-400"
-                            : "text-slate-600"
-                        }`}
-                      >
-                        ({bank.questions?.length || bank.questionCount || 0}{" "}
-                        questions)
-                      </span>
-                      {bank.sourceType === "SOP" &&
-                        bank.sourceSopDocumentTitle && (
+                        {bank.sourceType === "SOP" &&
+                          bank.sourceSopDocumentTitle && (
+                            <p
+                              className={`text-xs mt-0.5 ${
+                                isLoading || isLoadingBanks || isLoadingRoles
+                                  ? "text-slate-400"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              SOP: {bank.sourceSopDocumentTitle}
+                            </p>
+                          )}
+                        {bank.description && (
                           <p
                             className={`text-xs mt-0.5 ${
                               isLoading || isLoadingBanks || isLoadingRoles
@@ -331,23 +410,17 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                                 : "text-slate-500"
                             }`}
                           >
-                            SOP: {bank.sourceSopDocumentTitle}
+                            {bank.description}
                           </p>
                         )}
-                      {bank.description && (
-                        <p
-                          className={`text-xs mt-0.5 ${
-                            isLoading || isLoadingBanks || isLoadingRoles
-                              ? "text-slate-400"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {bank.description}
-                        </p>
-                      )}
-                    </label>
-                  </div>
-                ))}
+                      </label>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-500 text-sm text-center py-4">
+                    No question banks match your filter.
+                  </p>
+                )}
               </div>
             )}
           </fieldset>

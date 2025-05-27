@@ -265,7 +265,7 @@ export interface QuestionForQuizAttempt {
   questionType: string; // Ideally, this would be the QuestionType enum
   options: Array<{ _id: Types.ObjectId; text: string }>;
   categories?: string[];
-  difficulty?: string; // Ideally, this would be the Difficulty enum
+  // difficulty?: string; // REMOVED
   // include other fields as necessary for the client to render the question
 }
 
@@ -809,7 +809,7 @@ export class QuizService {
     const questionsForAttempt = await QuestionModel.find({
       _id: { $in: questionsToPresentIds },
     })
-      .select("_id questionText questionType options categories difficulty")
+      .select("_id questionText questionType options categories")
       .lean<QuestionForQuizAttempt[]>();
 
     const orderedQuestions = questionsToPresentIds

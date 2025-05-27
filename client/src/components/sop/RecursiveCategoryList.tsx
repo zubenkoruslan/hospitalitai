@@ -19,6 +19,8 @@ interface RecursiveCategoryListProps extends CategoryModalTriggers {
   // Updated interface extension
   categories: ISopCategory[];
   level?: number; // To manage indentation and styling for nesting
+  selectedCategoryIds?: Set<string>; // Made optional
+  onCategorySelect?: (categoryId: string, isSelected: boolean) => void; // Made optional
   // parentId is not strictly needed here if triggers pass the full parent category object
 }
 
@@ -30,6 +32,8 @@ const RecursiveCategoryList: React.FC<RecursiveCategoryListProps> = ({
   onTriggerAddSubCategory,
   onTriggerEditCategory,
   onTriggerDeleteCategory,
+  selectedCategoryIds, // Remains, but usage is conditional
+  onCategorySelect, // Remains, but usage is conditional
 }) => {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
     {}
@@ -102,7 +106,7 @@ const RecursiveCategoryList: React.FC<RecursiveCategoryListProps> = ({
         return (
           <div
             key={categoryKey}
-            className="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden transition-all duration-300 ease-in-out group"
+            className="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden transition-all duration-300 ease-in-out group mb-2"
           >
             <div
               className={`flex items-center ${headerPadding} transition-colors duration-150 ease-in-out relative ${
@@ -115,6 +119,24 @@ const RecursiveCategoryList: React.FC<RecursiveCategoryListProps> = ({
                   : "bg-slate-50 hover:bg-slate-100"
               }`}
             >
+              {onCategorySelect &&
+                selectedCategoryIds && ( // Conditionally render checkbox
+                  <input
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 mr-3 flex-shrink-0"
+                    checked={selectedCategoryIds.has(
+                      category._id || categoryKey
+                    )}
+                    onChange={(e) => {
+                      if (category._id) {
+                        onCategorySelect(category._id, e.target.checked);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={!category._id}
+                    aria-label={`Select category ${category.name}`}
+                  />
+                )}
               <div
                 className="flex-grow cursor-pointer"
                 onClick={() => toggleExpand(categoryKey)}
@@ -213,6 +235,8 @@ const RecursiveCategoryList: React.FC<RecursiveCategoryListProps> = ({
                       onTriggerAddSubCategory={onTriggerAddSubCategory}
                       onTriggerEditCategory={onTriggerEditCategory}
                       onTriggerDeleteCategory={onTriggerDeleteCategory}
+                      selectedCategoryIds={selectedCategoryIds} // Pass down, will be undefined if not provided
+                      onCategorySelect={onCategorySelect} // Pass down, will be undefined if not provided
                     />
                   )}
               </div>

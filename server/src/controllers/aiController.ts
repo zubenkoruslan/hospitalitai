@@ -3,13 +3,13 @@ import AiQuestionService from "../services/AiQuestionService";
 import { AppError } from "../utils/errorHandler"; // Corrected path
 
 interface GenerateQuestionsRequestBody {
+  bankId: string;
   menuId: string;
   itemIds?: string[];
   categoriesToFocus?: string[];
   questionFocusAreas: string[];
   targetQuestionCountPerItemFocus: number;
   questionTypes: string[];
-  difficulty: string;
   additionalContext?: string;
   // restaurantId will be taken from authenticated user or request context, not directly from body for security
 }
@@ -65,18 +65,19 @@ export const generateAiQuestionsHandler = async (
     }
 
     const {
+      bankId,
       menuId,
       categoriesToFocus,
       questionFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes,
-      difficulty,
       additionalContext,
       itemIds,
     } = req.body;
 
     // Basic validation (more can be added with express-validator)
     if (
+      !bankId ||
       !menuId ||
       ((!categoriesToFocus || categoriesToFocus.length === 0) &&
         (!itemIds || itemIds.length === 0)) ||
@@ -84,12 +85,11 @@ export const generateAiQuestionsHandler = async (
       questionFocusAreas.length === 0 ||
       !targetQuestionCountPerItemFocus ||
       !questionTypes ||
-      questionTypes.length === 0 ||
-      !difficulty
+      questionTypes.length === 0
     ) {
       return next(
         new AppError(
-          "Missing required fields for AI question generation. Ensure categories or item IDs are provided.",
+          "Missing required fields for AI question generation. Ensure bankId, menuId, categories/itemIds, focus areas, question count, and types are provided.",
           400
         )
       );
@@ -112,7 +112,6 @@ export const generateAiQuestionsHandler = async (
       questionFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes,
-      difficulty,
       additionalContext,
       itemIds,
       restaurantId: user.restaurantId.toString(),
@@ -128,7 +127,8 @@ export const generateAiQuestionsHandler = async (
     const pendingQuestions =
       await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
         rawGeneratedQuestions,
-        user.restaurantId.toString()
+        user.restaurantId.toString(),
+        bankId
       );
 
     res.status(201).json({

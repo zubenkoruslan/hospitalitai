@@ -32,20 +32,20 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Deep copy questions to make them editable without affecting original prop
+    // Deep copy questions. Since IQuestion no longer has difficulty, no need to destructure it out.
     setEditableQuestions(JSON.parse(JSON.stringify(generatedQuestions)));
-  }, [generatedQuestions, isOpen]); // Reset when questions change or modal reopens
+  }, [generatedQuestions, isOpen]);
 
   if (!isOpen) return null;
 
   const handleQuestionChange = (
     index: number,
-    field: keyof IQuestion,
+    field: keyof Omit<IQuestion, "difficulty">, // difficulty already removed from IQuestion, this Omit is redundant but harmless
     value: any
   ) => {
     setEditableQuestions((prev) => {
       const updated = [...prev];
-      // @ts-ignore TODO: type this better if possible for field access
+      // @ts-ignore
       updated[index][field] = value;
       return updated;
     });
@@ -59,9 +59,8 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
   ) => {
     setEditableQuestions((prev) => {
       const updated = [...prev];
-      // @ts-ignore TODO: type this better
+      // @ts-ignore
       updated[qIndex].options[oIndex][field] = value;
-      // If changing 'isCorrect' for single-choice, ensure only one is correct
       if (
         field === "isCorrect" &&
         value === true &&
@@ -83,11 +82,12 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
     setIsLoading(true);
     setError(null);
 
-    // Construct the payload for the API
-    const acceptedAndUpdatedQuestions = editableQuestions.map((q) => ({
-      ...q,
-      status: "active", // Explicitly set status to active for all questions being kept
-    }));
+    // Explicitly type to help TypeScript, ensure status is compatible
+    const acceptedAndUpdatedQuestions: Partial<IQuestion>[] =
+      editableQuestions.map((q) => ({
+        ...q, // Spread all properties of IQuestion (which doesn't have difficulty)
+        status: "active", // Set status to active, which is a valid IQuestion.status type
+      }));
 
     const originalIds = new Set(generatedQuestions.map((q) => q._id));
     const editableIds = new Set(editableQuestions.map((q) => q._id));
@@ -96,21 +96,14 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
     );
 
     try {
-      console.log("Processing reviewed questions with payload:", {
-        acceptedQuestions: acceptedAndUpdatedQuestions,
-        updatedQuestions: [], // Keeping this empty as acceptedQuestions handles updates to pending ones
-        deletedQuestionIds: deletedQuestionIds,
-      });
-
       await processReviewedAiQuestions(targetBankId, {
         acceptedQuestions: acceptedAndUpdatedQuestions,
-        updatedQuestions: [], // Backend logic for acceptedQuestions can handle updates from pending state
+        updatedQuestions: [],
         deletedQuestionIds: deletedQuestionIds,
       });
 
-      // alert("Questions processed successfully!"); // Replace with a more robust notification system if available
       onReviewComplete(targetBankId);
-      onClose(); // Close modal on success
+      onClose();
     } catch (err: any) {
       console.error("Error processing reviewed questions:", err);
       setError(
@@ -158,7 +151,6 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
               <label className="block text-sm font-medium text-gray-700">
                 Type: {q.questionType}
               </label>
-              {/* TODO: Add selector to change type if needed, and adjust options validation */}
             </div>
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -194,20 +186,9 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
               ))}
             </div>
             <div className="mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Difficulty:
-              </label>
-              <select
-                value={q.difficulty || "medium"}
-                onChange={(e) =>
-                  handleQuestionChange(qIndex, "difficulty", e.target.value)
-                }
-                className="mt-1 block w-full max-w-xs pl-2 pr-8 py-1.5 text-xs border-gray-300 rounded-md"
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
+              <p className="text-xs text-gray-500">
+                (All questions are automatically set to medium difficulty)
+              </p>
             </div>
             <div className="text-right">
               <Button

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/errorHandler";
 import { SopDocumentService } from "../services/sopDocumentService";
 import mongoose from "mongoose";
+import { SopQuestionGenerationService } from "../services/SopQuestionGenerationService";
 
 export class SopDocumentController {
   // Placeholder for upload method
@@ -212,4 +213,67 @@ export class SopDocumentController {
   }
 
   // TODO: Add other controller methods (get, list, delete, getStatus)
+
+  // ADDED: New controller method for selective question generation
+  static async generateQuestionsForSopBankController(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user || !req.user.restaurantId) {
+        throw new AppError(
+          "Authentication required: User or restaurantId not found.",
+          401
+        );
+      }
+      const { documentId } = req.params;
+      const {
+        selectedCategoryIds,
+        targetQuestionsPerSelectedCategory,
+        forceUpdateBank,
+      } = req.body;
+
+      if (!mongoose.Types.ObjectId.isValid(documentId)) {
+        throw new AppError("Invalid SOP Document ID format.", 400);
+      }
+      if (
+        !Array.isArray(selectedCategoryIds) ||
+        selectedCategoryIds.some(
+          (id: any) => !mongoose.Types.ObjectId.isValid(id)
+        )
+      ) {
+        throw new AppError(
+          "Invalid selectedCategoryIds provided. Must be an array of valid ObjectIds.",
+          400
+        );
+      }
+
+      // Construct params for the service, ensuring correct typing for optional numbers
+      const serviceParams = {
+        sopDocumentId: documentId,
+        restaurantId: req.user.restaurantId.toString(), // Ensure restaurantId is string for service
+        selectedCategoryIds,
+        targetQuestionsPerSelectedCategory: targetQuestionsPerSelectedCategory
+          ? parseInt(targetQuestionsPerSelectedCategory.toString(), 10)
+          : undefined,
+        forceUpdateBank:
+          typeof forceUpdateBank === "boolean" ? forceUpdateBank : false, // Default to false if not proper boolean
+      };
+
+      // Assuming SopQuestionGenerationService is imported and available
+      const questionBank =
+        await SopQuestionGenerationService.generateQuestionsForSopBank(
+          serviceParams
+        );
+
+      res.status(201).json({
+        message:
+          "Questions generated successfully for selected SOP sections and added to bank.",
+        data: questionBank,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -27,8 +27,9 @@ export interface IQuestion extends Document {
   categories: string[];
   restaurantId: Types.ObjectId;
   questionBankId: Types.ObjectId;
+  sopDocumentId?: Types.ObjectId;
+  sopCategoryId?: Types.ObjectId;
   createdBy: "ai" | "manual";
-  difficulty?: "easy" | "medium" | "hard";
   status: "active" | "pending_review" | "rejected";
   explanation?: string;
   createdAt?: Date;
@@ -88,11 +89,6 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       enum: ["ai", "manual"],
       required: true,
     },
-    difficulty: {
-      type: String,
-      enum: ["easy", "medium", "hard"],
-      required: false,
-    },
     status: {
       type: String,
       enum: ["active", "pending_review", "rejected"],
@@ -104,6 +100,17 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
       trim: true,
       maxlength: [500, "Explanation cannot exceed 500 characters"],
       required: false,
+    },
+    sopDocumentId: {
+      type: Schema.Types.ObjectId,
+      ref: "SopDocument",
+      required: false,
+      index: true,
+    },
+    sopCategoryId: {
+      type: Schema.Types.ObjectId,
+      required: false,
+      index: true,
     },
   },
   { timestamps: true }

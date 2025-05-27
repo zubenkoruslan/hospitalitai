@@ -1,12 +1,21 @@
-import React, { useState, FormEvent, useEffect } from "react";
+import React, { useState, FormEvent, useEffect, useCallback } from "react";
 import {
   IQuestion,
   NewAiQuestionGenerationParams,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
-import { triggerAiQuestionGenerationProcess as apiTriggerAiGeneration } from "../../services/api";
+import {
+  triggerAiQuestionGenerationProcess as apiTriggerAiGeneration,
+  getMenuWithItems,
+} from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
+import { MenuItem } from "../../types/menuItemTypes";
+
+interface MenuCategoryDisplayItem {
+  id: string;
+  name: string;
+}
 
 const QUESTION_FOCUS_AREAS = [
   { id: "Name", label: "Item Name" },
@@ -17,27 +26,24 @@ const QUESTION_FOCUS_AREAS = [
 
 interface GenerateAiQuestionsFormProps {
   bankId: string;
-  menuId?: string;
-  bankCategories: string[];
+  menuId: string;
   onAiQuestionsGenerated: (questions: IQuestion[]) => void;
   onCloseRequest: () => void;
+  initialCategories?: string[];
 }
 
 const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   bankId,
   menuId,
-  bankCategories,
   onAiQuestionsGenerated,
   onCloseRequest,
+  initialCategories,
 }) => {
   const { formatErrorMessage } = useValidation();
-  const [categoriesInput, setCategoriesInput] = useState("");
   const [targetQuestionCountPerItemFocus, setTargetQuestionCountPerItemFocus] =
     useState<number>(3);
 
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
-  const [aiQuestionDifficulty, setAiQuestionDifficulty] =
-    useState<string>("medium");
   const [aiQuestionTypes] = useState<string[]>([
     "multiple-choice-single",
     "true-false",
@@ -46,11 +52,85 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [internalIsLoading, setInternalIsLoading] = useState(false);
 
+  const [selectedMenuCategories, setSelectedMenuCategories] = useState<
+    string[]
+  >(initialCategories || []);
+  const [availableMenuCategories, setAvailableMenuCategories] = useState<
+    MenuCategoryDisplayItem[]
+  >([]);
+  const [isLoadingMenuCategories, setIsLoadingMenuCategories] = useState(false);
+  const [errorMenuCategories, setErrorMenuCategories] = useState<string | null>(
+    null
+  );
+
+  // Effect to fetch available categories when menuId changes
   useEffect(() => {
-    if (bankCategories && bankCategories.length > 0) {
-      setCategoriesInput(bankCategories.join(", "));
+    if (!menuId) {
+      setErrorMenuCategories("Menu ID is not provided.");
+      setAvailableMenuCategories([]);
+      // Don't reset selectedMenuCategories here, let the other effect handle initial state based on props
+      return;
     }
-  }, [bankCategories]);
+    const fetchCategories = async () => {
+      setIsLoadingMenuCategories(true);
+      setErrorMenuCategories(null);
+      setAvailableMenuCategories([]); // Reset before fetching new ones
+      try {
+        const menuDetails = await getMenuWithItems(menuId);
+        if (menuDetails && menuDetails.items && menuDetails.items.length > 0) {
+          const uniqueCategoryNames = Array.from(
+            new Set(
+              menuDetails.items
+                .map((item: MenuItem) => item.category)
+                .filter(Boolean)
+            )
+          );
+          setAvailableMenuCategories(
+            uniqueCategoryNames.map((name) => ({ id: name, name }))
+          );
+        } else {
+          // setErrorMenuCategories("No categories found in the selected menu or menu has no items.");
+        }
+      } catch (err) {
+        console.error("Error fetching menu categories:", err);
+        setErrorMenuCategories("Failed to load categories from the menu.");
+      } finally {
+        setIsLoadingMenuCategories(false);
+      }
+    };
+    fetchCategories();
+  }, [menuId]);
+
+  // Effect to set selected categories from initialCategories once availableMenuCategories are loaded
+  useEffect(() => {
+    if (
+      initialCategories &&
+      initialCategories.length > 0 &&
+      availableMenuCategories.length > 0
+    ) {
+      const validInitialCategories = initialCategories.filter((initCat) =>
+        availableMenuCategories.some((availCat) => availCat.id === initCat)
+      );
+      // Only set if different to avoid potential loops if not managed carefully, though with current deps it should be fine.
+      // This also ensures that if a user deselects all, and then initialCategories prop somehow changes without menuId changing,
+      // it correctly re-applies the initial prop based selection.
+      setSelectedMenuCategories(validInitialCategories);
+    } else if (
+      initialCategories &&
+      initialCategories.length > 0 &&
+      availableMenuCategories.length === 0 &&
+      !isLoadingMenuCategories
+    ) {
+      // This case means initialCategories were provided, but the fetched menu has no categories.
+      // We should probably clear selectedMenuCategories or rely on the initial state from the prop (which might be [])
+      setSelectedMenuCategories([]);
+    } else if (!initialCategories || initialCategories.length === 0) {
+      // If no initialCategories are provided (e.g. on subsequent uses of the form for the same menu after initial load)
+      // we don't want to clear user's manual selections. But if it's truly the first load with no initial, it's fine.
+      // The `useState(initialCategories || [])` handles the very first load case.
+      // This block might be redundant if `useState` already correctly handles it.
+    }
+  }, [initialCategories, availableMenuCategories, isLoadingMenuCategories]);
 
   const handleFocusAreaChange = (focusAreaId: string) => {
     setSelectedFocusAreas((prev) =>
@@ -60,55 +140,70 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
     );
   };
 
+  // ADDED: Handler for menu category selection
+  const handleMenuCategoryToggle = (categoryId: string) => {
+    setSelectedMenuCategories((prevSelected) =>
+      prevSelected.includes(categoryId)
+        ? prevSelected.filter((id) => id !== categoryId)
+        : [...prevSelected, categoryId]
+    );
+  };
+
+  // ADDED: Handler for select/deselect all menu categories
+  const handleToggleSelectAllMenuCategories = () => {
+    if (selectedMenuCategories.length === availableMenuCategories.length) {
+      setSelectedMenuCategories([]);
+    } else {
+      setSelectedMenuCategories(availableMenuCategories.map((cat) => cat.id));
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    setInternalIsLoading(true);
-
-    const parsedCategories = categoriesInput
-      .split(",")
-      .map((cat) => cat.trim())
-      .filter((cat) => cat);
 
     if (!menuId) {
-      setFormError(
-        "A Menu context is required for AI generation. Please select a menu."
-      );
-      setInternalIsLoading(false);
+      setFormError("A Menu ID is required but was not provided.");
       return;
     }
-    if (parsedCategories.length === 0) {
-      setFormError("Please provide at least one category for AI generation.");
-      setInternalIsLoading(false);
+    if (availableMenuCategories.length === 0) {
+      setFormError(
+        "No menu categories are available for this menu. Cannot generate AI questions without categories."
+      );
+      return;
+    }
+    if (selectedMenuCategories.length === 0) {
+      setFormError(
+        "Please select at least one menu category for AI generation."
+      );
       return;
     }
     if (selectedFocusAreas.length === 0) {
       setFormError("Please select at least one Question Focus Area.");
-      setInternalIsLoading(false);
       return;
     }
     if (targetQuestionCountPerItemFocus <= 0) {
       setFormError(
         "Target question count per item/focus must be a positive number."
       );
-      setInternalIsLoading(false);
       return;
     }
     if (targetQuestionCountPerItemFocus > 10) {
       setFormError(
         "Target question count per item/focus should not exceed 10."
       );
-      setInternalIsLoading(false);
       return;
     }
+    setInternalIsLoading(true);
 
     const payload: NewAiQuestionGenerationParams = {
+      bankId: bankId,
       menuId: menuId,
-      categoriesToFocus: parsedCategories,
+      categoriesToFocus: selectedMenuCategories,
       questionFocusAreas: selectedFocusAreas,
       targetQuestionCountPerItemFocus,
       questionTypes: aiQuestionTypes,
-      difficulty: aiQuestionDifficulty,
+      // difficulty is now optional and removed from here
     };
 
     console.log("AI Generation Payload:", JSON.stringify(payload, null, 2));
@@ -145,26 +240,69 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         </div>
       )}
 
-      <div>
-        <label htmlFor="aiCategories" className={commonLabelClass}>
-          Categories for AI Generation (comma-separated)
-        </label>
-        <input
-          id="aiCategories"
-          type="text"
-          value={categoriesInput}
-          onChange={(e) => setCategoriesInput(e.target.value)}
-          placeholder="e.g., Red Wine, Italian Cuisine, Allergens"
-          required
-          className={commonInputClass}
-          disabled={internalIsLoading}
-        />
-        {bankCategories && bankCategories.length > 0 && (
-          <p className="mt-1 text-xs text-gray-500">
-            Current bank categories (for reference): {bankCategories.join(", ")}
-          </p>
+      {/* ADDED: Menu Category Selection Section */}
+      <div className="pt-2">
+        <div className="flex justify-between items-center mb-1">
+          <label className={`${commonLabelClass}`}>
+            Menu Categories (Select at least one)
+          </label>
+          {availableMenuCategories.length > 0 && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleToggleSelectAllMenuCategories}
+              disabled={internalIsLoading || isLoadingMenuCategories}
+              className="text-xs px-2 py-1"
+            >
+              {selectedMenuCategories.length === availableMenuCategories.length
+                ? "Deselect All"
+                : "Select All"}
+            </Button>
+          )}
+        </div>
+        {isLoadingMenuCategories && (
+          <LoadingSpinner message="Loading menu categories..." />
         )}
+        {errorMenuCategories && (
+          <p className="text-xs text-red-500">{errorMenuCategories}</p>
+        )}
+        {!isLoadingMenuCategories &&
+          !errorMenuCategories &&
+          availableMenuCategories.length === 0 && (
+            <p className="text-xs text-gray-500 italic">
+              No categories available for this menu or menu is empty.
+            </p>
+          )}
+        {!isLoadingMenuCategories &&
+          !errorMenuCategories &&
+          availableMenuCategories.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 p-2 border rounded-md bg-gray-50 max-h-48 overflow-y-auto">
+              {availableMenuCategories.map((category) => (
+                <div key={category.id} className="flex items-center">
+                  <input
+                    id={`menu-category-${category.id}-${bankId}`}
+                    type="checkbox"
+                    value={category.id}
+                    checked={selectedMenuCategories.includes(category.id)}
+                    onChange={() => handleMenuCategoryToggle(category.id)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                    disabled={internalIsLoading}
+                  />
+                  <label
+                    htmlFor={`menu-category-${category.id}-${bankId}`}
+                    className="ml-2 text-sm text-gray-600 truncate"
+                    title={category.name}
+                  >
+                    {category.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
       </div>
+
+      {/* REMOVED: Old categories input field */}
+      {/* <div> ... </div> */}
 
       <div>
         <label
@@ -217,22 +355,8 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         </div>
       </div>
 
-      <div className="pt-2">
-        <label htmlFor={`aiDifficulty-${bankId}`} className={commonLabelClass}>
-          Question Difficulty
-        </label>
-        <select
-          id={`aiDifficulty-${bankId}`}
-          value={aiQuestionDifficulty}
-          onChange={(e) => setAiQuestionDifficulty(e.target.value)}
-          className={`${commonInputClass} max-w-xs`}
-          disabled={internalIsLoading}
-        >
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-        </select>
-      </div>
+      {/* REMOVED: Question Difficulty Selection */}
+      {/* <div className="pt-2"> ... </div> */}
 
       <div className="flex justify-end space-x-2 pt-3">
         <Button
@@ -243,7 +367,11 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         >
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={internalIsLoading}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={internalIsLoading || isLoadingMenuCategories}
+        >
           {internalIsLoading ? <LoadingSpinner /> : "Generate Questions"}
         </Button>
       </div>

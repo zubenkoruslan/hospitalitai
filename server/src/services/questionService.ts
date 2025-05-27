@@ -21,6 +21,7 @@ export interface NewQuestionData {
   restaurantId: mongoose.Types.ObjectId;
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
+  questionBankId: mongoose.Types.ObjectId;
 }
 
 // Interface for the data allowed when updating an existing question
@@ -501,6 +502,7 @@ export const generateAiQuestionsService = async (
           restaurantId: restaurantId,
           createdBy: "ai",
           difficulty: aiGeneratedContent.difficulty || "medium",
+          questionBankId: questionBank._id,
         };
         allGeneratedQuestionsData.push(questionData);
       }

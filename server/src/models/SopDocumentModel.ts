@@ -122,6 +122,10 @@ const SopDocumentSchema: Schema<ISopDocument> = new Schema(
       default: null,
       index: true, // Add index if you query by this often
     },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt fields

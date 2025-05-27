@@ -23,7 +23,7 @@ import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
 import HomePage from "./pages/HomePage";
-import QuestionBankListPage from "./pages/QuestionBankListPage";
+// import QuestionBankListPage from "./pages/QuestionBankListPage"; // Removed import
 import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
 import QuestionBankEditPage from "./pages/QuestionBankEditPage";
 import AiQuestionReviewPage from "./pages/AiQuestionReviewPage";
@@ -142,6 +142,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* REMOVED: Route for QuestionBankListPage as it has been deleted. QuizAndBankManagementPage is the entry point. */}
+            {/*
             <Route
               path="/question-banks"
               element={
@@ -150,6 +152,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            */}
             <Route
               path="/question-banks/:bankId"
               element={

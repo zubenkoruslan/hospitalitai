@@ -56,7 +56,6 @@ const ReviewQuestionItem: React.FC<{
         </p>
         <div className="text-sm text-gray-700 mb-2">
           <strong>Type:</strong> {formatQuestionType(question.questionType)} |{" "}
-          <strong>Difficulty:</strong> {question.difficulty || "N/A"} |{" "}
           <strong>Category:</strong> {question.categories?.join(", ") || "N/A"}
         </div>
         {question.options && question.options.length > 0 && (

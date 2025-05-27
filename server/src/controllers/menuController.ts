@@ -185,8 +185,19 @@ export const uploadMenuPdf = async (
 ): Promise<void> => {
   try {
     const restaurantIdString = req.params.restaurantId;
-    // restaurantIdString validation handled by validateObjectId("restaurantId") in routes file
     const restaurantId = new mongoose.Types.ObjectId(restaurantIdString);
+
+    // ---- START DEBUG LOGS ----
+    console.log(
+      "uploadMenuPdf controller - req.headers:",
+      JSON.stringify(req.headers, null, 2)
+    );
+    console.log(
+      "uploadMenuPdf controller - req.body:",
+      JSON.stringify(req.body, null, 2)
+    ); // req.body might be empty or undefined with multer, file is in req.file
+    console.log("uploadMenuPdf controller - req.file:", req.file);
+    // ---- END DEBUG LOGS ----
 
     if (!req.file) {
       return next(new AppError("No PDF file uploaded.", 400));

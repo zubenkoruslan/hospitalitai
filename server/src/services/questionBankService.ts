@@ -34,7 +34,8 @@ export interface UpdateQuestionBankData {
   name?: string;
   description?: string;
   targetQuestionCount?: number; // Added targetQuestionCount
-  // categories and questions will be handled by separate dedicated functions usually
+  categories?: string[]; // ADDED: categories field
+  // questions will be handled by separate dedicated functions usually
 }
 
 interface MenuSpecificAiParams {

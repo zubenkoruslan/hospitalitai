@@ -156,6 +156,7 @@ export class SopDocumentService {
       status: "uploaded", // Initial status
       categories: [],
       description,
+      uploadedAt: new Date(), // Explicitly set uploadedAt
     });
 
     try {

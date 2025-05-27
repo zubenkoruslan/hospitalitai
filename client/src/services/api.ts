@@ -14,9 +14,10 @@ const API_BASE_URL =
 // Create an Axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // REMOVED: Default Content-Type header. Axios will set it automatically.
+  // headers: {
+  //   "Content-Type": "application/json",
+  // },
 });
 
 // Request interceptor to add the auth token to headers
@@ -104,6 +105,7 @@ import {
   AiGenerationClientParams,
   UpdateQuestionClientData,
   NewAiQuestionGenerationParams,
+  QuestionType,
 } from "../types/questionBankTypes";
 
 // Import menu types
@@ -876,7 +878,7 @@ export const triggerAiQuestionGenerationProcess = async (
 // Function to fetch questions pending review
 export const getPendingReviewQuestions = async (): Promise<IQuestion[]> => {
   // Backend route GET /api/questions/pending-review uses authenticated user's restaurantId
-  const response = await api.post<{ data: IQuestion[] }>(
+  const response = await api.get<{ data: IQuestion[] }>(
     "/questions/pending-review"
   );
   return response.data.data; // Assuming backend wraps in a 'data' object like other question endpoints
@@ -1243,6 +1245,52 @@ export const updateSopDocumentTitle = async (
     document: ISopDocument;
   }>(`/sop-documents/${documentId}`, { title });
   return response.data.document;
+};
+
+// ADDED: Function to generate questions from selected SOP categories
+export const generateQuestionsFromSopCategories = async (
+  documentId: string,
+  selectedCategoryIds: string[],
+  targetQuestionsPerCategory?: number, // Optional: if you want to specify this from frontend
+  forceUpdateBank?: boolean // Optional: if you want to control this from frontend
+): Promise<{
+  questionBankId: string;
+  generatedQuestionCount: number;
+  // Potentially return the full ISopDocument or IQuestionBank if needed
+  // For now, keeping it minimal based on frontend needs identified so far
+  sopDocument?: ISopDocument; // If backend returns updated SOP document
+}> => {
+  const response = await api.post<{
+    questionBankId: string;
+    generatedQuestionCount: number;
+    sopDocument?: ISopDocument;
+  }>(`/sop-documents/${documentId}/generate-questions`, {
+    selectedCategoryIds,
+    targetQuestionsPerSelectedCategory: targetQuestionsPerCategory || 5, // Default to 5 if not provided
+    forceUpdateBank: forceUpdateBank === undefined ? true : forceUpdateBank, // Default to true (overwrite existing bank for the SOP)
+  });
+  return response.data;
+};
+
+// ADDED: Function to generate more AI questions for an SOP-linked Question Bank
+export const generateMoreAiQuestionsForSopBank = async (
+  bankId: string,
+  // sopDocumentId: string, // The backend can get this from the bankId
+  params: {
+    targetQuestionCount: number;
+    questionTypes: QuestionType[]; // Should be restricted to 'true-false' and 'multiple-choice-single'
+  }
+): Promise<{
+  questions: IQuestion[];
+  message: string;
+  pendingReviewQuestionIds?: string[];
+}> => {
+  const response = await api.post<{
+    questions: IQuestion[];
+    message: string;
+    pendingReviewQuestionIds?: string[];
+  }>(`/question-banks/${bankId}/generate-sop-questions`, params);
+  return response.data;
 };
 
 // Make the Axios instance available as a default export

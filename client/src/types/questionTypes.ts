@@ -13,5 +13,4 @@ export interface ClientQuestionForAttempt {
   questionType: string; // e.g., "multiple-choice-single", "true-false"
   options: ClientQuestionOption[];
   categories?: string[];
-  difficulty?: string;
 }

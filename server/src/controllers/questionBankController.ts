@@ -260,7 +260,7 @@ export const updateQuestionBank = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-    const { name, description, targetQuestionCount } = req.body;
+    const { name, description, targetQuestionCount, categories } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -274,6 +274,9 @@ export const updateQuestionBank = async (
     if (description !== undefined) updateData.description = description;
     if (targetQuestionCount !== undefined)
       updateData.targetQuestionCount = targetQuestionCount;
+    if (categories !== undefined) {
+      updateData.categories = categories;
+    }
 
     const updatedBank = await QuestionBankService.updateQuestionBankService(
       bankId,
@@ -977,7 +980,7 @@ export const generateAiQuestionsForSopBank = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-    const { targetQuestionCount, questionTypes, difficulty } = req.body;
+    const { targetQuestionCount, questionTypes } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -1033,16 +1036,12 @@ export const generateAiQuestionsForSopBank = async (
         new AppError("questionTypes must be a non-empty array of strings.", 400)
       );
     }
-    if (!difficulty || typeof difficulty !== "string") {
-      return next(new AppError("Difficulty level is required.", 400));
-    }
 
     const sopQuestionParams: GenerateQuestionsFromSopParams = {
       sopDocumentId: bank.sourceSopDocumentId.toString(),
       selectedSopCategoryNames: bank.categories,
       targetQuestionCount,
       questionTypes,
-      difficulty,
       restaurantId: restaurantIdString,
     };
 
@@ -1063,7 +1062,8 @@ export const generateAiQuestionsForSopBank = async (
     const pendingQuestions =
       await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
         rawQuestions,
-        restaurantIdString
+        restaurantIdString,
+        bankId
       );
 
     res.status(200).json({

@@ -10,8 +10,14 @@ export const createQuestion = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { questionText, questionType, options, categories, difficulty } =
-      req.body;
+    const {
+      questionText,
+      questionType,
+      options,
+      categories,
+      difficulty,
+      questionBankId,
+    } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -28,10 +34,21 @@ export const createQuestion = async (
       questionType,
       options,
       categories,
-      restaurantId,
+      restaurantId: new mongoose.Types.ObjectId(restaurantId),
       createdBy: "manual",
       difficulty,
+      questionBankId: new mongoose.Types.ObjectId(questionBankId),
     };
+
+    // Validate questionBankId presence (moved from service for early check)
+    if (!questionBankId) {
+      return next(
+        new AppError("Question bank ID is required to create a question.", 400)
+      );
+    }
+    if (!mongoose.Types.ObjectId.isValid(questionBankId)) {
+      return next(new AppError("Invalid Question Bank ID format.", 400));
+    }
 
     const newQuestion = await QuestionService.createQuestionService(
       questionData

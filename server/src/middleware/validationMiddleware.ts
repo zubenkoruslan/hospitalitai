@@ -470,19 +470,14 @@ export const validateCreateQuestionBankBody: ValidationChain[] = [
 
 export const validateUpdateQuestionBankBody: ValidationChain[] = [
   body().custom((value, { req }) => {
-    if (Object.keys(req.body).length === 0) {
-      throw new Error(
-        "No update data provided. Provide name, description, or targetQuestionCount."
-      );
-    }
-    // Check that at least one of the allowed fields is present
     if (
       req.body.name === undefined &&
       req.body.description === undefined &&
-      req.body.targetQuestionCount === undefined
+      req.body.targetQuestionCount === undefined &&
+      req.body.categories === undefined
     ) {
       throw new Error(
-        "No update data provided. Provide name, description, or targetQuestionCount."
+        "No update data provided. Provide name, description, targetQuestionCount, or categories."
       );
     }
     return true;
@@ -503,6 +498,17 @@ export const validateUpdateQuestionBankBody: ValidationChain[] = [
     .optional()
     .isInt({ min: 1 })
     .toInt(),
+  body("categories", "Categories must be an array of strings")
+    .optional()
+    .isArray(),
+  body("categories.*", "Each category must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage(
+      "Category names cannot be empty if categories array is provided."
+    ),
 ];
 
 export const validateAddQuestionToBankBody: ValidationChain[] = [
