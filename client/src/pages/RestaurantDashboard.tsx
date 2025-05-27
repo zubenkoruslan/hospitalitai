@@ -149,7 +149,7 @@ const RestaurantDashboard: React.FC = () => {
     }
     setIsStaffInviteLoading(true);
     try {
-      await inviteStaff(user.restaurantId, { email: emailToInvite });
+      await inviteStaff({ email: emailToInvite });
       setInviteMessage(`Invitation sent to ${emailToInvite}.`);
       setInviteEmail("");
       // Optionally, refresh staffData if useStaffSummary hook doesn't auto-update on new staff

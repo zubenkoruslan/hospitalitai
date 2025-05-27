@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getQuizAttemptDetails, updateStaffRole } from "../services/api";
+import { getQuizAttemptDetails } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -16,33 +16,27 @@ import Card from "../components/common/Card";
 // --- Main Component ---
 const StaffDetails: React.FC = () => {
   const { id: staffId } = useParams<{ id: string }>();
-  const { user: _user } = useAuth();
+  useAuth(); // Called for auth context, but user object not directly used here
   const navigate = useNavigate();
 
-  // Use the custom hook
-  const { staffDetails, loading, error, fetchStaffDetails } =
-    useStaffDetails(staffId);
+  // Use the custom hook - removed fetchStaffDetails as it's not used for manual refresh here
+  const { staffDetails, loading, error } = useStaffDetails(staffId);
 
-  // Keep state specific to this page (modals, role editing)
+  // State specific to this page (modals, notifications)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
     useState<ClientQuizAttemptDetails | null>(null);
-  const [_loadingModalDetails, _setLoadingModalDetails] = useState(false);
-  const [_modalError, _setModalError] = useState<string | null>(null);
+  const [loadingModalDetails, setLoadingModalDetails] = useState(false); // Renamed for clarity
+  const [modalError, setModalError] = useState<string | null>(null); // Renamed for clarity
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Update editedRole when staffDetails load or change (if not already editing)
-  useEffect(() => {
-    if (staffDetails) {
-      // setEditedRole(staffDetails.professionalRole || ""); // Removed
-    }
-  }, [staffDetails]);
+  // Removed useEffect related to setEditedRole as professionalRole editing is removed
 
   // --- Handlers ---
   const handleOpenAttemptModal = useCallback(
     async (attemptId: string) => {
-      _setLoadingModalDetails(true);
-      _setModalError(null);
+      setLoadingModalDetails(true);
+      setModalError(null);
       setModalDataForIncorrectAnswers(null);
 
       try {
@@ -50,26 +44,26 @@ const StaffDetails: React.FC = () => {
         if (attemptDetailsData) {
           setModalDataForIncorrectAnswers(attemptDetailsData);
         } else {
-          _setModalError("Could not load attempt details.");
+          setModalError("Could not load attempt details.");
         }
       } catch (err: any) {
         console.error("Error fetching attempt details:", err);
-        _setModalError(
+        setModalError(
           err.message || "Failed to load details for this attempt."
         );
       } finally {
-        _setLoadingModalDetails(false);
+        setLoadingModalDetails(false);
         setIsModalOpen(true);
       }
     },
-    [_setLoadingModalDetails, _setModalError]
+    [] // Dependencies: state setters are stable
   );
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setModalDataForIncorrectAnswers(null);
-    _setModalError(null);
-  }, [_setModalError]);
+    setModalError(null);
+  }, []); // Dependencies: state setters are stable
 
   // --- Render Logic ---
   if (loading) {
@@ -83,7 +77,6 @@ const StaffDetails: React.FC = () => {
     );
   }
 
-  // Use error state from hook
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100">
@@ -106,7 +99,6 @@ const StaffDetails: React.FC = () => {
     );
   }
 
-  // Use staffDetails from hook in the render
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
@@ -121,7 +113,6 @@ const StaffDetails: React.FC = () => {
           </Button>
         </div>
 
-        {/* Notifications Area */}
         {successMessage && (
           <div className="mb-4">
             <SuccessNotification
@@ -130,28 +121,16 @@ const StaffDetails: React.FC = () => {
             />
           </div>
         )}
-        {/* roleErrorText && isEditingRole && ( // Removed role error display
-          <div className="mb-4">
-            <ErrorMessage
-              message={roleErrorText}
-              onDismiss={() => setRoleErrorText(null)}
-            />
-          </div>
-        )*/}
+        {/* Removed commented out roleErrorText display */}
 
-        {/* Updated Page Title Header for staff name */}
         <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
             {staffDetails.name}
           </h1>
-          {/* Optional: Subtitle for role, if desired in this prominent header */}
-          {/* <p className="mt-1 text-lg text-gray-600">{staffDetails.professionalRole || "Role not set"}</p> */}
         </div>
 
-        {/* Updated Staff Details Card */}
         <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            {/* Column 1: Contact & Employment */}
             <div>
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 Contact & Employment
@@ -168,7 +147,6 @@ const StaffDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Column 2: Role & Performance Summary */}
             <div>
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 Role & Performance Summary
@@ -176,10 +154,11 @@ const StaffDetails: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <h3 className="text-base font-medium text-gray-700 mb-1">
-                    Professional Role
+                    Assigned Role {/* Changed label */}
                   </h3>
                   <p className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md inline-block">
-                    {staffDetails.professionalRole || "Not Set"}
+                    {staffDetails.assignedRoleName || "Not Set"}{" "}
+                    {/* Changed field */}
                   </p>
                 </div>
                 <div>
@@ -205,11 +184,11 @@ const StaffDetails: React.FC = () => {
           </div>
         </Card>
 
-        {/* Updated Quiz Results & Performance Card */}
         <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8">
           Quiz Performance
         </h2>
-        {loading && <LoadingSpinner message="Refreshing details..." />}
+        {/* Display loading spinner here only if a refresh action triggers loading, not the initial page load covered above */}
+        {/* {loading && <LoadingSpinner message="Refreshing details..." />} */}
         {staffDetails.aggregatedQuizPerformance.length === 0 && !loading && (
           <Card className="p-4 text-center text-gray-500">
             No quiz performance data available for this staff member.
@@ -303,14 +282,17 @@ const StaffDetails: React.FC = () => {
         </div>
       </main>
 
-      {/* Modal for Incorrect Answers */}
-      {isModalOpen && (
-        <ViewIncorrectAnswersModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          attemptDetails={modalDataForIncorrectAnswers}
-        />
-      )}
+      {isModalOpen &&
+        modalDataForIncorrectAnswers && ( // Added check for modalDataForIncorrectAnswers
+          <ViewIncorrectAnswersModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            attemptDetails={modalDataForIncorrectAnswers}
+            // Pass loadingModalDetails and modalError if ViewIncorrectAnswersModal needs them
+            // loading={loadingModalDetails}
+            // error={modalError}
+          />
+        )}
     </div>
   );
 };

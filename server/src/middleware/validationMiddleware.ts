@@ -73,17 +73,17 @@ export const validateSignupRequest: ValidationChain[] = [
     return true;
   }),
 
-  body("professionalRole").custom((value, { req }) => {
-    if (req.body.role === "staff" && (!value || String(value).trim() === "")) {
-      throw new Error("Professional role is required for staff role");
-    }
-    if (req.body.role === "restaurant" && value) {
-      throw new Error(
-        "Professional role should not be provided for restaurant role"
-      );
-    }
-    return true;
-  }),
+  // body("professionalRole").custom((value, { req }) => {
+  //   if (req.body.role === "staff" && (!value || String(value).trim() === "")) {
+  //     throw new Error("Professional role is required for staff role");
+  //   }
+  //   if (req.body.role === "restaurant" && value) {
+  //     throw new Error(
+  //       "Professional role should not be provided for restaurant role"
+  //     );
+  //   }
+  //   return true;
+  // }),
 ];
 
 // Validation rules for the /login endpoint

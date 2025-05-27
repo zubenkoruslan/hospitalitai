@@ -9,6 +9,7 @@ import {
   IQuestionBank, // Added for onBankCreated details
 } from "../../types/questionBankTypes";
 import { IMenuClient } from "../../types/menuTypes";
+import { MenuItem } from "../../types/menuItemTypes"; // ADDED: Import MenuItem
 import { ISopDocument, ISopCategory } from "../../types/sopTypes"; // Import ISopCategory
 import {
   getMenusByRestaurant,
@@ -26,12 +27,23 @@ import { useAuth } from "../../context/AuthContext";
 import { useValidation } from "../../context/ValidationContext";
 import SopCategoryRecursiveSelector from "./SopCategoryRecursiveSelector"; // Import the new component
 
-// const QUESTION_FOCUS_AREAS = [ // No longer needed here
-//   { id: "Name", label: "Item Name" },
-//   { id: "Ingredients", label: "Ingredients" },
-//   { id: "Dietary", label: "Dietary Information" },
-//   { id: "Description", label: "Description Details" },
-// ];
+// Keywords to identify beverage categories (case-insensitive check)
+const BEVERAGE_CATEGORY_KEYWORDS = [
+  "beverage",
+  "drink",
+  "coffee",
+  "tea",
+  "soda",
+  "wine",
+  "beer",
+  "cocktail",
+  "juice",
+  "smoothie",
+  "milkshake",
+  "water",
+  "spirit",
+  "liqueur",
+];
 
 interface CreateQuestionBankFormProps {
   onBankCreated: (details: {
@@ -74,10 +86,29 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   // Menu Specific State
   const [menus, setMenus] = useState<IMenuClient[]>([]);
   const [selectedMenuId, setSelectedMenuId] = useState<string>("");
-  const [menuCategories, setMenuCategories] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [areAllCategoriesSelected, setAreAllCategoriesSelected] =
     useState(false);
+
+  // ADDED: State for beverage category handling
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]); // All items of the selected menu
+  const [beverageItemCategories, setBeverageItemCategories] = useState<
+    string[]
+  >([]); // Unique categories of beverage items
+  const [nonBeverageItemCategories, setNonBeverageItemCategories] = useState<
+    string[]
+  >([]); // Unique categories of non-beverage items
+  const [isBeverageMenu, setIsBeverageMenu] = useState<boolean>(false); // True if menu contains any beverage items/categories
+  const [includeBeverageCategoriesInBank, setIncludeBeverageCategoriesInBank] =
+    useState<boolean>(false); // Checkbox state
+  const [
+    selectedBeverageCategoriesForBank,
+    setSelectedBeverageCategoriesForBank,
+  ] = useState<string[]>([]); // Selected beverage categories for the bank
+  const [
+    areAllBeverageCategoriesSelected,
+    setAreAllBeverageCategoriesSelected,
+  ] = useState(false);
 
   // SOP Specific State
   const [sopDocuments, setSopDocuments] = useState<ISopDocument[]>([]);
@@ -141,45 +172,108 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   useEffect(() => {
     const loadCategories = async () => {
       if (!selectedMenuId) {
-        setMenuCategories([]);
+        setMenuItems([]);
+        setBeverageItemCategories([]);
+        setNonBeverageItemCategories([]);
+        setIsBeverageMenu(false);
         setSelectedCategories([]);
+        setSelectedBeverageCategoriesForBank([]);
+        setIncludeBeverageCategoriesInBank(false);
+        setAreAllCategoriesSelected(false);
+        setAreAllBeverageCategoriesSelected(false);
         return;
       }
       setIsLoadingCategories(true);
       setCategoriesError(null);
       try {
         const menuWithItems = await getMenuWithItems(selectedMenuId);
-        const uniqueCategories = Array.from(
-          new Set(menuWithItems.items.map((item) => item.category))
-        );
-        setMenuCategories(uniqueCategories);
+        setMenuItems(menuWithItems.items || []); // Store all items
+
+        const allItems = menuWithItems.items || [];
+        const bevCats: string[] = [];
+        const nonBevCats: string[] = [];
+        const uniqueItemCategories = new Set<string>();
+
+        allItems.forEach((item) => {
+          const categoryLower = item.category?.toLowerCase() || "";
+          const isBeverage = BEVERAGE_CATEGORY_KEYWORDS.some((keyword) =>
+            categoryLower.includes(keyword)
+          );
+          if (item.category) {
+            uniqueItemCategories.add(item.category); // Add to overall unique set first
+          }
+        });
+
+        uniqueItemCategories.forEach((cat) => {
+          const categoryLower = cat.toLowerCase();
+          const isBeverage = BEVERAGE_CATEGORY_KEYWORDS.some((keyword) =>
+            categoryLower.includes(keyword)
+          );
+          if (isBeverage) {
+            bevCats.push(cat);
+          } else {
+            nonBevCats.push(cat);
+          }
+        });
+
+        setBeverageItemCategories(Array.from(new Set(bevCats)));
+        setNonBeverageItemCategories(Array.from(new Set(nonBevCats)));
+        setIsBeverageMenu(bevCats.length > 0);
+
+        // Reset selections when menu changes
+        setSelectedCategories([]);
+        setSelectedBeverageCategoriesForBank([]);
+        setIncludeBeverageCategoriesInBank(false);
+        setAreAllCategoriesSelected(false);
+        setAreAllBeverageCategoriesSelected(false);
       } catch (err: any) {
         console.error("Error fetching menu categories:", err);
         setCategoriesError(formatErrorMessage(err));
+        setBeverageItemCategories([]);
+        setNonBeverageItemCategories([]);
+        setIsBeverageMenu(false);
       }
       setIsLoadingCategories(false);
     };
     if (selectedMenuId) {
       loadCategories();
-      setAreAllCategoriesSelected(false); // Reset when menu changes
+    } else {
+      // Clear all menu related states if no menu is selected
+      setMenuItems([]);
+      setBeverageItemCategories([]);
+      setNonBeverageItemCategories([]);
+      setIsBeverageMenu(false);
+      setSelectedCategories([]);
+      setSelectedBeverageCategoriesForBank([]);
+      setIncludeBeverageCategoriesInBank(false);
+      setAreAllCategoriesSelected(false);
+      setAreAllBeverageCategoriesSelected(false);
     }
   }, [selectedMenuId, formatErrorMessage]);
 
-  // Effect to sync areAllCategoriesSelected with individual selections
+  // Effect to sync areAllCategoriesSelected with individual selections (for NON-BEVERAGE categories)
   useEffect(() => {
     if (
-      menuCategories.length > 0 &&
-      selectedCategories.length === menuCategories.length
+      nonBeverageItemCategories.length > 0 &&
+      selectedCategories.length === nonBeverageItemCategories.length
     ) {
       setAreAllCategoriesSelected(true);
     } else {
       setAreAllCategoriesSelected(false);
     }
-    // Reset focus areas if selected categories change significantly (e.g., cleared)
-    // if (selectedCategories.length === 0) { // Removed, selectedFocusAreas no longer exists
-    //   setSelectedFocusAreas([]);
-    // }
-  }, [selectedCategories, menuCategories]);
+  }, [selectedCategories, nonBeverageItemCategories]);
+
+  // ADDED: Effect to sync areAllBeverageCategoriesSelected with individual selections
+  useEffect(() => {
+    if (
+      beverageItemCategories.length > 0 &&
+      selectedBeverageCategoriesForBank.length === beverageItemCategories.length
+    ) {
+      setAreAllBeverageCategoriesSelected(true);
+    } else {
+      setAreAllBeverageCategoriesSelected(false);
+    }
+  }, [selectedBeverageCategoriesForBank, beverageItemCategories]);
 
   const handleSelectAllCategories = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -187,9 +281,22 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
     const isChecked = e.target.checked;
     setAreAllCategoriesSelected(isChecked);
     if (isChecked) {
-      setSelectedCategories([...menuCategories]);
+      setSelectedCategories([...nonBeverageItemCategories]);
     } else {
       setSelectedCategories([]);
+    }
+  };
+
+  // ADDED: Handler for selecting/deselecting all BEVERAGE categories
+  const handleSelectAllBeverageCategories = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const isChecked = e.target.checked;
+    setAreAllBeverageCategoriesSelected(isChecked);
+    if (isChecked) {
+      setSelectedBeverageCategoriesForBank([...beverageItemCategories]);
+    } else {
+      setSelectedBeverageCategoriesForBank([]);
     }
   };
 
@@ -246,7 +353,12 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         ...commonData,
         sourceType: "MENU",
         sourceMenuId: selectedMenuId,
-        categories: selectedCategories, // These are menu category names
+        categoriesToInclude: selectedCategories, // These are now selected non-beverage categories
+        beverageCategoriesToInclude:
+          includeBeverageCategoriesInBank &&
+          selectedBeverageCategoriesForBank.length > 0
+            ? selectedBeverageCategoriesForBank
+            : undefined,
       };
     } else if (sourceType === "sop") {
       if (!selectedSopDocumentId) {
@@ -435,7 +547,6 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                   setNewBankName("");
                   setNewBankDescription("");
                   setSelectedMenuId("");
-                  setMenuCategories([]);
                   setSelectedCategories([]);
                   setAreAllCategoriesSelected(false);
                   setSelectedSopDocumentId("");
@@ -523,80 +634,171 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
               <div className="space-y-4">
                 <div>
                   <label
-                    htmlFor="menuSelect"
-                    className="block text-sm font-medium text-gray-700"
+                    htmlFor="menu-select"
+                    className="block text-sm font-medium text-gray-700 mb-1"
                   >
                     Select Menu
                   </label>
                   <select
-                    id="menuSelect"
+                    id="menu-select"
                     value={selectedMenuId}
                     onChange={(e) => setSelectedMenuId(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
+                    disabled={isLoadingMenus}
                   >
-                    <option value="">-- Select a Menu --</option>
+                    <option value="" disabled>
+                      {isLoadingMenus
+                        ? "Loading menus..."
+                        : menus.length > 0
+                        ? "-- Select a Menu --"
+                        : "No menus available"}
+                    </option>
                     {menus.map((menu) => (
                       <option key={menu._id} value={menu._id}>
                         {menu.name}
                       </option>
                     ))}
                   </select>
+                  {menusError && (
+                    <p className="text-xs text-red-600 mt-1">{menusError}</p>
+                  )}
                 </div>
 
-                {isLoadingCategories && selectedMenuId && (
-                  <LoadingSpinner message="Loading menu categories..." />
-                )}
-                {categoriesError && (
-                  <div className="text-red-500 text-sm">{categoriesError}</div>
+                {selectedMenuId && isLoadingCategories && (
+                  <div className="flex justify-center">
+                    <LoadingSpinner />
+                  </div>
                 )}
 
                 {selectedMenuId &&
                   !isLoadingCategories &&
                   !categoriesError &&
-                  menuCategories.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Select Menu Categories for Question Bank
-                      </label>
-                      <div className="mt-2 space-y-2">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={areAllCategoriesSelected}
-                            onChange={handleSelectAllCategories}
-                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">
-                            Select All Categories
-                          </span>
-                        </label>
-                        {menuCategories.map((category) => (
-                          <label key={category} className="flex items-center">
+                  (nonBeverageItemCategories.length > 0 ||
+                    beverageItemCategories.length > 0) && (
+                    <>
+                      {/* Non-Beverage Categories Selection */}
+                      {nonBeverageItemCategories.length > 0 && (
+                        <div className="p-3 border border-gray-200 rounded-md bg-gray-50">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Main Menu Categories for Bank
+                          </label>
+                          <label className="flex items-center mb-2">
                             <input
                               type="checkbox"
-                              value={category}
-                              checked={selectedCategories.includes(category)}
-                              onChange={(e) => {
-                                const cat = e.target.value;
-                                setSelectedCategories((prev) =>
-                                  prev.includes(cat)
-                                    ? prev.filter((c) => c !== cat)
-                                    : [...prev, cat]
-                                );
-                              }}
-                              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                              className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                              checked={areAllCategoriesSelected}
+                              onChange={handleSelectAllCategories} // Handles non-beverage
+                              disabled={nonBeverageItemCategories.length === 0}
                             />
-                            <span className="ml-2 text-sm text-gray-700">
-                              {category}
+                            <span className="ml-2 text-sm text-gray-600">
+                              Select All Main Categories
                             </span>
                           </label>
-                        ))}
-                      </div>
-                    </div>
+                          <div className="max-h-40 overflow-y-auto space-y-1 pl-2 border-l-2 border-indigo-100">
+                            {nonBeverageItemCategories.map((category) => (
+                              <label
+                                key={category}
+                                className="flex items-center"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                  value={category}
+                                  checked={selectedCategories.includes(
+                                    category
+                                  )}
+                                  onChange={(e) => {
+                                    const cat = e.target.value;
+                                    setSelectedCategories((prev) =>
+                                      prev.includes(cat)
+                                        ? prev.filter((c) => c !== cat)
+                                        : [...prev, cat]
+                                    );
+                                  }}
+                                />
+                                <span className="ml-2 text-sm text-gray-800">
+                                  {category}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Beverage Categories Section - Conditional */}
+                      {isBeverageMenu && beverageItemCategories.length > 0 && (
+                        <div className="mt-4 p-3 border border-blue-200 rounded-md bg-blue-50">
+                          <label className="flex items-center mb-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              checked={includeBeverageCategoriesInBank}
+                              onChange={(e) =>
+                                setIncludeBeverageCategoriesInBank(
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            <span className="ml-2 text-sm font-medium text-blue-700">
+                              Dedicate section to specific beverage categories?
+                            </span>
+                          </label>
+                          {includeBeverageCategoriesInBank && (
+                            <div className="mt-2 pl-2 space-y-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Select Beverage Categories to Include:
+                              </label>
+                              <label className="flex items-center mb-2">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  checked={areAllBeverageCategoriesSelected}
+                                  onChange={handleSelectAllBeverageCategories}
+                                  disabled={beverageItemCategories.length === 0}
+                                />
+                                <span className="ml-2 text-sm text-gray-600">
+                                  Select All Beverage Categories
+                                </span>
+                              </label>
+                              <div className="max-h-32 overflow-y-auto space-y-1 pl-2 border-l-2 border-blue-100">
+                                {beverageItemCategories.map((category) => (
+                                  <label
+                                    key={`bev-${category}`}
+                                    className="flex items-center"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                      value={category}
+                                      checked={selectedBeverageCategoriesForBank.includes(
+                                        category
+                                      )}
+                                      onChange={(e) => {
+                                        const cat = e.target.value;
+                                        setSelectedBeverageCategoriesForBank(
+                                          (prev) =>
+                                            prev.includes(cat)
+                                              ? prev.filter((c) => c !== cat)
+                                              : [...prev, cat]
+                                        );
+                                      }}
+                                    />
+                                    <span className="ml-2 text-sm text-gray-800">
+                                      {category}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
+
                 {selectedMenuId &&
                   !isLoadingCategories &&
-                  menuCategories.length === 0 &&
+                  menuItems.length === 0 &&
                   !categoriesError && (
                     <p className="text-sm text-gray-500">
                       This menu has no categories or items to select from.

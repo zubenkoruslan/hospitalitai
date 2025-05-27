@@ -8,7 +8,6 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: "restaurant" | "staff";
-  professionalRole?: string; // Added professional role
   restaurantId?: mongoose.Types.ObjectId; // Optional here, but conditionally required by schema
   comparePassword(candidatePassword: string): Promise<boolean>; // Method signature
   assignedRoleId?: Types.ObjectId; // CHANGED: Single assigned Role ID
@@ -52,25 +51,13 @@ const userSchema = new Schema<IUser>(
       },
       index: true, // Added index for role filtering
     },
-    professionalRole: {
-      type: String,
-      trim: true,
-      required: function (this: IUser) {
-        // Only require professionalRole if the role is 'staff'
-        return this.role === "staff";
-      },
-    },
     restaurantId: {
-      type: Schema.Types.ObjectId,
-      ref: "Restaurant", // Reference to a potential Restaurant model
-      required: function (this: IUser) {
-        // Only require restaurantId if the role is 'staff'
-        return this.role === "staff";
-      },
-      index: true, // Added index for restaurant lookups
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Restaurant",
+      required: false, // Not all users (e.g. super admin) might be tied to a restaurant
     },
     assignedRoleId: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Role", // Reference to the Role model
       default: null, // Explicitly null if not assigned
       // Not making it required, as a staff might not have an operational role immediately

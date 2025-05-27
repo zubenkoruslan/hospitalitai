@@ -10,7 +10,6 @@ const SignupForm: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"staff" | "restaurant">("staff"); // Default role
-  const [professionalRole, setProfessionalRole] = useState<string>("");
   const [restaurantName, setRestaurantName] = useState(""); // For restaurant owner signup
   const [restaurantId, setRestaurantId] = useState(""); // REVERT: For staff signup
 
@@ -35,10 +34,6 @@ const SignupForm: React.FC = () => {
       setError("Restaurant ID is required for staff members.");
       return;
     }
-    if (role === "staff" && !professionalRole.trim()) {
-      setError("Please enter your professional role.");
-      return;
-    }
 
     setIsLoading(true);
 
@@ -49,7 +44,6 @@ const SignupForm: React.FC = () => {
       role,
       restaurantName: role === "restaurant" ? restaurantName : undefined,
       restaurantId: role === "staff" ? restaurantId : undefined,
-      professionalRole: role === "staff" ? professionalRole.trim() : undefined,
     };
 
     try {
@@ -249,26 +243,6 @@ const SignupForm: React.FC = () => {
                     }`}
                     value={restaurantId}
                     onChange={(e) => setRestaurantId(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="professionalRole" className={labelClasses}>
-                  Your Professional Role (e.g., Chef, Waiter)
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="professionalRole"
-                    name="professionalRole"
-                    type="text"
-                    required={role === "staff"}
-                    placeholder="E.g., Waiter, Chef, Supervisor"
-                    className={`${inputClasses} ${
-                      role !== "staff" ? "bg-gray-100" : ""
-                    }`}
-                    value={professionalRole}
-                    onChange={(e) => setProfessionalRole(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>

@@ -41,7 +41,7 @@ interface StaffMemberWithQuizProgress {
   name: string;
   email: string;
   createdAt?: Date;
-  professionalRole?: string;
+  assignedRoleName?: string;
   assignedRoleId?: Types.ObjectId;
   averageScore: number | null; // Overall average score from QuizResultService.calculateAverageScoreForUser
   quizzesTaken: number; // Count of unique quizzes with attempts by this staff member
@@ -70,7 +70,7 @@ interface StaffMemberDetails {
   name: string;
   email: string;
   createdAt?: Date;
-  professionalRole?: string;
+  assignedRoleName?: string;
   restaurantId?: Types.ObjectId;
   role: string;
   aggregatedQuizPerformance: AggregatedQuizPerformanceSummary[];
@@ -82,7 +82,6 @@ interface StaffUpdateResponse {
   name: string;
   email: string;
   role: string; // This 'role' is the general user role (e.g., 'staff', 'admin'), not the professional role.
-  professionalRole?: string;
   restaurantId?: Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
@@ -105,24 +104,20 @@ class StaffService {
       // 1. Fetch all staff members (lean for performance)
       const staffList = await User.find(
         { restaurantId: restaurantId, role: "staff" },
-        "_id name email createdAt professionalRole assignedRoleId"
+        "_id name email createdAt assignedRoleId"
       ).lean<Array<IUser & { assignedRoleId?: Types.ObjectId }>>();
 
       // 2. For each staff member, process roles and calculate quiz progress
       const staffWithDataPromises = staffList.map(async (staffMember) => {
-        let displayProfessionalRole = staffMember.professionalRole; // Start with the actual professionalRole
+        let displayAssignedRoleName: string | undefined = undefined;
 
-        // If professionalRole is not set (or empty) AND a formal role is assigned,
-        // use the assigned role's name as a fallback for display purposes.
-        if (
-          (!displayProfessionalRole || displayProfessionalRole.trim() === "") &&
-          staffMember.assignedRoleId
-        ) {
+        // If a formal role is assigned, use its name.
+        if (staffMember.assignedRoleId) {
           const roleDoc = await RoleModel.findById(staffMember.assignedRoleId)
             .select("name")
             .lean<PlainIRole>();
           if (roleDoc && roleDoc.name) {
-            displayProfessionalRole = roleDoc.name;
+            displayAssignedRoleName = roleDoc.name;
           }
         }
 
@@ -266,7 +261,7 @@ class StaffService {
           name: staffMember.name,
           email: staffMember.email,
           createdAt: staffMember.createdAt,
-          professionalRole: displayProfessionalRole,
+          assignedRoleName: displayAssignedRoleName,
           assignedRoleId: staffMember.assignedRoleId,
           averageScore: averageScore,
           quizzesTaken: quizzesTaken,
@@ -312,31 +307,40 @@ class StaffService {
     const staffObjectId = new Types.ObjectId(staffId);
 
     // 1. Fetch staff member basic details
-    const staffMember = await User.findOne(
-      {
-        _id: staffObjectId,
-        restaurantId: restaurantId,
-        // role: 'staff' // Assuming we only fetch 'staff' role users here. Or make it flexible.
-      },
-      "_id name email createdAt professionalRole restaurantId role" // Added 'role'
-    ).lean<
-      Pick<
-        IUser,
-        | "_id"
-        | "name"
-        | "email"
-        | "createdAt"
-        | "professionalRole"
-        | "restaurantId"
-        | "role"
-      > & { assignedRoleId?: Types.ObjectId } // ensure assignedRoleId is available if needed later
-    >();
+    const staffMember = await User.findOne({
+      _id: staffObjectId,
+      restaurantId: restaurantId,
+      role: "staff",
+    })
+      .select("_id name email createdAt restaurantId role assignedRoleId")
+      .lean<
+        Pick<
+          IUser,
+          | "_id"
+          | "name"
+          | "email"
+          | "createdAt"
+          | "restaurantId"
+          | "role"
+          | "assignedRoleId"
+        >
+      >();
 
     if (!staffMember) {
       throw new AppError(
         "Staff member not found or not part of the restaurant.",
         404
       );
+    }
+
+    let displayAssignedRoleName: string | undefined = undefined;
+    if (staffMember.assignedRoleId) {
+      const roleDoc = await RoleModel.findById(staffMember.assignedRoleId)
+        .select("name")
+        .lean<PlainIRole>();
+      if (roleDoc && roleDoc.name) {
+        displayAssignedRoleName = roleDoc.name;
+      }
     }
 
     // 2. Fetch all quiz attempts for the staff member
@@ -435,13 +439,13 @@ class StaffService {
       );
 
     return {
-      _id: staffMember._id,
+      _id: staffMember._id as Types.ObjectId,
       name: staffMember.name,
       email: staffMember.email,
       createdAt: staffMember.createdAt,
-      professionalRole: staffMember.professionalRole,
+      assignedRoleName: displayAssignedRoleName,
       restaurantId: staffMember.restaurantId,
-      role: staffMember.role, // Include the general role
+      role: staffMember.role,
       aggregatedQuizPerformance: aggregatedQuizPerformanceArray,
       averageScore: averageScore,
     };
@@ -457,49 +461,42 @@ class StaffService {
    * @returns A promise resolving to the updated staff member object.
    * @throws {AppError} If staff member not found (404) or on database error (500).
    */
-  static async updateStaffMemberRole(
-    staffId: string | Types.ObjectId,
-    professionalRole: string,
-    restaurantId: Types.ObjectId
-  ): Promise<StaffUpdateResponse> {
-    // Ensure staffId is an ObjectId
-    const staffObjectId = new Types.ObjectId(staffId);
+  // static async updateStaffMemberRole(
+  //   staffId: string | Types.ObjectId,
+  //   professionalRoleInput: string, // Renamed to avoid conflict if IUser had professionalRole
+  //   restaurantId: Types.ObjectId
+  // ): Promise<StaffUpdateResponse> {
+  //   try {
+  //     const updatedUser = await User.findOneAndUpdate(
+  //       { _id: staffId, restaurantId: restaurantId, role: "staff" },
+  //       // { $set: { professionalRole: professionalRoleInput } }, // This field no longer exists on User
+  //       { $set: { } }, // Example: Update other fields if this method is repurposed
+  //       { new: true, runValidators: true }
+  //     ).lean<IUser>(); // IUser no longer has professionalRole
 
-    try {
-      const updatedStaff = await User.findOneAndUpdate(
-        {
-          _id: staffObjectId,
-          restaurantId: restaurantId,
-          // role: 'staff' // Consider if this check is strictly needed here
-        },
-        { $set: { professionalRole: professionalRole } },
-        { new: true, runValidators: true }
-      ).select("-password"); // Exclude password
+  //     if (!updatedUser) {
+  //       throw new AppError(
+  //         "Staff member not found or you do not have permission to update.",
+  //         404
+  //       );
+  //     }
 
-      if (!updatedStaff) {
-        throw new AppError(
-          "Staff member not found or not part of the restaurant.",
-          404
-        );
-      }
-      // Map to StaffUpdateResponse, ensuring all fields are present or undefined
-      return {
-        _id: updatedStaff._id,
-        name: updatedStaff.name,
-        email: updatedStaff.email,
-        role: updatedStaff.role, // general user role
-        professionalRole: updatedStaff.professionalRole,
-        restaurantId: updatedStaff.restaurantId,
-        createdAt: updatedStaff.createdAt,
-        updatedAt: updatedStaff.updatedAt,
-        assignedRoleId: updatedStaff.assignedRoleId, // Include assignedRoleId
-      };
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      console.error(`Error updating staff member role: ${error}`);
-      throw new AppError(`Error updating staff member role: ${error}`, 500);
-    }
-  }
+  //     // Destructure user object; professionalRole is not on updatedUser as it's not in IUser
+  //     const { password, ...userWithoutSensitiveFields } = updatedUser.toObject ? updatedUser.toObject() : updatedUser;
+
+  //     // StaffUpdateResponse also no longer has professionalRole
+  //     return {
+  //       ...userWithoutSensitiveFields,
+  //       _id: userWithoutSensitiveFields._id as Types.ObjectId,
+  //       // professionalRole: undefined, // Explicitly ensure it's not returned
+  //       // Map other fields for StaffUpdateResponse as needed
+  //     };
+  //   } catch (error: any) {
+  //     console.error("Error updating staff member role in service:", error);
+  //     if (error instanceof AppError) throw error;
+  //     throw new AppError("Failed to update staff member role.", 500);
+  //   }
+  // }
 
   /**
    * Assigns or unassigns a specific Role to a staff member.

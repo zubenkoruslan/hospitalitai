@@ -76,43 +76,43 @@ router.get(
   }
 );
 
-/**
- * @route   PATCH /api/staff/:id
- * @desc    Update professional role for a specific staff member
- * @access  Private (Restaurant Role)
- */
-router.patch(
-  "/:id",
-  validateStaffIdParam, // Added validator
-  validateProfessionalRoleBody, // Added validator
-  handleValidationErrors, // Added error handler
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const restaurantId = req.user?.restaurantId;
-    const { id: staffId } = req.params;
-    const { professionalRole } = req.body;
-
-    if (!restaurantId) {
-      // This check remains for now
-      return next(new AppError("Restaurant ID not found for user.", 400));
-    }
-    // Removed: mongoose.Types.ObjectId.isValid(staffId) check (handled by validateStaffIdParam)
-    // Removed: professionalRole === undefined check (handled by validateProfessionalRoleBody)
-
-    try {
-      const staffResponse = await StaffService.updateStaffMemberRole(
-        staffId,
-        professionalRole,
-        restaurantId
-      );
-      res.status(200).json({
-        message: "Staff details updated successfully.",
-        staff: staffResponse,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  }
-);
+// /**
+//  * @route   PATCH /api/staff/:id
+//  * @desc    Update professional role for a specific staff member
+//  * @access  Private (Restaurant Role)
+//  */
+// router.patch(
+//   "/:id",
+//   validateStaffIdParam, // Added validator
+//   validateProfessionalRoleBody, // Added validator
+//   handleValidationErrors, // Added error handler
+//   async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+//     const restaurantId = req.user?.restaurantId;
+//     const { id: staffId } = req.params;
+//     const { professionalRole } = req.body;
+//
+//     if (!restaurantId) {
+//       // This check remains for now
+//       return next(new AppError("Restaurant ID not found for user.", 400));
+//     }
+//     // Removed: mongoose.Types.ObjectId.isValid(staffId) check (handled by validateStaffIdParam)
+//     // Removed: professionalRole === undefined check (handled by validateProfessionalRoleBody)
+//
+//     try {
+//       const staffResponse = await StaffService.updateStaffMemberRole(
+//         staffId,
+//         professionalRole,
+//         restaurantId
+//       );
+//       res.status(200).json({
+//         message: "Staff details updated successfully.",
+//         staff: staffResponse,
+//       });
+//     } catch (error: any) {
+//       next(error);
+//     }
+//   }
+// );
 
 // UPDATED: Route to update staff's assigned role
 /**

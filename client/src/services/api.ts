@@ -471,7 +471,7 @@ export const getQuizAttemptDetails = async (
   attemptId: string
 ): Promise<ClientQuizAttemptDetails> => {
   const response = await api.get<{ data: ClientQuizAttemptDetails }>(
-    `/quiz-results/attempt/${attemptId}`
+    `/quizzes/attempts/${attemptId}`
   );
   return response.data.data;
 };

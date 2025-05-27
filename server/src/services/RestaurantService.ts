@@ -91,7 +91,7 @@ class RestaurantService {
     restaurantId: string | mongoose.Types.ObjectId,
     invitingUserId: string | mongoose.Types.ObjectId,
     staffEmailToInvite: string,
-    staffDetails?: { name?: string; professionalRole?: string } // Placeholder for now
+    staffDetails?: { name?: string /*; professionalRole?: string*/ } // Removed professionalRole from staffDetails
   ): Promise<void> {
     // Returns void, or could return created/linked user
     const session = await mongoose.startSession();
@@ -138,8 +138,8 @@ class RestaurantService {
             restaurantId.toString()
           );
           existingUser.role = "staff"; // Ensure role is staff
-          if (staffDetails?.professionalRole)
-            existingUser.professionalRole = staffDetails.professionalRole;
+          // if (staffDetails?.professionalRole) // Removed professionalRole logic
+          // existingUser.professionalRole = staffDetails.professionalRole;
           // Update name if provided and different, or if user has no name
           if (staffDetails?.name && existingUser.name !== staffDetails.name)
             existingUser.name = staffDetails.name;
@@ -161,7 +161,7 @@ class RestaurantService {
           name: staffDetails?.name || "Invited Staff", // Default name or from input
           role: "staff",
           restaurantId: new mongoose.Types.ObjectId(restaurantId.toString()),
-          professionalRole: staffDetails?.professionalRole || "Staff", // Default role or from input
+          // professionalRole: staffDetails?.professionalRole || "Staff", // Removed professionalRole
           // Password would typically be set by the user via an invite link.
           // For now, we might leave it unset or set a temporary one (not recommended for production).
           // Password will be hashed by pre-save hook if provided.
@@ -222,7 +222,7 @@ class RestaurantService {
       // This assumes staff are primarily identified by User.restaurantId
       await User.updateMany(
         { restaurantId: restaurant._id },
-        { $set: { restaurantId: null, professionalRole: "Unassigned" } } // Also clear professionalRole or set to a default
+        { $set: { restaurantId: null /*, professionalRole: "Unassigned"*/ } } // Removed professionalRole update
       ).session(session);
 
       // TODO: Consider deleting associated Menus, Items, Quizzes, QuestionBanks, etc.

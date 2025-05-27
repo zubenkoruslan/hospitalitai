@@ -20,5 +20,5 @@ export interface SignupDataClient {
   name: string;
   restaurantName?: string; // For new restaurant owner signup
   restaurantId?: string; // For staff signup to existing restaurant
-  professionalRole?: string; // For staff
+  // professionalRole?: string; // For staff
 }

@@ -6,7 +6,8 @@ export interface AuthPayload {
   name: string;
   restaurantId?: mongoose.Types.ObjectId;
   restaurantName?: string;
-  professionalRole?: string;
+  iat?: number;
+  exp?: number;
 }
 
 export interface SignupData {
@@ -16,7 +17,6 @@ export interface SignupData {
   name: string;
   restaurantName?: string;
   restaurantId?: string; // For staff role
-  professionalRole?: string; // For staff role
   assignedRoleId?: string; // Optional: For assigning a specific role on signup
 }
 
@@ -30,14 +30,13 @@ export interface UserProfileUpdateData {
 
 // Represents the user object returned by API (excluding sensitive fields like password)
 export interface UserAPIResponse {
-  _id: mongoose.Types.ObjectId | string; // Allow string for flexibility if transformed
+  _id: string;
   name: string;
   email: string;
-  role: "restaurant" | "staff" | string;
-  restaurantId?: mongoose.Types.ObjectId | string;
+  role: string;
+  restaurantId?: string;
   restaurantName?: string;
-  professionalRole?: string;
-  assignedRoleId?: mongoose.Types.ObjectId | string | null;
+  assignedRoleId?: string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
   // Add any other fields that are safe and useful to return

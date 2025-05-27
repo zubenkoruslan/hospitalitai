@@ -87,11 +87,18 @@ export interface CreateQuestionBankClientData {
 
   // For Menu source
   sourceMenuId?: string;
-  // selectedCategoryNames from menu are effectively the bank's initial categories
-  categories?: string[]; // Used by menu and SOP source types for initial categories
+  categoriesToInclude?: string[]; // ADDED: For non-beverage/main categories from menu
+  beverageCategoriesToInclude?: string[]; // ADDED: For selected beverage categories from menu
 
   // For SOP source
   sourceSopDocumentId?: string;
+  // For SOP, 'categories' (if used) would mean selected SOP section names for the bank
+  // If creating bank from SOP and auto-populating categories, it might still use 'categoriesToInclude'
+  // or a specific field like 'sopCategoryNames'. For clarity, if SOP uses this DTO directly
+  // and needs to specify which SOP sections become bank categories, a distinct field or convention is needed.
+  // For now, assuming SOP creation might still use categoriesToInclude if applicable for its sections.
+  categories?: string[]; // RETAINED: For SOP category selection, but needs clarification if MENU uses categoriesToInclude
+
   generationMethod?: "AI" | "MANUAL"; // MODIFIED to uppercase
 
   // Note: AI generation parameters for menu (like targetQuestionCount)

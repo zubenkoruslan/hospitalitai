@@ -84,7 +84,7 @@ export interface StaffDetailsData {
   name: string;
   email: string;
   createdAt: string;
-  professionalRole?: string;
+  assignedRoleName?: string;
   aggregatedQuizPerformance: AggregatedQuizPerformanceSummary[]; // This now uses the updated version
   averageScore: number | null;
 }

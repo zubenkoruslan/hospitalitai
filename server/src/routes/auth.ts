@@ -117,7 +117,6 @@ router.post(
         name: userResultData.name,
         restaurantId: userResultData.restaurantId,
         restaurantName: restaurantNameForJwt,
-        professionalRole: userResultData.professionalRole,
       };
       const options: jwt.SignOptions = { expiresIn: JWT_EXPIRES_IN_SECONDS };
       const token = jwt.sign(payload, JWT_SECRET, options);
@@ -181,7 +180,6 @@ router.post(
         name: user.name,
         restaurantId: jwtRestaurantId, // Use the converted ObjectId
         restaurantName: user.restaurantName, // AuthService.loginUser returns user with restaurantName
-        professionalRole: user.professionalRole,
       };
 
       // Sign the token

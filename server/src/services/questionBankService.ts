@@ -49,7 +49,8 @@ export interface CreateQuestionBankFromMenuData {
   description?: string;
   restaurantId: mongoose.Types.ObjectId;
   menuId: mongoose.Types.ObjectId;
-  selectedCategoryNames: string[]; // Categories from the menu to associate with the bank
+  selectedCategories: string[]; // ADDED: Main/non-beverage categories
+  selectedBeverageCategories: string[]; // ADDED: Beverage categories
   generateAiQuestions?: boolean; // Flag to trigger AI question generation
   aiParams?: MenuSpecificAiParams; // Use the new specific interface
 }
@@ -325,6 +326,7 @@ export const removeQuestionFromBankService = async (
   }
 };
 
+// Service to create a new question bank from a specific menu
 export const createQuestionBankFromMenuService = async (
   data: CreateQuestionBankFromMenuData
 ): Promise<IQuestionBank> => {
@@ -333,100 +335,83 @@ export const createQuestionBankFromMenuService = async (
     description,
     restaurantId,
     menuId,
-    selectedCategoryNames,
-    generateAiQuestions: _generateAiQuestions, // Renamed to avoid conflict
-    aiParams: _aiParams, // Renamed to avoid conflict
+    selectedCategories,
+    selectedBeverageCategories,
+    generateAiQuestions,
+    aiParams,
   } = data;
 
-  // Validate basic inputs
-  if (!name || name.trim() === "") {
-    throw new AppError("Question bank name is required.", 400);
-  }
-  if (!mongoose.Types.ObjectId.isValid(menuId)) {
-    throw new AppError("Invalid Menu ID format.", 400);
-  }
-
-  // === BEGIN ADDED VALIDATION ===
-  const menu = await MenuModel.findOne<IMenu>({
-    _id: menuId,
-    restaurantId: restaurantId,
-    isActive: true,
-  }).lean();
-
-  if (!menu) {
-    throw new AppError(
-      `Active menu with ID ${menuId} not found for restaurant ${restaurantId}. Cannot create question bank.`,
-      404
-    );
-  }
-  // === END ADDED VALIDATION ===
-
-  const useTransactions = process.env.NODE_ENV !== "development"; // Example condition
-  let session: mongoose.ClientSession | null = null;
-
-  if (useTransactions) {
-    session = await mongoose.startSession();
-    session.startTransaction();
-  }
-
   try {
-    const newBank = new QuestionBankModel({
-      name,
-      description: description || "",
-      restaurantId,
-      sourceType: "MENU", // Set sourceType to MENU
-      sourceMenuId: menu._id, // Use menu._id (it's an ObjectId)
-      sourceMenuName: menu.name, // Use the fetched menu's name
-      categories: selectedCategoryNames, // Set categories from selected menu categories
-      questions: [], // Initialize with no questions
-      createdBy: restaurantId, // Assuming the user creating it owns the restaurant
+    // 1. Verify the menu exists and belongs to the restaurant
+    const menu = await MenuModel.findOne({
+      _id: menuId,
+      restaurantId: restaurantId,
     });
 
-    await newBank.save(session ? { session } : undefined); // Pass session only if it exists
-
-    /*
-    // Temporarily commented out AI Question Generation
-    if (
-      generateAiQuestions &&
-      aiParams &&
-      aiParams.targetQuestionCount &&
-      aiParams.targetQuestionCount > 0
-    ) {
-      const serviceParams: AiGenerationParams = { // Using the imported AiGenerationParams directly
-        restaurantId: data.restaurantId,
-        menuId: data.menuId.toString(),
-        bankId: newBank._id.toString(), // newBank._id should be available after save
-        numQuestionsPerItem: aiParams.targetQuestionCount, 
-        // geminiModelName: aiParams.geminiModelName, // Add if AiGenerationParams in questionService supports it
-      };
-      const generatedQuestions =
-        await generateAiQuestionsService(serviceParams); // Calling the imported function directly
-
-      if (generatedQuestions && generatedQuestions.length > 0) {
-        const questionIds = generatedQuestions.map(
-          (q: IQuestion) => q._id as mongoose.Types.ObjectId // Added IQuestion type for q
-        ); 
-        newBank.questions.push(...questionIds);
-        await newBank.save(session ? { session } : undefined); // Pass session only if it exists
-      }
+    if (!menu) {
+      throw new AppError(
+        `Menu with ID: ${menuId} not found or does not belong to this restaurant.`,
+        404
+      );
     }
-    */
 
-    if (session) {
-      await session.commitTransaction();
-      session.endSession();
+    // Combine all selected categories for the bank's main 'categories' field
+    const allSelectedBankCategories = [
+      ...(selectedCategories || []),
+      ...(selectedBeverageCategories || []),
+    ];
+    // Ensure uniqueness if there was any overlap (though UI logic should prevent it)
+    const uniqueBankCategories = Array.from(new Set(allSelectedBankCategories));
+
+    // 2. Create the new question bank
+    const newQuestionBank = new QuestionBankModel({
+      name,
+      description,
+      restaurantId,
+      sourceType: "MENU",
+      sourceMenuId: menuId,
+      sourceMenuName: menu.name, // Store menu name for easy display
+      categories: uniqueBankCategories, // Use the combined and unique categories
+      questions: [], // Questions will be added if AI generation is triggered
+    });
+
+    await newQuestionBank.save();
+
+    // 3. Optionally, trigger AI question generation
+    // This part would need to be fleshed out similar to SOP AI generation
+    // It would involve:
+    // - Identifying menu items from the selected categories (selectedCategories and selectedBeverageCategories)
+    // - Preparing prompts for those items/categories
+    // - Calling an AI service (e.g., AiQuestionService.generateRawQuestionsFromMenuContent)
+    // - Saving generated questions as pending review, linked to this new bank.
+
+    if (generateAiQuestions) {
+      console.log(
+        `Placeholder: AI Question generation for menu ${menuId} bank ${newQuestionBank._id} would be triggered here.`
+      );
+      console.log("Selected Main Categories:", selectedCategories);
+      console.log("Selected Beverage Categories:", selectedBeverageCategories);
+      console.log("AI Params:", aiParams);
+      // TODO: Implement AI question generation logic for menu-based banks
+      // This might involve fetching menu items based on the combined categories,
+      // then passing them to a service similar to how SOP questions are generated,
+      // or to AiQuestionService.generateRawQuestionsFromMenuContent
+      // and then AiQuestionService.saveGeneratedQuestionsAsPendingReview
     }
-    return newBank;
+
+    return newQuestionBank;
   } catch (error) {
-    if (session) {
-      await session.abortTransaction();
-      session.endSession();
-    }
+    console.error("Error creating question bank from menu in service:", error);
     if (error instanceof AppError) {
       throw error;
     }
-    console.error("Error creating question bank from menu in service:", error);
-    throw new AppError("Failed to create question bank from menu.", 500);
+    if (error instanceof mongoose.Error.ValidationError) {
+      throw new AppError(`Validation Error: ${error.message}`, 400);
+    }
+    throw new AppError(
+      "Failed to create question bank from menu in service.",
+      500
+    );
   }
 };
 

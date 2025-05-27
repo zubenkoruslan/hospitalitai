@@ -633,67 +633,86 @@ export class QuizService {
       targetRoles,
     } = data;
 
-    let actualBankIdsToUse: string[] = [];
-    let derivedSopDocumentId: Types.ObjectId | null = null;
+    // Validate that at least one source is provided
+    if (
+      (!questionBankIds || questionBankIds.length === 0) &&
+      !sourceSopDocumentId
+    ) {
+      throw new AppError(
+        "Quiz creation requires either questionBankIds or a sourceSopDocumentId.",
+        400
+      );
+    }
+    if (questionBankIds && questionBankIds.length > 0 && sourceSopDocumentId) {
+      throw new AppError(
+        "Quiz creation can be from banks OR an SOP document, not both.",
+        400
+      );
+    }
+
+    let questionIds: Types.ObjectId[] = [];
+    let sourceSnapshotCount = 0;
+    let finalSourceType: "QUESTION_BANKS" | "SOP_DOCUMENT" = "QUESTION_BANKS";
+    let finalSopDocumentId: Types.ObjectId | undefined = undefined;
 
     if (sourceSopDocumentId) {
-      const sopDoc = await SopDocumentModel.findById(
-        sourceSopDocumentId
-      ).lean();
-      if (!sopDoc) {
-        throw new AppError("SOP Document not found.", 404);
+      if (!mongoose.Types.ObjectId.isValid(sourceSopDocumentId)) {
+        throw new AppError("Invalid SOP Document ID format.", 400);
+      }
+      const sopDocObjectId = new Types.ObjectId(sourceSopDocumentId);
+      const sopDoc = await SopDocumentModel.findById(sopDocObjectId).lean();
+      if (
+        !sopDoc ||
+        sopDoc.restaurantId.toString() !== restaurantId.toString()
+      ) {
+        throw new AppError(
+          "SOP Document not found or does not belong to this restaurant.",
+          404
+        );
       }
       if (!sopDoc.questionBankId) {
         throw new AppError(
-          "SOP Document does not have an associated question bank.",
+          "The selected SOP Document does not have an associated Question Bank to source questions from.",
           400
         );
       }
-      actualBankIdsToUse = [sopDoc.questionBankId.toString()];
-      derivedSopDocumentId = sopDoc._id; // Store the ObjectId of the SOP doc
+      // Use the question bank linked to the SOP
+      const sopLinkedBank = await QuestionBankModel.findById(
+        sopDoc.questionBankId
+      ).lean();
+      if (
+        !sopLinkedBank ||
+        !sopLinkedBank.questions ||
+        sopLinkedBank.questions.length === 0
+      ) {
+        throw new AppError(
+          "The Question Bank linked to the SOP Document has no questions.",
+          400
+        );
+      }
+      questionIds = sopLinkedBank.questions.map((id) => new Types.ObjectId(id));
+      sourceSnapshotCount = questionIds.length;
+      finalSourceType = "SOP_DOCUMENT";
+      finalSopDocumentId = sopDocObjectId;
     } else if (questionBankIds && questionBankIds.length > 0) {
-      actualBankIdsToUse = questionBankIds;
-    } else {
+      const bankObjectIds = questionBankIds.map((id) => new Types.ObjectId(id));
+      questionIds = await getUniqueValidQuestionIdsFromQuestionBanks(
+        bankObjectIds,
+        restaurantId
+      );
+      sourceSnapshotCount = questionIds.length;
+      finalSourceType = "QUESTION_BANKS";
+    }
+
+    if (questionIds.length === 0) {
       throw new AppError(
-        "Either Question Bank IDs or an SOP Document ID must be provided.",
+        "No valid questions found in the selected sources for this restaurant.",
         400
       );
     }
-
-    if (actualBankIdsToUse.length === 0) {
+    if (numberOfQuestionsPerAttempt > questionIds.length) {
       throw new AppError(
-        "No question banks specified or derived for quiz creation.",
-        400
-      );
-    }
-
-    // Validate that all specified question banks belong to the restaurant
-    const banks = await QuestionBankModel.find({
-      _id: { $in: actualBankIdsToUse.map((id) => new Types.ObjectId(id)) },
-      restaurantId: restaurantId,
-    }).lean();
-
-    if (banks.length !== actualBankIdsToUse.length) {
-      throw new AppError(
-        "One or more question banks not found or do not belong to this restaurant.",
-        404
-      );
-    }
-
-    const validQuestionIds = await getUniqueValidQuestionIdsFromQuestionBanks(
-      actualBankIdsToUse.map((id) => new Types.ObjectId(id)),
-      new Types.ObjectId(restaurantId)
-    );
-
-    if (validQuestionIds.length === 0) {
-      throw new AppError(
-        "No questions found in the selected question bank(s).",
-        400
-      );
-    }
-    if (numberOfQuestionsPerAttempt > validQuestionIds.length) {
-      throw new AppError(
-        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total number of available unique questions (${validQuestionIds.length}).`,
+        `Number of questions per attempt (${numberOfQuestionsPerAttempt}) cannot exceed the total unique questions available (${questionIds.length}).`,
         400
       );
     }
@@ -702,20 +721,33 @@ export class QuizService {
       title,
       description,
       restaurantId,
-      sourceQuestionBankIds: actualBankIdsToUse.map(
-        (id) => new Types.ObjectId(id)
-      ),
-      sopDocumentId: derivedSopDocumentId, // Set sopDocumentId if derived
-      totalUniqueQuestionsInSourceSnapshot: validQuestionIds.length,
+      sourceQuestionBankIds:
+        finalSourceType === "QUESTION_BANKS" && questionBankIds
+          ? questionBankIds.map((id) => new Types.ObjectId(id))
+          : [],
+      sourceSopDocumentId: finalSopDocumentId,
+      sourceType: finalSourceType,
+      totalUniqueQuestionsInSourceSnapshot: sourceSnapshotCount,
       numberOfQuestionsPerAttempt,
-      targetRoles: targetRoles
-        ? targetRoles.map((id) => new Types.ObjectId(id))
-        : [],
-      isAvailable: true, // Default to available
+      isAvailable: false, // MODIFIED: Set default to false
+      targetRoles: targetRoles || [], // Ensure targetRoles is an array
+      // averageScore will be calculated and updated over time
     });
 
-    await newQuiz.save();
-    return newQuiz.toObject() as IQuiz; // Return plain object
+    try {
+      await newQuiz.save();
+      return newQuiz;
+    } catch (error: any) {
+      // Handle potential duplicate key error for title within the same restaurant
+      if (error.code === 11000) {
+        // Assuming a unique compound index on (title, restaurantId)
+        throw new AppError(
+          `A quiz with the title "${title}" already exists for this restaurant.`,
+          409 // Conflict
+        );
+      }
+      throw new AppError("Failed to save the new quiz.", 500);
+    }
   }
 
   /**
@@ -1114,13 +1146,8 @@ export class QuizService {
     }
 
     const staffInRestaurant = await User.find(staffQueryConditions)
-      .select("_id name email professionalRole assignedRoleId") // Ensure assignedRoleId is fetched if needed for display or further logic, though professionalRole might be sufficient from User model now
-      .lean<
-        Pick<
-          IUser,
-          "_id" | "name" | "email" | "professionalRole" | "assignedRoleId"
-        >[]
-      >();
+      .select("_id name email assignedRoleId") // Ensure assignedRoleId is fetched
+      .lean<Pick<IUser, "_id" | "name" | "email" | "assignedRoleId">[]>();
 
     if (!staffInRestaurant || staffInRestaurant.length === 0) {
       return []; // No staff in restaurant, so no progress to show
@@ -1198,7 +1225,7 @@ export class QuizService {
           _id: staff._id as Types.ObjectId, // Cast as IUser already has ObjectId _id
           name: staff.name,
           email: staff.email,
-          professionalRole: staff.professionalRole,
+          // professionalRole: staff.professionalRole, // Remove this line
         },
         quizTitle,
         progress: progressDetails,

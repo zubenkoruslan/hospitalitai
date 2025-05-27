@@ -45,8 +45,34 @@ export const validateCreateQuestionBank = [
   body("categories")
     .optional()
     .isArray()
-    .withMessage("Categories must be an array of strings."),
-  body("categories.*").optional().isString().trim(),
+    .withMessage("Categories must be an array of strings.")
+    .if((value, { req }) => req.body.sourceType !== "MENU"),
+  body("categories.*")
+    .optional()
+    .isString()
+    .trim()
+    .if((value, { req }) => req.body.sourceType !== "MENU"),
+  // ADDED: Validation for new MENU specific category fields
+  body("categoriesToInclude")
+    .optional()
+    .isArray()
+    .withMessage("categoriesToInclude must be an array of strings.")
+    .if((value, { req }) => req.body.sourceType === "MENU"),
+  body("categoriesToInclude.*")
+    .optional()
+    .isString()
+    .trim()
+    .if((value, { req }) => req.body.sourceType === "MENU"),
+  body("beverageCategoriesToInclude")
+    .optional()
+    .isArray()
+    .withMessage("beverageCategoriesToInclude must be an array of strings.")
+    .if((value, { req }) => req.body.sourceType === "MENU"),
+  body("beverageCategoriesToInclude.*")
+    .optional()
+    .isString()
+    .trim()
+    .if((value, { req }) => req.body.sourceType === "MENU"),
 ];
 
 // Placeholder for createQuestionBank
@@ -67,6 +93,8 @@ export const createQuestionBank = asyncHandler(
       categories,
       generationMethod: rawGenerationMethod,
       restaurantId,
+      categoriesToInclude,
+      beverageCategoriesToInclude,
     } = req.body;
 
     // Determine the actual generationMethod, defaulting to MANUAL for SOP if not provided
@@ -83,6 +111,8 @@ export const createQuestionBank = asyncHandler(
       categories: categories || [],
       restaurantId,
       // userId, // Pass if your service/model expects it
+      categoriesToInclude,
+      beverageCategoriesToInclude,
     };
 
     let newBank: IQuestionBank;
@@ -125,13 +155,29 @@ export const createQuestionBank = asyncHandler(
         // Let's assume the service or Mongoose handles the conversion for now,
         // or that validation middleware ensures correct type/format.
 
+        // VALIDATION for new MENU category fields
+        if (
+          (!categoriesToInclude || categoriesToInclude.length === 0) &&
+          (!beverageCategoriesToInclude ||
+            beverageCategoriesToInclude.length === 0)
+        ) {
+          return next(
+            new AppError(
+              "For MENU sourceType, at least one category from 'categoriesToInclude' or 'beverageCategoriesToInclude' must be provided.",
+              400
+            )
+          );
+        }
+
         newBank = await QuestionBankService.createQuestionBankFromMenuService({
           name: bankDetails.name,
           description: bankDetails.description,
-          restaurantId: bankDetails.restaurantId, // Assuming this is correctly populated and typed
-          menuId: sourceMenuId, // This comes from req.body, service expects ObjectId
-          selectedCategoryNames: bankDetails.categories, // This is categories from req.body
-          // generateAiQuestions and aiParams are omitted for now (defaults to no AI generation)
+          restaurantId: bankDetails.restaurantId,
+          menuId: sourceMenuId,
+          // PASS NEW FIELDS:
+          selectedCategories: categoriesToInclude || [],
+          selectedBeverageCategories: beverageCategoriesToInclude || [],
+          // The 'categories' field of the bank itself will be derived by the service from these two.
         });
       } else if (sourceType === "MANUAL") {
         // For MANUAL, we primarily use name, description, categories, and restaurantId.
@@ -438,7 +484,8 @@ export const createQuestionBankFromMenu = async (
       name,
       description,
       menuId,
-      selectedCategoryNames, // Ensure this is what client sends
+      selectedCategories,
+      selectedBeverageCategories,
       generateAiQuestions,
       aiParams,
     } = req.body;
@@ -451,42 +498,50 @@ export const createQuestionBankFromMenu = async (
     const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
 
     // Validate required fields
-    if (!name || !menuId || !selectedCategoryNames) {
+    if (!name || !menuId) {
       return next(
         new AppError(
-          "Missing required fields: name, menuId, and selectedCategoryNames are required.",
+          "Missing required fields: name and menuId are required.",
           400
         )
       );
     }
+    // Add validation for new category fields
+    if (
+      (!selectedCategories || selectedCategories.length === 0) &&
+      (!selectedBeverageCategories || selectedBeverageCategories.length === 0)
+    ) {
+      return next(
+        new AppError(
+          "At least one category from 'selectedCategories' or 'selectedBeverageCategories' must be provided.",
+          400
+        )
+      );
+    }
+
     if (!mongoose.Types.ObjectId.isValid(menuId)) {
       return next(new AppError("Invalid menu ID format.", 400));
     }
 
     const bankData: QuestionBankService.CreateQuestionBankFromMenuData = {
-      // Corrected Type
       name,
       description,
       restaurantId,
       menuId: new mongoose.Types.ObjectId(menuId),
-      selectedCategoryNames,
+      selectedCategories: selectedCategories || [],
+      selectedBeverageCategories: selectedBeverageCategories || [],
       generateAiQuestions,
       aiParams,
     };
 
     const result = await QuestionBankService.createQuestionBankFromMenuService(
-      // Corrected service call if it was createQuestionBankFromMenu
       bankData
-      // req.user.restaurantId // This was likely an error if bankData already contains restaurantId
     );
-
-    // If service returns null or throws error for not found, it will be caught by general error handler
-    // or specific checks within service. Controller assumes success if no error is thrown.
 
     res.status(201).json({
       status: "success",
-      message: "Question bank created successfully from menu.", // Static message
-      data: result, // result is IQuestionBank
+      message: "Question bank created successfully from menu.",
+      data: result,
     });
   } catch (error) {
     next(error);

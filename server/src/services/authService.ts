@@ -17,7 +17,6 @@ interface SignupData {
   name: string;
   restaurantName?: string;
   restaurantId?: string; // For staff role
-  professionalRole?: string; // For staff role
   assignedRoleId?: string; // CHANGED: For single role assignment
 }
 
@@ -25,7 +24,7 @@ interface SignupData {
 interface LoginResponse {
   user: UserAPIResponse;
   restaurantName?: string;
-  professionalRole?: string;
+  // professionalRole?: string; // Ensure this is removed or commented
 }
 
 class AuthService {
@@ -104,15 +103,7 @@ class AuthService {
     restaurantId: mongoose.Types.ObjectId;
     restaurantName: string | undefined;
   }> {
-    const {
-      email,
-      password,
-      role,
-      name,
-      restaurantId,
-      professionalRole,
-      assignedRoleId,
-    } = data;
+    const { email, password, role, name, restaurantId, assignedRoleId } = data;
 
     if (role !== "staff") {
       throw new AppError("Invalid role for staff registration.", 400);
@@ -125,20 +116,13 @@ class AuthService {
     session.startTransaction();
 
     try {
-      // 1. Find the target restaurant - this read operation can be outside or inside the transaction
-      // For simplicity and since it's a read, keeping it before trying to write.
-      // However, if strict serializability is needed or if the restaurant's existence is critical
-      // for the transaction's validity from the start, it could be moved inside.
       let targetRestaurant: IRestaurant | null;
       try {
-        // Finding restaurant can stay outside or be part of the transaction.
-        // If it's part of the transaction, it would use { session }.
-        // For now, assuming it's acceptable to validate restaurant existence before starting writes.
         targetRestaurant = await Restaurant.findById(restaurantId).session(
           session
-        ); // Added session here for consistency
+        );
       } catch (findError: any) {
-        await session.abortTransaction(); // Abort if findById itself fails due to bad ID format before query
+        await session.abortTransaction();
         session.endSession();
         console.error("Error finding restaurant by ID:", findError);
         throw new AppError(
@@ -155,19 +139,17 @@ class AuthService {
       const finalRestaurantId = targetRestaurant._id as mongoose.Types.ObjectId;
       const restaurantName = targetRestaurant.name;
 
-      // 2. Create the staff user
       const newUser = new User({
         email,
-        password, // Hashing handled by pre-save hook
+        password,
         role,
         name,
         restaurantId: finalRestaurantId,
-        professionalRole,
         assignedRoleId: assignedRoleId
           ? new Types.ObjectId(assignedRoleId)
           : null,
       });
-      await newUser.save({ session }); // Pass session here
+      await newUser.save({ session });
 
       await session.commitTransaction();
       return { user: newUser, restaurantId: finalRestaurantId, restaurantName };
@@ -192,7 +174,7 @@ class AuthService {
    *
    * @param email - The user's email address.
    * @param passwordInput - The plain text password provided by the user.
-   * @returns A promise resolving to an object containing the authenticated user's details (excluding password), their restaurant's name (if applicable), and their professional role (if applicable).
+   * @returns A promise resolving to an object containing the authenticated user's details (excluding password), their restaurant's name (if applicable).
    * @throws {AppError} If authentication fails (invalid email/password) (401), or if an unexpected database error occurs (500).
    */
   static async loginUser(
@@ -201,7 +183,7 @@ class AuthService {
   ): Promise<LoginResponse> {
     try {
       const userDoc = await User.findOne({ email }).select(
-        "+password name role restaurantId email createdAt updatedAt professionalRole assignedRoleId"
+        "+password name role restaurantId email createdAt updatedAt assignedRoleId"
       );
 
       if (!userDoc) {
@@ -231,12 +213,13 @@ class AuthService {
         restaurantId: userObject.restaurantId?.toString(),
         assignedRoleId: userObject.assignedRoleId?.toString(),
         restaurantName: restaurantName,
+        // professionalRole is intentionally omitted here
       };
 
       return {
         user: responseUser,
         restaurantName: responseUser.restaurantName,
-        professionalRole: responseUser.professionalRole,
+        // professionalRole is intentionally omitted here
       };
     } catch (error: any) {
       console.error("Error during login:", error);
