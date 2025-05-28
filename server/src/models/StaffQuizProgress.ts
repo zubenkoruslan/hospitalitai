@@ -12,7 +12,7 @@ export interface IStaffQuizProgress extends Document {
   seenQuestionIds: Types.ObjectId[] | IQuestion[];
   totalUniqueQuestionsInSource: number;
   isCompletedOverall: boolean;
-  lastAttemptTimestamp?: Date;
+  lastAttemptCompletedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -51,7 +51,7 @@ const StaffQuizProgressSchema: Schema<IStaffQuizProgress> = new Schema(
       type: Boolean,
       default: false,
     },
-    lastAttemptTimestamp: {
+    lastAttemptCompletedAt: {
       type: Date,
     },
   },

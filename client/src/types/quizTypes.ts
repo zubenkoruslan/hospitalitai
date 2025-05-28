@@ -40,6 +40,9 @@ export interface ClientIQuiz {
   updatedAt?: string;
   averageScore?: number | null;
   targetRoles?: IRole[]; // Added targetRoles
+  retakeCooldownHours?: number; // Added field
+  nextAvailableAt?: string | null; // Added field (ISO date string)
+  lastAttemptCompletedAt?: string | null; // Added field (ISO date string)
 }
 
 // From api.ts: GenerateQuizFromBanksClientData (lines 342-347)
@@ -50,6 +53,7 @@ export interface GenerateQuizFromBanksClientData {
   sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
   targetRoles?: string[]; // Added for target roles selection
+  retakeCooldownHours?: number; // Added field
 }
 
 // From api.ts: ClientAvailableQuiz (lines 413-423)
@@ -61,6 +65,9 @@ export interface ClientAvailableQuiz {
   numberOfQuestionsPerAttempt: number;
   totalUniqueQuestionsInSourceSnapshot?: number;
   isAvailable?: boolean;
+  retakeCooldownHours?: number; // Added field
+  nextAvailableAt?: string | null; // Added field (ISO date string)
+  lastAttemptCompletedAt?: string | null; // Added field (ISO date string)
 }
 
 // From api.ts: ClientQuizAttemptDetails (lines 443-451)
@@ -159,4 +166,5 @@ export interface UpdateQuizClientData {
   numberOfQuestionsPerAttempt?: number;
   isAvailable?: boolean;
   targetRoles?: string[];
+  retakeCooldownHours?: number; // Added field
 }

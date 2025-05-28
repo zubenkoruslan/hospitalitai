@@ -31,7 +31,7 @@ interface QuizProgressSummary {
   quizTitle: string;
   overallProgressPercentage: number;
   isCompletedOverall: boolean;
-  lastAttemptTimestamp?: Date | null;
+  lastAttemptCompletedAt?: Date | null;
   averageScoreForQuiz?: number | null;
 }
 
@@ -251,7 +251,8 @@ class StaffService {
             quizTitle: progressRecord.quizId.title,
             overallProgressPercentage: overallProgressPercentage,
             isCompletedOverall: progressRecord.isCompletedOverall,
-            lastAttemptTimestamp: progressRecord.lastAttemptTimestamp || null,
+            lastAttemptCompletedAt:
+              progressRecord.lastAttemptCompletedAt || null,
             averageScoreForQuiz: averageScoreForThisQuiz,
           });
         }

@@ -31,6 +31,7 @@ import CreateQuizPage from "./pages/CreateQuizPage";
 import SettingsPage from "./pages/SettingsPage";
 import SopManagementPage from "./pages/SopManagementPage";
 import SopDocumentDetailPage from "./pages/SopDocumentDetailPage";
+import MenuUploadPage from "./pages/MenuUploadPage";
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 // import NotificationsPage from "./pages/NotificationsPage"; // Removed
@@ -198,6 +199,18 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="restaurant">
                   <SopDocumentDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/new-test-route"
+              element={<div>This is the new test route page!</div>}
+            />
+            <Route
+              path="/menu-upload-path"
+              element={
+                <ProtectedRoute requiredRole="restaurant">
+                  <MenuUploadPage />
                 </ProtectedRoute>
               }
             />

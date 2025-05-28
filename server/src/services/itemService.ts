@@ -20,7 +20,7 @@ interface ItemData {
   isActive?: boolean;
 }
 
-interface ItemUpdateData {
+export interface ItemUpdateData {
   name?: string;
   description?: string;
   price?: number;
@@ -363,7 +363,10 @@ class ItemService {
           500
         );
       }
-
+      console.log(
+        "[ItemService.updateItem] Updated item details:",
+        JSON.stringify(updatedItem, null, 2)
+      );
       return updatedItem;
     } catch (error: any) {
       console.error("Error updating menu item in service:", error);

@@ -1,18 +1,33 @@
-import express, { Router } from "express";
-import * as menuController from "../controllers/menuController";
+import express from "express";
+import {
+  createMenu,
+  getAllMenus,
+  getMenuById,
+  updateMenu,
+  deleteMenu,
+  updateMenuActivationStatus,
+  handleMenuUploadPreview,
+  handleFinalizeMenuImport,
+  uploadMenuPdf,
+  deleteCategoryAndReassignItems,
+  handleProcessMenuForConflictResolution,
+  getMenuImportJobStatus,
+} from "../controllers/menuController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import { uploadPdf } from "../middleware/uploadMiddleware"; // Assuming this is your correct multer middleware for PDF
+import { uploadPdf } from "../middleware/uploadMiddleware";
 import {
   handleValidationErrors,
   validateCreateMenu,
+  validateUpdateMenu,
   validateObjectId,
   validateMenuIdParam,
-  validateUpdateMenu,
   validateCategoryNameParam,
+  validateFinalMenuImportData,
+  validateProcessConflictResolutionData,
 } from "../middleware/validationMiddleware";
 import { body } from "express-validator";
 
-const router: Router = express.Router();
+const router = express.Router();
 
 // ... (other menu routes, e.g., get all menus for a restaurant)
 router.get(
@@ -20,7 +35,7 @@ router.get(
   protect,
   validateObjectId("restaurantId"),
   handleValidationErrors,
-  menuController.getMenusByRestaurant
+  getAllMenus
 );
 
 // GET a single menu by its ID, including its items
@@ -31,7 +46,7 @@ router.get(
   handleValidationErrors,
   // Optional: Add role-based access if needed, e.g., only restaurant staff/admin
   // restrictTo(['restaurantAdmin', 'manager', 'staff']),
-  menuController.getMenuByIdWithItems
+  getMenuById
 );
 
 // POST - Create a new menu
@@ -39,21 +54,21 @@ router.get(
 router.post(
   "/",
   protect,
-  restrictTo("restaurant"), // Example: Only restaurant admins can create a base menu
+  restrictTo("restaurant"),
   validateCreateMenu,
   handleValidationErrors,
-  menuController.createMenu
+  createMenu
 );
 
 // PUT - Update an existing menu's details (e.g., name, description)
 router.put(
   "/:menuId",
   protect,
-  restrictTo("restaurant"), // Example: Only restaurant admins can update menu details
+  restrictTo("restaurant"),
   validateMenuIdParam,
   validateUpdateMenu,
   handleValidationErrors,
-  menuController.updateMenuDetails
+  updateMenu
 );
 
 // DELETE - Delete a menu
@@ -61,43 +76,83 @@ router.put(
 router.delete(
   "/:menuId",
   protect,
-  restrictTo("restaurant"), // Example: Only restaurant admins can delete menus
+  restrictTo("restaurant"),
   validateMenuIdParam,
   handleValidationErrors,
-  menuController.deleteMenu
+  deleteMenu
 );
 
 // Route to upload a menu PDF for a specific restaurant
 router.post(
   "/upload/pdf/:restaurantId",
   protect,
-  restrictTo("restaurant"), // Changed from "restaurantAdmin" to "restaurant"
+  restrictTo("restaurant"),
   uploadPdf.single("menuPdf"),
   validateObjectId("restaurantId"),
   handleValidationErrors,
-  menuController.uploadMenuPdf
+  uploadMenuPdf
+);
+
+// NEW Route: Upload a menu PDF to get a preview for interactive correction
+router.post(
+  "/upload/preview", // No restaurantId in path, will be taken from req.user
+  protect, // Ensure user is authenticated
+  restrictTo("restaurant"),
+  uploadPdf.single("menuPdf"), // Use the same multer middleware for PDF upload
+  // No specific body/param validation here as we rely on file upload and auth context
+  // handleValidationErrors, // Not strictly needed if no preceding validators that add to req.errors
+  handleMenuUploadPreview
 );
 
 // New route for deleting a category within a specific menu
 router.delete(
   "/:menuId/categories/:categoryName",
   protect,
-  restrictTo("restaurant"), // Also ensure this is "restaurant" if intended for restaurant owners/managers
+  restrictTo("restaurant"),
   validateMenuIdParam,
   validateCategoryNameParam,
   handleValidationErrors,
-  menuController.deleteCategoryAndReassignItems
+  deleteCategoryAndReassignItems
 );
 
 // Route to update menu activation status
 router.patch(
   "/:menuId/status",
   protect, // General auth
-  restrictTo("restaurant"), // Ensure user is restaurant owner
+  restrictTo("restaurant"),
   validateMenuIdParam, // Validate menuId in params
   body("isActive").isBoolean().withMessage("isActive must be a boolean."), // Validate isActive in body
   handleValidationErrors,
-  menuController.updateMenuActivationStatusHandler
+  updateMenuActivationStatus
+);
+
+// POST /api/menus/upload/import
+router.post(
+  "/upload/import",
+  protect,
+  restrictTo("restaurant"),
+  validateFinalMenuImportData,
+  handleFinalizeMenuImport
+);
+
+// POST /api/menus/upload/process - For conflict resolution
+router.post(
+  "/upload/process",
+  protect,
+  restrictTo("restaurant"),
+  validateProcessConflictResolutionData,
+  handleValidationErrors,
+  handleProcessMenuForConflictResolution
+);
+
+// GET /api/menus/upload/status/:jobId - For async import job status
+router.get(
+  "/upload/status/:jobId",
+  protect,
+  restrictTo("restaurant"),
+  validateObjectId("jobId"), // Validate that jobId is a valid ObjectId
+  handleValidationErrors,
+  getMenuImportJobStatus
 );
 
 export default router;

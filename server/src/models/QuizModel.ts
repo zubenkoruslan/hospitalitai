@@ -12,6 +12,7 @@ export interface IQuiz extends Document {
   isAvailable?: boolean;
   averageScore?: number | null;
   targetRoles?: Types.ObjectId[];
+  retakeCooldownHours: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,6 +67,12 @@ const QuizSchema: Schema<IQuiz> = new Schema(
         ref: "Role",
       },
     ],
+    retakeCooldownHours: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: [0, "Retake cooldown cannot be negative."],
+    },
   },
   {
     timestamps: true,

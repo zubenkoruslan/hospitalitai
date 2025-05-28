@@ -26,7 +26,7 @@ const menuSchema = new Schema<IMenu>(
       type: Schema.Types.ObjectId,
       ref: "Restaurant", // Reference to the Restaurant model
       required: [true, "Menu must belong to a restaurant"],
-      index: true,
+      // index: true, // Covered by compound index below
     },
     isActive: {
       // Added isActive field to schema
@@ -39,6 +39,9 @@ const menuSchema = new Schema<IMenu>(
     timestamps: true, // Add createdAt and updatedAt timestamps
   }
 );
+
+// Add compound unique index for restaurantId and name
+menuSchema.index({ restaurantId: 1, name: 1 }, { unique: true });
 
 // Create and export the Menu model
 const Menu: Model<IMenu> = mongoose.model<IMenu>("Menu", menuSchema);

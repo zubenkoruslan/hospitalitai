@@ -25,6 +25,7 @@ export const generateQuizFromBanksController = async (
       sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
       targetRoles,
+      retakeCooldownHours,
     } = req.body as GenerateQuizFromBanksRequestBody;
 
     if (!req.user || !req.user.restaurantId) {
@@ -43,6 +44,7 @@ export const generateQuizFromBanksController = async (
       questionBankIds,
       sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
+      retakeCooldownHours,
       targetRoles: targetRoles
         ? targetRoles.map((id) => new mongoose.Types.ObjectId(id))
         : undefined,
@@ -325,14 +327,7 @@ export const updateQuizController = async (
 ): Promise<void> => {
   try {
     const { quizId } = req.params;
-    const {
-      title,
-      description,
-      questionBankIds,
-      numberOfQuestionsPerAttempt,
-      isAvailable,
-      targetRoles,
-    } = req.body as UpdateQuizRequestBody;
+    const updateDataFromRequest = req.body as UpdateQuizRequestBody;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -342,34 +337,60 @@ export const updateQuizController = async (
     const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
 
-    const serviceUpdateData: Partial<IQuiz> = {};
+    // Construct the final updateData object to be passed to the service
+    const updateDataForService: Partial<IQuiz> = {
+      ...(updateDataFromRequest.title && {
+        title: updateDataFromRequest.title,
+      }),
+      ...(updateDataFromRequest.description && {
+        description: updateDataFromRequest.description,
+      }),
+      ...(updateDataFromRequest.questionBankIds && {
+        sourceQuestionBankIds: updateDataFromRequest.questionBankIds.map(
+          (id) => new mongoose.Types.ObjectId(id)
+        ),
+      }),
+      ...(updateDataFromRequest.numberOfQuestionsPerAttempt && {
+        numberOfQuestionsPerAttempt:
+          updateDataFromRequest.numberOfQuestionsPerAttempt,
+      }),
+      ...(typeof updateDataFromRequest.isAvailable === "boolean" && {
+        isAvailable: updateDataFromRequest.isAvailable,
+      }),
+      ...(updateDataFromRequest.targetRoles && {
+        targetRoles: updateDataFromRequest.targetRoles.map(
+          (id) => new mongoose.Types.ObjectId(id)
+        ),
+      }),
+      ...(updateDataFromRequest.retakeCooldownHours !== undefined && {
+        // Added field
+        retakeCooldownHours: updateDataFromRequest.retakeCooldownHours,
+      }),
+    };
 
-    if (title !== undefined) serviceUpdateData.title = title;
-    if (description !== undefined) serviceUpdateData.description = description;
-    if (numberOfQuestionsPerAttempt !== undefined)
-      serviceUpdateData.numberOfQuestionsPerAttempt =
-        numberOfQuestionsPerAttempt;
-    if (isAvailable !== undefined) serviceUpdateData.isAvailable = isAvailable;
+    // Remove undefined properties to avoid overwriting with null if not provided
+    Object.keys(updateDataForService).forEach(
+      (key) =>
+        (updateDataForService as any)[key] === undefined &&
+        delete (updateDataForService as any)[key]
+    );
 
-    if (targetRoles) {
-      serviceUpdateData.targetRoles = targetRoles.map(
-        (id) => new mongoose.Types.ObjectId(id)
-      );
-    }
-    if (questionBankIds) {
-      serviceUpdateData.sourceQuestionBankIds = questionBankIds.map(
-        (id) => new mongoose.Types.ObjectId(id)
-      );
+    if (Object.keys(updateDataForService).length === 0) {
+      return next(new AppError("No update data provided.", 400));
     }
 
     const updatedQuiz = await QuizService.updateQuiz(
       quizObjectId,
       restaurantId,
-      serviceUpdateData
+      updateDataForService
     );
 
+    if (!updatedQuiz) {
+      // This case might be redundant if service throws 404, but good for safety
+      return next(new AppError("Quiz not found or failed to update.", 404));
+    }
+
     res.status(200).json({
-      status: "success",
       message: "Quiz updated successfully.",
       data: updatedQuiz,
     });

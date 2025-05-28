@@ -178,6 +178,15 @@ import {
 } from "../types/sopTypes";
 // Remove: import { ISopDocument as ISopDocumentType } from "../types/sopTypes"; // Removed duplicate/aliased import
 
+// Import menu upload types for conflict processing
+import {
+  ProcessConflictResolutionRequest,
+  ProcessConflictResolutionResponse,
+  ParsedMenuItem as ClientParsedMenuItem,
+  FinalImportRequestBody,
+  ImportResult,
+} from "../types/menuUploadTypes";
+
 // Question Bank Endpoints
 
 /**
@@ -325,12 +334,9 @@ export const getMenusByRestaurant = async (
   if (status) {
     url += `?status=${status}`;
   }
-  const response = await api.get<{
-    success: boolean;
-    count: number;
-    data: IMenuClient[];
-  }>(url);
-  return response.data.data; // data is the array of IMenuClient
+  // The backend directly returns an array of IMenuClient, not nested in a 'data' object.
+  const response = await api.get<IMenuClient[]>(url);
+  return response.data; // Return response.data directly
 };
 
 /**
@@ -340,11 +346,14 @@ export const getMenusByRestaurant = async (
 export const getMenuWithItems = async (
   menuId: string
 ): Promise<IMenuWithItemsClient> => {
-  const response = await api.get<{
-    success: boolean;
-    data: IMenuWithItemsClient;
-  }>(`/menus/${menuId}`);
-  return response.data.data; // data is the IMenuWithItemsClient object
+  const response = await api.get<IMenuWithItemsClient>(`/menus/${menuId}`, {
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
+  return response.data; // Changed from response.data.data
 };
 
 // ADDED: Get a single question by ID
@@ -773,13 +782,12 @@ export const deleteMenuCategory = async (
   categoryName: string
 ): Promise<any> => {
   const response = await api.delete(
-    `/menus/${menuId}/categories/${encodeURIComponent(categoryName)}`
+    `/menus/${menuId}/categories/${categoryName}`
   );
-  return response.data;
+  return response.data; // Assuming backend sends back some confirmation or updated menu
 };
 
-// PDF Upload for Menu
-
+// PDF Upload for Menu - This function is deprecated and will be removed.
 export const processPdfMenuUpload = async (
   restaurantId: string,
   formData: FormData
@@ -1290,6 +1298,44 @@ export const generateMoreAiQuestionsForSopBank = async (
     message: string;
     pendingReviewQuestionIds?: string[];
   }>(`/question-banks/${bankId}/generate-sop-questions`, params);
+  return response.data;
+};
+
+// ADDING NEW FUNCTION HERE
+/**
+ * Processes menu items to identify conflicts before final import.
+ * @param request - The full ProcessConflictResolutionRequest object.
+ * @returns The items augmented with conflict resolution information.
+ */
+export const processMenuItemsForConflicts = async (
+  request: ProcessConflictResolutionRequest
+): Promise<ProcessConflictResolutionResponse> => {
+  const response = await api.post<ProcessConflictResolutionResponse>(
+    "/menus/upload/process",
+    request
+  );
+  return response.data;
+};
+
+// New function for final import
+export const finalizeMenuImportClient = async (
+  requestBody: FinalImportRequestBody
+): Promise<ImportResult | { jobId: string; message: string }> => {
+  const response = await api.post<
+    ImportResult | { jobId: string; message: string }
+  >("/menus/upload/import", requestBody);
+  return response.data;
+};
+
+// New function to get import job status
+export const getMenuImportJobStatus = async (
+  jobId: string
+): Promise<ImportResult> => {
+  // Assuming the job status endpoint returns full ImportResult when done, or a status object
+  // The backend might return a different shape for in-progress jobs vs completed jobs.
+  // For simplicity, let's assume it aims to return ImportResult or throws error if not found/pending.
+  // Or, a more complex type: Promise<ImportResult | { status: string; progress?: number; message?: string }>
+  const response = await api.get<ImportResult>(`/menus/upload/status/${jobId}`);
   return response.data;
 };
 

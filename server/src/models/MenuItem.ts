@@ -134,6 +134,9 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
   }
 );
 
+// Add compound index for frequently queried fields
+MenuItemSchema.index({ restaurantId: 1, menuId: 1 });
+
 // Create and export the Mongoose model
 const MenuItem: Model<IMenuItem> = mongoose.model<IMenuItem>(
   "MenuItem",

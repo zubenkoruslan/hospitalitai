@@ -162,7 +162,7 @@ const QuizTakingPage: React.FC = () => {
       setUserAnswers(initialAnswers); // Initialize with localStorage data or empty
       userAnswersRef.current = initialAnswers; // Sync ref too
 
-      const fetchedQuestions = await startQuizAttempt(quizId); // Now directly returns ClientQuestionForAttempt[]
+      const fetchedQuestions = await startQuizAttempt(quizId);
       // const newAttemptId = response.attemptId; // No longer returned here
 
       // setCurrentAttemptId(newAttemptId); // Attempt ID will be set on submit
@@ -185,7 +185,30 @@ const QuizTakingPage: React.FC = () => {
         setQuestions([]); // Ensure questions is empty
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load quiz questions.");
+      if (
+        err.response &&
+        err.response.status === 403 &&
+        err.response.data?.additionalDetails?.nextAvailableAt
+      ) {
+        // Specific handling for quiz cooldown error
+        const nextAvailableDate = new Date(
+          err.response.data.additionalDetails.nextAvailableAt
+        );
+        const formattedTime = nextAvailableDate.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const formattedDate = nextAvailableDate.toLocaleDateString();
+        setError(
+          `${err.response.data.message} You can try again after ${formattedDate} at ${formattedTime}.`
+        );
+        setQuestions([]); // Ensure no questions are displayed
+      } else {
+        // Generic error handling
+        setError(
+          err.response?.data?.message || "Failed to load quiz questions."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -526,27 +549,21 @@ const QuizTakingPage: React.FC = () => {
     );
   }
 
-  // Error state after loading
-  if (error && !submissionResult) {
+  // Display error prominently if it occurs during question loading phase
+  if (error && questions.length === 0 && !submissionResult) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="flex flex-col min-h-screen bg-gray-100">
         <Navbar />
-        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-              Error Loading Quiz
-            </h1>
-          </div>
-          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
-            <ErrorMessage message={error} onDismiss={() => setError(null)} />
-            <div className="mt-8 text-center">
-              <Button
-                onClick={() => navigate("/staff/dashboard")}
-                variant="secondary"
-              >
-                Back to Dashboard
-              </Button>
-            </div>
+        <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center">
+          <Card className="w-full max-w-lg p-8 text-center">
+            <ErrorMessage message={error} />
+            <Button
+              variant="primary"
+              onClick={() => navigate("/staff/dashboard")}
+              className="mt-6"
+            >
+              Back to Dashboard
+            </Button>
           </Card>
         </main>
       </div>

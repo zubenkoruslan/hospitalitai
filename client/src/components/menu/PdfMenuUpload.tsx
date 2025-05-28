@@ -16,17 +16,13 @@ import { ArrowUpTrayIcon } from "@heroicons/react/24/outline"; // For dropzone i
 interface PdfMenuUploadProps {
   isOpen: boolean; // To control modal visibility
   onClose: () => void; // To close the modal
-  restaurantId: string; // Pass the current restaurant's ID as a prop
-  onUploadSuccess?: (menuData: any) => void; // Optional callback on successful upload
-  onUploadError?: (error: string) => void; // Optional callback on error
+  onFileSelected: (file: File) => void; // New prop to pass the selected file up
 }
 
 const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
   isOpen,
   onClose,
-  restaurantId,
-  onUploadSuccess,
-  onUploadError,
+  onFileSelected, // Destructure new prop
 }) => {
   const { token } = useAuth(); // Get token from AuthContext
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -112,92 +108,25 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
 
   const triggerFileSelect = () => fileInputRef.current?.click();
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedFile) {
-      setError("Please select or drop a PDF file to upload.");
-      return;
-    }
-    if (!token) {
-      setError("Authentication error. Please log in again.");
-      return;
-    }
-
-    setIsUploading(true);
-    setError(null);
-    setMessage("Preparing upload...");
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append("menuPdf", selectedFile);
-
-    try {
-      setMessage("Uploading menu...");
-      const response = await axios.post(
-        `/api/menus/upload/pdf/${restaurantId}`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              setUploadProgress(percentCompleted);
-              setMessage(`Uploading: ${percentCompleted}%`);
-            }
-          },
-        }
-      );
-
-      setIsUploading(false);
-      setMessage(response.data.message || "Menu PDF processed successfully!");
-      setSelectedFile(null);
-      setUploadProgress(100);
-      if (onUploadSuccess) {
-        onUploadSuccess(response.data.data);
-      }
-    } catch (err: any) {
-      setIsUploading(false);
-      setUploadProgress(0);
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to upload menu. Please try again.";
-      setError(errorMessage);
-      setMessage(null);
-      if (onUploadError) {
-        onUploadError(errorMessage);
-      }
-      console.error("Upload error:", err);
-    }
-  };
-
-  const formId = "pdf-upload-form";
+  const formId = "pdf-select-form"; // Changed ID, it's not really a submit form anymore
 
   const footerContent = (
     <>
-      <Button variant="secondary" onClick={onClose} disabled={isUploading}>
+      <Button variant="secondary" onClick={onClose}>
         Cancel
       </Button>
       <Button
-        type="submit"
-        form={formId}
+        type="button" // Changed from submit
         variant="primary"
-        disabled={isUploading || !selectedFile}
+        disabled={!selectedFile}
+        onClick={() => {
+          if (selectedFile) {
+            onFileSelected(selectedFile);
+          }
+        }}
         className="ml-3"
       >
-        {isUploading ? (
-          <span className="flex items-center">
-            <LoadingSpinner message="" />
-            <span className="ml-2">Uploading ({uploadProgress}%)</span>
-          </span>
-        ) : (
-          "Upload Menu"
-        )}
+        Proceed to Preview
       </Button>
     </>
   );
@@ -206,11 +135,15 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Upload PDF Menu"
+      title="Select PDF Menu to Upload" // Updated title
       size="lg"
       footerContent={footerContent}
     >
-      <form onSubmit={handleSubmit} id={formId} className="space-y-6">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        id={formId}
+        className="space-y-6"
+      >
         {/* Drop Zone */}
         <div
           onDragEnter={handleDragEnter}
@@ -233,16 +166,15 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
                 ? "border-sky-500 bg-sky-50"
                 : "border-slate-300 hover:border-slate-400 bg-slate-50"
             }
-            ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+            `} // Removed isUploading opacity/cursor changes
         >
           <input
             ref={fileInputRef}
-            id="pdf-upload-input-modal" // ID can remain for label association if any, but mostly for reset
+            id="pdf-upload-input-modal"
             type="file"
             accept=".pdf,application/pdf"
             onChange={handleFileChange}
-            disabled={isUploading}
-            className="hidden" // Hide the default input
+            className="hidden"
           />
           <ArrowUpTrayIcon
             className={`mx-auto h-12 w-12 mb-3 ${
@@ -267,27 +199,10 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
           </p>
         </div>
 
-        {/* Progress Bar - visibility controlled by isUploading & progress */}
-        {isUploading && uploadProgress > 0 && (
-          <div>
-            {/* Message state already shows percentage, no need for a separate label here */}
-            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mt-2">
-              <div
-                className="bg-sky-500 h-2.5 rounded-full transition-all duration-150 ease-linear"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
         {/* Status Messages */}
         {message && !error && (
           <div
-            className={`p-3 rounded-lg text-sm mt-4 ${
-              isUploading
-                ? "bg-sky-50 border border-sky-300 text-sky-700"
-                : "bg-green-50 border border-green-300 text-green-700"
-            }`}
+            className={`p-3 rounded-lg text-sm mt-4 bg-green-50 border border-green-300 text-green-700`}
           >
             {message}
           </div>

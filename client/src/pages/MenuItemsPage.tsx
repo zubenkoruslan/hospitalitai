@@ -72,7 +72,23 @@ const toTitleCase = (str: string): string => {
 // --- Main Component ---
 const MenuItemsPage: React.FC = () => {
   const { menuId } = useParams<{ menuId: string }>();
-  console.log(`[MenuItemsPage] menuId from useParams: ${menuId}`);
+
+  // Add console logs here
+  console.log("[MenuItemsPage] Raw menuId from useParams:", menuId);
+  console.log("[MenuItemsPage] menuId type:", typeof menuId);
+  console.log("[MenuItemsPage] menuId length:", menuId?.length);
+  if (menuId) {
+    const charCodes = [];
+    for (let i = 0; i < menuId.length; i++) {
+      charCodes.push(menuId.charCodeAt(i));
+    }
+    console.log("[MenuItemsPage] menuId charCodes:", charCodes.join(", "));
+    // You can also try to see if trimming it makes a difference for validation
+    // This is just for logging, don't use the trimmed version for API calls yet
+    const trimmedMenuId = menuId.trim();
+    console.log("[MenuItemsPage] trimmedMenuId for logging:", trimmedMenuId);
+    console.log("[MenuItemsPage] trimmedMenuId length:", trimmedMenuId.length);
+  }
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -126,7 +142,7 @@ const MenuItemsPage: React.FC = () => {
       ...new Set(
         items
           .filter((item) => item.itemType === "food" && item.category)
-          .map((item) => item.category!)
+          .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
   }, [items]);
@@ -137,7 +153,7 @@ const MenuItemsPage: React.FC = () => {
       ...new Set(
         items
           .filter((item) => item.itemType === "beverage" && item.category)
-          .map((item) => item.category!)
+          .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
   }, [items]);
@@ -309,7 +325,7 @@ const MenuItemsPage: React.FC = () => {
     return items.reduce(
       (acc, item) => {
         const typeKey = item.itemType; // "food" or "beverage"
-        const categoryKey = item.category || "Uncategorized";
+        const categoryKey = toTitleCase(item.category || "Uncategorized");
 
         if (!acc[typeKey]) {
           // This case should ideally not happen if types are always food/beverage
@@ -489,7 +505,18 @@ const MenuItemsPage: React.FC = () => {
           const itemsInCategory = itemsToDisplay[category];
           if (!itemsInCategory || itemsInCategory.length === 0) return null;
 
+          console.log(
+            `[MenuItemsPage] Rendering category: "${category}", itemsInCategory:`,
+            JSON.stringify(itemsInCategory, null, 2)
+          );
+
           const uniqueCategoryKey = `${activeTab}-${category}`;
+          console.log(
+            `[MenuItemsPage] Category: "${category}", Is Expanded: ${!!expandedCategories[
+              uniqueCategoryKey
+            ]}`
+          );
+
           return (
             <div key={uniqueCategoryKey} className="mb-6 last:mb-0">
               <div

@@ -48,6 +48,30 @@ const formatApiError = (err: any, context: string): string => {
   }
 };
 
+// --- Helper function to format time remaining or specific time ---
+const formatAvailability = (nextAvailableAtIso?: string | null): string => {
+  if (!nextAvailableAtIso) return "";
+  const nextAvailableDate = new Date(nextAvailableAtIso);
+  const now = new Date();
+
+  if (nextAvailableDate <= now) return "Available now";
+
+  const diffMs = nextAvailableDate.getTime() - now.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  // const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+  if (diffHours > 0) {
+    return `Available in ${diffHours}h ${diffMinutes}m`;
+  }
+  if (diffMinutes > 0) {
+    return `Available in ${diffMinutes}m`;
+  }
+  return `Available in <1m`; // Or show seconds if preferred
+  // Alternatively, for a specific time:
+  // return `Available at ${nextAvailableDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
+
 // --- Helper Component for Rendering a Single Quiz Item (Refactored) ---
 interface QuizItemProps {
   quizDisplayItem: StaffQuizDisplayItem;
@@ -58,7 +82,14 @@ const QuizItem: React.FC<QuizItemProps> = ({
   quizDisplayItem,
   onViewAttemptIncorrectAnswers,
 }) => {
-  const { title, description, progress, _id: quizId } = quizDisplayItem;
+  const {
+    title,
+    description,
+    progress,
+    _id: quizId,
+    retakeCooldownHours,
+    nextAvailableAt,
+  } = quizDisplayItem;
   const navigate = useNavigate();
 
   const isCompletedOverall = progress?.isCompletedOverall || false;
@@ -71,6 +102,9 @@ const QuizItem: React.FC<QuizItemProps> = ({
             100
         )
       : 0;
+
+  const isQuizOnCooldown =
+    nextAvailableAt && new Date() < new Date(nextAvailableAt);
 
   return (
     <Card
@@ -172,7 +206,17 @@ const QuizItem: React.FC<QuizItemProps> = ({
       </div>
 
       <div className="flex-shrink-0 mt-auto p-4 border-t border-gray-100">
-        {!isCompletedOverall ? (
+        {isQuizOnCooldown ? (
+          <div className="text-center">
+            <Button
+              variant="primary"
+              className="w-full text-sm py-1.5 opacity-70 cursor-not-allowed bg-slate-400 hover:bg-slate-400 focus:bg-slate-400"
+              disabled
+            >
+              You've completed your quiz for today.
+            </Button>
+          </div>
+        ) : !isCompletedOverall ? (
           <Button
             variant="primary"
             className="w-full text-sm py-1.5"

@@ -31,6 +31,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
   const [description, setDescription] = useState<string>("");
   const [numberOfQuestionsPerAttempt, setNumberOfQuestionsPerAttempt] =
     useState<number>(10);
+  const [retakeCooldownHours, setRetakeCooldownHours] = useState<number>(0);
   const [availableBanks, setAvailableBanks] = useState<IQuestionBank[]>([]);
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false); // For form submission
@@ -93,6 +94,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       setTitle("");
       setDescription("");
       setNumberOfQuestionsPerAttempt(10);
+      setRetakeCooldownHours(0);
       setSelectedBankIds([]);
       setSelectedRoleIds([]); // Reset selected roles
       setError(null);
@@ -136,13 +138,18 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       setError("Number of questions per attempt must be greater than zero.");
       return;
     }
+    if (retakeCooldownHours < 0) {
+      setError("Cooldown hours cannot be negative.");
+      return;
+    }
 
     setIsLoading(true);
     const quizData: GenerateQuizFromBanksClientData = {
       title,
       questionBankIds: selectedBankIds,
       numberOfQuestionsPerAttempt,
-      targetRoles: selectedRoleIds, // Add selected role IDs
+      targetRoles: selectedRoleIds,
+      retakeCooldownHours,
     };
 
     if (description.trim()) {
@@ -283,6 +290,28 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
               required
               disabled={isLoadingBanks || isLoading || isLoadingRoles}
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="retakeCooldownHours"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Cooldown Between Attempts (hours)
+            </label>
+            <input
+              type="number"
+              id="retakeCooldownHours"
+              value={retakeCooldownHours}
+              onChange={(e) =>
+                setRetakeCooldownHours(parseInt(e.target.value, 10) || 0)
+              }
+              min="0"
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+            />
+            <p className="text-xs text-slate-500">
+              Set to 0 for no cooldown (staff can retake immediately).
+            </p>
           </div>
 
           <fieldset className="space-y-3">

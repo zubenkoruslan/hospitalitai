@@ -1,17 +1,7 @@
-import React, {
-  useState,
-  useMemo,
-  useCallback,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {
-  processPdfMenuUpload,
-  inviteStaff,
-  getStaffList,
-} from "../services/api"; // Added inviteStaff, getStaffList
+import { inviteStaff, getStaffList } from "../services/api"; // Added inviteStaff, getStaffList
 import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
@@ -20,6 +10,7 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
+import PdfMenuUpload from "../components/menu/PdfMenuUpload"; // Corrected import path
 import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
@@ -34,7 +25,6 @@ const _isCompletedQuiz = (result: ResultSummary): boolean => {
 const RestaurantDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use custom hooks for data fetching
   const {
@@ -67,10 +57,9 @@ const RestaurantDashboard: React.FC = () => {
   // Keep other state
   const [copied, setCopied] = useState(false);
 
-  // State for menu upload
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  // State for menu upload modal
+  const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null); // Can be used for feedback before navigation
 
   // Memoize calculations based on staffData from the hook
   const overallAveragePerformance = useMemo(() => {
@@ -102,42 +91,15 @@ const RestaurantDashboard: React.FC = () => {
     }
   }, [user?.restaurantId]); // Dependency: user.restaurantId
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
-      setUploadMessage(null); // Clear previous messages
-    } else {
-      setSelectedFile(null);
-    }
+  const openPdfUploadModal = () => {
+    setUploadMessage(null); // Clear previous messages
+    setIsPdfUploadModalOpen(true);
   };
 
-  const handleFileUpload = async () => {
-    if (!selectedFile || !user?.restaurantId) {
-      setUploadMessage("Please select a file and ensure you are logged in.");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadMessage(null);
-    const formData = new FormData();
-    formData.append("menuPdf", selectedFile);
-
-    try {
-      await processPdfMenuUpload(user.restaurantId, formData);
-      setUploadMessage("Menu uploaded successfully!");
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Reset the file input
-      }
-      fetchMenus(); // Refresh menus list
-    } catch (err: any) {
-      setUploadMessage(
-        err.response?.data?.message ||
-          "Failed to upload menu. Please try again."
-      );
-    } finally {
-      setIsUploading(false);
-    }
+  const handleFileSelectedForDashboardUpload = (file: File) => {
+    setIsPdfUploadModalOpen(false); // Close the modal
+    // Navigate to MenuUploadPage, passing the file in state
+    navigate("/menu-upload-path", { state: { fileToUpload: file } });
   };
 
   const handleActualInviteStaff = async (emailToInvite: string) => {
@@ -428,32 +390,13 @@ const RestaurantDashboard: React.FC = () => {
               Upload New Menu (PDF)
             </h2>
             <div className="space-y-4">
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                id="menuPdfUpload"
-              />
               <Button
                 variant="secondary"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                onClick={openPdfUploadModal}
                 className="mb-2 w-full text-sm py-2 truncate"
               >
-                {selectedFile ? selectedFile.name : "Select PDF File"}
+                Select PDF to Upload
               </Button>
-              {selectedFile && (
-                <Button
-                  variant="primary"
-                  onClick={handleFileUpload}
-                  disabled={isUploading || !selectedFile}
-                  className="w-full text-sm py-2"
-                >
-                  {isUploading ? <LoadingSpinner /> : "Upload Menu"}
-                </Button>
-              )}
               {uploadMessage && (
                 <p
                   className={`mt-3 text-xs ${
@@ -587,6 +530,15 @@ const RestaurantDashboard: React.FC = () => {
           </Card>
         )}
       </main>
+
+      {/* PDF Upload Modal for Dashboard */}
+      {isPdfUploadModalOpen && (
+        <PdfMenuUpload
+          isOpen={isPdfUploadModalOpen}
+          onClose={() => setIsPdfUploadModalOpen(false)}
+          onFileSelected={handleFileSelectedForDashboardUpload}
+        />
+      )}
     </div>
   );
 };

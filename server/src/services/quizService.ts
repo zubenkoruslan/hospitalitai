@@ -52,6 +52,7 @@ export interface PlainIQuiz {
   isAvailable?: boolean;
   averageScore?: number | null;
   targetRoles?: Types.ObjectId[];
+  retakeCooldownHours: number;
   createdAt: Date;
   updatedAt: Date;
   // Ensure all data fields from IQuiz are here, without Document methods
@@ -66,6 +67,7 @@ export interface CreateQuizFromBanksData {
   sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
   targetRoles?: Types.ObjectId[];
+  retakeCooldownHours?: number; // Added field
 }
 
 // New interface for progress with average score
@@ -76,15 +78,14 @@ export interface IStaffQuizProgressWithAverageScore extends IStaffQuizProgress {
 // Plain interface for lean StaffQuizProgress objects
 export interface PlainIStaffQuizProgress {
   _id: Types.ObjectId;
-  staffUserId: Types.ObjectId | IUser; // Could be IUser if populated
-  quizId: Types.ObjectId | IQuiz; // Could be IQuiz if populated
-  restaurantId: Types.ObjectId | IUser; // Could be IUser if populated
-  seenQuestionIds: Types.ObjectId[] | QuestionDocument[]; // Corrected IQuestion to QuestionDocument
+  staffUserId: Types.ObjectId | IUser;
+  quizId: Types.ObjectId | IQuiz;
+  restaurantId: Types.ObjectId | IUser;
+  seenQuestionIds: Types.ObjectId[] | QuestionDocument[];
   totalUniqueQuestionsInSource: number;
   isCompletedOverall: boolean;
-  lastAttemptTimestamp?: Date;
-  // questionsAnsweredToday?: number; // REMOVED
-  // lastActivityDateForDailyReset?: Date; // REMOVED
+  lastAttemptCompletedAt?: Date;
+  averageScore?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -133,7 +134,7 @@ export interface IStaffMemberQuizProgressDetails {
     | "isCompletedOverall"
     | "seenQuestionIds"
     | "totalUniqueQuestionsInSource"
-    | "lastAttemptTimestamp"
+    | "lastAttemptCompletedAt"
   > | null;
   averageScoreForQuiz: number | null;
   attempts: IQuizAttemptSummary[];
@@ -245,8 +246,11 @@ interface AvailableQuizInfo {
   title: string;
   description?: string;
   createdAt?: Date;
-  numQuestions: number;
-  averageScore?: number | null;
+  numQuestions: number; // This is numberOfQuestionsPerAttempt from IQuiz
+  // averageScore?: number | null; // Decided to remove as it's not reliably calculated here for this list view
+  retakeCooldownHours: number;
+  nextAvailableAt?: string | null; // ISO string
+  lastAttemptCompletedAt?: string | null; // ISO string
 }
 
 // Interface for data submitted by the client for a quiz attempt
@@ -558,16 +562,15 @@ export class QuizService {
     try {
       const staffUser = await User.findById(staffUserId)
         .select("assignedRoleId")
-        .lean<Pick<IUser, "assignedRoleId">>();
+        .lean<Pick<IUser, "assignedRoleId" | "_id">>(); // Added _id for logging
       if (!staffUser) {
-        // Or handle as an error, but returning empty might be safer if staff not found shouldn't halt all quiz display
         console.warn(
-          `[QuizService] Staff user ${staffUserId} not found when fetching available quizzes.`
+          `[QuizService.getAvailableQuizzesForStaff] Staff user ${staffUserId} not found when fetching available quizzes.`
         );
         return [];
       }
 
-      const staffAssignedRoleId = staffUser.assignedRoleId; // This could be ObjectId or undefined
+      const staffAssignedRoleId = staffUser.assignedRoleId;
 
       const queryConditions: any = {
         restaurantId: restaurantId,
@@ -576,12 +579,11 @@ export class QuizService {
 
       if (staffAssignedRoleId) {
         queryConditions.$or = [
-          { targetRoles: { $exists: false } }, // For older quizzes without targetRoles field
-          { targetRoles: { $size: 0 } }, // Quiz is for everyone (empty array)
-          { targetRoles: staffAssignedRoleId }, // Quiz targets the role this staff member has (using $in implicitly due to array field)
+          { targetRoles: { $exists: false } },
+          { targetRoles: { $size: 0 } },
+          { targetRoles: staffAssignedRoleId },
         ];
       } else {
-        // If staff has no assigned role, they only see quizzes for everyone
         queryConditions.$or = [
           { targetRoles: { $exists: false } },
           { targetRoles: { $size: 0 } },
@@ -589,20 +591,109 @@ export class QuizService {
       }
 
       const quizzes = await QuizModel.find(queryConditions)
-        .select("_id title description createdAt numberOfQuestionsPerAttempt") // Removed averageScore for now
+        .select(
+          "_id title description createdAt numberOfQuestionsPerAttempt retakeCooldownHours restaurantId" // Ensure restaurantId is selected
+        )
         .sort({ createdAt: -1 })
-        .lean<IQuiz[]>(); // Ensure it's an array of IQuiz
+        .lean<PlainIQuiz[]>(); // Use PlainIQuiz as it has retakeCooldownHours
 
-      // Transform to AvailableQuizInfo
-      // Consider calculating averageScore here if needed, or ensure it's on IQuiz model
-      return quizzes.map((quiz) => ({
-        _id: quiz._id.toString(), // Convert ObjectId to string
-        title: quiz.title,
-        description: quiz.description,
-        createdAt: quiz.createdAt,
-        numQuestions: quiz.numberOfQuestionsPerAttempt, // Direct mapping from IQuiz
-        // averageScore: quiz.averageScore, // Assuming averageScore is part of IQuiz (if not, needs calculation or removal)
-      }));
+      const availableQuizzesInfo: AvailableQuizInfo[] = [];
+
+      for (const quiz of quizzes) {
+        let nextAvailableAt: string | null = null;
+        let lastAttemptCompletedAtStr: string | null = null;
+
+        // SERVER-SIDE DEBUGGING LOGS
+        if (quiz.title === "SOP Quiz") {
+          // Or use quiz._id.toString() if more reliable
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff] Processing quiz: ${quiz.title} (ID: ${quiz._id})`
+          );
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff]   - quiz.retakeCooldownHours: ${quiz.retakeCooldownHours}`
+          );
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff]   - staffUser._id for SQP query: ${staffUser._id}`
+          );
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff]   - quiz._id for SQP query: ${quiz._id}`
+          );
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff]   - quiz.restaurantId for SQP query: ${quiz.restaurantId}`
+          );
+        }
+        // END SERVER-SIDE DEBUGGING LOGS
+
+        if (quiz.retakeCooldownHours > 0) {
+          const progress = await StaffQuizProgress.findOne({
+            staffUserId: staffUser._id, // Use staffUser._id from fetched staffUser
+            quizId: quiz._id,
+            restaurantId: quiz.restaurantId, // ensure restaurantId is part of query for specificity
+          }).lean<PlainIStaffQuizProgress>();
+
+          // SERVER-SIDE DEBUGGING LOGS
+          if (quiz.title === "SOP Quiz") {
+            console.log(
+              "[quizService.getAvailableQuizzesForStaff]   - SQP findOne result (progress):",
+              progress
+            );
+            if (progress) {
+              console.log(
+                "[quizService.getAvailableQuizzesForStaff]     - progress.lastAttemptCompletedAt:",
+                progress.lastAttemptCompletedAt
+              );
+            }
+          }
+          // END SERVER-SIDE DEBUGGING LOGS
+
+          if (progress && progress.lastAttemptCompletedAt) {
+            lastAttemptCompletedAtStr =
+              progress.lastAttemptCompletedAt.toISOString();
+            const cooldownEndTime = new Date(
+              progress.lastAttemptCompletedAt.getTime() +
+                quiz.retakeCooldownHours * 60 * 60 * 1000
+            );
+
+            // SERVER-SIDE DEBUGGING LOGS
+            if (quiz.title === "SOP Quiz") {
+              console.log(
+                "[quizService.getAvailableQuizzesForStaff]     - calculated cooldownEndTime:",
+                cooldownEndTime.toISOString()
+              );
+              console.log(
+                "[quizService.getAvailableQuizzesForStaff]     - new Date() < cooldownEndTime:",
+                new Date() < cooldownEndTime
+              );
+            }
+            // END SERVER-SIDE DEBUGGING LOGS
+
+            if (new Date() < cooldownEndTime) {
+              nextAvailableAt = cooldownEndTime.toISOString();
+            }
+          }
+        }
+
+        // SERVER-SIDE DEBUGGING LOGS
+        if (quiz.title === "SOP Quiz") {
+          console.log(
+            `[quizService.getAvailableQuizzesForStaff]   - final nextAvailableAt for this quiz: ${nextAvailableAt}`
+          );
+        }
+        // END SERVER-SIDE DEBUGGING LOGS
+
+        availableQuizzesInfo.push({
+          _id: quiz._id.toString(),
+          title: quiz.title,
+          description: quiz.description,
+          createdAt: quiz.createdAt,
+          numQuestions: quiz.numberOfQuestionsPerAttempt,
+          retakeCooldownHours: quiz.retakeCooldownHours,
+          nextAvailableAt,
+          lastAttemptCompletedAt: lastAttemptCompletedAtStr,
+        });
+      }
+
+      return availableQuizzesInfo;
     } catch (error: any) {
       console.error(
         "Error fetching available quizzes for staff in service:",
@@ -631,6 +722,7 @@ export class QuizService {
       sourceSopDocumentId,
       numberOfQuestionsPerAttempt,
       targetRoles,
+      retakeCooldownHours, // Added field
     } = data;
 
     // Validate that at least one source is provided
@@ -729,9 +821,9 @@ export class QuizService {
       sourceType: finalSourceType,
       totalUniqueQuestionsInSourceSnapshot: sourceSnapshotCount,
       numberOfQuestionsPerAttempt,
-      isAvailable: false, // MODIFIED: Set default to false
+      isAvailable: true, // Default to available
       targetRoles: targetRoles || [], // Ensure targetRoles is an array
-      // averageScore will be calculated and updated over time
+      retakeCooldownHours: retakeCooldownHours || 0, // Added field, default to 0
     });
 
     try {
@@ -773,6 +865,34 @@ export class QuizService {
       );
       throw new AppError("Quiz not found or is not currently available.", 404);
     }
+
+    // ADDED: Cooldown Logic Start
+    if (quiz.retakeCooldownHours > 0) {
+      const progress = await StaffQuizProgress.findOne({
+        staffUserId,
+        quizId,
+        restaurantId: quiz.restaurantId, // ensure restaurantId is part of query for specificity
+      }).lean<PlainIStaffQuizProgress>(); // PlainIStaffQuizProgress has lastAttemptCompletedAt
+
+      if (progress && progress.lastAttemptCompletedAt) {
+        const cooldownEndTime = new Date(
+          progress.lastAttemptCompletedAt.getTime() +
+            quiz.retakeCooldownHours * 60 * 60 * 1000
+        );
+
+        if (new Date() < cooldownEndTime) {
+          throw new AppError(
+            "This quiz is currently on cooldown for you.",
+            403,
+            {
+              nextAvailableAt: cooldownEndTime.toISOString(),
+              reason: "COOLDOWN_ACTIVE",
+            }
+          );
+        }
+      }
+    }
+    // ADDED: Cooldown Logic End
 
     // 2. Find or create StaffQuizProgress
     let staffProgress = await StaffQuizProgress.findOne({
@@ -992,7 +1112,7 @@ export class QuizService {
       staffUserId,
       quizId,
       restaurantId: quiz.restaurantId,
-      questionsPresented: attemptQuestionsProcessedForDB, // Use the DB formatted array
+      questionsPresented: attemptQuestionsProcessedForDB,
       score,
       attemptDate: new Date(),
       durationInSeconds: attemptData.durationInSeconds,
@@ -1006,7 +1126,7 @@ export class QuizService {
       ]),
     ].map((idStr) => new Types.ObjectId(idStr));
 
-    staffProgress.lastAttemptTimestamp = new Date();
+    staffProgress.lastAttemptCompletedAt = newAttempt.attemptDate;
 
     if (
       staffProgress.seenQuestionIds.length >=
@@ -1042,46 +1162,51 @@ export class QuizService {
     staffUserId: Types.ObjectId,
     quizId: Types.ObjectId
   ): Promise<IStaffQuizProgressWithAttempts | null> {
-    const staffProgress = await StaffQuizProgress.findOne({
+    const progress = await StaffQuizProgress.findOne({
       staffUserId,
       quizId,
     })
-      .populate<{ staffUserId: IUser }>({
-        path: "staffUserId",
-        select: "name email professionalRole",
-      })
-      .populate<{ quizId: IQuiz }>({
-        path: "quizId",
-        select: "title description numberOfQuestionsPerAttempt restaurantId",
-      })
-      .lean<PlainIStaffQuizProgress | null>(); // Use PlainIStaffQuizProgress for lean base type
+      .populate<{ staffUserId: IUser }>("staffUserId", "name email _id")
+      .populate<{ quizId: IQuiz }>("quizId")
+      .lean<PlainIStaffQuizProgress & { staffUserId: IUser; quizId: IQuiz }>();
 
-    if (!staffProgress) {
-      return null;
+    if (!progress) {
+      const quiz = await QuizModel.findById(quizId).lean<IQuiz>();
+      if (!quiz) return null;
+      const user = await User.findById(staffUserId).lean<IUser>();
+      if (!user) return null;
+
+      return {
+        _id: new mongoose.Types.ObjectId(),
+        staffUserId: user,
+        quizId: quiz,
+        restaurantId: quiz.restaurantId,
+        seenQuestionIds: [],
+        totalUniqueQuestionsInSource:
+          quiz.totalUniqueQuestionsInSourceSnapshot || 0,
+        isCompletedOverall: false,
+        lastAttemptCompletedAt: undefined,
+        averageScore: null,
+        createdAt: undefined,
+        updatedAt: undefined,
+        attempts: [],
+      } as IStaffQuizProgressWithAttempts;
     }
 
-    const attempts = await QuizAttempt.find({
+    let averageScoreForThisQuiz: number | null = null;
+    const attemptDocs = await QuizAttempt.find({
       staffUserId,
       quizId,
-      restaurantId: (staffProgress.quizId as IQuiz).restaurantId, // Get restaurantId from populated quiz
+      restaurantId: (progress.quizId as IQuiz).restaurantId,
     })
-      .select("_id score questionsPresented attemptDate") // Select fields for IQuizAttemptSummary
+      .select("_id score questionsPresented attemptDate")
       .sort({ attemptDate: -1 })
       .lean<IQuizAttempt[]>();
 
-    let averageScore: number | null = null;
-    const attemptSummaries: IQuizAttemptSummary[] = [];
-
-    if (attempts.length > 0) {
-      let totalPercentageSum = 0;
-      let validAttemptsCount = 0;
-      attempts.forEach((attempt) => {
+    const attemptSummaries: IQuizAttemptSummary[] = attemptDocs.map(
+      (attempt) => {
         const totalQuestionsInAttempt = attempt.questionsPresented?.length || 0;
-        if (totalQuestionsInAttempt > 0) {
-          totalPercentageSum += attempt.score / totalQuestionsInAttempt;
-          validAttemptsCount++;
-        }
-        attemptSummaries.push({
+        return {
           _id: (attempt._id as Types.ObjectId).toString(),
           score: attempt.score,
           totalQuestions: totalQuestionsInAttempt,
@@ -1089,25 +1214,44 @@ export class QuizService {
           hasIncorrectAnswers:
             totalQuestionsInAttempt > 0 &&
             attempt.score < totalQuestionsInAttempt,
-        });
+        };
+      }
+    );
+
+    if (attemptDocs.length > 0) {
+      let totalPercentageSum = 0;
+      let validAttemptsCount = 0;
+      attemptDocs.forEach((attempt) => {
+        const totalQuestionsInAttempt = attempt.questionsPresented?.length || 0;
+        if (totalQuestionsInAttempt > 0) {
+          totalPercentageSum += attempt.score / totalQuestionsInAttempt;
+          validAttemptsCount++;
+        }
       });
       if (validAttemptsCount > 0) {
-        averageScore = parseFloat(
+        averageScoreForThisQuiz = parseFloat(
           ((totalPercentageSum / validAttemptsCount) * 100).toFixed(1)
         );
       }
     }
 
-    // Assertions for populated fields after lean
-    const populatedStaffProgress =
-      staffProgress as unknown as IStaffQuizProgressWithAttempts;
-    populatedStaffProgress.staffUserId = staffProgress.staffUserId as IUser;
-    populatedStaffProgress.quizId = staffProgress.quizId as IQuiz;
-
+    // Explicitly construct the return object to match IStaffQuizProgressWithAttempts
     return {
-      ...populatedStaffProgress,
+      _id: progress._id,
+      staffUserId: progress.staffUserId, // progress.staffUserId is IUser due to lean type
+      quizId: progress.quizId, // progress.quizId is IQuiz due to lean type
+      restaurantId: progress.restaurantId, // Ensure this is on PlainIStaffQuizProgress or IQuiz
+      seenQuestionIds: progress.seenQuestionIds,
+      totalUniqueQuestionsInSource: progress.totalUniqueQuestionsInSource,
+      isCompletedOverall: progress.isCompletedOverall,
+      lastAttemptCompletedAt: progress.lastAttemptCompletedAt,
+      averageScore:
+        progress.averageScore !== undefined
+          ? progress.averageScore
+          : averageScoreForThisQuiz,
+      createdAt: progress.createdAt,
+      updatedAt: progress.updatedAt,
       attempts: attemptSummaries,
-      averageScore,
     };
   }
 
@@ -1209,14 +1353,14 @@ export class QuizService {
         | "isCompletedOverall"
         | "seenQuestionIds"
         | "totalUniqueQuestionsInSource"
-        | "lastAttemptTimestamp"
+        | "lastAttemptCompletedAt"
       > | null = staffProgressDoc
         ? {
             isCompletedOverall: staffProgressDoc.isCompletedOverall,
             seenQuestionIds: staffProgressDoc.seenQuestionIds,
             totalUniqueQuestionsInSource:
               staffProgressDoc.totalUniqueQuestionsInSource,
-            lastAttemptTimestamp: staffProgressDoc.lastAttemptTimestamp,
+            lastAttemptCompletedAt: staffProgressDoc.lastAttemptCompletedAt,
           }
         : null;
 

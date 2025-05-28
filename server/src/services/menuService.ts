@@ -1,31 +1,48 @@
 import mongoose, { Types } from "mongoose";
 import Menu, { IMenu } from "../models/Menu";
-import MenuItem, { ItemType, ITEM_TYPES } from "../models/MenuItem";
-import ItemService from "./itemService";
+import MenuItem, { IMenuItem, ItemType, ITEM_TYPES } from "../models/MenuItem";
 import { AppError } from "../utils/errorHandler";
-// Import MenuItem if needed for future operations like cascade delete
-// import MenuItem from '../models/MenuItem';
 import pdfParse from "pdf-parse";
 import fs from "fs";
-import path from "path";
 import {
   GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
-  Part as _Part,
   FunctionDeclaration,
   FunctionDeclarationSchemaType,
   FunctionDeclarationSchema,
-} from "@google/generative-ai"; // Import Gemini SDK
+} from "@google/generative-ai";
+import { v4 as uuidv4 } from "uuid";
+import {
+  GeminiAIServiceOutput,
+  MenuUploadPreview,
+  ParsedMenuItem,
+  FinalImportRequestBody,
+  ImportResult,
+  ImportResultItemDetail,
+  ProcessConflictResolutionRequest,
+  ProcessConflictResolutionResponse,
+  MenuImportJobData,
+  ImportActionStatus,
+  ConflictResolutionStatus,
+  IMenuImportJob,
+} from "../types/menuUploadTypes";
+import MenuImportJobModel, {
+  IMenuImportJobDocument,
+} from "../models/MenuImportJobModel";
+import { menuImportQueue } from "../queues/menuImportQueue";
+import {
+  MAX_ITEM_NAME_LENGTH,
+  MAX_ITEM_DESCRIPTION_LENGTH,
+  MAX_INGREDIENTS,
+  MAX_INGREDIENT_LENGTH,
+  ASYNC_IMPORT_THRESHOLD,
+} from "../utils/constants";
 
-// Interface for data used in create/update
 interface MenuData {
   name: string;
   description?: string;
   isActive?: boolean;
 }
 
-// Interface for data used by Gemini for structured extraction
 interface ExtractedMenuItem {
   itemName: string;
   itemPrice?: number | null;
@@ -37,80 +54,13 @@ interface ExtractedMenuItem {
   isVegetarian: boolean;
 }
 
-interface _ExtractedMenuData {
+interface _InternalMenuAIDataStructure {
   menuName: string;
   menuItems: ExtractedMenuItem[];
 }
 
-// System instruction for the AI
-const _systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.\n\n**CRITICAL INSTRUCTION: You MUST use the 'extract_menu_data' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the extracted data. No matter how difficult the menu or what issues you encounter, you must still attempt to call the function, even if it means some fields are empty or default values are used based on your best effort. Do not write any prose or conversational text.**\n\nInput Context Provided per Request:\n- Raw text extracted from a PDF menu (labelled as \"Input Text to Parse\").\n- Original filename of the PDF for context (labelled as \"Original Filename\").\n\nInstructions:\n1. **Menu Name**:\n   - Identify the menu name from the text (e.g., a title at the top like \"Dinner Menu\" or \"Summer Menu\").\n   - If no clear menu name is found, use the \"Original Filename\" (without the \".pdf\" extension) as the menu name.\n\n2. **Menu Items**:\n   - Extract each menu item from the \"Input Text to Parse\". Menu items often consist of a name, an optional description/ingredients, and a price.\n   - **Layout Awareness**: Be mindful of multi-column layouts. Try to associate item names with their corresponding details (price, ingredients) even if they are in different visual columns. Read down columns where possible before moving across.\n   - For each item, determine:\n     - **Item Name**: The name of the dish or beverage. This is often the most prominent text for an item. **Aim for names that are between 2 and 50 characters. If a name is naturally very long on the menu, provide the most salient part that fits this range. Avoid extremely short or single-character names unless absolutely unavoidable and clearly the only identifier on the menu.**\n     - **Item Price**: The numerical price. If no price is listed, or if terms like \"Market Price\" or \"MP\" are used, omit this field or set to null. Prices are often at the end of an item\'s entry or in a separate column aligned with the item.\n     - **Item Type**: Classify as \"food\" or \"beverage\".\n     - **Item Ingredients**: Extract all listed or clearly described ingredients as an array of strings. Focus on nouns or noun phrases representing the food components. Omit general adjectives (e.g., \'delicious\', \'fresh\') unless part of a specific ingredient name (e.g., \'fresh mozzarella\'). Ingredients may be in a list below the item name or integrated into a descriptive sentence.\n     - **Item Category**: Identify the category primarily from section headers in the text (e.g., \"Starters\", \"Mains\", \"Desserts\", \"Butchers block\", \"Sides\", \"For the Table\", \"Dish of the day\"). Use the exact wording from the menu\'s section header if available. These headers are typically larger or distinctly styled. **Where possible and not conflicting with clear menu typography, try to output categories in lowercase (e.g., \"starters\" instead of \"STARTERS\") to align with preferred system formatting.** If no explicit section headers exist directly above a group of items, infer the category based on the item\'s position or typical menu structure (e.g., appetizers often appear first). Prioritize explicit headers found anywhere relevant before relying solely on positional inference. Sub-categories under a major header should generally be considered part of the major category unless the schema specifically asks for sub-categories (which it currently does not).\n     - **Dietary Flags**: Identify dietary attributes (isGlutenFree, isVegan, isVegetarian) based on explicit indicators (e.g., (V), (VG), (GF)) or analysis of ingredients. Set to false if not clearly indicated.\n\n3. **Output Schema**:\n   - Return the parsed data in the JSON structure defined by the 'extract_menu_data' function.\n\n4. **Additional Notes on Robustness & Tricky Layouts**:\n   - **Varied Formats**: Menus can have diverse visual structures. Try to identify patterns within the current menu to guide parsing.\n   - **Multi-line Items**: An item\'s name, description, or ingredients might span multiple lines. Consolidate this information for a single item. A new item typically starts with a distinctly formatted name or when a price for a previous item is clearly identified.\n   - **Irrelevant Text**: Ignore page numbers, restaurant contact details, decorative text, and visual separators (lines, asterisks) that are not part of item names, descriptions, or categories.\n   - **Price Association**: Ensure prices are correctly associated with their respective items, especially in multi-column layouts or when prices are listed separately but aligned with items.\n   - **Currency**: Ensure prices are numbers (e.g., 12.99), not strings with currency symbols (e.g., \"$12.99\"). The function call schema expects a number or null.\n\nExample Input Text (for your reference, this is an illustration of how an input might look, it is NOT the actual text to parse for the current request):\n\`\`\`
-Dinner Menu
-Starters
-Garlic Bread (V) - 8
-Toasted ciabatta, garlic butter, parsley
+const _systemInstruction = `System: You are an expert at parsing restaurant menu data from raw text extracted from PDF files. Your task is to analyze the provided text and extract structured menu data according to the specified schema. Follow these instructions carefully to ensure accurate parsing.\\n\\n**CRITICAL INSTRUCTION: You MUST use the 'extract_menu_data' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the extracted data. No matter how difficult the menu or what issues you encounter, you must still attempt to call the function, even if it means some fields are empty or default values are used based on your best effort. Do not write any prose or conversational text.**\\n\\nInput Context Provided per Request:\\n- Raw text extracted from a PDF menu (labelled as \\"Input Text to Parse\\").\\n- Original filename of the PDF for context (labelled as \\"Original Filename\\").\\n\\nInstructions:\\n1. **Menu Name**:\\n   - Identify the menu name from the text (e.g., a title at the top like \\"Dinner Menu\\" or \\"Summer Menu\\").\\n   - If no clear menu name is found, use the \\"Original Filename\\" (without the \\".pdf\\" extension) as the menu name.\\n\\n2. **Menu Items**:\\n   - Extract each menu item from the \\"Input Text to Parse\\". Menu items often consist of a name, an optional description/ingredients, and a price.\\n   - **Layout Awareness**: Be mindful of multi-column layouts. Try to associate item names with their corresponding details (price, ingredients) even if they are in different visual columns. Read down columns where possible before moving across.\\n   - For each item, determine:\\n     - **Item Name**: The name of the dish or beverage. This is often the most prominent text for an item. **Aim for names that are between 2 and ${MAX_ITEM_NAME_LENGTH} characters. If a name is naturally very long on the menu, provide the most salient part that fits this range. Avoid extremely short or single-character names unless absolutely unavoidable and clearly the only identifier on the menu.**\\n     - **Item Price**: The numerical price. If no price is listed, or if terms like \\"Market Price\\" or \\"MP\\" are used, omit this field or set to null. Prices are often at the end of an item\\'s entry or in a separate column aligned with the item.\\n     - **Item Type**: Classify as \\"food\\" or \\"beverage\\".\\n     - **Item Ingredients**: Extract all listed or clearly described ingredients as an array of strings. Focus on nouns or noun phrases representing the food components. Omit general adjectives (e.g., 'delicious', 'fresh') unless part of a specific ingredient name (e.g., 'fresh mozzarella'). Ingredients may be in a list below the item name or integrated into a descriptive sentence.\\n     - **Item Category**: Identify the category primarily from section headers in the text (e.g., \\"Starters\\", \\"Mains\\", \\"Desserts\\", \\"Butchers block\\", \\"Sides\\", \\"For the Table\\", \\"Dish of the day\\"). Use the exact wording from the menu\\'s section header if available. These headers are typically larger or distinctly styled. **Where possible and not conflicting with clear menu typography, try to output categories in lowercase (e.g., \\"starters\\" instead of \\"STARTERS\\") to align with preferred system formatting.** If no explicit section headers exist directly above a group of items, infer the category based on the item\\'s position or typical menu structure (e.g., appetizers often appear first). Prioritize explicit headers found anywhere relevant before relying solely on positional inference. Sub-categories under a major header should generally be considered part of the major category unless the schema specifically asks for sub-categories (which it currently does not).\\n     - **Dietary Flags**: Identify dietary attributes (isGlutenFree, isVegan, isVegetarian) based on explicit indicators (e.g., (V), (VG), (GF)) or analysis of ingredients. Set to false if not clearly indicated. (isDairyFree is currently not requested for AI output but can be added if schema changes).\\n\\n3. **Output Schema**:\\n   - Return the parsed data in the JSON structure defined by the 'extract_menu_data' function.\\n\\n4. **Additional Notes on Robustness & Tricky Layouts**:\\n   - **Varied Formats**: Menus can have diverse visual structures. Try to identify patterns within the current menu to guide parsing.\\n   - **Multi-line Items**: An item\\'s name, description, or ingredients might span multiple lines. Consolidate this information for a single item. A new item typically starts with a distinctly formatted name or when a price for a previous item is clearly identified.\\n   - **Irrelevant Text**: Ignore page numbers, restaurant contact details, decorative text, and visual separators (lines, asterisks) that are not part of item names, descriptions, or categories.\\n   - **Price Association**: Ensure prices are correctly associated with their respective items, especially in multi-column layouts or when prices are listed separately but aligned with items.\\n   - **Currency**: Ensure prices are numbers (e.g., 12.99), not strings with currency symbols (e.g., \\"$12.99\\"). The function call schema expects a number or null.\\n\n(Example input/output omitted for brevity, assumed to be correct as per previous versions)\n`;
 
-Main Courses
-Freedown Hill Wagyu Steak Burger - 24
-Caramelised onion, tomato relish, double cheese, tomato, gem lettuce
-Vegan Curry (VG) - 18
-Chickpeas, spinach, coconut milk, basmati rice
-
-Drinks
-House Red Wine - 10
-\`\`\`
-
-Example Output (for your reference, illustrating the expected JSON structure from the function call):
-\`\`\`json
-{
-  "menuName": "Dinner Menu",
-  "menuItems": [
-    {
-      "itemName": "Garlic Bread",
-      "itemPrice": 8,
-      "itemType": "food",
-      "itemIngredients": ["toasted ciabatta", "garlic butter", "parsley", "bread"],
-      "itemCategory": "Starters",
-      "isGlutenFree": false,
-      "isVegan": false,
-      "isVegetarian": true
-    },
-    {
-      "itemName": "Freedown Hill Wagyu Steak Burger",
-      "itemPrice": 24,
-      "itemType": "food",
-      "itemIngredients": ["caramelised onion", "tomato relish", "double cheese", "tomato", "gem lettuce", "wagyu beef"],
-      "itemCategory": "Main Courses",
-      "isGlutenFree": false,
-      "isVegan": false,
-      "isVegetarian": false
-    },
-    {
-      "itemName": "Vegan Curry",
-      "itemPrice": 18,
-      "itemType": "food",
-      "itemIngredients": ["chickpeas", "spinach", "coconut milk", "basmati rice", "curry paste"],
-      "itemCategory": "Main Courses",
-      "isGlutenFree": true,
-      "isVegan": true,
-      "isVegetarian": true
-    },
-    {
-      "itemName": "House Red Wine",
-      "itemPrice": 10,
-      "itemType": "beverage",
-      "itemIngredients": [],
-      "itemCategory": "Drinks",
-      "isGlutenFree": true,
-      "isVegan": true,
-      "isVegetarian": true
-    }
-  ]
-}
-\`\`\`
-Remember to use the actual "Input Text to Parse" and "Original Filename" provided in each request.
-`;
-
-// Define the schema for the function call for Gemini
 const menuExtractionFunctionSchema: FunctionDeclaration = {
   name: "extract_menu_data",
   description:
@@ -137,7 +87,7 @@ const menuExtractionFunctionSchema: FunctionDeclaration = {
             itemPrice: {
               type: FunctionDeclarationSchemaType.NUMBER,
               description:
-                'The price of the menu item as a number (e.g., 12.99). Null if not applicable (e.g. "Market Price") or not listed.',
+                "The price of the menu item as a number (e.g., 12.99). Null if not applicable or not listed.",
             },
             itemType: {
               type: FunctionDeclarationSchemaType.STRING,
@@ -155,7 +105,7 @@ const menuExtractionFunctionSchema: FunctionDeclaration = {
             itemCategory: {
               type: FunctionDeclarationSchemaType.STRING,
               description:
-                'The category the item belongs to, ideally derived from section headers in the menu text (e.g., "Starters", "Main Courses", "Sides", "Butchers block"). If no header, infer from context. Use exact header wording if possible.',
+                'The category the item belongs to, e.g., "Starters", "Main Courses".',
             },
             isGlutenFree: {
               type: FunctionDeclarationSchemaType.BOOLEAN,
@@ -182,599 +132,1301 @@ const menuExtractionFunctionSchema: FunctionDeclaration = {
             "isVegan",
             "isVegetarian",
           ],
-        },
+        } as FunctionDeclarationSchema,
       },
     },
     required: ["menuName", "menuItems"],
-  },
+  } as FunctionDeclarationSchema,
 };
 
-// Define an interface for the expected AI response structure
-interface ExtractedMenuAIResponse {
-  menuName: string;
-  menuItems: Array<{
-    itemName: string;
-    itemPrice?: number | null;
-    itemType: string; // AI should return "food" or "beverage"
-    itemIngredients: string[];
-    itemCategory: string;
-    isGlutenFree: boolean;
-    isVegan: boolean;
-    isVegetarian: boolean;
-  }>;
+async function getAIRawExtraction(
+  rawText: string,
+  originalFileName?: string
+): Promise<GeminiAIServiceOutput> {
+  const GOOGLE_GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GOOGLE_GEMINI_API_KEY) {
+    throw new AppError("Google Gemini API key is not configured.", 500);
+  }
+  const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash-latest",
+    systemInstruction: _systemInstruction,
+    tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
+  });
+
+  const chat = model.startChat({});
+  const promptParts = [
+    `Original Filename: ${originalFileName || "Unknown"}`,
+    `Input Text to Parse: ${rawText}`,
+  ];
+
+  try {
+    const result = await chat.sendMessage(promptParts);
+    const call = result.response.functionCalls()?.[0];
+
+    if (call && call.name === "extract_menu_data") {
+      return call.args as GeminiAIServiceOutput;
+    } else {
+      const responseText = result.response.text();
+      console.error(
+        "Gemini did not return the expected function call:",
+        responseText
+      );
+      throw new AppError(
+        "AI failed to process the menu using the expected function call structure. The response text was: " +
+          responseText,
+        500,
+        {
+          aiResponseText: responseText,
+          reason: "No function call or incorrect function call name",
+        }
+      );
+    }
+  } catch (error: any) {
+    console.error("Error during AI processing or sending message:", error);
+    throw new AppError(`AI processing error: ${error.message}`, 500, {
+      originalError: error.message,
+      details: error.stack,
+    });
+  }
 }
 
 class MenuService {
-  /**
-   * Creates a new menu for a specific restaurant.
-   *
-   * @param data - The data for the new menu (name, optional description).
-   * @param restaurantId - The ID of the restaurant creating the menu.
-   * @param session - Optional Mongoose client session for transaction.
-   * @returns A promise resolving to the created menu document.
-   * @throws {AppError} If a menu with the same name already exists for the restaurant (400),
-   *                    if Mongoose validation fails (e.g., name length) (400),
-   *                    or if any database save operation fails (500).
-   */
+  private static _prepareAndValidateNewItemData(
+    itemFields: ParsedMenuItem["fields"],
+    menuObjectId: Types.ObjectId,
+    restaurantId: Types.ObjectId
+  ): Omit<
+    IMenuItem,
+    keyof mongoose.Document | "_id" | "createdAt" | "updatedAt"
+  > & { _id?: Types.ObjectId } {
+    const newItemData: any = {
+      menuId: menuObjectId,
+      restaurantId: restaurantId,
+    };
+
+    if (itemFields.name.value) {
+      const name = String(itemFields.name.value).trim();
+      if (!name) throw new Error("Item name cannot be empty.");
+      if (name.length > MAX_ITEM_NAME_LENGTH)
+        throw new Error(
+          `Item name exceeds maximum length of ${MAX_ITEM_NAME_LENGTH} characters.`
+        );
+      newItemData.name = name;
+    } else {
+      throw new Error("Item name is required.");
+    }
+
+    newItemData.price =
+      itemFields.price.value !== null &&
+      itemFields.price.value !== undefined &&
+      String(itemFields.price.value).trim() !== ""
+        ? Number(itemFields.price.value)
+        : undefined;
+    if (
+      newItemData.price !== undefined &&
+      (isNaN(newItemData.price) || newItemData.price < 0)
+    ) {
+      throw new Error("Invalid item price. Must be a non-negative number.");
+    }
+
+    newItemData.description = String(
+      itemFields.description?.value || ""
+    ).trim();
+    if (newItemData.description.length > MAX_ITEM_DESCRIPTION_LENGTH)
+      throw new Error(
+        `Item description exceeds maximum length of ${MAX_ITEM_DESCRIPTION_LENGTH} characters.`
+      );
+
+    newItemData.category = String(
+      itemFields.category.value || "Uncategorized"
+    ).trim();
+
+    newItemData.itemType = (
+      ITEM_TYPES.includes(String(itemFields.itemType.value) as ItemType)
+        ? String(itemFields.itemType.value)
+        : "food"
+    ) as ItemType;
+
+    const ingredients = (
+      Array.isArray(itemFields.ingredients.value)
+        ? (itemFields.ingredients.value as string[])
+        : []
+    )
+      .map((ing) => String(ing).trim())
+      .filter((ing) => ing);
+    if (ingredients.length > MAX_INGREDIENTS)
+      throw new Error(
+        `Number of ingredients exceeds maximum of ${MAX_INGREDIENTS}.`
+      );
+    ingredients.forEach((ing) => {
+      if (ing.length > MAX_INGREDIENT_LENGTH)
+        throw new Error(
+          `Ingredient "${ing}" exceeds maximum length of ${MAX_INGREDIENT_LENGTH} characters.`
+        );
+    });
+    newItemData.ingredients = ingredients;
+
+    newItemData.isGlutenFree = Boolean(itemFields.isGlutenFree.value);
+    newItemData.isVegan = Boolean(itemFields.isVegan.value);
+    newItemData.isVegetarian = Boolean(itemFields.isVegetarian.value);
+    newItemData.isDairyFree = false;
+
+    return newItemData as Omit<
+      IMenuItem,
+      keyof mongoose.Document | "_id" | "createdAt" | "updatedAt"
+    > & { _id?: Types.ObjectId };
+  }
+
+  private static _prepareAndValidateUpdatedItemData(
+    itemFields: ParsedMenuItem["fields"],
+    existingItemDoc: IMenuItem
+  ): Record<string, any> {
+    const updatePayload: Record<string, any> = {};
+
+    if (
+      itemFields.name.value !== undefined &&
+      String(itemFields.name.value).trim() !== existingItemDoc.name
+    ) {
+      const name = String(itemFields.name.value).trim();
+      if (!name) throw new Error("Item name cannot be empty.");
+      if (name.length > MAX_ITEM_NAME_LENGTH)
+        throw new Error(
+          `Item name exceeds maximum length of ${MAX_ITEM_NAME_LENGTH} characters.`
+        );
+      updatePayload.name = name;
+    }
+
+    const newPrice =
+      itemFields.price.value !== null &&
+      itemFields.price.value !== undefined &&
+      String(itemFields.price.value).trim() !== ""
+        ? Number(itemFields.price.value)
+        : undefined;
+
+    if (newPrice !== undefined) {
+      if (isNaN(newPrice) || newPrice < 0)
+        throw new Error("Invalid item price. Must be a non-negative number.");
+      if (newPrice !== existingItemDoc.price) updatePayload.price = newPrice;
+    } else if (existingItemDoc.price !== undefined && newPrice === undefined) {
+      updatePayload.price = undefined;
+    }
+
+    if (
+      itemFields.description?.value !== undefined &&
+      String(itemFields.description.value).trim() !==
+        (existingItemDoc.description || "")
+    ) {
+      const description = String(itemFields.description.value).trim();
+      if (description.length > MAX_ITEM_DESCRIPTION_LENGTH)
+        throw new Error(
+          `Item description exceeds maximum length of ${MAX_ITEM_DESCRIPTION_LENGTH} characters.`
+        );
+      updatePayload.description = description;
+    }
+
+    if (
+      itemFields.category.value !== undefined &&
+      String(itemFields.category.value).trim() !==
+        (existingItemDoc.category || "Uncategorized")
+    ) {
+      updatePayload.category = String(itemFields.category.value).trim();
+    }
+
+    if (
+      itemFields.itemType.value !== undefined &&
+      String(itemFields.itemType.value) !== existingItemDoc.itemType
+    ) {
+      const itemType = ITEM_TYPES.includes(
+        String(itemFields.itemType.value) as ItemType
+      )
+        ? String(itemFields.itemType.value)
+        : existingItemDoc.itemType;
+      updatePayload.itemType = itemType as ItemType;
+    }
+
+    if (itemFields.ingredients.value !== undefined) {
+      const newIngredients = (
+        Array.isArray(itemFields.ingredients.value)
+          ? (itemFields.ingredients.value as string[])
+          : []
+      )
+        .map((ing) => String(ing).trim())
+        .filter((ing) => ing);
+      if (newIngredients.length > MAX_INGREDIENTS)
+        throw new Error(
+          `Number of ingredients exceeds maximum of ${MAX_INGREDIENTS}.`
+        );
+      newIngredients.forEach((ing) => {
+        if (ing.length > MAX_INGREDIENT_LENGTH)
+          throw new Error(
+            `Ingredient "${ing}" exceeds maximum length of ${MAX_INGREDIENT_LENGTH} characters.`
+          );
+      });
+      if (
+        JSON.stringify(newIngredients) !==
+        JSON.stringify(existingItemDoc.ingredients || [])
+      ) {
+        updatePayload.ingredients = newIngredients;
+      }
+    }
+
+    if (
+      itemFields.isGlutenFree.value !== undefined &&
+      Boolean(itemFields.isGlutenFree.value) !== existingItemDoc.isGlutenFree
+    ) {
+      updatePayload.isGlutenFree = Boolean(itemFields.isGlutenFree.value);
+    }
+    if (
+      itemFields.isVegan.value !== undefined &&
+      Boolean(itemFields.isVegan.value) !== existingItemDoc.isVegan
+    ) {
+      updatePayload.isVegan = Boolean(itemFields.isVegan.value);
+    }
+    if (
+      itemFields.isVegetarian.value !== undefined &&
+      Boolean(itemFields.isVegetarian.value) !== existingItemDoc.isVegetarian
+    ) {
+      updatePayload.isVegetarian = Boolean(itemFields.isVegetarian.value);
+    }
+    return updatePayload;
+  }
+
   static async createMenu(
     data: MenuData,
     restaurantId: Types.ObjectId,
     session?: mongoose.ClientSession
   ): Promise<IMenu> {
-    const { name, description, isActive } = data;
-    const trimmedName = name.trim();
-
-    try {
-      const existingMenuQuery = Menu.findOne({
-        name: trimmedName,
-        restaurantId: restaurantId,
-      });
-      if (session) {
-        existingMenuQuery.session(session);
-      }
-      const existingMenu = await existingMenuQuery;
-
-      if (existingMenu) {
-        throw new AppError("A menu with this name already exists", 400);
-      }
-
-      const newMenuData: Partial<IMenu> = {
-        name: trimmedName,
-        restaurantId: restaurantId,
-        isActive: isActive !== undefined ? isActive : true,
-      };
-      if (description) newMenuData.description = description.trim();
-
-      const menu = new Menu(newMenuData);
-      const savedMenu = await menu.save(session ? { session } : undefined);
-      return savedMenu;
-    } catch (error: any) {
-      console.error("Error creating menu in service:", error);
-      if (error instanceof AppError) throw error;
-      throw new AppError("Failed to create menu.", 500);
+    const existingMenu = await Menu.findOne({ name: data.name, restaurantId });
+    if (existingMenu) {
+      throw new AppError(
+        `A menu with the name "${data.name}" already exists for this restaurant. Please choose a different name or update the existing menu.`,
+        409
+      );
     }
+    const menu = new Menu({ ...data, restaurantId });
+    await menu.save({ session });
+    return menu;
   }
 
-  /**
-   * Retrieves all menus belonging to a specific restaurant.
-   *
-   * @param restaurantId - The ID of the restaurant whose menus are to be fetched.
-   * @param status - Optional status filter (all, active, inactive)
-   * @returns A promise resolving to an array of menu documents.
-   * @throws {AppError} If any unexpected database error occurs (500).
-   */
   static async getAllMenus(
     restaurantId: Types.ObjectId,
     status?: "all" | "active" | "inactive"
   ): Promise<IMenu[]> {
-    try {
-      const queryConditions: mongoose.FilterQuery<IMenu> = {
-        restaurantId: restaurantId,
-      };
-
-      if (status === "active") {
-        queryConditions.isActive = true;
-      } else if (status === "inactive") {
-        queryConditions.isActive = false;
-      }
-      // If status is 'all' or undefined, no isActive filter is added, fetching all.
-
-      const menus = await Menu.find(queryConditions).lean();
-      return menus;
-    } catch (error: any) {
-      console.error("Error fetching all menus in service:", error);
-      throw new AppError("Failed to fetch menus.", 500);
+    const query: any = { restaurantId };
+    if (status && status !== "all") {
+      query.isActive = status === "active";
     }
+    return Menu.find(query).sort({ name: 1 });
   }
 
-  /**
-   * Retrieves a single menu by its ID, ensuring it belongs to the specified restaurant.
-   *
-   * @param menuId - The ID of the menu to retrieve.
-   * @param restaurantId - The ID of the restaurant to scope the search.
-   * @returns A promise resolving to the menu document.
-   * @throws {AppError} If the menu is not found or doesn't belong to the restaurant (404),
-   *                    if the menuId format is invalid (400),
-   *                    or if any unexpected database error occurs (500).
-   */
   static async getMenuById(
     menuId: string | Types.ObjectId,
     restaurantId: Types.ObjectId
-  ): Promise<IMenu | null> {
-    const menuObjectId =
-      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
-
-    try {
-      // Use lean() for performance
-      const menu = await Menu.findOne({
-        _id: menuObjectId,
-        restaurantId,
-      }).lean();
-      if (!menu) {
-        throw new AppError("Menu not found or access denied", 404);
-      }
-      return menu;
-    } catch (error: any) {
-      console.error("Error fetching menu by ID in service:", error);
-      if (error instanceof AppError) throw error;
-      // Handle potential CastError if menuId is invalid format
-      if (error.name === "CastError") {
-        throw new AppError("Invalid menu ID format.", 400);
-      }
-      throw new AppError("Failed to fetch menu.", 500);
+  ): Promise<any | null> {
+    console.log(
+      "[MenuService.getMenuById] Received menuId:",
+      menuId,
+      "- Type:",
+      typeof menuId,
+      "- Length:",
+      String(menuId).length
+    );
+    if (!mongoose.Types.ObjectId.isValid(menuId)) {
+      console.error(
+        "[MenuService.getMenuById] Validation failed for menuId:",
+        menuId
+      );
+      throw new AppError("Invalid menu ID format", 400);
     }
+    const menu = await Menu.findOne({ _id: menuId, restaurantId }).lean();
+    if (!menu) {
+      return null;
+    }
+    const items = await MenuItem.find({
+      menuId: menu._id,
+      restaurantId,
+      isActive: true,
+    }).lean();
+    return { ...menu, items };
   }
 
-  /**
-   * Updates an existing menu.
-   *
-   * @param menuId - The ID of the menu to update.
-   * @param updateData - An object containing the fields to update (name, description).
-   * @param restaurantId - The ID of the restaurant owning the menu.
-   * @returns A promise resolving to the updated menu document.
-   * @throws {AppError} If a menu with the updated name already exists (400),
-   *                    if the menu is not found or doesn't belong to the restaurant (404),
-   *                    if Mongoose validation fails during update (400),
-   *                    if the menuId format is invalid (400),
-   *                    or if any unexpected database error occurs (500).
-   */
   static async updateMenu(
     menuId: string | Types.ObjectId,
     updateData: Partial<MenuData>,
     restaurantId: Types.ObjectId
   ): Promise<IMenu | null> {
-    const menuObjectId =
-      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
-
-    const preparedUpdate: { [key: string]: any } = {};
-    if (updateData.name !== undefined)
-      preparedUpdate.name = updateData.name.trim();
-    if (updateData.description !== undefined)
-      preparedUpdate.description = updateData.description.trim();
-
-    // Return early if no actual fields to update
-    if (Object.keys(preparedUpdate).length === 0) {
-      // Optionally fetch and return the existing menu if no updates are provided
-      return this.getMenuById(menuObjectId, restaurantId);
+    if (!mongoose.Types.ObjectId.isValid(menuId)) {
+      throw new AppError("Invalid menu ID format", 400);
     }
-
-    try {
-      // Check for name conflict only if name is being updated
-      if (preparedUpdate.name) {
-        const existingMenu = await Menu.findOne({
-          _id: { $ne: menuObjectId },
-          name: preparedUpdate.name,
-          restaurantId: restaurantId,
-        });
-        if (existingMenu) {
-          throw new AppError(
-            `A menu with the name '${preparedUpdate.name}' already exists`,
-            400
-          );
-        }
-      }
-
-      // Find and update the menu
-      const updatedMenu = await Menu.findOneAndUpdate(
-        { _id: menuObjectId, restaurantId: restaurantId },
-        { $set: preparedUpdate },
-        { new: true, runValidators: true } // Return the updated doc, run validators
+    const menu = await Menu.findOne({ _id: menuId, restaurantId });
+    if (!menu) {
+      throw new AppError(
+        "Menu not found or does not belong to this restaurant",
+        404
       );
-
-      if (!updatedMenu) {
-        throw new AppError("Menu not found or access denied", 404);
-      }
-      return updatedMenu;
-    } catch (error: any) {
-      console.error("Error updating menu in service:", error);
-      if (error instanceof AppError) throw error;
-      // Handle potential Mongoose validation errors
-      throw new AppError("Failed to update menu.", 500);
     }
+    if (updateData.name && updateData.name !== menu.name) {
+      const existingMenuWithName = await Menu.findOne({
+        name: updateData.name,
+        restaurantId,
+        _id: { $ne: menuId },
+      });
+      if (existingMenuWithName) {
+        throw new AppError(
+          `Another menu with the name "${updateData.name}" already exists. Please choose a different name.`,
+          409
+        );
+      }
+    }
+    Object.assign(menu, updateData);
+    await menu.save();
+    return menu;
   }
 
-  /**
-   * Deletes a specific menu.
-   * Note: This currently does NOT handle deletion of associated MenuItems.
-   *
-   * @param menuId - The ID of the menu to delete.
-   * @param restaurantId - The ID of the restaurant owning the menu.
-   * @returns A promise resolving to an object indicating the number of deleted documents (should be 1).
-   * @throws {AppError} If the menu is not found or doesn't belong to the restaurant (404),
-   *                    if the menuId format is invalid (400),
-   *                    or if any unexpected database error occurs (500).
-   */
   static async deleteMenu(
     menuId: string | Types.ObjectId,
     restaurantId: Types.ObjectId
   ): Promise<{ deletedMenuCount: number; deletedItemsCount: number }> {
-    const menuObjectId =
-      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
-
+    if (!mongoose.Types.ObjectId.isValid(menuId)) {
+      throw new AppError("Invalid menu ID format", 400);
+    }
     const session = await mongoose.startSession();
     session.startTransaction();
-
     try {
-      // 1. Verify the menu exists and belongs to the restaurant.
-      const menu = await Menu.findOne({
-        _id: menuObjectId,
-        restaurantId: restaurantId,
-      }).session(session);
-
+      const menu = await Menu.findOne({ _id: menuId, restaurantId }).session(
+        session
+      );
       if (!menu) {
         throw new AppError(
-          "Menu not found or does not belong to this restaurant.",
+          "Menu not found or does not belong to this restaurant",
           404
         );
       }
-
-      // 2. Delete associated MenuItems.
-      const itemDeletionResult = await MenuItem.deleteMany(
-        { menuId: menuObjectId, restaurantId: restaurantId },
-        { session }
-      );
-
-      // 3. Delete the Menu document itself.
-      const menuDeletionResult = await Menu.deleteOne({
-        _id: menuObjectId,
-        restaurantId: restaurantId,
+      const deletedItemsResult = await MenuItem.deleteMany({
+        menuId,
+        restaurantId,
       }).session(session);
-
+      const deletedMenuResult = await Menu.deleteOne({
+        _id: menuId,
+        restaurantId,
+      }).session(session);
+      if (deletedMenuResult.deletedCount === 0) {
+        throw new AppError(
+          "Menu not found during delete operation or does not belong to this restaurant",
+          404
+        );
+      }
       await session.commitTransaction();
-
       return {
-        deletedMenuCount: menuDeletionResult.deletedCount || 0,
-        deletedItemsCount: itemDeletionResult.deletedCount || 0,
+        deletedMenuCount: deletedMenuResult.deletedCount,
+        deletedItemsCount: deletedItemsResult.deletedCount,
       };
-    } catch (error: any) {
+    } catch (error) {
       await session.abortTransaction();
-      console.error("Error deleting menu and its items in service:", error);
-      if (error instanceof AppError) {
-        throw error;
-      }
-      if (error.name === "CastError" && error.path === "_id") {
-        throw new AppError("Invalid Menu ID format.", 400);
-      }
-      throw new AppError("Failed to delete menu and associated items.", 500);
+      throw error;
     } finally {
       session.endSession();
     }
   }
 
-  /**
-   * Updates the activation status of a menu.
-   * @param menuId - The ID of the menu.
-   * @param restaurantId - The ID of the restaurant for authorization.
-   * @param isActive - The new activation status (true or false).
-   * @returns A promise resolving to the updated menu document or null if not found/authorized.
-   * @throws AppError on database or validation errors.
-   */
   static async updateMenuActivationStatus(
     menuId: string | Types.ObjectId,
     restaurantId: Types.ObjectId,
     isActive: boolean
   ): Promise<IMenu | null> {
-    const menuObjectId =
-      typeof menuId === "string" ? new Types.ObjectId(menuId) : menuId;
-
-    try {
-      const updatedMenu = await Menu.findOneAndUpdate(
-        { _id: menuObjectId, restaurantId: restaurantId },
-        { $set: { isActive: isActive } },
-        { new: true, runValidators: true }
-      ).lean();
-
-      if (!updatedMenu) {
-        return null;
-      }
-      return updatedMenu as IMenu;
-    } catch (error: any) {
-      console.error("Error updating menu activation status in service:", error);
-      if (error.name === "CastError" && error.path === "_id") {
-        throw new AppError("Invalid Menu ID format.", 400);
-      }
-      // Simplified AppError call
-      throw new AppError("Failed to update menu activation status.", 500);
+    if (!mongoose.Types.ObjectId.isValid(menuId)) {
+      throw new AppError("Invalid menu ID format", 400);
     }
+    const menu = await Menu.findOne({ _id: menuId, restaurantId });
+    if (!menu) {
+      throw new AppError(
+        "Menu not found or does not belong to this restaurant",
+        404
+      );
+    }
+    menu.isActive = isActive;
+    await menu.save();
+    return menu;
   }
 
-  /**
-   * Processes an uploaded PDF menu, extracts text, parses it into a menu structure,
-   * and saves it to the database.
-   *
-   * @param multerFilePath The path to the uploaded PDF file.
-   * @param restaurantId The ID of the restaurant this menu belongs to.
-   * @param originalFileName Optional: The original name of the uploaded PDF file.
-   * @returns A promise resolving to the created IMenu document with its items.
-   * @throws {AppError} If PDF parsing fails, or if menu/item creation fails.
-   */
+  static async getMenuUploadPreview(
+    multerFilePath: string,
+    restaurantId: Types.ObjectId,
+    originalFileName?: string
+  ): Promise<MenuUploadPreview> {
+    let rawText = "";
+    let parsedAIOutput: GeminiAIServiceOutput | null = null;
+    const previewId = uuidv4();
+    const globalErrors: string[] = [];
+
+    try {
+      const dataBuffer = fs.readFileSync(multerFilePath);
+      const pdfData = await pdfParse(dataBuffer);
+      rawText = pdfData.text;
+    } catch (error: any) {
+      console.error("Error reading or parsing PDF for preview:", error);
+      globalErrors.push(`Failed to read or parse PDF: ${error.message}`);
+      return {
+        previewId,
+        filePath: multerFilePath,
+        sourceFormat: "pdf",
+        parsedMenuName:
+          originalFileName?.replace(/\.pdf$/i, "") || "Menu from PDF",
+        parsedItems: [],
+        detectedCategories: [],
+        summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+        globalErrors,
+        rawAIText: rawText.substring(0, 5000),
+        rawAIOutput: null,
+      };
+    }
+
+    if (!rawText.trim()) {
+      globalErrors.push("No text content could be extracted from the PDF.");
+    }
+
+    try {
+      if (rawText.trim()) {
+        parsedAIOutput = await getAIRawExtraction(rawText, originalFileName);
+      }
+    } catch (error: any) {
+      console.error("Error calling AI for preview:", error);
+      globalErrors.push(`AI processing failed: ${error.message}`);
+      if (error instanceof AppError && error.additionalDetails) {
+        globalErrors.push(
+          `AI Details: ${JSON.stringify(error.additionalDetails)}`
+        );
+      }
+    }
+
+    const parsedItems: ParsedMenuItem[] = [];
+    const detectedCategories = new Set<string>();
+    let itemsWithPotentialErrors = 0;
+
+    if (parsedAIOutput && parsedAIOutput.menuItems) {
+      parsedAIOutput.menuItems.forEach((aiItem, index) => {
+        const itemId = uuidv4();
+        let itemHasError = false;
+
+        const fields: ParsedMenuItem["fields"] = {
+          name: { value: aiItem.itemName?.trim() || "", isValid: true },
+          price: {
+            value:
+              aiItem.itemPrice !== undefined && aiItem.itemPrice !== null
+                ? Number(aiItem.itemPrice)
+                : null,
+            isValid: true,
+          },
+          description: { value: "", isValid: true },
+          category: {
+            value: aiItem.itemCategory?.trim() || "Uncategorized",
+            isValid: true,
+          },
+          itemType: {
+            value: ITEM_TYPES.includes(aiItem.itemType as ItemType)
+              ? aiItem.itemType
+              : "food",
+            isValid: true,
+          },
+          ingredients: {
+            value: Array.isArray(aiItem.itemIngredients)
+              ? aiItem.itemIngredients
+                  .map((i) => String(i).trim())
+                  .filter((i) => i)
+              : [],
+            isValid: true,
+          },
+          isGlutenFree: { value: Boolean(aiItem.isGlutenFree), isValid: true },
+          isVegan: { value: Boolean(aiItem.isVegan), isValid: true },
+          isVegetarian: { value: Boolean(aiItem.isVegetarian), isValid: true },
+        };
+
+        if (!fields.name.value) {
+          fields.name.isValid = false;
+          fields.name.errorMessage = "Item name is missing from AI output.";
+          itemHasError = true;
+        }
+        if (String(fields.name.value).length > MAX_ITEM_NAME_LENGTH) {
+          fields.name.isValid = false;
+          fields.name.errorMessage = `Name too long (max ${MAX_ITEM_NAME_LENGTH}). AI parsed: ${String(
+            fields.name.value
+          ).substring(0, MAX_ITEM_NAME_LENGTH)}...`;
+          itemHasError = true;
+        }
+        if (
+          fields.price.value !== null &&
+          (isNaN(Number(fields.price.value)) || Number(fields.price.value) < 0)
+        ) {
+          fields.price.isValid = false;
+          fields.price.errorMessage =
+            "Invalid price (must be non-negative number).";
+          itemHasError = true;
+        }
+        if (fields.category.value) {
+          detectedCategories.add(String(fields.category.value));
+        }
+
+        if (itemHasError) itemsWithPotentialErrors++;
+
+        parsedItems.push({
+          id: itemId,
+          internalIndex: index,
+          fields,
+          status: itemHasError ? "error_system_validation" : "new",
+          originalSourceData: aiItem,
+        });
+      });
+    }
+
+    return {
+      previewId,
+      filePath: multerFilePath,
+      sourceFormat: "pdf",
+      parsedMenuName:
+        parsedAIOutput?.menuName ||
+        originalFileName?.replace(/\.pdf$/i, "") ||
+        "Menu from PDF",
+      parsedItems,
+      detectedCategories: Array.from(detectedCategories),
+      summary: {
+        totalItemsParsed: parsedItems.length,
+        itemsWithPotentialErrors,
+      },
+      globalErrors,
+      rawAIText: rawText.substring(0, 5000),
+      rawAIOutput: parsedAIOutput,
+    };
+  }
+
   static async processPdfMenuUpload(
     multerFilePath: string,
     restaurantId: Types.ObjectId,
     originalFileName?: string
   ): Promise<IMenu> {
-    const projectRootDir = path.resolve(__dirname, "../../..");
-    const absoluteFilePath = path.resolve(projectRootDir, multerFilePath);
-
-    console.log("[MenuService] Attempting to process PDF with Gemini AI.");
-    console.log(`[MenuService] Multer provided path: ${multerFilePath}`);
-    console.log(
-      `[MenuService] Resolved absolute file path: ${absoluteFilePath}`
+    throw new AppError(
+      "processPdfMenuUpload is deprecated, use getMenuUploadPreview and finalizeMenuImport.",
+      500
     );
+  }
 
-    let session: mongoose.ClientSession | undefined = undefined; // Define session here to be accessible in finally
+  static async finalizeMenuImport(
+    data: FinalImportRequestBody,
+    restaurantId: Types.ObjectId,
+    userId: Types.ObjectId
+  ): Promise<ImportResult | { jobId: string; message: string }> {
+    const {
+      filePath,
+      parsedMenuName,
+      targetMenuId,
+      replaceAllItems,
+      itemsToImport,
+    } = data;
+
+    if (itemsToImport.length > ASYNC_IMPORT_THRESHOLD) {
+      const newMenuImportJobDocData = {
+        userId,
+        restaurantId,
+        originalFilePath: filePath,
+        parsedMenuName,
+        targetMenuId: targetMenuId
+          ? new Types.ObjectId(targetMenuId)
+          : undefined,
+        replaceAllItems,
+        itemsToImport,
+        status: "pending" as IMenuImportJob["status"],
+        progress: 0,
+        attempts: 0,
+      };
+      const newMenuImportJobDoc: IMenuImportJobDocument =
+        new MenuImportJobModel(newMenuImportJobDocData);
+      await newMenuImportJobDoc.save();
+
+      const jobData: MenuImportJobData = {
+        menuImportJobDocumentId: (
+          newMenuImportJobDoc._id as Types.ObjectId
+        ).toString(),
+      };
+      await menuImportQueue.add("menu-import-job", jobData);
+
+      return {
+        jobId: (newMenuImportJobDoc._id as Types.ObjectId).toString(),
+        message: `Menu import with ${
+          itemsToImport.length
+        } items has been queued for processing. Job ID: ${(
+          newMenuImportJobDoc._id as Types.ObjectId
+        ).toString()}`,
+      };
+    }
+
+    console.log(
+      "Processing import synchronously as item count is below threshold."
+    );
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    let menuObjectId: Types.ObjectId | undefined = targetMenuId
+      ? new Types.ObjectId(targetMenuId)
+      : undefined;
+    let finalMenuName = parsedMenuName;
+    const result: ImportResult = {
+      overallStatus: "success",
+      message: "",
+      menuId: undefined,
+      menuName: undefined,
+      itemsProcessed: itemsToImport.length,
+      itemsCreated: 0,
+      itemsUpdated: 0,
+      itemsSkipped: 0,
+      itemsErrored: 0,
+      errorDetails: [],
+      errorReport: "",
+    };
+    const errorReportLines: string[] = [
+      "ItemID,ItemName,ActionAttempted,ErrorReason",
+    ];
 
     try {
-      if (!fs.existsSync(absoluteFilePath)) {
-        console.error(
-          `[MenuService] CRITICAL: File not found at resolved absolute path: ${absoluteFilePath}.`
+      let menu: IMenu | null = null;
+      if (targetMenuId) {
+        menu = await Menu.findOne({ _id: targetMenuId, restaurantId }).session(
+          session
         );
-        throw new AppError(
-          `Uploaded file not found for AI processing. Path: ${absoluteFilePath}`,
-          500
-        );
-      }
-
-      const dataBuffer = fs.readFileSync(absoluteFilePath);
-      const pdfData = await pdfParse(dataBuffer);
-      const rawText = pdfData.text;
-
-      if (!rawText || rawText.trim().length === 0) {
-        throw new AppError(
-          "Extracted text from PDF is empty. Cannot process.",
-          400
-        );
-      }
-
-      // Initialize Gemini AI Client (this part remains outside transaction)
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.error(
-          "[MenuService] GEMINI_API_KEY is not set in environment variables."
-        );
-        throw new AppError(
-          "AI service configuration error. API key missing.",
-          500
-        );
-      }
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-latest",
-        tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
-        systemInstruction: _systemInstruction,
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-        ],
-      });
-
-      // Simplified prompt for the specific task, relying on systemInstruction for overall guidance
-      const taskPrompt = `Input Text to Parse:\n-------------------------\n${rawText}\n-------------------------\n\nOriginal Filename (for context): ${
-        originalFileName || "N/A"
-      }\n\nNow, analyze the "Input Text to Parse" and directly call the 'extract_menu_data' function with the extracted structured menu data.`;
-
-      const chat = model.startChat();
-      const result = await chat.sendMessage(taskPrompt); // USE simplified taskPrompt
-      const response = result.response;
-
-      const functionCalls = response.functionCalls();
-      if (functionCalls && functionCalls.length > 0) {
-        const functionCall = functionCalls[0];
-        if (functionCall.name === "extract_menu_data") {
-          const extractedData = functionCall.args as ExtractedMenuAIResponse;
-
-          console.log(
-            "[MenuService] AI extracted data:",
-            JSON.stringify(extractedData, null, 2)
+        if (!menu) {
+          throw new AppError(
+            `Target menu with ID "${targetMenuId}" not found.`,
+            404
           );
-
-          // --- Start Transaction ---
-          session = await mongoose.startSession();
-          session.startTransaction();
-
-          const aiMenuName =
-            extractedData.menuName ||
-            (originalFileName
-              ? path.parse(originalFileName).name.replace(/_/g, " ").trim()
-              : "Imported Menu");
-          const menuDataForCreate: MenuData = {
-            name: aiMenuName.substring(0, 100),
-            description: `Menu parsed from ${
-              originalFileName || "uploaded PDF"
-            } by AI.`.substring(0, 500),
-            isActive: true,
-          };
-
-          const createdMenu = await MenuService.createMenu(
-            menuDataForCreate,
+        }
+        menuObjectId = menu._id as Types.ObjectId;
+        finalMenuName = menu.name;
+        result.menuId = menuObjectId.toString();
+        result.menuName = finalMenuName;
+        if (replaceAllItems) {
+          await MenuItem.deleteMany({
+            menuId: menuObjectId,
+            restaurantId,
+          }).session(session);
+          console.log(
+            `All existing items deleted from menu "${finalMenuName}" as per replaceAllItems flag.`
+          );
+        }
+      } else if (parsedMenuName) {
+        menu = await Menu.findOne({
+          name: parsedMenuName,
+          restaurantId,
+        }).session(session);
+        if (!menu) {
+          if (!parsedMenuName.trim()) {
+            throw new AppError(
+              "Menu name cannot be empty when creating a new menu.",
+              400
+            );
+          }
+          menu = await MenuService.createMenu(
+            { name: parsedMenuName, isActive: true },
             restaurantId,
             session
           );
-
-          if (
-            extractedData.menuItems &&
-            Array.isArray(extractedData.menuItems)
-          ) {
-            for (const item of extractedData.menuItems) {
-              const aiProvidedCategory: string = item.itemCategory;
-              let resolvedItemType: ItemType;
-
-              if (
-                (ITEM_TYPES as ReadonlyArray<string>).includes(item.itemType)
-              ) {
-                resolvedItemType = item.itemType as ItemType;
-              } else {
-                console.warn(
-                  `[MenuService] AI provided invalid itemType '${item.itemType}' for item '${item.itemName}'. Defaulting to 'food'.`
-                );
-                resolvedItemType = "food";
-              }
-
-              // Prepare and validate item name length before sending to ItemService
-              let preparedItemName = String(
-                item.itemName || "Unnamed AI Item"
-              ).trim();
-              if (preparedItemName.length < 2) {
-                // If too short after trim, decide on a strategy:
-                // Option 1: Skip this item
-                // console.warn(`[MenuService] AI extracted item name '${item.itemName}' is too short. Skipping item.`);
-                // continue;
-                // Option 2: Use a modified placeholder that meets min length
-                preparedItemName = `${preparedItemName} (AI Item)`.substring(
-                  0,
-                  50
-                ); // Ensure it still fits if original was 1 char
-                if (preparedItemName.length < 2)
-                  preparedItemName = "Valid AI Item"; // Fallback if above is still too short
-              }
-              if (preparedItemName.length > 50) {
-                preparedItemName = preparedItemName.substring(0, 50);
-              }
-              // At this point, preparedItemName should be between 2 and 50 chars if logic is correct
-
-              const itemDataForService: Parameters<
-                typeof ItemService.createItem
-              >[0] = {
-                name: preparedItemName, // Use the validated and potentially truncated name
-                menuId: createdMenu._id as Types.ObjectId,
-                itemType: resolvedItemType,
-                category: aiProvidedCategory, // This is lowercased in ItemService.createItem
-                description: undefined,
-                price:
-                  typeof item.itemPrice === "number"
-                    ? item.itemPrice
-                    : undefined,
-                ingredients: item.itemIngredients || [],
-                isGlutenFree: Boolean(item.isGlutenFree),
-                isDairyFree: undefined,
-                isVegetarian: Boolean(item.isVegetarian),
-                isVegan: Boolean(item.isVegan),
-              };
-              try {
-                await ItemService.createItem(
-                  itemDataForService,
-                  restaurantId,
-                  session
-                ); // Pass session
-              } catch (itemError: any) {
-                // If individual item creation fails, we might want to log and continue,
-                // or abort the whole transaction. For now, let's rethrow to abort.
-                console.warn(
-                  `[MenuService] Error creating item "${item.itemName}" within transaction: ${itemError.message}. Aborting transaction.`
-                );
-                throw itemError; // This will be caught by the outer catch and abort the transaction
-              }
-            }
-          }
-          await session.commitTransaction();
-          return createdMenu;
-        } else {
-          console.error(
-            "[MenuService] AI responded with an unexpected function call:",
-            functionCall.name
-          );
-          throw new AppError(
-            "AI processing error: Unexpected function call by AI.",
-            500
+        }
+        menuObjectId = menu._id as Types.ObjectId;
+        finalMenuName = menu.name;
+        result.menuId = menuObjectId.toString();
+        result.menuName = finalMenuName;
+        if (replaceAllItems) {
+          await MenuItem.deleteMany({
+            menuId: menuObjectId,
+            restaurantId,
+          }).session(session);
+          console.log(
+            `All existing items deleted from menu "${finalMenuName}" as per replaceAllItems flag.`
           );
         }
       } else {
-        console.warn(
-          "[MenuService] AI did not return a function call. Text response:",
-          response.text()
-        );
         throw new AppError(
-          "AI processing error: AI did not return structured menu data as expected.",
-          500
-        );
-      }
-    } catch (error: any) {
-      if (session && session.inTransaction()) {
-        await session.abortTransaction();
-      }
-      console.error(
-        "[MenuService] Error processing PDF menu upload with AI:",
-        error
-      );
-      // Specific error handling from before remains relevant
-      if (error instanceof AppError) throw error;
-      if (error.message && error.message.includes("GEMINI_API_KEY")) {
-        throw new AppError(
-          "AI service configuration error. Please check API key.",
-          500
-        );
-      }
-      if (
-        error.message &&
-        (error.message.toLowerCase().includes("safety settings") ||
-          error.message.toLowerCase().includes("blocked"))
-      ) {
-        console.error(
-          "[MenuService] Gemini content blocked due to safety settings. Response:",
-          error.response?.candidates?.[0]?.finishReason,
-          error.response?.candidates?.[0]?.safetyRatings
-        );
-        throw new AppError(
-          "Content generation blocked by AI safety settings. Please check the PDF content or adjust safety thresholds if appropriate.",
+          "TargetMenuId or parsedMenuName must be provided.",
           400
         );
       }
-      throw new AppError(
-        "Failed to process PDF menu with AI: " + error.message,
-        500
-      );
-    } finally {
-      if (session) {
-        session.endSession();
+
+      if (!menuObjectId) {
+        throw new AppError(
+          "Failed to identify target menu. Critical logic error.",
+          500
+        );
       }
-      // Ensure file is deleted regardless of success or failure of the transaction/AI processing
-      if (absoluteFilePath && fs.existsSync(absoluteFilePath)) {
+
+      const bulkOperations: any[] = [];
+      for (const item of itemsToImport) {
         try {
-          fs.unlinkSync(absoluteFilePath);
-          console.log(
-            `[MenuService] Successfully deleted temp file: ${absoluteFilePath}`
-          );
-        } catch (unlinkError: any) {
-          console.error(
-            `[MenuService] Failed to delete temp file ${absoluteFilePath}: ${unlinkError.message}`
+          if (item.importAction === "skip" || item.userAction === "ignore") {
+            result.itemsSkipped++;
+            continue;
+          }
+          if (item.importAction === "create") {
+            const newItemData = MenuService._prepareAndValidateNewItemData(
+              item.fields,
+              menuObjectId,
+              restaurantId
+            );
+            bulkOperations.push({ insertOne: { document: newItemData } });
+            result.itemsCreated++;
+          } else if (item.importAction === "update" && item.existingItemId) {
+            const existingItem = await MenuItem.findOne({
+              _id: item.existingItemId,
+              restaurantId,
+              menuId: menuObjectId,
+            }).session(session);
+            if (!existingItem)
+              throw new Error(
+                `Item to update (ID: ${item.existingItemId}) not found in target menu ${menuObjectId}.`
+              );
+
+            const updatePayload =
+              MenuService._prepareAndValidateUpdatedItemData(
+                item.fields,
+                existingItem
+              );
+            if (Object.keys(updatePayload).length > 0) {
+              bulkOperations.push({
+                updateOne: {
+                  filter: { _id: existingItem._id },
+                  update: { $set: updatePayload },
+                },
+              });
+              result.itemsUpdated++;
+            } else {
+              result.itemsSkipped++;
+            }
+          } else {
+            throw new Error(
+              `Invalid importAction '${item.importAction}' or missing existingItemId for update.`
+            );
+          }
+        } catch (error: any) {
+          result.itemsErrored++;
+          const errorStatus: ImportActionStatus = "error";
+          result.errorDetails?.push({
+            id: item.id,
+            name: String(item.fields.name.value || "N/A"),
+            status: errorStatus,
+            errorReason: error.message,
+            existingItemId: item.existingItemId,
+          });
+          errorReportLines.push(
+            `"${item.id}","${String(item.fields.name.value || "N/A").replace(
+              /"/g,
+              '""'
+            )}","${item.importAction || "N/A"}","${error.message.replace(
+              /"/g,
+              '""'
+            )}"`
           );
         }
       }
+
+      if (bulkOperations.length > 0) {
+        const bulkWriteResult = await MenuItem.bulkWrite(bulkOperations, {
+          session,
+        });
+        if (bulkWriteResult.hasWriteErrors()) {
+          bulkWriteResult.getWriteErrors().forEach((writeError: any) => {
+            result.itemsErrored++;
+            const errorStatus: ImportActionStatus = "error";
+            result.errorDetails?.push({
+              id: `bulkError_${writeError.index ?? "N/A"}`,
+              name: "Bulk Op Error",
+              status: errorStatus,
+              errorReason: writeError.errmsg,
+            });
+            errorReportLines.push(
+              `"bulkError_${
+                writeError.index ?? "N/A"
+              }","Bulk Op Error","bulk_operation","${(
+                writeError.errmsg || "Unknown bulk error"
+              ).replace(/"/g, '""')}"`
+            );
+          });
+        }
+      }
+
+      result.overallStatus =
+        result.itemsErrored > 0
+          ? result.itemsErrored === itemsToImport.length - result.itemsSkipped
+            ? "failed"
+            : "partial_success"
+          : "success";
+      result.message =
+        result.itemsErrored > 0
+          ? `Import completed with ${result.itemsErrored} errors.`
+          : `Successfully imported ${result.itemsCreated} new items and updated ${result.itemsUpdated} items. ${result.itemsSkipped} items were skipped.`;
+
+      if (errorReportLines.length > 1)
+        result.errorReport = errorReportLines.join("\\n");
+      result.menuName = finalMenuName;
+      await session.commitTransaction();
+
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlink(filePath, (err) => {
+          if (err)
+            console.error(
+              "Error deleting temp PDF after sync import:",
+              filePath,
+              err
+            );
+          else console.log("Temp PDF deleted after sync import:", filePath);
+        });
+      }
+    } catch (error: any) {
+      await session.abortTransaction();
+      result.overallStatus = "failed";
+      result.message = error.message || "Unexpected error during import.";
+      const errorStatus: ImportActionStatus = "error";
+      if (error instanceof AppError && error.additionalDetails) {
+        result.errorDetails?.push({
+          id: "global_error",
+          name: "Global Import Error",
+          status: errorStatus,
+          errorReason: JSON.stringify(error.additionalDetails),
+        });
+      } else {
+        result.errorDetails?.push({
+          id: "global_error",
+          name: "Global Import Error",
+          status: errorStatus,
+          errorReason: error.message,
+        });
+      }
+    } finally {
+      session.endSession();
     }
+    return result;
+  }
+
+  static async processQueuedMenuImport(
+    menuImportJobDocumentId: string | Types.ObjectId
+  ): Promise<ImportResult> {
+    const jobDoc = await MenuImportJobModel.findById(
+      menuImportJobDocumentId
+    ).exec();
+    if (!jobDoc) {
+      return {
+        overallStatus: "failed",
+        message: `Critical error: MenuImportJob document not found for ID: ${menuImportJobDocumentId}.`,
+        itemsProcessed: 0,
+        itemsCreated: 0,
+        itemsUpdated: 0,
+        itemsSkipped: 0,
+        itemsErrored: 0,
+      };
+    }
+
+    jobDoc.status = "processing";
+    jobDoc.processedAt = new Date();
+    await jobDoc.save();
+
+    const {
+      restaurantId,
+      originalFilePath,
+      parsedMenuName,
+      targetMenuId,
+      replaceAllItems,
+      itemsToImport,
+    } = jobDoc;
+
+    const jobRestaurantId = new Types.ObjectId(restaurantId);
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    let menuObjectId: Types.ObjectId | undefined = targetMenuId
+      ? new Types.ObjectId(targetMenuId.toString())
+      : undefined;
+    let finalMenuName = parsedMenuName;
+
+    const jobResult: ImportResult = {
+      overallStatus: "success",
+      message: "",
+      menuId: undefined,
+      menuName: undefined,
+      itemsProcessed: itemsToImport.length,
+      itemsCreated: 0,
+      itemsUpdated: 0,
+      itemsSkipped: 0,
+      itemsErrored: 0,
+      errorDetails: [],
+      errorReport: "",
+    };
+    const errorReportLines: string[] = [
+      "ItemID,ItemName,ActionAttempted,ErrorReason",
+    ];
+
+    try {
+      let menu: IMenu | null = null;
+      if (targetMenuId) {
+        menu = await Menu.findOne({
+          _id: targetMenuId,
+          restaurantId: jobRestaurantId,
+        }).session(session);
+        if (!menu) {
+          throw new AppError(
+            `Target menu with ID "${targetMenuId}" not found for job ${jobDoc._id}.`,
+            404
+          );
+        }
+        menuObjectId = menu._id as Types.ObjectId;
+        finalMenuName = menu.name;
+        jobResult.menuId = menuObjectId.toString();
+        jobResult.menuName = finalMenuName;
+        if (replaceAllItems) {
+          await MenuItem.deleteMany({
+            menuId: menuObjectId,
+            restaurantId: jobRestaurantId,
+          }).session(session);
+          console.log(
+            `Job ${jobDoc._id}: All existing items deleted from menu "${finalMenuName}" as per replaceAllItems flag.`
+          );
+        }
+      } else if (parsedMenuName) {
+        menu = await Menu.findOne({
+          name: parsedMenuName,
+          restaurantId: jobRestaurantId,
+        }).session(session);
+        if (!menu) {
+          if (!parsedMenuName.trim()) {
+            throw new AppError(
+              `Menu name cannot be empty when creating a new menu for job ${jobDoc._id}.`,
+              400
+            );
+          }
+          menu = await MenuService.createMenu(
+            { name: parsedMenuName, isActive: true },
+            jobRestaurantId,
+            session
+          );
+        }
+        menuObjectId = menu._id as Types.ObjectId;
+        finalMenuName = menu.name;
+        jobResult.menuId = menuObjectId.toString();
+        jobResult.menuName = finalMenuName;
+
+        if (replaceAllItems) {
+          await MenuItem.deleteMany({
+            menuId: menuObjectId,
+            restaurantId: jobRestaurantId,
+          }).session(session);
+          console.log(
+            `Job ${jobDoc._id}: All existing items deleted from menu "${finalMenuName}" as per replaceAllItems flag.`
+          );
+        }
+      } else {
+        throw new AppError(
+          `TargetMenuId or parsedMenuName must be provided for job ${jobDoc._id}.`,
+          400
+        );
+      }
+
+      if (!menuObjectId) {
+        throw new AppError(
+          `Failed to identify target menu for job ${jobDoc._id}. Critical logic error.`,
+          500
+        );
+      }
+
+      const bulkOperations: any[] = [];
+      for (const item of itemsToImport) {
+        try {
+          if (item.importAction === "skip" || item.userAction === "ignore") {
+            jobResult.itemsSkipped++;
+            continue;
+          }
+          if (item.importAction === "create") {
+            const newItemData = MenuService._prepareAndValidateNewItemData(
+              item.fields,
+              menuObjectId,
+              jobRestaurantId
+            );
+            bulkOperations.push({ insertOne: { document: newItemData } });
+            jobResult.itemsCreated++;
+          } else if (item.importAction === "update" && item.existingItemId) {
+            const existingItem = await MenuItem.findOne({
+              _id: item.existingItemId,
+              restaurantId: jobRestaurantId,
+              menuId: menuObjectId,
+            }).session(session);
+            if (!existingItem)
+              throw new Error(
+                `Item to update (ID: ${item.existingItemId}) not found in target menu ${menuObjectId} for job ${jobDoc._id}.`
+              );
+
+            const updatePayload =
+              MenuService._prepareAndValidateUpdatedItemData(
+                item.fields,
+                existingItem
+              );
+            if (Object.keys(updatePayload).length > 0) {
+              bulkOperations.push({
+                updateOne: {
+                  filter: { _id: existingItem._id },
+                  update: { $set: updatePayload },
+                },
+              });
+              jobResult.itemsUpdated++;
+            } else {
+              jobResult.itemsSkipped++;
+            }
+          } else {
+            throw new Error(
+              `Invalid importAction '${item.importAction}' or missing existingItemId for update on job ${jobDoc._id}.`
+            );
+          }
+        } catch (error: any) {
+          jobResult.itemsErrored++;
+          const errorStatus: ImportActionStatus = "error";
+          jobResult.errorDetails?.push({
+            id: item.id,
+            name: String(item.fields.name.value || "N/A"),
+            status: errorStatus,
+            errorReason: error.message,
+            existingItemId: item.existingItemId,
+          });
+          errorReportLines.push(
+            `"${item.id}","${String(item.fields.name.value || "N/A").replace(
+              /"/g,
+              '""'
+            )}","${item.importAction || "N/A"}","${error.message.replace(
+              /"/g,
+              '""'
+            )}"`
+          );
+        }
+      }
+
+      if (bulkOperations.length > 0) {
+        const bulkWriteResult = await MenuItem.bulkWrite(bulkOperations, {
+          session,
+        });
+        if (bulkWriteResult.hasWriteErrors()) {
+          bulkWriteResult.getWriteErrors().forEach((writeError: any) => {
+            jobResult.itemsErrored++;
+            const errorStatus: ImportActionStatus = "error";
+            jobResult.errorDetails?.push({
+              id: `bulkError_${writeError.index ?? "N/A"}`,
+              name: "Bulk Op Error",
+              status: errorStatus,
+              errorReason: writeError.errmsg,
+            });
+            errorReportLines.push(
+              `"bulkError_${
+                writeError.index ?? "N/A"
+              }","Bulk Op Error","bulk_operation","${(
+                writeError.errmsg || "Unknown bulk error"
+              ).replace(/"/g, '""')}"`
+            );
+          });
+        }
+      }
+
+      jobResult.overallStatus =
+        jobResult.itemsErrored > 0
+          ? jobResult.itemsErrored ===
+            itemsToImport.length - jobResult.itemsSkipped
+            ? "failed"
+            : "partial_success"
+          : "success";
+      jobResult.message =
+        jobResult.itemsErrored > 0
+          ? `Import completed with ${jobResult.itemsErrored} errors for job ${jobDoc._id}.`
+          : `Successfully imported ${jobResult.itemsCreated} new items and updated ${jobResult.itemsUpdated} items for job ${jobDoc._id}. ${jobResult.itemsSkipped} items were skipped.`;
+
+      if (errorReportLines.length > 1)
+        jobResult.errorReport = errorReportLines.join("\\n");
+      jobResult.menuName = finalMenuName;
+
+      await session.commitTransaction();
+      jobDoc.status =
+        jobResult.overallStatus === "failed"
+          ? "failed"
+          : jobResult.overallStatus === "partial_success"
+          ? "partial_success"
+          : "completed";
+      jobDoc.errorMessage = jobResult.message;
+
+      if (
+        (jobDoc.status === "completed" ||
+          jobDoc.status === "partial_success") &&
+        originalFilePath &&
+        fs.existsSync(originalFilePath)
+      ) {
+        fs.unlink(originalFilePath, (err) => {
+          if (err)
+            console.error(
+              `Job ${jobDoc._id}: Error deleting temp PDF after async import:`,
+              originalFilePath,
+              err
+            );
+          else
+            console.log(
+              `Job ${jobDoc._id}: Temp PDF deleted after async import:`,
+              originalFilePath
+            );
+        });
+      }
+    } catch (error: any) {
+      await session.abortTransaction();
+      jobResult.overallStatus = "failed";
+      jobResult.message =
+        error.message ||
+        `Unexpected error during queued import for job ${jobDoc._id}.`;
+      const errorStatus: ImportActionStatus = "error";
+      if (error instanceof AppError && error.additionalDetails) {
+        jobResult.errorDetails?.push({
+          id: "global_job_error",
+          name: "Global Job Error",
+          status: errorStatus,
+          errorReason: JSON.stringify(error.additionalDetails),
+        });
+      } else {
+        jobResult.errorDetails?.push({
+          id: "global_job_error",
+          name: "Global Job Error",
+          status: errorStatus,
+          errorReason: error.message,
+        });
+      }
+      jobDoc.status = "failed";
+      if (!jobDoc.errorMessage) jobDoc.errorMessage = jobResult.message;
+    } finally {
+      session.endSession();
+    }
+
+    jobDoc.result = jobResult;
+    jobDoc.completedAt = new Date();
+    jobDoc.progress = 100;
+    await jobDoc.save();
+    return jobResult;
+  }
+
+  static async processMenuForConflictResolution(
+    data: ProcessConflictResolutionRequest
+  ): Promise<ProcessConflictResolutionResponse> {
+    const {
+      itemsToProcess,
+      restaurantId: restaurantIdFromData,
+      targetMenuId: targetMenuIdFromData,
+    } = data;
+
+    if (
+      !restaurantIdFromData ||
+      !mongoose.Types.ObjectId.isValid(restaurantIdFromData)
+    ) {
+      throw new AppError(
+        "Invalid or missing restaurant ID for conflict resolution.",
+        400
+      );
+    }
+    const restaurantId = new mongoose.Types.ObjectId(restaurantIdFromData);
+
+    const processedItems: ParsedMenuItem[] = [];
+    let itemsRequiringUserAction = 0;
+    let potentialUpdatesIdentified = 0;
+    let newItemsConfirmed = 0;
+
+    for (const item of itemsToProcess) {
+      let conflictResolutionStatus: ConflictResolutionStatus = "no_conflict";
+      let conflictMessage: string | undefined = undefined;
+      let existingItemIdForUpdate: string | undefined = undefined;
+      let candidateItemIdsForMultiple: string[] | undefined = undefined;
+
+      if (item.userAction === "ignore") {
+        conflictResolutionStatus = "skipped_by_user";
+        processedItems.push({
+          ...item,
+          conflictResolution: { status: conflictResolutionStatus },
+        });
+        continue;
+      }
+
+      try {
+        const itemNameTrimmed = String(item.fields.name.value).trim();
+        if (!itemNameTrimmed) {
+          throw new Error("Item name is empty, cannot process for conflicts.");
+        }
+
+        const findQuery: any = {
+          restaurantId: restaurantId,
+          name: {
+            $regex: `^${itemNameTrimmed.replace(
+              /[-\/\\^$*+?.()|[\]{}]/g,
+              "\\$&"
+            )}$`,
+            $options: "i",
+          },
+        };
+
+        if (
+          targetMenuIdFromData &&
+          mongoose.Types.ObjectId.isValid(targetMenuIdFromData)
+        ) {
+          findQuery.menuId = new mongoose.Types.ObjectId(targetMenuIdFromData);
+        }
+
+        const potentialDuplicates = await MenuItem.find(findQuery)
+          .select("_id name menuId")
+          .limit(5)
+          .lean<
+            Array<
+              Pick<IMenuItem, "_id" | "name" | "menuId"> & {
+                _id: Types.ObjectId;
+              }
+            >
+          >();
+
+        if (potentialDuplicates.length === 1) {
+          const duplicate = potentialDuplicates[0];
+          conflictResolutionStatus = "update_candidate";
+          existingItemIdForUpdate = duplicate._id.toString();
+          conflictMessage = `One existing item found with name "${duplicate.name}".`;
+          potentialUpdatesIdentified++;
+        } else if (potentialDuplicates.length > 1) {
+          conflictResolutionStatus = "multiple_candidates";
+          candidateItemIdsForMultiple = potentialDuplicates.map((dup) =>
+            dup._id.toString()
+          );
+          conflictMessage = `${potentialDuplicates.length} existing items found with similar names. Please review.`;
+          itemsRequiringUserAction++;
+        } else {
+          conflictResolutionStatus = "no_conflict";
+          newItemsConfirmed++;
+        }
+      } catch (error: any) {
+        console.error(
+          `Error processing conflict for item "${String(
+            item.fields.name.value
+          )}": ${error.message}`
+        );
+        conflictResolutionStatus = "error_processing_conflict";
+        conflictMessage = `Error during conflict check: ${error.message}`;
+        itemsRequiringUserAction++;
+      }
+      processedItems.push({
+        ...item,
+        conflictResolution: {
+          status: conflictResolutionStatus,
+          message: conflictMessage,
+          existingItemId: existingItemIdForUpdate,
+          candidateItemIds: candidateItemIdsForMultiple,
+        },
+      });
+    }
+    return {
+      processedItems,
+      summary: {
+        itemsRequiringUserAction,
+        potentialUpdatesIdentified,
+        newItemsConfirmed,
+        totalProcessed: itemsToProcess.length,
+      },
+    };
   }
 }
 

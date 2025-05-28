@@ -2,6 +2,7 @@
   "name": "server",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "test": "NODE_ENV=test JWT_SECRET=test_jwt_secret_for_mocha_!@#$#% npx mocha -r ts-node/register src/**/*.test.ts",
     "start": "ts-node src/server.ts",
@@ -15,6 +16,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.15.0",
     "bcryptjs": "^3.0.2",
+    "bullmq": "^5.53.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -24,7 +26,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
     "morgan": "^1.10.0",
-    "openai": "^4.95.1"
+    "openai": "^4.95.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -36,6 +39,7 @@
     "@types/mocha": "^10.0.10",
     "@types/morgan": "^1.9.9",
     "@types/supertest": "^6.0.2",
+    "@types/uuid": "^10.0.0",
     "chai": "^5.1.1",
     "mocha": "^11.1.0",
     "mongodb-memory-server": "^10.0.0",

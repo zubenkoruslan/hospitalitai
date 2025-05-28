@@ -149,6 +149,144 @@ export const validateQuizIdParam: ValidationChain[] = [
   ...validateObjectId("quizId"),
 ];
 
+// Validation for creating a quiz from question banks or SOP
+export const validateCreateQuizFromBanksBody: ValidationChain[] = [
+  body("title", "Quiz title is required").trim().notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("questionBankIds", "questionBankIds must be an array of MongoIDs")
+    .optional()
+    .isArray()
+    .custom((value) => {
+      if (
+        value &&
+        !value.every((id: string) => mongoose.Types.ObjectId.isValid(id))
+      ) {
+        throw new Error("Each item in questionBankIds must be a valid MongoID");
+      }
+      return true;
+    }),
+  body("sourceSopDocumentId", "sourceSopDocumentId must be a valid MongoID")
+    .optional()
+    .isMongoId(),
+  body(
+    "numberOfQuestionsPerAttempt",
+    "Number of questions per attempt is required and must be at least 1"
+  )
+    .isInt({ min: 1 })
+    .toInt(),
+  body("targetRoles", "targetRoles must be an array of MongoIDs")
+    .optional()
+    .isArray()
+    .custom((value) => {
+      if (
+        value &&
+        !value.every((id: string) => mongoose.Types.ObjectId.isValid(id))
+      ) {
+        throw new Error("Each item in targetRoles must be a valid MongoID");
+      }
+      return true;
+    }),
+  body("retakeCooldownHours", "Retake cooldown must be a non-negative number")
+    .optional()
+    .isNumeric({ no_symbols: true })
+    .toInt()
+    .custom((value) => {
+      if (value < 0) {
+        throw new Error("Retake cooldown cannot be negative.");
+      }
+      return true;
+    }),
+  // Ensure either questionBankIds or sourceSopDocumentId is provided
+  body().custom((value, { req }) => {
+    if (!req.body.questionBankIds && !req.body.sourceSopDocumentId) {
+      throw new Error(
+        "Either questionBankIds or sourceSopDocumentId must be provided."
+      );
+    }
+    if (req.body.questionBankIds && req.body.sourceSopDocumentId) {
+      throw new Error(
+        "Provide either questionBankIds or sourceSopDocumentId, not both."
+      );
+    }
+    return true;
+  }),
+];
+
+// Validation for updating an existing quiz
+export const validateUpdateQuizBody: ValidationChain[] = [
+  body("title", "Quiz title must be a non-empty string")
+    .optional()
+    .trim()
+    .notEmpty(),
+  body("description", "Description must be a string")
+    .optional()
+    .isString()
+    .trim(),
+  body("questionBankIds", "questionBankIds must be an array of MongoIDs")
+    .optional()
+    .isArray()
+    .custom((value) => {
+      if (
+        value &&
+        !value.every((id: string) => mongoose.Types.ObjectId.isValid(id))
+      ) {
+        throw new Error("Each item in questionBankIds must be a valid MongoID");
+      }
+      return true;
+    }),
+  body(
+    "numberOfQuestionsPerAttempt",
+    "Number of questions per attempt must be at least 1"
+  )
+    .optional()
+    .isInt({ min: 1 })
+    .toInt(),
+  body("isAvailable", "isAvailable must be a boolean").optional().isBoolean(),
+  body("targetRoles", "targetRoles must be an array of MongoIDs")
+    .optional()
+    .isArray()
+    .custom((value) => {
+      if (
+        value &&
+        !value.every((id: string) => mongoose.Types.ObjectId.isValid(id))
+      ) {
+        throw new Error("Each item in targetRoles must be a valid MongoID");
+      }
+      return true;
+    }),
+  body("retakeCooldownHours", "Retake cooldown must be a non-negative number")
+    .optional()
+    .isNumeric({ no_symbols: true })
+    .toInt()
+    .custom((value) => {
+      if (value < 0) {
+        throw new Error("Retake cooldown cannot be negative.");
+      }
+      return true;
+    }),
+  // Ensure at least one field is provided for update
+  body().custom((value, { req }) => {
+    const fields = [
+      "title",
+      "description",
+      "questionBankIds",
+      "numberOfQuestionsPerAttempt",
+      "isAvailable",
+      "targetRoles",
+      "retakeCooldownHours",
+    ];
+    if (fields.every((field) => req.body[field] === undefined)) {
+      throw new Error(
+        "No update data provided. Please provide at least one field to update."
+      );
+    }
+    return true;
+  }),
+];
+
 export const validateAutoGenerateQuiz: ValidationChain[] = [
   body("title", "Quiz title is required").trim().notEmpty(),
   body("menuIds", "Please select at least one menu (must be an array of IDs)")
@@ -603,72 +741,6 @@ export const validateUpdateItemBody: ValidationChain[] = [
   body("isVegan", "isVegan must be a boolean").optional().isBoolean(),
 ];
 
-// === Quiz Validators (Updates) ===
-export const validateUpdateQuizBody: ValidationChain[] = [
-  body("title", "Title must be a non-empty string")
-    .optional()
-    .isString()
-    .trim()
-    .notEmpty(),
-  body("description", "Description must be a non-empty string")
-    .optional()
-    .isString()
-    .trim()
-    .notEmpty(), // If provided, it cannot be empty
-  body(
-    "questionBankIds",
-    "questionBankIds must be an array of MongoDB ObjectId strings"
-  )
-    .optional()
-    .isArray(),
-  body(
-    "questionBankIds.*",
-    "Each questionBankId in questionBankIds must be a valid MongoDB ObjectId string"
-  ).isMongoId(),
-  body(
-    "numberOfQuestionsPerAttempt",
-    "numberOfQuestionsPerAttempt must be a positive integer"
-  )
-    .optional()
-    .isInt({ min: 1 })
-    .toInt(),
-  body("isAvailable")
-    .optional()
-    .isBoolean()
-    .withMessage("isAvailable must be a boolean"),
-  // Added validation for targetRoles during quiz update
-  body("targetRoles")
-    .optional()
-    .isArray()
-    .withMessage("targetRoles must be an array of role IDs"),
-  body("targetRoles.*")
-    // .optional() // Not needed here, if targetRoles is present, its elements are validated
-    .isMongoId()
-    .withMessage(
-      "Each targetRole ID in targetRoles must be a valid MongoDB ObjectId string"
-    ),
-  // Ensure at least one field is provided for update
-  body().custom((value, { req }) => {
-    const updateFields = [
-      "title",
-      "description",
-      "questionBankIds",
-      "numberOfQuestionsPerAttempt",
-      "isAvailable",
-      "targetRoles",
-    ];
-    const hasUpdate = updateFields.some(
-      (field) => req.body[field] !== undefined
-    );
-    if (!hasUpdate) {
-      throw new Error(
-        "No update data provided. Please provide at least one field to update."
-      );
-    }
-    return true;
-  }),
-];
-
 // === Question Controller Validators (AI Generation) ===
 export const validateGenerateAiQuestionsBody: ValidationChain[] = [
   body("menuId", "Menu ID is required for AI question generation").isMongoId(),
@@ -795,6 +867,167 @@ export const validatePasswordChangeRequest = [
     }
     return true;
   }),
+];
+
+export const validateFinalMenuImportData = [
+  body("previewId")
+    .isString()
+    .withMessage("Preview ID must be a string.")
+    .notEmpty()
+    .withMessage("Preview ID is required."),
+  body("filePath")
+    .isString()
+    .withMessage("File path must be a string.")
+    .notEmpty()
+    .withMessage("File path is required."),
+  // parsedMenuName is optional
+  body("parsedMenuName")
+    .optional()
+    .isString()
+    .withMessage("Parsed menu name must be a string if provided.")
+    .isLength({ min: 1, max: 100 })
+    .withMessage(
+      "Parsed menu name must be between 1 and 100 characters if provided."
+    ),
+  // targetMenuId is optional, but if provided, should be a valid ObjectId
+  body("targetMenuId")
+    .optional()
+    .isMongoId()
+    .withMessage(
+      "Target menu ID must be a valid MongoDB ObjectId if provided."
+    ),
+  // replaceAllItems is optional boolean
+  body("replaceAllItems")
+    .optional()
+    .isBoolean()
+    .withMessage("Replace all items flag must be a boolean if provided."),
+
+  body("itemsToImport")
+    .isArray({ min: 0 })
+    .withMessage("Items to import must be an array."),
+  // Basic validation for each item in the array
+  body("itemsToImport.*.id")
+    .isString()
+    .withMessage("Each item to import must have an ID (string).")
+    .notEmpty()
+    .withMessage("Item ID cannot be empty."),
+  body("itemsToImport.*.importAction")
+    .isIn(["create", "update", "skip"])
+    .withMessage(
+      "Each item importAction must be one of: create, update, skip."
+    ),
+
+  // Validate structure of fields for items being created or updated (more detailed)
+  body("itemsToImport").custom((items, { req }) => {
+    if (!Array.isArray(items)) return true; // Already handled by isArray
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.importAction === "create" || item.importAction === "update") {
+        if (!item.fields) {
+          throw new Error(
+            `Item at index ${i} with action '${item.importAction}' is missing 'fields' object.`
+          );
+        }
+        if (
+          !item.fields.name ||
+          typeof item.fields.name.value !== "string" ||
+          item.fields.name.value.trim() === ""
+        ) {
+          throw new Error(
+            `Item at index ${i} (action: '${item.importAction}') must have a non-empty name string.`
+          );
+        }
+        if (
+          item.fields.name.value.trim().length < 2 ||
+          item.fields.name.value.trim().length > 50
+        ) {
+          throw new Error(
+            `Item name for item at index ${i} (action: '${item.importAction}') must be between 2 and 50 characters.`
+          );
+        }
+        if (
+          !item.fields.category ||
+          typeof item.fields.category.value !== "string" ||
+          item.fields.category.value.trim() === ""
+        ) {
+          throw new Error(
+            `Item at index ${i} (action: '${item.importAction}') must have a non-empty category string.`
+          );
+        }
+        if (
+          !item.fields.itemType ||
+          typeof item.fields.itemType.value !== "string" ||
+          !["food", "beverage"].includes(item.fields.itemType.value)
+        ) {
+          throw new Error(
+            `Item at index ${i} (action: '${item.importAction}') must have a valid itemType ('food' or 'beverage').`
+          );
+        }
+        if (
+          item.fields.price &&
+          item.fields.price.value !== null &&
+          typeof item.fields.price.value !== "number"
+        ) {
+          throw new Error(
+            `Price for item at index ${i} (action: '${item.importAction}') must be a number or null if provided.`
+          );
+        }
+        // Add more checks for other fields as necessary (ingredients, booleans etc.)
+        if (
+          item.fields.ingredients &&
+          !Array.isArray(item.fields.ingredients.value)
+        ) {
+          throw new Error(
+            `Ingredients for item at index ${i} (action: '${item.importAction}') must be an array if provided.`
+          );
+        }
+        if (
+          item.fields.isGlutenFree &&
+          typeof item.fields.isGlutenFree.value !== "boolean"
+        ) {
+          throw new Error(
+            `isGlutenFree for item at index ${i} (action: '${item.importAction}') must be a boolean if provided.`
+          );
+        }
+        // etc. for isVegan, isVegetarian
+      }
+    }
+    return true;
+  }),
+  handleValidationErrors, // Generic handler for express-validator errors
+];
+
+// Validation for POST /api/menus/upload/process (Conflict Resolution)
+export const validateProcessConflictResolutionData: ValidationChain[] = [
+  body("itemsToProcess")
+    .isArray({ min: 1 })
+    .withMessage("itemsToProcess must be a non-empty array."),
+  // Validate each item in the itemsToProcess array
+  body("itemsToProcess.*.id")
+    .isString()
+    .withMessage("Each item in itemsToProcess must have a string id."),
+  body("itemsToProcess.*.fields")
+    .isObject()
+    .withMessage("Each item in itemsToProcess must have a fields object."),
+  body("itemsToProcess.*.fields.name")
+    .isObject()
+    .withMessage("Each item fields must have a name object."),
+  body("itemsToProcess.*.fields.name.value")
+    .isString()
+    .notEmpty()
+    .withMessage("Each item name.value must be a non-empty string.")
+    .isLength({ min: 1, max: 100 }) // Assuming item names can be up to 100, align with MenuItem model if different
+    .withMessage("Item name.value must be between 1 and 100 characters."),
+  // Optionally, add more checks for other fields if they are critical for conflict resolution logic
+  // e.g., itemType, category presence/type.
+  // body("itemsToProcess.*.fields.itemType.value")
+  //   .isIn(ITEM_TYPES) // Assuming ITEM_TYPES is accessible here or defined
+  //   .withMessage(`Item itemType.value must be one of: ${ITEM_TYPES.join(", ")}`),
+  // body("itemsToProcess.*.fields.category.value")
+  //   .isString()
+  //   .notEmpty()
+  //   .withMessage("Item category.value must be a non-empty string."),
 ];
 
 // You might have other validators here...

@@ -18,6 +18,7 @@ export interface GenerateQuizFromBanksRequestBody {
   sourceSopDocumentId?: string; // Added for SOP source
   numberOfQuestionsPerAttempt: number;
   targetRoles?: string[];
+  retakeCooldownHours?: number; // Added field
 }
 
 // Interface for request body when updating a quiz
@@ -28,6 +29,7 @@ export interface UpdateQuizRequestBody {
   numberOfQuestionsPerAttempt?: number;
   isAvailable?: boolean;
   targetRoles?: string[]; // Optional: array of role IDs, empty array means for all
+  retakeCooldownHours?: number; // Added field
 }
 
 // Interface for request body when submitting a quiz attempt

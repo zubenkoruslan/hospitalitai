@@ -67,8 +67,11 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
   // Combine provided categories with temporarily added ones for the dropdown
   const combinedCategories = useMemo(() => {
-    const base = availableCategories || [];
-    return [...new Set([...base, ...tempCategories])].sort();
+    const base = availableCategories
+      ? availableCategories.map((cat) => toTitleCase(cat))
+      : []; // Ensure availableCategories are title cased
+    const temp = tempCategories.map((cat) => toTitleCase(cat)); // Ensure tempCategories are title cased
+    return [...new Set([...base, ...temp])].sort();
   }, [availableCategories, tempCategories]);
 
   // This useMemo is now less critical if `availableCategories` is the primary source for the dropdown.
@@ -76,31 +79,36 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   // or for a secondary "suggestion" mechanism if we re-introduce a text input for "Other".
   // For now, the primary list for the dropdown will be `availableCategories`.
   const categorySuggestions = useMemo(() => {
-    const suggestions = new Set<string>(availableCategories || []);
+    const suggestions = new Set<string>(
+      availableCategories
+        ? availableCategories.map((cat) => toTitleCase(cat))
+        : []
+    ); // Ensure availableCategories are title cased
 
     // Add categories from all items in the current menu (already covered by availableCategories)
     // if (allItemsInMenu) {
     //   allItemsInMenu.forEach((item) => {
     //     if (item.category) {
-    //       suggestions.add(item.category);
+    //       suggestions.add(toTitleCase(item.category)); // Normalize
     //     }
     //   });
     // }
 
     // Ensure current item's category is in suggestions if editing and it exists
-    if (
-      isEditMode &&
-      currentItem?.category &&
-      !suggestions.has(currentItem.category)
-    ) {
-      suggestions.add(currentItem.category); // Add it if it's not in the passed list (e.g. if items list was filtered)
+    if (isEditMode && currentItem?.category) {
+      const currentItemCategoryTitleCase = toTitleCase(currentItem.category); // Normalize
+      if (!suggestions.has(currentItemCategoryTitleCase)) {
+        suggestions.add(currentItemCategoryTitleCase); // Add it if it's not in the passed list
+      }
     }
 
     // Fallback to standard categories if itemType is selected and no suggestions yet
     // This ensures there are some options if availableCategories is empty and itemType is selected.
     if (suggestions.size === 0 && formData.itemType) {
       const standardCategoriesFallback =
-        formData.itemType === "food" ? FOOD_CATEGORIES : BEVERAGE_CATEGORIES;
+        formData.itemType === "food"
+          ? FOOD_CATEGORIES.map((cat) => toTitleCase(cat))
+          : BEVERAGE_CATEGORIES.map((cat) => toTitleCase(cat)); // Normalize
       standardCategoriesFallback.forEach((cat) => suggestions.add(cat));
     }
 
@@ -116,47 +124,53 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   useEffect(() => {
     // console.log("[Modal useEffect] Running. isEditMode:", isEditMode, "currentItem:", !!currentItem, "isOpen:", isOpen);
     if (isOpen) {
-      setTempCategories([]); // Reset temp categories when modal opens
+      // Always reset tempCategories when modal opens for a fresh start with category handling
+      setTempCategories([]);
+
       if (isEditMode && currentItem) {
         try {
-          // console.log("[Modal useEffect] Populating form for edit.");
-          const categoryToSet: string = currentItem.category || "";
-          // Create a new object for edit mode to avoid mutating the constant
-          const newData: MenuItemFormData = {
+          const categoryToSet = toTitleCase(currentItem.category || "");
+          setFormData({
             name: currentItem.name,
             description: currentItem.description || "",
             price: currentItem.price != null ? String(currentItem.price) : "",
             ingredients: (currentItem.ingredients || []).join(", "),
             itemType: currentItem.itemType,
-            category: categoryToSet,
-            menuId: currentItem.menuId, // Ensure menuId is included from currentItem
+            category: categoryToSet, // Use normalized category from currentItem
+            menuId: currentItem.menuId,
             isGlutenFree: currentItem.isGlutenFree ?? false,
             isDairyFree: currentItem.isDairyFree ?? false,
             isVegetarian: currentItem.isVegetarian ?? false,
             isVegan: currentItem.isVegan ?? false,
-          };
-          // console.log("[Modal useEffect] Setting form data:", newData);
-          setFormData(newData);
+          });
           setFormError(null);
+
+          // If the current item's category (after title-casing) isn't in the availableCategories prop (also title-cased for comparison),
+          // add it to tempCategories so it appears in the dropdown. This ensures the current category is selectable.
+          const titleCasedAvailableCategories = availableCategories
+            ? availableCategories.map((cat) => toTitleCase(cat))
+            : [];
           if (
             categoryToSet &&
-            !categorySuggestions.includes(categoryToSet) &&
-            (!availableCategories ||
-              !availableCategories.includes(categoryToSet))
+            !titleCasedAvailableCategories.includes(categoryToSet)
           ) {
-            setTempCategories((prev) => [...new Set([...prev, categoryToSet])]);
+            // This updates tempCategories. It's okay if availableCategories changes and this runs again,
+            // as setTempCategories will handle duplicates if any.
+            setTempCategories((prevTemp) => {
+              if (!prevTemp.includes(categoryToSet)) {
+                return [...new Set([...prevTemp, categoryToSet])].sort();
+              }
+              return prevTemp;
+            });
           }
         } catch (_error) {
-          // Prefixed error
-          // console.error("[Modal useEffect] Error during edit mode population:", _error);
           setFormError("Failed to load item data for editing.");
         }
       } else if (!isEditMode) {
-        // console.log("[Modal useEffect] Resetting form for add mode.");
+        // Reset for add mode
         setFormData({
-          // Reset with menuId from props
           ...baseInitialFormData,
-          menuId: menuId, // Corrected: Use menuId from props
+          menuId: menuId,
         });
         setFormError(null);
       }
@@ -165,9 +179,8 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     currentItem,
     isEditMode,
     isOpen,
-    availableCategories,
-    categorySuggestions,
-    menuId, // menuId from props is a dependency now
+    menuId,
+    availableCategories, // Primary dependencies for form initialization and category setup
   ]);
 
   const handleInputChange = (
@@ -587,6 +600,15 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       )}
     </Modal>
   );
+};
+
+const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 export default AddEditMenuItemModal;

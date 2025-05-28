@@ -6,8 +6,13 @@ class AppError extends Error {
   statusCode: number;
   status: string;
   isOperational: boolean;
+  additionalDetails?: Record<string, any>;
 
-  constructor(message: string, statusCode: number) {
+  constructor(
+    message: string,
+    statusCode: number,
+    additionalDetails?: Record<string, any>
+  ) {
     super(message); // Call parent constructor (Error)
 
     this.statusCode = statusCode;
@@ -15,6 +20,9 @@ class AppError extends Error {
     this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
     // Mark as operational (errors we expect and handle gracefully)
     this.isOperational = true;
+    if (additionalDetails) {
+      this.additionalDetails = additionalDetails;
+    }
 
     // Capture stack trace, excluding constructor call from it
     Error.captureStackTrace(this, this.constructor);
@@ -39,10 +47,16 @@ const globalErrorHandler = (
   // Send response to client
   // For operational errors, send a user-friendly message
   if (err.isOperational) {
-    res.status(err.statusCode).json({
+    const responsePayload: Record<string, any> = {
       status: err.status,
       message: err.message,
-    });
+    };
+    if (err.additionalDetails) {
+      for (const key in err.additionalDetails) {
+        responsePayload[key] = err.additionalDetails[key];
+      }
+    }
+    res.status(err.statusCode).json(responsePayload);
   } else {
     // For programming or unknown errors, don't leak details
     res.status(500).json({

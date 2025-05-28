@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useMemo, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   createMenu,
@@ -16,8 +16,6 @@ import {
   PlusIcon,
   TrashIcon,
   ArrowUpTrayIcon,
-  EyeIcon,
-  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 import { useMenus } from "../hooks/useMenus";
@@ -50,7 +48,12 @@ const formatApiError = (err: any, context: string): string => {
 
 // --- Main Component ---
 const MenusPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  console.log("MenusPage User:", user);
+  console.log("Auth Token:", token);
 
   // Use the useMenus hook for menu data, loading, and error states
   const {
@@ -82,6 +85,14 @@ const MenusPage: React.FC = () => {
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
+  // Effect to refetch menus if navigated with newMenuImported state
+  useEffect(() => {
+    if (location.state?.newMenuImported) {
+      refetchMenus();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, refetchMenus, navigate]);
+
   // --- Modal Handlers ---
   const openAddModal = () => {
     setCurrentMenu(null);
@@ -95,6 +106,10 @@ const MenusPage: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const openPdfUploadModal = () => {
+    setIsPdfUploadModalOpen(true);
+  };
+
   const closeModal = () => {
     setIsAddMenuModalOpen(false);
     setIsDeleteModalOpen(false);
@@ -102,26 +117,7 @@ const MenusPage: React.FC = () => {
     setFormData(initialFormData);
     setFormError(null);
     setIsSubmitting(false);
-  };
-
-  const openPdfUploadModal = () => {
-    setIsPdfUploadModalOpen(true);
-  };
-
-  const closePdfUploadModal = () => {
     setIsPdfUploadModalOpen(false);
-  };
-
-  const handlePdfUploadSuccess = (newMenuData: any) => {
-    setSuccessMessage(
-      `Menu "${newMenuData.name}" imported successfully from PDF!`
-    );
-    refetchMenus();
-    closePdfUploadModal();
-  };
-
-  const handlePdfUploadError = (errorMessage: string) => {
-    setPageError(`PDF Upload Failed: ${errorMessage}`);
   };
 
   // --- Form Handlers ---
@@ -179,6 +175,9 @@ const MenusPage: React.FC = () => {
   // --- Delete Handler ---
   const handleDeleteConfirm = async () => {
     if (!currentMenu) return;
+
+    console.log("Attempting to delete menu with ID:", currentMenu._id);
+
     setIsSubmitting(true);
     setPageError(null);
 
@@ -212,6 +211,11 @@ const MenusPage: React.FC = () => {
     } finally {
       setIsTogglingMenuStatus(null);
     }
+  };
+
+  const handleFileSelectedForUpload = (file: File) => {
+    setIsPdfUploadModalOpen(false);
+    navigate("/menu-upload-path", { state: { fileToUpload: file } });
   };
 
   // --- Render Logic ---
@@ -556,14 +560,12 @@ const MenusPage: React.FC = () => {
         </div>
       )}
 
-      {/* Updated PDF Upload Modal Usage */}
-      {isPdfUploadModalOpen && restaurantId && (
+      {/* Restored PdfMenuUpload Modal Usage with new onFileSelected prop */}
+      {isPdfUploadModalOpen && (
         <PdfMenuUpload
           isOpen={isPdfUploadModalOpen}
-          onClose={closePdfUploadModal}
-          restaurantId={restaurantId}
-          onUploadSuccess={handlePdfUploadSuccess}
-          onUploadError={handlePdfUploadError}
+          onClose={closeModal}
+          onFileSelected={handleFileSelectedForUpload}
         />
       )}
     </div>
