@@ -151,7 +151,7 @@ const HomePage: React.FC = () => {
       {/* Footer */}
       <footer className="bg-slate-800 text-slate-300 pt-12 pb-8">
         <div className="container mx-auto px-4 text-center">
-          <h3 className="text-2xl font-bold text-white mb-4">HospitalityAI</h3>
+          <h3 className="text-2xl font-bold text-white mb-4">QuizCrunch</h3>
           <p className="text-slate-400 mb-6">
             Empowering hospitality staff through intelligent training solutions.
           </p>

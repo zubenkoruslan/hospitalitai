@@ -71,7 +71,7 @@ export class EmailService {
     const mailOptions = {
       from: process.env.FROM_EMAIL,
       to: email,
-      subject: "Reset Your HospitalityAI Password",
+      subject: "Reset Your QuizCrunch Password",
       html: this.getPasswordResetTemplate(email, userName, resetUrl, userRole),
     };
 
@@ -101,7 +101,7 @@ export class EmailService {
           
           <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 16px 0;">
             <strong>${invitedByName}</strong> has invited you to join the team at 
-            <strong>${restaurantName}</strong> on HospitalityAI.
+            <strong>${restaurantName}</strong> on QuizCrunch.
           </p>
         </div>
         
@@ -128,7 +128,7 @@ export class EmailService {
         
         <div style="text-align: center;">
           <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-            HospitalityAI - Restaurant Staff Management Platform
+            QuizCrunch - Restaurant Staff Management Platform
           </p>
         </div>
       </div>
@@ -157,7 +157,7 @@ export class EmailService {
           
           <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 16px 0;">
             We received a request to reset the password for your ${roleTitle} account 
-            (<strong>${email}</strong>) on HospitalityAI.
+            (<strong>${email}</strong>) on QuizCrunch.
           </p>
         </div>
         
@@ -188,7 +188,7 @@ export class EmailService {
         
         <div style="text-align: center;">
           <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-            HospitalityAI - Restaurant Staff Management Platform<br>
+            QuizCrunch - Restaurant Staff Management Platform<br>
             This is an automated message, please do not reply.
           </p>
         </div>
