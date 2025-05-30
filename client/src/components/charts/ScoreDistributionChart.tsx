@@ -9,6 +9,7 @@ interface ScoreDistributionChartProps {
   staffData: StaffMemberWithData[];
   selectedCategory: string | null;
   onSelectCategory: (categoryKey: string | null) => void;
+  className?: string;
 }
 
 // Enhanced bar chart component for visualizing score distribution
@@ -16,6 +17,7 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
   staffData,
   selectedCategory,
   onSelectCategory,
+  className = "",
 }) => {
   const scoreDistribution = useMemo(() => {
     const distribution = {
@@ -54,15 +56,18 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
     return totalStaff > 0 ? Math.round((count / totalStaff) * 100) : 0;
   };
 
-  // Distribution categories configuration
+  // Distribution categories configuration with modern colors
   const categories = [
     {
       key: "excellent",
       label: "Excellent",
       range: "90+",
-      color: "bg-green-500",
-      hoverColor: "bg-green-600",
-      textColor: "text-green-800",
+      color: "bg-emerald-500",
+      hoverColor: "bg-emerald-600",
+      textColor: "text-emerald-700",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200",
+      iconColor: "text-emerald-600",
       count: scoreDistribution.excellent,
       percentage: getPercentage(scoreDistribution.excellent),
     },
@@ -72,7 +77,10 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
       range: "75-89",
       color: "bg-blue-500",
       hoverColor: "bg-blue-600",
-      textColor: "text-blue-800",
+      textColor: "text-blue-700",
+      bgColor: "bg-blue-50",
+      borderColor: "border-blue-200",
+      iconColor: "text-blue-600",
       count: scoreDistribution.good,
       percentage: getPercentage(scoreDistribution.good),
     },
@@ -80,9 +88,12 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
       key: "average",
       label: "Average",
       range: "60-74",
-      color: "bg-yellow-500",
-      hoverColor: "bg-yellow-600",
-      textColor: "text-yellow-800",
+      color: "bg-amber-500",
+      hoverColor: "bg-amber-600",
+      textColor: "text-amber-700",
+      bgColor: "bg-amber-50",
+      borderColor: "border-amber-200",
+      iconColor: "text-amber-600",
       count: scoreDistribution.average,
       percentage: getPercentage(scoreDistribution.average),
     },
@@ -92,7 +103,10 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
       range: "<60",
       color: "bg-red-500",
       hoverColor: "bg-red-600",
-      textColor: "text-red-800",
+      textColor: "text-red-700",
+      bgColor: "bg-red-50",
+      borderColor: "border-red-200",
+      iconColor: "text-red-600",
       count: scoreDistribution.needsWork,
       percentage: getPercentage(scoreDistribution.needsWork),
     },
@@ -100,71 +114,183 @@ const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({
       key: "noResults",
       label: "No Results",
       range: "N/A",
-      color: "bg-gray-300",
-      hoverColor: "bg-gray-400",
-      textColor: "text-gray-800",
+      color: "bg-slate-400",
+      hoverColor: "bg-slate-500",
+      textColor: "text-slate-700",
+      bgColor: "bg-slate-50",
+      borderColor: "border-slate-200",
+      iconColor: "text-slate-500",
       count: scoreDistribution.noResults,
       percentage: getPercentage(scoreDistribution.noResults),
     },
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-gray-800">
-          Staff Performance Overview
-        </h2>
-        <div className="text-sm text-gray-500">
-          Total Staff: <span className="font-semibold">{totalStaff}</span>
+    <div
+      className={`bg-white rounded-2xl shadow-sm border border-slate-200 ${className}`}
+    >
+      {/* Header Section */}
+      <div className="p-6 pb-4 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Staff Performance Overview
+            </h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Distribution of quiz scores across all staff members
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="text-sm text-slate-500">Total Staff:</div>
+            <div className="bg-slate-100 rounded-lg px-3 py-1">
+              <span className="font-semibold text-slate-900">{totalStaff}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {categories.map((category) => {
-          const isSelected = selectedCategory === category.key;
-          return (
-            <div
-              key={category.key}
-              className={`flex flex-col bg-gray-50 rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-                isSelected
-                  ? "ring-2 ring-blue-500 shadow-lg"
-                  : "hover:shadow-md"
-              }`}
-              onClick={() => onSelectCategory(isSelected ? null : category.key)}
-              role="button"
-              aria-pressed={isSelected}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ")
-                  onSelectCategory(isSelected ? null : category.key);
-              }}
-            >
-              <div className="mb-2">
-                <div className="flex justify-between items-center">
-                  <h3 className={`font-semibold ${category.textColor}`}>
-                    {category.label}
-                  </h3>
-                  <span className="text-sm text-gray-500">
-                    {category.range}
-                  </span>
-                </div>
-                <div className="text-3xl font-bold mt-1">{category.count}</div>
-                <div className="text-sm text-gray-500">
-                  {category.percentage}% of staff
-                </div>
-              </div>
-
-              <div className="mt-auto pt-3">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
+      {/* Chart Section */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {categories.map((category) => {
+            const isSelected = selectedCategory === category.key;
+            return (
+              <div
+                key={category.key}
+                className={`
+                  group relative overflow-hidden rounded-xl border-2 transition-all duration-300 cursor-pointer
+                  ${
+                    isSelected
+                      ? `${category.borderColor} shadow-lg scale-[1.02] bg-white`
+                      : `border-slate-200 hover:border-slate-300 hover:shadow-md bg-slate-50 hover:bg-white`
+                  }
+                `}
+                onClick={() =>
+                  onSelectCategory(isSelected ? null : category.key)
+                }
+                role="button"
+                aria-pressed={isSelected}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectCategory(isSelected ? null : category.key);
+                  }
+                }}
+              >
+                {/* Selection Indicator */}
+                {isSelected && (
                   <div
-                    className={`${category.color} h-2.5 rounded-full transition-all duration-500 ease-out hover:${category.hoverColor}`}
-                    style={{ width: `${category.percentage}%` }}
-                  ></div>
+                    className={`absolute top-0 left-0 w-full h-1 ${category.color}`}
+                  />
+                )}
+
+                <div className="p-5">
+                  {/* Header Row */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <h3
+                        className={`font-semibold text-lg ${category.textColor}`}
+                      >
+                        {category.label}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        Score: {category.range}
+                      </p>
+                    </div>
+                    <div className={`p-2 rounded-lg ${category.bgColor}`}>
+                      <div
+                        className={`w-3 h-3 rounded-full ${category.color}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Count Display */}
+                  <div className="mb-4">
+                    <div className="text-3xl font-bold text-slate-900 leading-none">
+                      {category.count}
+                    </div>
+                    <div className="text-sm text-slate-600 mt-1">
+                      {category.percentage}% of total
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className={`
+                          ${
+                            category.color
+                          } h-full rounded-full transition-all duration-700 ease-out
+                          ${
+                            isSelected
+                              ? "shadow-sm"
+                              : "group-hover:brightness-110"
+                          }
+                        `}
+                        style={{
+                          width: `${Math.max(category.percentage, 2)}%`,
+                          transition:
+                            "width 0.7s ease-out, filter 0.2s ease-out",
+                        }}
+                      />
+                    </div>
+
+                    {/* Interactive Feedback */}
+                    <div className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                      {isSelected ? "Click to deselect" : "Click to filter"}
+                    </div>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+
+        {/* Summary Footer */}
+        {totalStaff > 0 && (
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-600">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-emerald-500 rounded-full" />
+                <span>
+                  High Performers:{" "}
+                  {scoreDistribution.excellent + scoreDistribution.good}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-amber-500 rounded-full" />
+                <span>
+                  Needs Attention:{" "}
+                  {scoreDistribution.average + scoreDistribution.needsWork}
+                </span>
+              </div>
+              {scoreDistribution.noResults > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-slate-400 rounded-full" />
+                  <span>No Data: {scoreDistribution.noResults}</span>
+                </div>
+              )}
             </div>
-          );
-        })}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {totalStaff === 0 && (
+          <div className="text-center py-12">
+            <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-8 h-8 bg-slate-300 rounded-full" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              No Staff Data
+            </h3>
+            <p className="text-slate-600">
+              Staff performance data will appear here once quiz results are
+              available.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
