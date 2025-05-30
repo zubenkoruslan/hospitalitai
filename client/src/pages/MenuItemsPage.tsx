@@ -8,13 +8,19 @@ import {
   updateMenu,
   deleteMenuCategory,
 } from "../services/api";
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button"; // Import Button
-import { TrashIcon } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // ADDED: Icons for collapsibles
+import {
+  TrashIcon,
+  PlusIcon,
+  PencilIcon,
+  DocumentTextIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
   MenuItem,
@@ -606,118 +612,144 @@ const MenuItemsPage: React.FC = () => {
   // --- Render Logic ---
   if (loading && !menuDetails) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-100">
-        <Navbar />
-        <main className="flex-grow flex items-center justify-center">
+      <DashboardLayout
+        breadcrumb={[
+          { name: "Menu Management", href: "/menu" },
+          { name: "Loading..." },
+        ]}
+      >
+        <div className="flex items-center justify-center py-12">
           <LoadingSpinner message="Loading menu items..." />
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-100">
-        <Navbar />
-        <main className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+      <DashboardLayout
+        breadcrumb={[
+          { name: "Menu Management", href: "/menu" },
+          { name: "Error" },
+        ]}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <DocumentTextIcon className="h-8 w-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">
+              Error Loading Menu
+            </h1>
             <ErrorMessage message={error} />
             <Button
               variant="secondary"
               onClick={() => navigate("/menu")}
               className="mt-6"
             >
-              &larr; Back to Menus
+              ← Back to Menus
             </Button>
           </div>
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (!menuDetails) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-100">
-        <Navbar />
-        <main className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-700 mb-4">
+      <DashboardLayout
+        breadcrumb={[
+          { name: "Menu Management", href: "/menu" },
+          { name: "Not Found" },
+        ]}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+            <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <DocumentTextIcon className="h-8 w-8 text-slate-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-700 mb-4">
               Menu Not Found
             </h1>
-            <p className="text-gray-600">
+            <p className="text-slate-600 mb-6">
               The requested menu could not be found.
             </p>
-            <Button
-              variant="secondary"
-              onClick={() => navigate("/menu")}
-              className="mt-6"
-            >
-              &larr; Back to Menus
+            <Button variant="secondary" onClick={() => navigate("/menu")}>
+              ← Back to Menus
             </Button>
           </div>
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        {/* Back to Menus Link */}
-        <div className="mb-4">
-          <Button
-            variant="secondary"
-            onClick={() => navigate("/menu")}
-            className="text-sm"
-          >
-            &larr; Back to All Menus
-          </Button>
-        </div>
-
-        {/* Page Title Header */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <div className="flex flex-col md:flex-row justify-between md:items-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 truncate">
-              {menuDetails.name}
-            </h1>
-            <div className="mt-4 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-              <Button variant="secondary" onClick={openMenuDetailsModal}>
-                Edit Menu Details
-              </Button>
-              <Button variant="primary" onClick={openAddModal}>
-                Add New Item
-              </Button>
+    <DashboardLayout
+      breadcrumb={[
+        { name: "Menu Management", href: "/menu" },
+        { name: menuDetails.name },
+      ]}
+    >
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-8 border border-amber-100 shadow-sm">
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="p-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl shadow-lg">
+              <DocumentTextIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                {menuDetails.name}
+              </h1>
+              {menuDetails.description && (
+                <p className="text-slate-600 mt-2">{menuDetails.description}</p>
+              )}
             </div>
           </div>
-          {menuDetails.description && (
-            <p className="mt-2 text-sm text-gray-600">
-              {menuDetails.description}
-            </p>
-          )}
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              variant="secondary"
+              onClick={openMenuDetailsModal}
+              className="flex items-center space-x-2"
+            >
+              <PencilIcon className="h-4 w-4" />
+              <span>Edit Menu Details</span>
+            </Button>
+            <Button
+              variant="primary"
+              onClick={openAddModal}
+              className="flex items-center space-x-2"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span>Add New Item</span>
+            </Button>
+          </div>
         </div>
 
         {/* Success and Error Messages */}
         {successMessage && (
-          <div className="mb-4">
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
             <SuccessNotification
               message={successMessage}
               onDismiss={() => setSuccessMessage(null)}
             />
           </div>
         )}
-        {/* Display hook's error if not in loading state and menuDetails exist (to avoid showing during initial load error) */}
+
+        {/* Display hook's error if not in loading state and menuDetails exist */}
         {error && !loading && menuDetails && (
-          <div className="mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
             <ErrorMessage message={error} onDismiss={clearError} />
           </div>
         )}
 
         {/* Loading state for items if menuDetails are already loaded */}
         {loading && menuDetails && (
-          <div className="text-center py-10">
-            <LoadingSpinner message="Loading items..." />
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
+            <div className="text-center">
+              <LoadingSpinner message="Loading items..." />
+            </div>
           </div>
         )}
 
@@ -726,7 +758,7 @@ const MenuItemsPage: React.FC = () => {
 
         {/* Render categorized items or placeholder */}
         {!loading && renderCategorizedItems()}
-      </main>
+      </div>
 
       {/* Modals */}
       {isAddEditModalOpen && (
@@ -794,7 +826,7 @@ const MenuItemsPage: React.FC = () => {
         categoryName={categoryToDelete}
         isDeleting={isDeletingCategory}
       />
-    </div>
+    </DashboardLayout>
   );
 };
 

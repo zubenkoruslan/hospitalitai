@@ -15,7 +15,7 @@ import { ClientStaffQuizProgress } from "../types/staffTypes";
 
 import { IQuestionBank } from "../types/questionBankTypes";
 
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -23,7 +23,14 @@ import SuccessNotification from "../components/common/SuccessNotification";
 import Card from "../components/common/Card";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent"; // For delete confirmations
 import Modal from "../components/common/Modal"; // A generic Modal component will be useful
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/solid"; // Import chevron icons
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  AcademicCapIcon,
+  BookOpenIcon,
+  PlusIcon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline"; // Import chevron icons
 
 // Question Bank Components (Modals/Forms)
 import CreateQuestionBankForm from "../components/questionBank/CreateQuestionBankForm";
@@ -453,237 +460,289 @@ const QuizAndBankManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-            Quiz & Question Bank Management
-          </h1>
+    <DashboardLayout title="Quiz & Question Bank Management">
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-8 border border-indigo-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg">
+              <AcademicCapIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                Quiz & Question Bank Management
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Create and manage question banks and quizzes for your staff
+                training
+              </p>
+            </div>
+          </div>
         </div>
 
-        {error && <ErrorMessage message={error} onDismiss={dismissMessages} />}
+        {/* Messages */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <ErrorMessage message={error} onDismiss={dismissMessages} />
+          </div>
+        )}
         {successMessage && (
-          <SuccessNotification
-            message={successMessage}
-            onDismiss={dismissMessages}
-          />
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+            <SuccessNotification
+              message={successMessage}
+              onDismiss={dismissMessages}
+            />
+          </div>
         )}
 
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
-          <div className="flex justify-between items-center mb-4 md:mb-6">
-            <div
-              className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors duration-150 ease-in-out"
-              onClick={() =>
-                setIsQuestionBanksExpanded(!isQuestionBanksExpanded)
-              }
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  setIsQuestionBanksExpanded(!isQuestionBanksExpanded);
+        {/* Question Banks Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+            <div className="flex justify-between items-center">
+              <div
+                className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
+                onClick={() =>
+                  setIsQuestionBanksExpanded(!isQuestionBanksExpanded)
                 }
-              }}
-              aria-expanded={isQuestionBanksExpanded}
-              aria-controls="question-banks-content"
-            >
-              <h2 className="text-2xl font-semibold text-gray-800 mr-3">
-                Question Banks
-              </h2>
-              {isQuestionBanksExpanded ? (
-                <ChevronUpIcon className="h-6 w-6 text-gray-700" />
-              ) : (
-                <ChevronDownIcon className="h-6 w-6 text-gray-700" />
-              )}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    setIsQuestionBanksExpanded(!isQuestionBanksExpanded);
+                  }
+                }}
+                aria-expanded={isQuestionBanksExpanded}
+                aria-controls="question-banks-content"
+              >
+                <BookOpenIcon className="h-6 w-6 text-slate-700 mr-3" />
+                <h2 className="text-xl font-semibold text-slate-900 mr-3">
+                  Question Banks
+                </h2>
+                {isQuestionBanksExpanded ? (
+                  <ChevronUpIcon className="h-5 w-5 text-slate-600" />
+                ) : (
+                  <ChevronDownIcon className="h-5 w-5 text-slate-600" />
+                )}
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateBankModalOpen(true)}
+                disabled={!restaurantId}
+                className="flex items-center space-x-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Create Question Bank</span>
+              </Button>
             </div>
-            <Button
-              variant="primary"
-              onClick={() => setIsCreateBankModalOpen(true)}
-              disabled={!restaurantId /* || !!isNavigatingToBankEdit */}
-            >
-              Create New Question Bank
-            </Button>
           </div>
+
           {isQuestionBanksExpanded && (
-            <div id="question-banks-content">
+            <div id="question-banks-content" className="p-6">
               {/* Filter UI for Question Banks */}
-              <div className="mb-4 flex justify-start items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-slate-700">
                   Filter by source:
                 </span>
-                {(
-                  [
-                    "ALL",
-                    "SOP",
-                    "MENU",
-                    "MANUAL",
-                  ] as QuestionBankSourceFilterType[]
-                ).map((type) => (
-                  <Button
-                    key={type}
-                    variant={
-                      questionBankSourceFilter === type
-                        ? "primary"
-                        : "secondary"
-                    }
-                    onClick={() => handleQuestionBankFilterChange(type)}
-                    className="px-2.5 py-1.5 text-xs"
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
-                  </Button>
-                ))}
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "ALL",
+                      "SOP",
+                      "MENU",
+                      "MANUAL",
+                    ] as QuestionBankSourceFilterType[]
+                  ).map((type) => (
+                    <Button
+                      key={type}
+                      variant={
+                        questionBankSourceFilter === type
+                          ? "primary"
+                          : "secondary"
+                      }
+                      onClick={() => handleQuestionBankFilterChange(type)}
+                      className="px-3 py-1.5 text-sm"
+                    >
+                      {type.charAt(0).toUpperCase() +
+                        type.slice(1).toLowerCase()}
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <Card
+
+              <div
                 className={`transition-opacity duration-300 ease-in-out ${
                   isQuestionBankListVisible ? "opacity-100" : "opacity-0"
                 }`}
               >
                 {renderQuestionBankList()}
-              </Card>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
-          <div className="flex justify-between items-center mb-4 md:mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Quizzes</h2>
-            <Button
-              variant="primary"
-              onClick={() => setIsGenerateQuizModalOpen(true)}
-            >
-              Create Quiz from Banks
-            </Button>
+        {/* Quizzes Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center">
+                <AcademicCapIcon className="h-6 w-6 text-slate-700 mr-3" />
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Quizzes
+                </h2>
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setIsGenerateQuizModalOpen(true)}
+                className="flex items-center space-x-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Create Quiz</span>
+              </Button>
+            </div>
           </div>
-          {isLoadingQuizzes && quizzes.length === 0 && <LoadingSpinner />}
-          {!isLoadingQuizzes && quizzes.length === 0 && !error && (
-            <Card className="p-4 text-center text-gray-500">
-              No quizzes found. Create one from your question banks!
-            </Card>
-          )}
-          {!isLoadingQuizzes && quizzes.length > 0 && (
-            <QuizList
-              quizzes={quizzes}
-              isLoading={false}
-              onPreview={_handleOpenEditQuizModal}
-              onActivate={handleActivateQuiz}
-              onDeactivate={handleDeactivateQuiz}
-              onDelete={(quiz) => setQuizToDelete(quiz)}
-              onViewProgress={handleViewQuizProgress}
-              isDeletingQuizId={isDeletingQuizId}
-            />
-          )}
-          {isLoadingQuizzes && quizzes.length > 0 && (
-            <div className="my-4">
-              <LoadingSpinner />
-            </div>
-          )}
+
+          <div className="p-6">
+            {isLoadingQuizzes && quizzes.length === 0 && (
+              <div className="text-center py-12">
+                <LoadingSpinner />
+              </div>
+            )}
+            {!isLoadingQuizzes && quizzes.length === 0 && !error && (
+              <div className="text-center py-12">
+                <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No quizzes found
+                </h3>
+                <p className="text-slate-500">
+                  Create your first quiz from your question banks!
+                </p>
+              </div>
+            )}
+            {!isLoadingQuizzes && quizzes.length > 0 && (
+              <QuizList
+                quizzes={quizzes}
+                isLoading={false}
+                onPreview={_handleOpenEditQuizModal}
+                onActivate={handleActivateQuiz}
+                onDeactivate={handleDeactivateQuiz}
+                onDelete={(quiz) => setQuizToDelete(quiz)}
+                onViewProgress={handleViewQuizProgress}
+                isDeletingQuizId={isDeletingQuizId}
+              />
+            )}
+            {isLoadingQuizzes && quizzes.length > 0 && (
+              <div className="my-4">
+                <LoadingSpinner />
+              </div>
+            )}
+          </div>
         </div>
+      </div>
 
-        {isCreateBankModalOpen && restaurantId && (
-          <Modal
-            isOpen={isCreateBankModalOpen}
-            onClose={() => setIsCreateBankModalOpen(false)}
-            title="Create New Question Bank"
-          >
-            <CreateQuestionBankForm
-              onBankCreated={handleCreateBankSuccess}
-              onCancel={() => setIsCreateBankModalOpen(false)}
-            />
-          </Modal>
-        )}
-
-        {bankToDelete && (
-          <Modal
-            isOpen={!!bankToDelete}
-            onClose={() => setBankToDelete(null)}
-            title="Delete Question Bank"
-          >
-            <ConfirmationModalContent
-              message={`Are you sure you want to delete the question bank "${bankToDelete.name}"? This will also remove it from any quizzes it's part of, and delete all questions exclusively belonging to this bank if not used elsewhere.`}
-              onConfirm={handleDeleteBank}
-              onCancel={() => setBankToDelete(null)}
-              confirmText="Delete"
-              confirmButtonVariant="destructive"
-            />
-          </Modal>
-        )}
-
-        {isGenerateQuizModalOpen && (
-          <GenerateQuizFromBanksModal
-            isOpen={isGenerateQuizModalOpen}
-            onClose={() => setIsGenerateQuizModalOpen(false)}
-            onQuizGenerated={handleQuizGenerated}
+      {isCreateBankModalOpen && restaurantId && (
+        <Modal
+          isOpen={isCreateBankModalOpen}
+          onClose={() => setIsCreateBankModalOpen(false)}
+          title="Create New Question Bank"
+        >
+          <CreateQuestionBankForm
+            onBankCreated={handleCreateBankSuccess}
+            onCancel={() => setIsCreateBankModalOpen(false)}
           />
-        )}
+        </Modal>
+      )}
 
-        {quizToDelete && (
-          <Modal
-            isOpen={!!quizToDelete}
-            onClose={() => setQuizToDelete(null)}
-            title="Delete Quiz"
-          >
-            <ConfirmationModalContent
-              message={`Are you sure you want to delete the quiz "${quizToDelete.title}"? All associated staff results will also be deleted.`}
-              onConfirm={handleDeleteQuiz}
-              onCancel={() => setQuizToDelete(null)}
-              confirmText="Delete"
-              confirmButtonVariant="destructive"
-            />
-          </Modal>
-        )}
-
-        {isStaffProgressModalOpen && selectedQuizForProgress && (
-          <StaffQuizProgressModal
-            isOpen={isStaffProgressModalOpen}
-            onClose={() => {
-              setIsStaffProgressModalOpen(false);
-              setSelectedQuizForProgress(null);
-              setStaffProgressData(null);
-              setStaffProgressError(null);
-            }}
-            quizTitle={selectedQuizForProgress.title}
-            quizTargetRoles={selectedQuizForProgress.targetRoles}
-            progressData={staffProgressData}
-            isLoading={isLoadingStaffProgress}
-            error={staffProgressError}
+      {bankToDelete && (
+        <Modal
+          isOpen={!!bankToDelete}
+          onClose={() => setBankToDelete(null)}
+          title="Delete Question Bank"
+        >
+          <ConfirmationModalContent
+            message={`Are you sure you want to delete the question bank "${bankToDelete.name}"? This will also remove it from any quizzes it's part of, and delete all questions exclusively belonging to this bank if not used elsewhere.`}
+            onConfirm={handleDeleteBank}
+            onCancel={() => setBankToDelete(null)}
+            confirmText="Delete"
+            confirmButtonVariant="destructive"
           />
-        )}
+        </Modal>
+      )}
 
-        {isEditQuizModalOpen && quizToEdit && (
-          <EditQuizModal
-            isOpen={isEditQuizModalOpen}
-            onClose={() => {
-              setIsEditQuizModalOpen(false);
-              setQuizToEdit(null);
-            }}
-            initialQuizData={quizToEdit}
-            onQuizUpdated={handleQuizUpdated}
+      {isGenerateQuizModalOpen && (
+        <GenerateQuizFromBanksModal
+          isOpen={isGenerateQuizModalOpen}
+          onClose={() => setIsGenerateQuizModalOpen(false)}
+          onQuizGenerated={handleQuizGenerated}
+        />
+      )}
+
+      {quizToDelete && (
+        <Modal
+          isOpen={!!quizToDelete}
+          onClose={() => setQuizToDelete(null)}
+          title="Delete Quiz"
+        >
+          <ConfirmationModalContent
+            message={`Are you sure you want to delete the quiz "${quizToDelete.title}"? All associated staff results will also be deleted.`}
+            onConfirm={handleDeleteQuiz}
+            onCancel={() => setQuizToDelete(null)}
+            confirmText="Delete"
+            confirmButtonVariant="destructive"
           />
-        )}
+        </Modal>
+      )}
 
-        {isConfirmDeactivateModalOpen && quizToDeactivateTarget && (
-          <Modal
-            isOpen={isConfirmDeactivateModalOpen}
-            onClose={() => {
+      {isStaffProgressModalOpen && selectedQuizForProgress && (
+        <StaffQuizProgressModal
+          isOpen={isStaffProgressModalOpen}
+          onClose={() => {
+            setIsStaffProgressModalOpen(false);
+            setSelectedQuizForProgress(null);
+            setStaffProgressData(null);
+            setStaffProgressError(null);
+          }}
+          quizTitle={selectedQuizForProgress.title}
+          quizTargetRoles={selectedQuizForProgress.targetRoles}
+          progressData={staffProgressData}
+          isLoading={isLoadingStaffProgress}
+          error={staffProgressError}
+        />
+      )}
+
+      {isEditQuizModalOpen && quizToEdit && (
+        <EditQuizModal
+          isOpen={isEditQuizModalOpen}
+          onClose={() => {
+            setIsEditQuizModalOpen(false);
+            setQuizToEdit(null);
+          }}
+          initialQuizData={quizToEdit}
+          onQuizUpdated={handleQuizUpdated}
+        />
+      )}
+
+      {isConfirmDeactivateModalOpen && quizToDeactivateTarget && (
+        <Modal
+          isOpen={isConfirmDeactivateModalOpen}
+          onClose={() => {
+            setIsConfirmDeactivateModalOpen(false);
+            setQuizToDeactivateTarget(null);
+          }}
+          title={`Deactivate Quiz: ${quizToDeactivateTarget.title}`}
+        >
+          <ConfirmationModalContent
+            message={`Are you sure you want to deactivate the quiz "${quizToDeactivateTarget.title}"? Staff will no longer be able to take new attempts.`}
+            onConfirm={confirmDeactivateQuiz}
+            onCancel={() => {
               setIsConfirmDeactivateModalOpen(false);
               setQuizToDeactivateTarget(null);
             }}
-            title={`Deactivate Quiz: ${quizToDeactivateTarget.title}`}
-          >
-            <ConfirmationModalContent
-              message={`Are you sure you want to deactivate the quiz "${quizToDeactivateTarget.title}"? Staff will no longer be able to take new attempts.`}
-              onConfirm={confirmDeactivateQuiz}
-              onCancel={() => {
-                setIsConfirmDeactivateModalOpen(false);
-                setQuizToDeactivateTarget(null);
-              }}
-              confirmText="Deactivate"
-              confirmButtonVariant="destructive"
-            />
-          </Modal>
-        )}
-      </main>
-    </div>
+            confirmText="Deactivate"
+            confirmButtonVariant="destructive"
+          />
+        </Modal>
+      )}
+    </DashboardLayout>
   );
 };
 

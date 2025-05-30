@@ -11,7 +11,7 @@ import {
   inviteStaff,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -24,6 +24,15 @@ import {
 } from "../types/staffTypes";
 import { IRole } from "../types/roleTypes";
 import RoleFormModal from "../components/common/RoleFormModal";
+import {
+  UsersIcon,
+  UserPlusIcon,
+  CogIcon,
+  PlusIcon,
+  EyeIcon,
+  TrashIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
 
 // Helper function to format percentages
 const formatPercentage = (value: number | null) =>
@@ -344,79 +353,102 @@ const StaffManagement: React.FC = () => {
 
   if ((loading || rolesLoading) && !error && !rolesError) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        <Navbar />
-        <main className="flex-grow flex items-center justify-center">
+      <DashboardLayout title="Staff & Role Management">
+        <div className="flex items-center justify-center py-12">
           <LoadingSpinner message="Loading staff and roles..." />
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-            Staff & Role Management
-          </h1>
+    <DashboardLayout title="Staff & Role Management">
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+              <UsersIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                Staff & Role Management
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Manage your team members, roles, and permissions
+              </p>
+            </div>
+          </div>
         </div>
 
+        {/* Messages */}
         {message && (
-          <div
-            className="mb-6 p-4 text-sm text-green-700 bg-green-100 rounded-lg"
-            role="alert"
-          >
-            {message}
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-1 bg-green-100 rounded-full mr-3">
+                <svg
+                  className="w-5 h-5 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <span className="text-green-700">{message}</span>
+            </div>
             <button
               type="button"
-              className="ml-auto -mx-1.5 -my-1.5 bg-green-100 text-green-500 rounded-lg focus:ring-2 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex h-8 w-8"
+              className="text-green-500 hover:text-green-700 transition-colors"
               onClick={() => setMessage(null)}
               aria-label="Dismiss"
             >
-              <span className="sr-only">Dismiss</span>
-              <svg
-                className="w-5 h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
-              >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
                   clipRule="evenodd"
-                ></path>
+                />
               </svg>
             </button>
           </div>
         )}
+
         {error && (
-          <ErrorMessage message={error} onDismiss={() => setError(null)} />
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+          </div>
         )}
+
         {rolesError && (
-          <ErrorMessage
-            message={rolesError}
-            onDismiss={() => setRolesError(null)}
-          />
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <ErrorMessage
+              message={rolesError}
+              onDismiss={() => setRolesError(null)}
+            />
+          </div>
         )}
 
         {/* Role Filter Section */}
         {!rolesLoading && (
-          <div className="mb-8 p-4 bg-white shadow rounded-lg">
-            <h3 className="text-lg font-medium text-gray-700 mb-3">
-              Filter by Role:
-            </h3>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <CogIcon className="h-5 w-5 text-slate-600" />
+              <h3 className="text-lg font-medium text-slate-900">
+                Filter by Role
+              </h3>
+            </div>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setSelectedRoleId(null)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors
-                  ${
-                    selectedRoleId === null
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }
-                `}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  selectedRoleId === null
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
               >
                 All Roles ({staffList.length})
               </button>
@@ -424,13 +456,11 @@ const StaffManagement: React.FC = () => {
                 <button
                   key={role._id}
                   onClick={() => setSelectedRoleId(role._id)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors
-                    ${
-                      selectedRoleId === role._id
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }
-                  `}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    selectedRoleId === role._id
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
                   {role.name} ({roleCounts[role._id] || 0})
                 </button>
@@ -680,8 +710,8 @@ const StaffManagement: React.FC = () => {
             isLoading={roleSubmitLoading}
           />
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 
