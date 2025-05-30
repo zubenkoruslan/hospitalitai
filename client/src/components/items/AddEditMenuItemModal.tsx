@@ -19,13 +19,31 @@ const baseInitialFormData = {
   description: "",
   price: "",
   ingredients: "",
-  itemType: "" as "" | "food" | "beverage", // Ensure type matches MenuItemFormData
+  itemType: "" as "" | "food" | "beverage" | "wine", // Include wine type
   category: "",
   isGlutenFree: false,
   isDairyFree: false,
   isVegetarian: false,
   isVegan: false,
+  // Wine-specific fields
+  producer: "",
+  grapeVariety: "",
+  vintage: "",
+  region: "",
+  servingOptions: "",
+  suggestedPairingsText: "",
 };
+
+// Wine categories for fallback
+const WINE_CATEGORIES = [
+  "Red Wine",
+  "White Wine",
+  "Rosé Wine",
+  "Sparkling Wine",
+  "Dessert Wine",
+  "Fortified Wine",
+  "Other",
+] as const;
 
 interface AddEditMenuItemModalProps {
   isOpen: boolean;
@@ -37,6 +55,7 @@ interface AddEditMenuItemModalProps {
   isSubmitting: boolean;
   allItemsInMenu?: MenuItem[]; // Existing prop for all items
   availableCategories?: string[]; // New prop for unique categories from the menu
+  itemType: "food" | "beverage" | "wine"; // Add itemType as required prop
 }
 
 const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
@@ -49,11 +68,13 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   isSubmitting,
   allItemsInMenu: _allItemsInMenu,
   availableCategories, // Destructure the new prop
+  itemType, // Destructure the new prop
 }) => {
   // Initialize formData with menuId from props
   const [formData, setFormData] = useState<MenuItemFormData>(() => ({
     ...baseInitialFormData,
     menuId: menuId, // Corrected: Use menuId from props
+    itemType: itemType, // Set itemType from prop
   }));
   const [formError, setFormError] = useState<string | null>(null);
   // State to manage if user is typing a new category
@@ -62,6 +83,16 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   const [isNewCategoryInputModalOpen, setIsNewCategoryInputModalOpen] =
     useState(false);
   const [tempCategories, setTempCategories] = useState<string[]>([]); // To hold newly added categories not yet in parent
+
+  // State for wine serving options
+  const [servingOptionsArray, setServingOptionsArray] = useState<
+    Array<{ size: string; price: string }>
+  >([]);
+
+  // State for expandable sections in wine modal
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isServingOptionsExpanded, setIsServingOptionsExpanded] =
+    useState(false);
 
   const isEditMode = currentItem !== null;
 
@@ -104,11 +135,13 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
     // Fallback to standard categories if itemType is selected and no suggestions yet
     // This ensures there are some options if availableCategories is empty and itemType is selected.
-    if (suggestions.size === 0 && formData.itemType) {
+    if (suggestions.size === 0 && itemType) {
       const standardCategoriesFallback =
-        formData.itemType === "food"
+        itemType === "food"
           ? FOOD_CATEGORIES.map((cat) => toTitleCase(cat))
-          : BEVERAGE_CATEGORIES.map((cat) => toTitleCase(cat)); // Normalize
+          : itemType === "beverage"
+          ? BEVERAGE_CATEGORIES.map((cat) => toTitleCase(cat))
+          : WINE_CATEGORIES.map((cat) => toTitleCase(cat)); // Wine categories fallback
       standardCategoriesFallback.forEach((cat) => suggestions.add(cat));
     }
 
@@ -119,7 +152,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     // });
 
     return Array.from(suggestions).sort();
-  }, [formData.itemType, availableCategories, currentItem, isEditMode]);
+  }, [itemType, availableCategories, currentItem, isEditMode]);
 
   useEffect(() => {
     // console.log("[Modal useEffect] Running. isEditMode:", isEditMode, "currentItem:", !!currentItem, "isOpen:", isOpen);
@@ -131,18 +164,50 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         try {
           const categoryToSet = toTitleCase(currentItem.category || "");
           setFormData({
+            ...baseInitialFormData,
+            menuId: menuId,
             name: currentItem.name,
             description: currentItem.description || "",
-            price: currentItem.price != null ? String(currentItem.price) : "",
-            ingredients: (currentItem.ingredients || []).join(", "),
-            itemType: currentItem.itemType,
-            category: categoryToSet, // Use normalized category from currentItem
-            menuId: currentItem.menuId,
+            price: currentItem.price?.toString() || "",
+            ingredients: currentItem.ingredients?.join(", ") || "",
+            itemType: itemType, // Use itemType from prop instead of currentItem
+            category: categoryToSet,
             isGlutenFree: currentItem.isGlutenFree ?? false,
             isDairyFree: currentItem.isDairyFree ?? false,
             isVegetarian: currentItem.isVegetarian ?? false,
             isVegan: currentItem.isVegan ?? false,
+            producer: currentItem.producer || "",
+            grapeVariety: currentItem.grapeVariety?.join(", ") || "",
+            vintage: currentItem.vintage?.toString() || "",
+            region: currentItem.region || "",
+            servingOptions: currentItem.servingOptions
+              ? JSON.stringify(currentItem.servingOptions)
+              : "",
+            suggestedPairingsText:
+              currentItem.suggestedPairingsText?.join(", ") || "",
           });
+
+          // Initialize serving options array for wine items
+          if (itemType === "wine" && currentItem.servingOptions) {
+            setServingOptionsArray(
+              currentItem.servingOptions.map((option) => ({
+                size: option.size,
+                price: option.price.toString(),
+              }))
+            );
+          } else {
+            setServingOptionsArray([]);
+          }
+
+          // Auto-expand sections with content for wine items
+          if (itemType === "wine") {
+            setIsDescriptionExpanded(!!currentItem.description);
+            setIsServingOptionsExpanded(!!currentItem.servingOptions?.length);
+          } else {
+            setIsDescriptionExpanded(false);
+            setIsServingOptionsExpanded(false);
+          }
+
           setFormError(null);
 
           // If the current item's category (after title-casing) isn't in the availableCategories prop (also title-cased for comparison),
@@ -171,7 +236,11 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         setFormData({
           ...baseInitialFormData,
           menuId: menuId,
+          itemType: itemType, // Use itemType from prop
         });
+        setServingOptionsArray([]);
+        setIsDescriptionExpanded(false);
+        setIsServingOptionsExpanded(false);
         setFormError(null);
       }
     }
@@ -180,6 +249,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     isEditMode,
     isOpen,
     menuId,
+    itemType, // Add itemType to dependencies
     availableCategories, // Primary dependencies for form initialization and category setup
   ]);
 
@@ -252,6 +322,27 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     setNewCategoryName(""); // Clear for next time
   };
 
+  // Serving options handlers for wine items
+  const addServingOption = () => {
+    setServingOptionsArray((prev) => [...prev, { size: "", price: "" }]);
+  };
+
+  const removeServingOption = (index: number) => {
+    setServingOptionsArray((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateServingOption = (
+    index: number,
+    field: "size" | "price",
+    value: string
+  ) => {
+    setServingOptionsArray((prev) =>
+      prev.map((option, i) =>
+        i === index ? { ...option, [field]: value } : option
+      )
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -262,10 +353,6 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
     if (!formData.name.trim()) {
       setFormError("Item name is required.");
-      return;
-    }
-    if (!formData.itemType) {
-      setFormError("Item type is required.");
       return;
     }
     // Use finalCategory for validation
@@ -281,10 +368,62 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
       return;
     }
 
+    // Wine-specific validation
+    if (itemType === "wine") {
+      if (
+        formData.vintage &&
+        (isNaN(parseInt(formData.vintage)) ||
+          parseInt(formData.vintage) < 1800 ||
+          parseInt(formData.vintage) > 2030)
+      ) {
+        setFormError("Vintage must be a valid year between 1800 and 2030.");
+        return;
+      }
+
+      // Validate serving options for wine items
+      for (let i = 0; i < servingOptionsArray.length; i++) {
+        const option = servingOptionsArray[i];
+        if (option.size && !option.price) {
+          setFormError(
+            `Serving option ${i + 1}: Price is required when size is specified.`
+          );
+          return;
+        }
+        if (option.price && !option.size) {
+          setFormError(
+            `Serving option ${i + 1}: Size is required when price is specified.`
+          );
+          return;
+        }
+        if (
+          option.price &&
+          (isNaN(parseFloat(option.price)) || parseFloat(option.price) < 0)
+        ) {
+          setFormError(
+            `Serving option ${
+              i + 1
+            }: Price must be a valid non-negative number.`
+          );
+          return;
+        }
+      }
+    }
+
     const dataToSubmit: MenuItemFormData = {
       ...formData,
       category: finalCategory, // Ensure the correct category is submitted
     };
+
+    // For wine items, convert serving options array to proper format
+    if (itemType === "wine") {
+      const validServingOptions = servingOptionsArray
+        .filter((option) => option.size.trim() && option.price.trim())
+        .map((option) => ({
+          size: option.size.trim(),
+          price: parseFloat(option.price),
+        }));
+      dataToSubmit.servingOptions = JSON.stringify(validServingOptions);
+    }
 
     // console.log("[Modal] Validation passed. Calling onSubmit with:", dataToSubmit);
     onSubmit(dataToSubmit, currentItem?._id || null);
@@ -352,61 +491,152 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Item Type */}
-          <div>
-            <label
-              htmlFor="itemType"
-              className="block text-sm font-medium text-slate-700 mb-1"
-            >
-              Item Type <span className="text-red-500">*</span>
-            </label>
+        {/* Wine-specific fields in new order */}
+        {itemType === "wine" && (
+          <>
+            {/* Grape Variety */}
+            <div>
+              <label
+                htmlFor="grapeVariety"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Grape Variety{" "}
+                <span className="text-sm text-slate-500">
+                  (comma-separated, optional)
+                </span>
+              </label>
+              <input
+                type="text"
+                id="grapeVariety"
+                name="grapeVariety"
+                value={formData.grapeVariety}
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                placeholder="e.g., Chardonnay, Pinot Noir"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Vintage */}
+              <div>
+                <label
+                  htmlFor="vintage"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  Vintage{" "}
+                  <span className="text-sm text-slate-500">(optional)</span>
+                </label>
+                <input
+                  type="number"
+                  id="vintage"
+                  name="vintage"
+                  value={formData.vintage}
+                  onChange={handleInputChange}
+                  className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="e.g., 2020"
+                  min="1800"
+                  max="2030"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Producer */}
+              <div>
+                <label
+                  htmlFor="producer"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  Producer{" "}
+                  <span className="text-sm text-slate-500">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  id="producer"
+                  name="producer"
+                  value={formData.producer}
+                  onChange={handleInputChange}
+                  className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                  placeholder="e.g., Château Margaux"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Region */}
+            <div>
+              <label
+                htmlFor="region"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Region{" "}
+                <span className="text-sm text-slate-500">(optional)</span>
+              </label>
+              <input
+                type="text"
+                id="region"
+                name="region"
+                value={formData.region}
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                placeholder="e.g., Bordeaux, France"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Suggested Food Pairings */}
+            <div>
+              <label
+                htmlFor="suggestedPairingsText"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Suggested Food Pairings{" "}
+                <span className="text-sm text-slate-500">
+                  (comma-separated, optional)
+                </span>
+              </label>
+              <input
+                type="text"
+                id="suggestedPairingsText"
+                name="suggestedPairingsText"
+                value={formData.suggestedPairingsText}
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                placeholder="e.g., Grilled salmon, Roasted chicken"
+                disabled={isSubmitting}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Category - Show for all item types but positioned after wine fields for wine items */}
+        <div>
+          <label
+            htmlFor="itemCategory"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
+            Category <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-2">
             <select
-              id="itemType"
-              name="itemType"
-              value={formData.itemType}
+              id="itemCategory"
+              name="category"
+              value={
+                isAddingNewCategory ? "_add_new_category_" : formData.category
+              }
               onChange={handleInputChange}
               className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-              disabled={isSubmitting}
-              required
+              disabled={isSubmitting || (!isAddingNewCategory && !itemType)}
+              required={!isAddingNewCategory}
             >
-              <option value="">Select Type...</option>
-              <option value="food">Food</option>
-              <option value="beverage">Beverage</option>
+              <option value="">Select or Add Category...</option>
+              {combinedCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+              <option value="_add_new_category_">Add New Category...</option>
             </select>
-          </div>
-
-          {/* Category */}
-          <div>
-            <label
-              htmlFor="itemCategory"
-              className="block text-sm font-medium text-slate-700 mb-1"
-            >
-              Category <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              <select
-                id="itemCategory"
-                name="category"
-                value={
-                  isAddingNewCategory ? "_add_new_category_" : formData.category
-                }
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                disabled={
-                  isSubmitting || (!isAddingNewCategory && !formData.itemType)
-                }
-                required={!isAddingNewCategory}
-              >
-                <option value="">Select or Add Category...</option>
-                {combinedCategories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-                <option value="_add_new_category_">Add New Category...</option>
-              </select>
-            </div>
           </div>
         </div>
 
@@ -422,133 +652,342 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               <input
                 type="text"
                 id="newCategoryName"
-                name="newCategoryName" // Ensure this name is handled in handleInputChange
+                name="newCategoryName"
                 value={newCategoryName}
-                onChange={handleInputChange} // Use generic handleInputChange
+                onChange={handleInputChange}
                 className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
                 placeholder="Enter new category name"
                 disabled={isSubmitting}
                 required
               />
-              {/* The button to confirm/save the new category name from the simple modal can be removed if direct input is preferred. 
-                    Or, keep if a sub-modal for confirmation is used. For simplicity, direct input is assumed for now.
-                    If a sub-modal was used, its open state was setIsNewCategoryInputModalOpen, and save was handleSaveNewCategory.
-                    Let's remove the explicit button for now and assume typing in the field is sufficient.
-                  */}
             </div>
           </div>
         )}
 
-        {/* Price */}
+        {/* Description - Expandable section */}
         <div>
-          <label
-            htmlFor="price"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
-            Price <span className="text-sm text-slate-500">(optional)</span>
-          </label>
-          <input
-            type="number"
-            id="price"
-            name="price"
-            value={formData.price}
-            onChange={handleInputChange}
-            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
-            placeholder="e.g., 12.99"
-            step="0.01"
-            min="0"
-            disabled={isSubmitting}
-          />
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-slate-700">
+              Description{" "}
+              <span className="text-sm text-slate-500">(optional)</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+              className="text-sky-600 hover:text-sky-700 text-sm font-medium flex items-center gap-1"
+            >
+              {isDescriptionExpanded ? (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 15l7-7 7 7"
+                    />
+                  </svg>
+                  Collapse
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                  Expand
+                </>
+              )}
+            </button>
+          </div>
+
+          {isDescriptionExpanded && (
+            <div className="mt-2">
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows={3}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Description */}
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
-            Description{" "}
-            <span className="text-sm text-slate-500">(optional)</span>
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            rows={3}
-            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        {/* Ingredients */}
-        <div>
-          <label
-            htmlFor="ingredients"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
-            Ingredients{" "}
-            <span className="text-sm text-slate-500">
-              (comma-separated, optional)
-            </span>
-          </label>
-          <input
-            type="text"
-            id="ingredients"
-            name="ingredients"
-            value={formData.ingredients}
-            onChange={handleInputChange}
-            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-            placeholder="e.g., Flour, Tomato, Cheese"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        {/* Dietary Flags */}
-        <div className="space-y-3 pt-2">
-          <h4 className="text-sm font-medium text-slate-700 mb-2">
-            Dietary Information{" "}
-            <span className="text-xs text-slate-500">(optional)</span>
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
-            {[
-              { name: "isGlutenFree", label: "Gluten-Free" },
-              { name: "isDairyFree", label: "Dairy-Free" },
-              { name: "isVegetarian", label: "Vegetarian" },
-              { name: "isVegan", label: "Vegan" },
-            ].map((flag) => (
-              <label
-                key={flag.name}
-                className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors"
+        {/* Wine Serving Options - Expandable section */}
+        {itemType === "wine" && (
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">
+                Serving Options{" "}
+                <span className="text-sm text-slate-500">(optional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setIsServingOptionsExpanded(!isServingOptionsExpanded)
+                }
+                className="text-sky-600 hover:text-sky-700 text-sm font-medium flex items-center gap-1"
               >
-                <input
-                  type="checkbox"
-                  id={flag.name}
-                  name={flag.name}
-                  checked={
-                    formData[flag.name as keyof MenuItemFormData] as boolean
-                  }
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
-                  disabled={
-                    isSubmitting ||
-                    (flag.name === "isVegetarian" && formData.isVegan)
-                  }
-                />
-                <span
-                  className={`text-sm ${
-                    isSubmitting ||
-                    (flag.name === "isVegetarian" && formData.isVegan)
-                      ? "text-slate-400"
-                      : "text-slate-700"
-                  }`}
+                {isServingOptionsExpanded ? (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 15l7-7 7 7"
+                      />
+                    </svg>
+                    Collapse
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                    Expand
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isServingOptionsExpanded && (
+              <div className="mt-3 space-y-4">
+                {servingOptionsArray.length > 0 && (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">
+                            Size
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">
+                            Price
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-slate-700">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {servingOptionsArray.map((option, index) => (
+                          <tr key={index} className="bg-white">
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={option.size}
+                                onChange={(e) =>
+                                  updateServingOption(
+                                    index,
+                                    "size",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                placeholder="e.g., Glass, Bottle, Half Bottle"
+                                disabled={isSubmitting}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={option.price}
+                                onChange={(e) =>
+                                  updateServingOption(
+                                    index,
+                                    "price",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="0.00"
+                                step="0.01"
+                                min="0"
+                                disabled={isSubmitting}
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => removeServingOption(index)}
+                                disabled={isSubmitting}
+                                className="text-xs px-2 py-1"
+                              >
+                                Remove
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={addServingOption}
+                  disabled={isSubmitting}
+                  className="text-sm"
                 >
-                  {flag.label}
+                  Add Serving Option
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Non-wine fields */}
+        {itemType !== "wine" && (
+          <>
+            {/* Ingredients / Grape Variety */}
+            <div>
+              <label
+                htmlFor="ingredients"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Ingredients{" "}
+                <span className="text-sm text-slate-500">
+                  (comma-separated, optional)
                 </span>
               </label>
-            ))}
+              <input
+                type="text"
+                id="ingredients"
+                name="ingredients"
+                value={formData.ingredients}
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                placeholder="e.g., Flour, Tomato, Cheese"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Description for non-wine items (always visible) */}
+            <div>
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Description{" "}
+                <span className="text-sm text-slate-500">(optional)</span>
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows={3}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                disabled={isSubmitting}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Price - Hidden for wine items */}
+        {itemType !== "wine" && (
+          <div>
+            <label
+              htmlFor="price"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Price <span className="text-sm text-slate-500">(optional)</span>
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              value={formData.price}
+              onChange={handleInputChange}
+              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="e.g., 12.99"
+              step="0.01"
+              min="0"
+              disabled={isSubmitting}
+            />
           </div>
-        </div>
+        )}
+
+        {/* Dietary Flags - Hidden for wine items */}
+        {itemType !== "wine" && (
+          <div className="space-y-3 pt-2">
+            <h4 className="text-sm font-medium text-slate-700 mb-2">
+              Dietary Information{" "}
+              <span className="text-xs text-slate-500">(optional)</span>
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+              {[
+                { name: "isGlutenFree", label: "Gluten-Free" },
+                { name: "isDairyFree", label: "Dairy-Free" },
+                { name: "isVegetarian", label: "Vegetarian" },
+                { name: "isVegan", label: "Vegan" },
+              ].map((flag) => (
+                <label
+                  key={flag.name}
+                  className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    id={flag.name}
+                    name={flag.name}
+                    checked={
+                      formData[flag.name as keyof MenuItemFormData] as boolean
+                    }
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
+                    disabled={
+                      isSubmitting ||
+                      (flag.name === "isVegetarian" && formData.isVegan)
+                    }
+                  />
+                  <span
+                    className={`text-sm ${
+                      isSubmitting ||
+                      (flag.name === "isVegetarian" && formData.isVegan)
+                        ? "text-slate-400"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {flag.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </form>
 
       {/* Sub-Modal for Adding New Category */}

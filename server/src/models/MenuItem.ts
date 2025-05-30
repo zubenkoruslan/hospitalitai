@@ -1,7 +1,15 @@
 import mongoose, { Document, Schema, Model, Types } from "mongoose";
 // import { IUser } from "./User"; // Removed unused import
 
-export const ITEM_TYPES = ["food", "beverage"] as const;
+export const ITEM_TYPES = ["food", "beverage", "wine"] as const;
+export const WINE_STYLES = [
+  "still",
+  "sparkling",
+  "champagne",
+  "dessert",
+  "fortified",
+  "other",
+] as const;
 // REMOVE FoodCategory, BeverageCategory types and constants
 // export const FOOD_CATEGORIES = [
 //   "appetizer",
@@ -19,15 +27,29 @@ export const ITEM_TYPES = ["food", "beverage"] as const;
 // ] as const;
 
 export type ItemType = (typeof ITEM_TYPES)[number];
+export type WineStyleType = (typeof WINE_STYLES)[number];
 // export type FoodCategory = (typeof FOOD_CATEGORIES)[number];
 // export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
 // export type ItemCategory = FoodCategory | BeverageCategory; // Will just be string now
+
+// Interface for Wine Serving Option sub-document
+export interface IWineServingOption extends Types.Subdocument {
+  size: string;
+  price: number;
+}
+
+// For plain objects (e.g. after .lean())
+export interface ILeanWineServingOption {
+  _id?: Types.ObjectId;
+  size: string;
+  price: number;
+}
 
 // Interface representing a MenuItem document in MongoDB
 export interface IMenuItem extends Document {
   name: string;
   description?: string;
-  price?: number;
+  price?: number; // For wines, this might be a primary price (e.g., bottle) or omitted if servingOptions are used
   ingredients?: string[];
   itemType: ItemType;
   category: string; // Category will now be a simple string, not validated against a list
@@ -40,9 +62,51 @@ export interface IMenuItem extends Document {
   isDairyFree: boolean;
   isVegetarian: boolean;
   isVegan: boolean;
+
+  // Wine-specific fields
+  wineStyle?: WineStyleType;
+  producer?: string;
+  grapeVariety?: string[];
+  vintage?: number;
+  region?: string;
+  servingOptions?: Types.DocumentArray<IWineServingOption>; // Array of serving options for wines
+  suggestedPairingsText?: string[]; // Names of food items suggested for pairing by AI
+}
+
+// For plain objects (e.g. after .lean())
+export interface ILeanMenuItem {
+  _id?: Types.ObjectId;
+  name: string;
+  description?: string;
+  price?: number;
+  ingredients?: string[];
+  itemType: ItemType;
+  category: string;
+  menuId: Types.ObjectId;
+  restaurantId: Types.ObjectId;
+  isActive?: boolean;
+  isGlutenFree: boolean;
+  isDairyFree: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
+  wineStyle?: WineStyleType;
+  producer?: string;
+  grapeVariety?: string[];
+  vintage?: number;
+  region?: string;
+  servingOptions?: ILeanWineServingOption[];
+  suggestedPairingsText?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  __v?: number;
 }
 
 // Mongoose schema definition
+const WineServingOptionSchema: Schema<IWineServingOption> = new Schema({
+  size: { type: String, required: true, trim: true },
+  price: { type: Number, required: true, min: [0, "Price cannot be negative"] },
+});
+
 const MenuItemSchema: Schema<IMenuItem> = new Schema(
   {
     name: {
@@ -67,7 +131,7 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
     itemType: {
       type: String,
       enum: ITEM_TYPES,
-      required: [true, "Item type (food/beverage) is required"],
+      required: [true, "Item type (food/beverage/wine) is required"],
       index: true,
     },
     category: {
@@ -127,6 +191,41 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       type: Boolean,
       default: true,
       index: true,
+    },
+    // Wine-specific schema fields
+    wineStyle: {
+      type: String,
+      enum: WINE_STYLES,
+      trim: true,
+      index: true, // Index for filtering by wine style
+    },
+    producer: {
+      type: String,
+      trim: true,
+    },
+    grapeVariety: {
+      type: [{ type: String, trim: true }],
+      default: undefined, // Explicitly undefined for arrays if not provided
+    },
+    vintage: {
+      type: Number,
+      min: [1000, "Vintage year seems too old"],
+      max: [
+        new Date().getFullYear() + 5,
+        "Vintage year seems too far in the future",
+      ],
+    },
+    region: {
+      type: String,
+      trim: true,
+    },
+    servingOptions: {
+      type: [WineServingOptionSchema],
+      default: undefined, // Explicitly undefined for arrays if not provided
+    },
+    suggestedPairingsText: {
+      type: [{ type: String, trim: true }],
+      default: undefined, // Explicitly undefined for arrays if not provided
     },
   },
   {

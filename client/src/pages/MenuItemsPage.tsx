@@ -131,11 +131,13 @@ const MenuItemsPage: React.FC = () => {
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   // NEW: State for active tab
-  const [activeTab, setActiveTab] = useState<"food" | "beverage">("food");
+  const [activeTab, setActiveTab] = useState<"food" | "beverage" | "wine">(
+    "food"
+  );
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
-  // New: Memoize unique food and beverage categories separately
+  // New: Memoize unique food, beverage, and wine categories separately
   const uniqueFoodCategories = useMemo(() => {
     if (!items) return [];
     return [
@@ -153,6 +155,17 @@ const MenuItemsPage: React.FC = () => {
       ...new Set(
         items
           .filter((item) => item.itemType === "beverage" && item.category)
+          .map((item) => toTitleCase(item.category!))
+      ),
+    ].sort();
+  }, [items]);
+
+  const uniqueWineCategories = useMemo(() => {
+    if (!items) return [];
+    return [
+      ...new Set(
+        items
+          .filter((item) => item.itemType === "wine" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
@@ -319,16 +332,16 @@ const MenuItemsPage: React.FC = () => {
   // Memoize grouped items to avoid recalculation on every render
   const groupedItemsByTypeAndCategory = useMemo(() => {
     if (!items || items.length === 0) {
-      return { food: {}, beverage: {} }; // Ensure structure exists
+      return { food: {}, beverage: {}, wine: {} }; // Ensure structure exists
     }
 
     return items.reduce(
       (acc, item) => {
-        const typeKey = item.itemType; // "food" or "beverage"
+        const typeKey = item.itemType; // "food", "beverage", or "wine"
         const categoryKey = toTitleCase(item.category || "Uncategorized");
 
         if (!acc[typeKey]) {
-          // This case should ideally not happen if types are always food/beverage
+          // This case should ideally not happen if types are always food/beverage/wine
           // but as a fallback, initialize it.
           acc[typeKey] = {};
         }
@@ -338,8 +351,8 @@ const MenuItemsPage: React.FC = () => {
         acc[typeKey][categoryKey].push(item);
         return acc;
       },
-      { food: {}, beverage: {} } as Record<
-        string, // "food" or "beverage"
+      { food: {}, beverage: {}, wine: {} } as Record<
+        string, // "food", "beverage", or "wine"
         Record<string, MenuItem[]> // Categories within that type
       >
     );
@@ -434,6 +447,18 @@ const MenuItemsPage: React.FC = () => {
         >
           Beverage Items
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("wine")}
+          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
+            activeTab === "wine"
+              ? "border-indigo-600 text-indigo-700"
+              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
+          }`}
+          aria-current={activeTab === "wine" ? "page" : undefined}
+        >
+          Wine Items
+        </button>
       </nav>
     </div>
   );
@@ -443,10 +468,16 @@ const MenuItemsPage: React.FC = () => {
     const itemsToDisplay =
       activeTab === "food"
         ? groupedItemsByTypeAndCategory.food
-        : groupedItemsByTypeAndCategory.beverage;
+        : activeTab === "beverage"
+        ? groupedItemsByTypeAndCategory.beverage
+        : groupedItemsByTypeAndCategory.wine;
 
     const uniqueCategoriesForTab =
-      activeTab === "food" ? uniqueFoodCategories : uniqueBeverageCategories;
+      activeTab === "food"
+        ? uniqueFoodCategories
+        : activeTab === "beverage"
+        ? uniqueBeverageCategories
+        : uniqueWineCategories;
 
     const hasItemsInTab =
       itemsToDisplay &&
@@ -708,13 +739,25 @@ const MenuItemsPage: React.FC = () => {
           menuId={menuId ?? ""}
           allItemsInMenu={items}
           restaurantId={restaurantId ?? ""}
+          itemType={
+            currentItem?.itemType ?? // Use existing item's type when editing
+            (activeTab === "beverage"
+              ? "beverage"
+              : activeTab === "wine"
+              ? "wine"
+              : "food") // Default to activeTab for new items
+          }
           availableCategories={
             currentItem?.itemType === "beverage"
               ? uniqueBeverageCategories
               : currentItem?.itemType === "food"
               ? uniqueFoodCategories
+              : currentItem?.itemType === "wine"
+              ? uniqueWineCategories
               : activeTab === "beverage" // Fallback to activeTab for new items
               ? uniqueBeverageCategories
+              : activeTab === "wine"
+              ? uniqueWineCategories
               : uniqueFoodCategories // Default to food categories for new items if food tab active or other cases
           }
         />

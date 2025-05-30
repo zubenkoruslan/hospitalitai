@@ -7,6 +7,12 @@ import {
   // sanitizeParam, // Removed as it's not a standard export and was commented out
 } from "express-validator";
 import mongoose from "mongoose";
+import {
+  MAX_ITEM_NAME_LENGTH,
+  MAX_ITEM_DESCRIPTION_LENGTH,
+  MAX_INGREDIENTS,
+  MAX_INGREDIENT_LENGTH,
+} from "../utils/constants";
 
 // Middleware to handle validation errors
 export const handleValidationErrors = (
@@ -940,10 +946,10 @@ export const validateFinalMenuImportData = [
         }
         if (
           item.fields.name.value.trim().length < 2 ||
-          item.fields.name.value.trim().length > 50
+          item.fields.name.value.trim().length > MAX_ITEM_NAME_LENGTH
         ) {
           throw new Error(
-            `Item name for item at index ${i} (action: '${item.importAction}') must be between 2 and 50 characters.`
+            `Item name for item at index ${i} (action: '${item.importAction}') must be between 2 and ${MAX_ITEM_NAME_LENGTH} characters.`
           );
         }
         if (
@@ -958,10 +964,10 @@ export const validateFinalMenuImportData = [
         if (
           !item.fields.itemType ||
           typeof item.fields.itemType.value !== "string" ||
-          !["food", "beverage"].includes(item.fields.itemType.value)
+          !["food", "beverage", "wine"].includes(item.fields.itemType.value)
         ) {
           throw new Error(
-            `Item at index ${i} (action: '${item.importAction}') must have a valid itemType ('food' or 'beverage').`
+            `Item at index ${i} (action: '${item.importAction}') must have a valid itemType ('food', 'beverage', or 'wine').`
           );
         }
         if (
@@ -989,6 +995,36 @@ export const validateFinalMenuImportData = [
           throw new Error(
             `isGlutenFree for item at index ${i} (action: '${item.importAction}') must be a boolean if provided.`
           );
+        }
+        // Validate wine-specific fields if itemType is 'wine'
+        if (item.fields.itemType.value === "wine") {
+          if (
+            !item.fields.wineStyle ||
+            typeof item.fields.wineStyle.value !== "string" ||
+            ![
+              "still",
+              "sparkling",
+              "champagne",
+              "dessert",
+              "fortified",
+              "other",
+            ].includes(item.fields.wineStyle.value)
+          ) {
+            throw new Error(
+              `Wine style for item at index ${i} (action: '${item.importAction}') must be one of: still, sparkling, champagne, dessert, fortified, other.`
+            );
+          }
+          // Validate wineServingOptions if provided
+          if (
+            item.fields.wineServingOptions &&
+            item.fields.wineServingOptions.value
+          ) {
+            if (!Array.isArray(item.fields.wineServingOptions.value)) {
+              throw new Error(
+                `Wine serving options for item at index ${i} (action: '${item.importAction}') must be an array if provided.`
+              );
+            }
+          }
         }
         // etc. for isVegan, isVegetarian
       }

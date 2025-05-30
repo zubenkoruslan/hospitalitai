@@ -20,7 +20,7 @@ import {
   ImportResult,
 } from "../types/menuUploadTypes"; // Import the new type
 import { Types } from "mongoose";
-import MenuImportJob from "../models/MenuImportJob"; // Import the model
+import MenuImportJob from "../models/MenuImportJobModel"; // Import the correct model
 
 // Using Express Request type and will work with the existing global AuthPayload if possible.
 // This local type definition is a temporary workaround if global augmentation isn't perfectly matched.
@@ -471,33 +471,26 @@ export const getMenuImportJobStatus = async (
       );
     }
 
+    // Access result fields from the result object or provide defaults
+    const result = job.result;
+
     const jobStatusResponse = {
       jobId: job._id,
       status: job.status,
-      message:
-        job.resultSummaryMessage ||
-        (job.processingErrors && job.processingErrors.length > 0
-          ? job.processingErrors.join("; ")
-          : "Job status retrieved."),
-      totalItemsInRequest: job.totalItemsInRequest,
-      itemsProcessed: job.itemsProcessed,
-      itemsCreated: job.itemsCreated,
-      itemsUpdated: job.itemsUpdated,
-      itemsSkipped: job.itemsSkipped,
-      itemsErrored: job.itemsErrored,
+      message: job.errorMessage || result?.message || "Job status retrieved.",
+      overallStatus: result?.overallStatus || job.status,
+      menuId: result?.menuId,
+      menuName: result?.menuName,
+      itemsProcessed: result?.itemsProcessed || 0,
+      itemsCreated: result?.itemsCreated || 0,
+      itemsUpdated: result?.itemsUpdated || 0,
+      itemsSkipped: result?.itemsSkipped || 0,
+      itemsErrored: result?.itemsErrored || 0,
       createdAt: job.createdAt,
-      startedAt: job.startedAt,
+      processedAt: job.processedAt,
       completedAt: job.completedAt,
-      menuId: job.menuId,
-      finalMenuName: job.finalMenuName,
-      errorReportCsv:
-        job.status === "failed" || job.status === "partial_completion"
-          ? job.errorReportCsv
-          : undefined,
-      errorDetails:
-        job.status === "failed" || job.status === "partial_completion"
-          ? job.errorDetails
-          : undefined,
+      errorDetails: result?.errorDetails,
+      errorReport: result?.errorReport,
     };
 
     res.status(200).json(jobStatusResponse);

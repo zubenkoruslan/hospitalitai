@@ -10,6 +10,7 @@ import {
   FunctionDeclarationSchema,
   FunctionDeclarationSchemaProperty,
 } from "@google/generative-ai";
+import { AI_MODEL_NAME } from "../utils/constants";
 
 interface AICategory {
   name: string;
@@ -24,7 +25,7 @@ let geminiModelInstance: GenerativeModel | null = null;
 if (GEMINI_API_KEY) {
   genAIInstance = new GoogleGenerativeAI(GEMINI_API_KEY);
   geminiModelInstance = genAIInstance.getGenerativeModel({
-    model: "gemini-1.5-flash-latest", // Or your preferred model
+    model: AI_MODEL_NAME, // Using constant for consistency
     safetySettings: [
       {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,

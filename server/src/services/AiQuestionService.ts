@@ -21,6 +21,7 @@ import {
 } from "@google/generative-ai";
 import { AppError } from "../utils/errorHandler"; // Added AppError import
 import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
+import { AI_MODEL_NAME } from "../utils/constants";
 
 // Define the schema for the function call for Gemini to generate questions
 const questionGenerationFunctionSchema: FunctionDeclaration = {
@@ -106,7 +107,7 @@ const DELAY_BETWEEN_BATCHES_MS = 20000; // Adjusted for potentially larger categ
 if (GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest",
+    model: AI_MODEL_NAME,
     safetySettings: [
       {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,

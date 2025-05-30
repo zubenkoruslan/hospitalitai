@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api, {
   finalizeMenuImportClient,
@@ -19,6 +19,18 @@ import {
 } from "../types/menuUploadTypes";
 import { IMenuClient } from "../types/menuTypes";
 import { useAuth } from "../context/AuthContext"; // Assuming this is your auth context
+import { normalizeCategory } from "../utils/stringUtils"; // Import the shared utility
+
+// Helper to normalize category names for grouping (e.g., to title case)
+// const normalizeCategory = (category?: string): string => { // Remove local definition
+//   if (!category || category.trim() === "") return "Uncategorized";
+//   return category
+//     .trim()
+//     .toLowerCase()
+//     .split(" ")
+//     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+//     .join(" ");
+// };
 
 // Define a more specific type for items being edited in the table to ensure non-optional fields
 interface EditableItem
@@ -43,6 +55,14 @@ const MenuUploadPage: React.FC = () => {
   const [importJobId, setImportJobId] = useState<string | null>(null);
   const [isLoadingJobStatus, setIsLoadingJobStatus] = useState<boolean>(false);
   const [jobStatusError, setJobStatusError] = useState<string | null>(null);
+
+  // New state for category expansion
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({});
+
+  // New state for all unique categories (user-added + detected)
+  const [allUniqueCategories, setAllUniqueCategories] = useState<string[]>([]);
 
   // New state for menu selection
   const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
@@ -119,6 +139,18 @@ const MenuUploadPage: React.FC = () => {
           ...response.data,
           parsedItems: itemsWithUserAction,
         });
+        // Initialize allUniqueCategories from detectedCategories and item categories
+        // Categories are now pre-normalized from the server to prevent duplicates
+        const initialCategories = new Set(
+          response.data.detectedCategories || []
+        );
+        itemsWithUserAction.forEach((item) => {
+          if (item.fields.category.value) {
+            // Categories are already normalized from server, so just add them directly
+            initialCategories.add(item.fields.category.value as string);
+          }
+        });
+        setAllUniqueCategories(Array.from(initialCategories).sort());
       } catch (err: any) {
         console.error("Error uploading for preview:", err);
         setError(
@@ -136,6 +168,10 @@ const MenuUploadPage: React.FC = () => {
   useEffect(() => {
     if (selectedFile && !uploadPreview && !isLoading && !error) {
       handleUploadPreview(selectedFile);
+    }
+    // Reset expanded categories when a new preview is loaded or cleared
+    if (!uploadPreview) {
+      setExpandedCategories({});
     }
   }, [selectedFile, uploadPreview, isLoading, error, handleUploadPreview]);
 
@@ -159,6 +195,213 @@ const MenuUploadPage: React.FC = () => {
 
     fetchMenus();
   }, [restaurantId, isAuthLoading]);
+
+  const groupedAndSortedItems = useMemo(() => {
+    if (!uploadPreview?.parsedItems) {
+      return { categories: {}, order: [] };
+    }
+    const grouped: Record<string, ParsedMenuItem[]> = {};
+    // Use allUniqueCategories to ensure even empty user-added categories can be listed if desired
+    // However, for grouping, we only group items that actually exist.
+    uploadPreview.parsedItems.forEach((item) => {
+      // Categories are already normalized from server, so use directly
+      const categoryKey =
+        (item.fields.category.value as string) || "Uncategorized";
+      if (!grouped[categoryKey]) {
+        grouped[categoryKey] = [];
+      }
+      grouped[categoryKey].push(item);
+    });
+
+    // Create order: existing categories with items first, then any new empty ones from allUniqueCategories
+    const categoryOrder = Object.keys(grouped).sort((a, b) => {
+      if (a === "Uncategorized") return 1;
+      if (b === "Uncategorized") return -1;
+      return a.localeCompare(b);
+    });
+
+    allUniqueCategories.forEach((uniqueCat) => {
+      if (!categoryOrder.includes(uniqueCat)) {
+        categoryOrder.push(uniqueCat); // Add new, potentially empty, categories to the order
+      }
+    });
+
+    return {
+      categories: grouped,
+      order: categoryOrder.filter(
+        (cat, index, self) => self.indexOf(cat) === index
+      ),
+    }; // Ensure unique order
+  }, [uploadPreview?.parsedItems, allUniqueCategories]);
+
+  const toggleCategoryExpansion = (categoryKey: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryKey]: !prev[categoryKey],
+    }));
+  };
+
+  const handleAddNewCategory = () => {
+    const newCategoryName = window.prompt("Enter new category name:");
+    if (newCategoryName && newCategoryName.trim() !== "") {
+      const normalized = normalizeCategory(newCategoryName.trim());
+      if (!allUniqueCategories.includes(normalized)) {
+        setAllUniqueCategories((prev) => [...prev, normalized].sort());
+        setExpandedCategories((prev) => ({ ...prev, [normalized]: true })); // Expand new category by default
+        // No items to add to it yet, groupedAndSortedItems will include it in 'order' due to allUniqueCategories dependency
+      } else {
+        alert(`Category "${normalized}" already exists.`);
+      }
+    }
+  };
+
+  const handleRenameCategory = (oldName: string, newName: string) => {
+    if (oldName === newName) return;
+
+    setAllUniqueCategories((prev) =>
+      [...prev.filter((cat) => cat !== oldName), newName].sort()
+    );
+    setExpandedCategories((prev) => {
+      const newExpanded = { ...prev };
+      if (prev[oldName] !== undefined) {
+        newExpanded[newName] = prev[oldName];
+        delete newExpanded[oldName];
+      }
+      return newExpanded;
+    });
+
+    if (uploadPreview && uploadPreview.parsedItems) {
+      const updatedParsedItems = uploadPreview.parsedItems.map((item) => {
+        // Categories are already normalized, so compare directly
+        if ((item.fields.category.value as string) === oldName) {
+          return {
+            ...item,
+            fields: {
+              ...item.fields,
+              category: {
+                ...item.fields.category,
+                value: newName, // Assign the new, already normalized name
+              },
+            },
+          };
+        }
+        return item;
+      });
+      setUploadPreview((prev) =>
+        prev ? { ...prev, parsedItems: updatedParsedItems } : null
+      );
+    }
+  };
+
+  const handleDeleteCategory = (categoryName: string) => {
+    if (categoryName === "Uncategorized") {
+      alert("Cannot delete the 'Uncategorized' category.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the category "${categoryName}"? Items in this category will be moved to "Uncategorized".`
+      )
+    ) {
+      return;
+    }
+
+    setAllUniqueCategories((prev) =>
+      prev.filter((cat) => cat !== categoryName).sort()
+    );
+    setExpandedCategories((prev) => {
+      const newExpanded = { ...prev };
+      delete newExpanded[categoryName];
+      return newExpanded;
+    });
+
+    if (uploadPreview && uploadPreview.parsedItems) {
+      let uncategorizedExists =
+        allUniqueCategories.includes("Uncategorized") ||
+        categoryName === "Uncategorized";
+      const updatedParsedItems = uploadPreview.parsedItems.map((item) => {
+        // Categories are already normalized, so compare directly
+        if ((item.fields.category.value as string) === categoryName) {
+          if (!uncategorizedExists) {
+            // If 'Uncategorized' isn't in allUniqueCategories yet (it will be added by this action)
+            // and items are being moved to it ensure it's added there.
+            // This state will be updated by setAllUniqueCategories above IF categoryName wasn't Uncategorized.
+            // If 'Uncategorized' is the target, it should be handled by the grouping logic naturally.
+          }
+          return {
+            ...item,
+            fields: {
+              ...item.fields,
+              category: {
+                ...item.fields.category,
+                value: "Uncategorized",
+              },
+            },
+          };
+        }
+        return item;
+      });
+
+      // Ensure "Uncategorized" is in allUniqueCategories if items were moved to it
+      const itemsWereMoved = updatedParsedItems.some(
+        (item) => (item.fields.category.value as string) === "Uncategorized"
+      );
+      if (itemsWereMoved && !allUniqueCategories.includes("Uncategorized")) {
+        // This case should be rare if allUniqueCategories is managed correctly with setAllUniqueCategories before this block,
+        // but as a safeguard:
+        setAllUniqueCategories((prev) =>
+          [...new Set([...prev, "Uncategorized"])].sort()
+        );
+      }
+
+      setUploadPreview((prev) =>
+        prev ? { ...prev, parsedItems: updatedParsedItems } : null
+      );
+    }
+  };
+
+  const handleItemMove = (
+    itemId: string,
+    newCategoryKey: string,
+    oldCategoryKey: string
+  ) => {
+    if (!uploadPreview || !uploadPreview.parsedItems) return;
+
+    const updatedParsedItems = uploadPreview.parsedItems.map((item) => {
+      if (item.id === itemId) {
+        // Ensure the newCategoryKey is valid (exists in allUniqueCategories)
+        // This check might be redundant if newCategoryKey comes from a rendered category header
+        // but good for safety.
+        if (!allUniqueCategories.includes(newCategoryKey)) {
+          console.warn(
+            `Attempted to move item to non-existent category: ${newCategoryKey}`
+          );
+          return item; // Don't change if target category isn't recognized
+        }
+        return {
+          ...item,
+          fields: {
+            ...item.fields,
+            category: {
+              ...item.fields.category,
+              value: newCategoryKey, // Assign the new category name
+            },
+          },
+        };
+      }
+      return item;
+    });
+
+    setUploadPreview((prev) =>
+      prev ? { ...prev, parsedItems: updatedParsedItems } : null
+    );
+    // Optionally, expand the new category if it was collapsed
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [newCategoryKey]: true,
+      [oldCategoryKey]: prev[oldCategoryKey] || false,
+    }));
+  };
 
   const handleConflictCheck = useCallback(async () => {
     if (!uploadPreview || !uploadPreview.parsedItems) {
@@ -288,12 +531,32 @@ const MenuUploadPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Error finalizing import:", err);
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to finalize import."
-      );
-      setImportResult(null);
+
+      // Enhanced error logging for debugging validation issues
+      if (err.response?.data) {
+        console.error(
+          "Full error response data:",
+          JSON.stringify(err.response.data, null, 2)
+        );
+        if (err.response.data.errors) {
+          console.error("Validation errors array:", err.response.data.errors);
+          err.response.data.errors.forEach((err: any, index: number) => {
+            console.error(`Validation error ${index}:`, err);
+          });
+        }
+      }
+
+      setImportResult({
+        overallStatus: "failed",
+        message: err.response?.data?.message || err.message,
+        totalItemsInRequest: 0,
+        itemsProcessed: 0,
+        itemsCreated: 0,
+        itemsUpdated: 0,
+        itemsSkipped: 0,
+        itemsErrored: 0,
+        errorDetails: err.response?.data?.errors || [],
+      });
       setImportJobId(null);
     } finally {
       setIsFinalizingImport(false);
@@ -713,9 +976,21 @@ const MenuUploadPage: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-700 mb-4">
                 4. Edit & Confirm Items
               </h2>
+              <div className="mb-4">
+                <button
+                  onClick={handleAddNewCategory}
+                  className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:bg-gray-300"
+                  disabled={!uploadPreview} // Only enable if there's a preview
+                >
+                  Add New Category
+                </button>
+              </div>
               <EditableMenuTable
-                items={uploadPreview.parsedItems}
-                availableCategories={uploadPreview.detectedCategories}
+                groupedItems={groupedAndSortedItems.categories}
+                categoryOrder={groupedAndSortedItems.order}
+                expandedCategories={expandedCategories}
+                toggleCategoryExpansion={toggleCategoryExpansion}
+                availableCategories={allUniqueCategories}
                 onItemsChange={(updatedItems: ParsedMenuItem[]) =>
                   setUploadPreview((currentPreview: MenuUploadPreview | null) =>
                     currentPreview
@@ -723,6 +998,9 @@ const MenuUploadPage: React.FC = () => {
                       : null
                   )
                 }
+                onRenameCategory={handleRenameCategory}
+                onDeleteCategory={handleDeleteCategory}
+                onItemMove={handleItemMove}
               />
             </section>
           ) : (

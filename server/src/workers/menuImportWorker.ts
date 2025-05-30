@@ -1,6 +1,6 @@
 import { Worker, Job } from "bullmq";
 import mongoose from "mongoose";
-import { QUEUE_NAME, connectionOptions } from "./menuImportQueue";
+import { QUEUE_NAME, connectionOptions } from "../queues/menuImportQueue";
 import MenuImportJobModel from "../models/MenuImportJobModel";
 import MenuService from "../services/menuService"; // Assuming MenuService is a class with static methods
 import {
@@ -8,6 +8,7 @@ import {
   IMenuImportJob,
   ImportResult,
 } from "../types/menuUploadTypes";
+import { IMenuImportJobDocument } from "../models/MenuImportJobModel";
 import connectDB from "../utils/connectDB"; // Utility to connect to MongoDB
 
 // Ensure DB is connected before worker starts processing
@@ -50,7 +51,7 @@ const worker = new Worker<
 
     const { menuImportJobDocumentId } = job.data;
 
-    let menuImportJobDoc: IMenuImportJob | null = null;
+    let menuImportJobDoc: IMenuImportJobDocument | null = null;
 
     try {
       menuImportJobDoc = await MenuImportJobModel.findById(

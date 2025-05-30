@@ -1,5 +1,10 @@
 import mongoose, { Types } from "mongoose";
-import MenuItem, { IMenuItem, ItemType, ITEM_TYPES } from "../models/MenuItem";
+import MenuItem, {
+  IMenuItem,
+  ItemType,
+  ITEM_TYPES,
+  ILeanMenuItem,
+} from "../models/MenuItem";
 import Menu from "../models/Menu";
 import { AppError } from "../utils/errorHandler";
 
@@ -195,7 +200,7 @@ class ItemService {
   static async getItems(
     filter: ItemFilter,
     restaurantId: Types.ObjectId
-  ): Promise<IMenuItem[]> {
+  ): Promise<ILeanMenuItem[]> {
     const queryFilter: {
       restaurantId: Types.ObjectId;
       menuId?: Types.ObjectId;
@@ -216,7 +221,7 @@ class ItemService {
 
     try {
       const items = await MenuItem.find(queryFilter).lean();
-      return items;
+      return items as unknown as ILeanMenuItem[];
     } catch (error: any) {
       console.error("Error fetching menu items in service:", error);
       throw new AppError("Failed to fetch menu items.", 500);

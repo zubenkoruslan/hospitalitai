@@ -25,7 +25,8 @@
     "react-router-dom": "^7.5.0",
     "react-select": "^5.10.1",
     "react-spinners": "^0.17.0",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
@@ -35,6 +36,7 @@
     "@types/jest": "^29.5.14",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.22.0",

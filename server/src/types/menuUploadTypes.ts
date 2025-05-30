@@ -4,15 +4,34 @@ import { Document, Types } from "mongoose";
  * Represents a single menu item as directly returned by the Gemini AI function call.
  * This aligns with `ExtractedMenuAIResponse.menuItems[0]` from menuService.ts.
  */
+
+export type MenuItemType = "food" | "beverage" | "wine";
+export type WineStyleType =
+  | "still"
+  | "sparkling"
+  | "champagne"
+  | "dessert"
+  | "fortified"
+  | "other";
+
 export interface GeminiProcessedMenuItem {
   itemName: string;
   itemPrice?: number | null; // Gemini schema has number, allow null
-  itemType: "food" | "beverage"; // Matches your ExtractedMenuItem and Gemini schema
+  itemType: MenuItemType; // Matches your ExtractedMenuItem and Gemini schema, added "wine"
   itemIngredients: string[];
   itemCategory: string;
   isGlutenFree: boolean;
   isVegan: boolean;
   isVegetarian: boolean;
+
+  // Wine-specific fields from AI
+  wineStyle?: WineStyleType;
+  wineProducer?: string;
+  wineGrapeVariety?: string[];
+  wineVintage?: number;
+  wineRegion?: string;
+  wineServingOptions?: Array<{ size: string; price: number | null }>;
+  winePairings?: string[];
   // If Gemini can provide originalText or sourceCoordinates per item, add here.
   // e.g., originalItemText?: string;
   // e.g., itemSourceCoordinates?: any;
@@ -70,9 +89,17 @@ export interface GeminiParseOutput {
  * Represents a single field of a parsed menu item for the preview table.
  * Includes validation status.
  */
-export interface ParsedMenuItemField {
-  value: string | number | boolean | string[] | null; // Expanded to include boolean and string[]
-  originalValue?: string | number | boolean | string[] | null; // Expanded as well
+export interface ParsedMenuItemField<
+  T =
+    | string
+    | number
+    | boolean
+    | string[]
+    | null
+    | Array<{ id: string; size: string; price: string }>
+> {
+  value: T;
+  originalValue?: T;
   isValid: boolean;
   errorMessage?: string;
   confidence?: number; // Optional: confidence score from AI. Not directly available in current ExtractedMenuAIResponse.
@@ -85,16 +112,28 @@ export interface ParsedMenuItem {
   id: string; // A temporary client-side or backend-generated ID for the row
   internalIndex: number; // original index from AI output array, useful for debugging AI mapping
   fields: {
-    name: ParsedMenuItemField;
-    description?: ParsedMenuItemField; // Note: GeminiAIServiceOutput doesn't have description directly, may need to map from ingredients or add to AI schema
-    price: ParsedMenuItemField;
-    category: ParsedMenuItemField; // Category name
-    itemType: ParsedMenuItemField; // "food" | "beverage"
-    ingredients: ParsedMenuItemField; // Representing array of strings perhaps as a comma-separated string or a more complex field type
-    isGlutenFree: ParsedMenuItemField; // boolean
-    isVegan: ParsedMenuItemField; // boolean
-    isVegetarian: ParsedMenuItemField; // boolean
-    // Add other standardized fields as needed
+    name: ParsedMenuItemField<string>;
+    description?: ParsedMenuItemField<string>; // Note: GeminiAIServiceOutput doesn't have description directly, may need to map from ingredients or add to AI schema
+    price: ParsedMenuItemField<number | null>;
+    category: ParsedMenuItemField<string>; // Category name
+    itemType: ParsedMenuItemField<MenuItemType>; // "food" | "beverage" | "wine"
+    ingredients: ParsedMenuItemField<string[]>; // Representing array of strings perhaps as a comma-separated string or a more complex field type
+    isGlutenFree: ParsedMenuItemField<boolean>; // boolean
+    isVegan: ParsedMenuItemField<boolean>; // boolean
+    isVegetarian: ParsedMenuItemField<boolean>; // boolean
+
+    // Wine-specific fields for UI editing
+    wineStyle?: ParsedMenuItemField<WineStyleType | null>;
+    wineProducer?: ParsedMenuItemField<string | null>;
+    wineGrapeVariety?: ParsedMenuItemField<string | null>; // Stored as comma-separated string for UI
+    wineVintage?: ParsedMenuItemField<number | string | null>; // Number from AI, string for UI input
+    wineRegion?: ParsedMenuItemField<string | null>;
+    wineServingOptions?: ParsedMenuItemField<Array<{
+      id: string;
+      size: string;
+      price: string;
+    }> | null>; // Array of objects with client-side ID and string price for UI
+    winePairings?: ParsedMenuItemField<string | null>; // Stored as comma-separated string for UI
   };
   originalSourceData?: GeminiProcessedMenuItem; // Store the original AI item for reference
   status: "new" | "edited" | "error" | "ignored" | "error_system_validation"; // Status for UI tracking during PREVIEW/EDIT stage

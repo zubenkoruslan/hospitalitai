@@ -5,8 +5,10 @@ import {
   GenerationConfig,
   SafetySetting,
   Part,
+  GenerativeModel,
 } from "@google/generative-ai";
 import dotenv from "dotenv";
+import { AI_MODEL_NAME } from "../utils/constants";
 
 dotenv.config();
 
@@ -24,6 +26,12 @@ export interface IGeneratedQuestion {
   questionText: string;
   options: Array<{ text: string; isCorrect: boolean }>;
   // Potentially add 'explanation' if the AI can generate it
+}
+
+export interface Question {
+  questionText: string;
+  answers: string[];
+  correctAnswerIndex: number;
 }
 
 /**
@@ -49,7 +57,9 @@ export async function generateQuestionsFromSopText(
     throw new Error("Number of questions must be positive.");
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({
+    model: AI_MODEL_NAME,
+  });
 
   const prompt = `You are an expert instructional designer. Based on the following Standard Operating Procedure (SOP) document, generate ${numberOfQuestions} multiple-choice questions.
 Each question should test understanding of key procedures, safety information, or important details within the SOP.

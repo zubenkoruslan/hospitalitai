@@ -45,11 +45,36 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
                 {item.description}
               </p>
             )}
-            <div className="flex items-center text-xs mb-1">
-              <span className="text-lg font-bold text-green-700">
-                ${item.price?.toFixed(2) ?? "N/A"}
-              </span>
-            </div>
+
+            {/* Price/Serving Options Display */}
+            {item.itemType === "wine" &&
+            item.servingOptions &&
+            item.servingOptions.length > 0 ? (
+              <div className="mb-1">
+                <div className="text-xs text-gray-600 font-medium mb-1">
+                  Serving Options:
+                </div>
+                <div className="space-y-1">
+                  {item.servingOptions.map((option, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center text-xs"
+                    >
+                      <span className="text-gray-700">{option.size}</span>
+                      <span className="font-bold text-green-700">
+                        ${option.price.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center text-xs mb-1">
+                <span className="text-lg font-bold text-green-700">
+                  ${item.price?.toFixed(2) ?? "N/A"}
+                </span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-1 text-xs mb-2">
               {item.isGlutenFree && (
                 <span className="bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded-full text-xxs">

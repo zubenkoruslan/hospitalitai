@@ -34,6 +34,9 @@ import restaurantRoutes from "./routes/restaurantRoutes";
 import sopDocumentRoutes from "./routes/sopDocumentRoutes";
 import sopDocumentEditRoutes from "./routes/sopDocumentEditRoutes"; // Import new edit routes
 
+// Import and start the menu import worker
+import "./workers/menuImportWorker"; // This will start the worker
+
 const app: Express = express();
 
 // === Middleware ===

@@ -62,6 +62,24 @@ export interface ParsedMenuItemField {
   confidence?: number;
 }
 
+export interface WineServingOption {
+  id: string;
+  size: string;
+  price: string;
+  // Add isValid/errorMessage here if needed for individual option validation
+  isValidSize?: boolean;
+  sizeErrorMessage?: string;
+  isValidPrice?: boolean;
+  priceErrorMessage?: string;
+}
+
+export interface ParsedWineServingOptionsField {
+  value: WineServingOption[] | null;
+  originalValue?: WineServingOption[] | null;
+  isValid: boolean;
+  errorMessage?: string;
+}
+
 // Represents the status of a parsed item during the preview and import process
 export type ItemStatus =
   | "new"
@@ -82,6 +100,15 @@ export interface ParsedMenuItem {
     isGlutenFree: ParsedMenuItemField;
     isVegan: ParsedMenuItemField;
     isVegetarian: ParsedMenuItemField;
+    wineServingOptions?: ParsedWineServingOptionsField;
+
+    // Wine-specific fields for UI editing, matching server/src/types/menuUploadTypes.ts ParsedMenuItem
+    wineStyle?: ParsedMenuItemField; // e.g., value: "still" | "sparkling" | ... | null
+    wineProducer?: ParsedMenuItemField; // e.g., value: "Chateau Montelena" | null
+    wineGrapeVariety?: ParsedMenuItemField; // e.g., value: "Chardonnay, Sauvignon Blanc" | null
+    wineVintage?: ParsedMenuItemField; // e.g., value: 2020 | "2020" | null (flexible for input)
+    wineRegion?: ParsedMenuItemField; // e.g., value: "Napa Valley" | null
+    winePairings?: ParsedMenuItemField; // e.g., value: "Steak, Aged Cheese" | null
   };
   originalSourceData?: GeminiProcessedMenuItem;
   status: ItemStatus;
