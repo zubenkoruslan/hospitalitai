@@ -6,7 +6,7 @@ import {
   deleteMenu,
   updateMenuActivationStatus,
 } from "../services/api";
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -16,6 +16,10 @@ import {
   PlusIcon,
   TrashIcon,
   ArrowUpTrayIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  PencilIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 import { useMenus } from "../hooks/useMenus";
@@ -318,147 +322,148 @@ const MenusPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        {/* Updated Page Title Header */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-              Restaurant Menus
-            </h1>
-            {/* Action buttons can remain here or be moved to a separate bar below */}
-            <div className="mt-4 sm:mt-0 flex space-x-3">
-              <Button
-                variant="primary"
-                onClick={openAddModal}
-                disabled={isSubmitting}
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add New Menu
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={openPdfUploadModal}
-                disabled={isSubmitting}
-              >
-                <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                Upload PDF Menu
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Notifications */}
-        {pageError && (
-          <div className="mb-4">
-            <ErrorMessage
-              message={pageError}
-              onDismiss={() => setPageError(null)}
-            />
-          </div>
-        )}
-        {successMessage && (
-          <div className="mb-4">
-            <SuccessNotification
-              message={successMessage}
-              onDismiss={() => setSuccessMessage(null)}
-            />
-          </div>
-        )}
-        {menusError && (
-          <div className="mb-4">
-            <ErrorMessage message={menusError} />
-          </div>
-        )}
-
-        {/* Updated Card for Menus Grid */}
-        <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-          {isLoading && menus.length === 0 && (
-            <div className="flex justify-center items-center py-10">
-              <LoadingSpinner message="Loading menus..." />
-            </div>
-          )}
-          {!isLoading && menus.length === 0 && !menusError && (
-            <div className="text-center py-10">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.75 17L3 10.25V4.5h3.75L12 9l5.25-4.5H21v5.75L14.25 17h-4.5z"
-                />
-                <path
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 19L3 17V7.5M19 19l2-2V7.5"
-                />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No menus found
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating a new menu or uploading a PDF.
-              </p>
-            </div>
-          )}
-          {menus.length > 0 && (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {menus.map((menu) => (
-                <Card
-                  key={menu._id}
-                  className="bg-white shadow-lg rounded-xl p-4 flex flex-col justify-between hover:shadow-xl transition-shadow duration-300"
+      <DashboardLayout>
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+          {/* Updated Page Title Header */}
+          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                Restaurant Menus
+              </h1>
+              {/* Action buttons can remain here or be moved to a separate bar below */}
+              <div className="mt-4 sm:mt-0 flex space-x-3">
+                <Button
+                  variant="primary"
+                  onClick={openAddModal}
+                  disabled={isSubmitting}
                 >
-                  <div>
-                    <Link
-                      to={`/menu/${menu._id}`}
-                      className="block hover:no-underline"
-                    >
-                      <h3 className="text-lg font-semibold text-gray-800 truncate hover:text-blue-600 transition-colors">
-                        {menu.name}
-                      </h3>
-                    </Link>
-                    <p className="text-sm text-gray-600 mt-1 h-10 overflow-hidden text-ellipsis">
-                      {menu.description || (
-                        <span className="italic text-gray-400">
-                          No description.
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end space-x-2">
-                    <Link to={`/menu/${menu._id}`}>
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  Add New Menu
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={openPdfUploadModal}
+                  disabled={isSubmitting}
+                >
+                  <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+                  Upload PDF Menu
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications */}
+          {pageError && (
+            <div className="mb-4">
+              <ErrorMessage
+                message={pageError}
+                onDismiss={() => setPageError(null)}
+              />
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-4">
+              <SuccessNotification
+                message={successMessage}
+                onDismiss={() => setSuccessMessage(null)}
+              />
+            </div>
+          )}
+          {menusError && (
+            <div className="mb-4">
+              <ErrorMessage message={menusError} />
+            </div>
+          )}
+
+          {/* Updated Card for Menus Grid */}
+          <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+            {isLoading && menus.length === 0 && (
+              <div className="flex justify-center items-center py-10">
+                <LoadingSpinner message="Loading menus..." />
+              </div>
+            )}
+            {!isLoading && menus.length === 0 && !menusError && (
+              <div className="text-center py-10">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9.75 17L3 10.25V4.5h3.75L12 9l5.25-4.5H21v5.75L14.25 17h-4.5z"
+                  />
+                  <path
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 19L3 17V7.5M19 19l2-2V7.5"
+                  />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  No menus found
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Get started by creating a new menu or uploading a PDF.
+                </p>
+              </div>
+            )}
+            {menus.length > 0 && (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {menus.map((menu) => (
+                  <Card
+                    key={menu._id}
+                    className="bg-white shadow-lg rounded-xl p-4 flex flex-col justify-between hover:shadow-xl transition-shadow duration-300"
+                  >
+                    <div>
+                      <Link
+                        to={`/menu/${menu._id}`}
+                        className="block hover:no-underline"
+                      >
+                        <h3 className="text-lg font-semibold text-gray-800 truncate hover:text-blue-600 transition-colors">
+                          {menu.name}
+                        </h3>
+                      </Link>
+                      <p className="text-sm text-gray-600 mt-1 h-10 overflow-hidden text-ellipsis">
+                        {menu.description || (
+                          <span className="italic text-gray-400">
+                            No description.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end space-x-2">
+                      <Link to={`/menu/${menu._id}`}>
+                        <Button
+                          variant="secondary"
+                          aria-label={`View items in ${menu.name}`}
+                          className="text-xs p-1.5"
+                        >
+                          View
+                        </Button>
+                      </Link>
                       <Button
-                        variant="secondary"
-                        aria-label={`View items in ${menu.name}`}
+                        variant="destructive"
+                        onClick={() => openDeleteModal(menu)}
+                        aria-label={`Delete ${menu.name}`}
                         className="text-xs p-1.5"
                       >
-                        View
+                        <TrashIcon className="h-4 w-4" />
                       </Button>
-                    </Link>
-                    <Button
-                      variant="destructive"
-                      onClick={() => openDeleteModal(menu)}
-                      aria-label={`Delete ${menu.name}`}
-                      className="text-xs p-1.5"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </Card>
-      </main>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        </main>
+      </DashboardLayout>
 
       {/* Modals */}
       {isAddMenuModalOpen && (

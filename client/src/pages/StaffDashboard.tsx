@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { /* Link, */ useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import api, {
   getAvailableQuizzesForStaff,
   getMyQuizProgress,
@@ -14,6 +14,14 @@ import ErrorMessage from "../components/common/ErrorMessage";
 import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
 import { ClientStaffQuizProgressWithAttempts } from "../types/staffTypes";
 import { ClientIQuiz, ClientQuizAttemptDetails } from "../types/quizTypes";
+import {
+  AcademicCapIcon,
+  ChartBarIcon,
+  TrophyIcon,
+  PlayIcon,
+  ClockIcon,
+  CheckCircleIcon,
+} from "@heroicons/react/24/outline";
 
 // New interface for combining Quiz definition with its progress
 interface StaffQuizDisplayItem extends ClientIQuiz {
@@ -443,7 +451,7 @@ const StaffDashboard: React.FC = () => {
     // Show main loader if auth is still loading
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
-        <Navbar />
+        <DashboardLayout />
         <main className="flex-grow flex items-center justify-center">
           <LoadingSpinner message="Loading dashboard..." />
         </main>
@@ -452,121 +460,141 @@ const StaffDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        {/* Page Title Header */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-            Welcome, {user?.name || "Staff Member"}!
-          </h1>
-          <p className="mt-1 text-md text-gray-600">
-            Here are your available quizzes and performance summary.
-          </p>
+    <DashboardLayout title="Staff Dashboard">
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg">
+              <AcademicCapIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                Staff Dashboard
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Track your progress and continue your training journey
+              </p>
+              {user?.name && (
+                <p className="text-sm text-green-700 mt-2 font-medium">
+                  Welcome back, {user.name}!
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Combined Error Display for major errors */}
-        {(quizError && !rankingError) ||
-        (rankingError && !quizError) ||
-        (quizError && rankingError) ? (
-          <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
-            <ErrorMessage
-              message={
-                quizError && rankingError
-                  ? "Failed to load quiz and ranking data. Please try again later."
-                  : quizError || rankingError || "An unexpected error occurred."
-              }
-            />
-          </Card>
-        ) : null}
-
-        {/* Main content layout: Performance Summary on top, then Quizzes */}
-        <div className="space-y-6">
-          {/* Performance Summary Section */}
-          <div>
-            <Card
-              className="bg-white shadow-lg rounded-xl p-4 sm:p-6"
-              data-testid="performance-summary-card"
-            >
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                Your Performance Summary
-              </h2>
-              {loadingRanking ? (
-                <div className="text-center py-10">
-                  <LoadingSpinner message="Loading performance data..." />
-                </div>
-              ) : rankingError ? (
-                <ErrorMessage message={rankingError} />
-              ) : (
-                renderRankingInfo()
-              )}
-            </Card>
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Overall Progress */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <ChartBarIcon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Quizzes Available
+                </p>
+                <p className="text-2xl font-bold text-slate-900">
+                  {quizzes.length}
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Quizzes Section - Restructured into two cards */}
-          {loadingQuizzes && quizzes.length === 0 ? (
-            <div className="text-center py-10">
-              <LoadingSpinner message="Loading quizzes..." />
+          {/* Ranking */}
+          {rankingData.myRank !== null && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-lg">
+                  <TrophyIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
+                    Your Rank
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    #{rankingData.myRank} of {rankingData.totalRankedStaff}
+                  </p>
+                </div>
+              </div>
             </div>
-          ) : !loadingQuizzes && quizzes.length === 0 && !quizError ? (
-            <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-              <p className="text-center text-gray-500 py-10">
-                No quizzes are currently assigned to you.
-              </p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Pending Quizzes Card */}
-              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                  Pending Quizzes ({pendingQuizzes.length})
-                </h2>
-                {pendingQuizzes.length > 0 ? (
-                  <div className="space-y-4">
-                    {pendingQuizzes.map((quiz) => (
-                      <QuizItem
-                        key={quiz._id}
-                        quizDisplayItem={quiz}
-                        onViewAttemptIncorrectAnswers={
-                          handleOpenAttemptIncorrectAnswersModal
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 py-4">
-                    No pending quizzes. Great job!
-                  </p>
-                )}
-              </Card>
+          )}
 
-              {/* Completed Quizzes Card */}
-              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                  Completed Quizzes ({completedQuizzes.length})
-                </h2>
-                {completedQuizzes.length > 0 ? (
-                  <div className="space-y-4">
-                    {completedQuizzes.map((quiz) => (
-                      <QuizItem
-                        key={quiz._id}
-                        quizDisplayItem={quiz}
-                        onViewAttemptIncorrectAnswers={
-                          handleOpenAttemptIncorrectAnswersModal
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 py-4">
-                    No quizzes completed yet. Keep learning!
+          {/* Average Score */}
+          {rankingData.myAverageScore !== null && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                  <CheckCircleIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
+                    Avg. Score
                   </p>
-                )}
-              </Card>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {rankingData.myAverageScore.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(rankingData.myAverageScore, 100)}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
             </div>
           )}
         </div>
-      </main>
+
+        {/* Error Message */}
+        {quizError && rankingError && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <ErrorMessage message={quizError} />
+          </div>
+        )}
+
+        {/* Quizzes Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Available Quizzes
+            </h2>
+          </div>
+          <div className="p-6">
+            {quizzes.length === 0 ? (
+              <div className="text-center py-12">
+                <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No quizzes available
+                </h3>
+                <p className="text-slate-500">
+                  Check back later for new training materials.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {quizzes.map((quizDisplayItem) => (
+                  <QuizItem
+                    key={quizDisplayItem._id}
+                    quizDisplayItem={quizDisplayItem}
+                    onViewAttemptIncorrectAnswers={
+                      handleOpenAttemptIncorrectAnswersModal
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal */}
       {isIncorrectAnswersModalOpen && selectedAttemptForModal && (
         <ViewIncorrectAnswersModal
           isOpen={isIncorrectAnswersModalOpen}
@@ -574,7 +602,7 @@ const StaffDashboard: React.FC = () => {
           attemptDetails={selectedAttemptForModal}
         />
       )}
-    </div>
+    </DashboardLayout>
   );
 };
 

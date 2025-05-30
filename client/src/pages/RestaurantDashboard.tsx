@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { inviteStaff, getStaffList } from "../services/api"; // Added inviteStaff, getStaffList
-import Navbar from "../components/Navbar";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
 import { useMenus } from "../hooks/useMenus";
@@ -14,6 +14,16 @@ import PdfMenuUpload from "../components/menu/PdfMenuUpload"; // Corrected impor
 import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
+import {
+  UsersIcon,
+  AcademicCapIcon,
+  DocumentTextIcon,
+  ClipboardDocumentIcon,
+  ChartBarIcon,
+  PlusIcon,
+  ArrowUpOnSquareIcon,
+  DocumentArrowUpIcon,
+} from "@heroicons/react/24/outline";
 
 // Helper function to check if a quiz is completed regardless of capitalization
 // This function uses ResultSummary, ensure it's compatible with the imported one
@@ -160,72 +170,82 @@ const RestaurantDashboard: React.FC = () => {
 
   if (authIsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner message="Authenticating..." />
-      </div>
+      <DashboardLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <LoadingSpinner message="Authenticating..." />
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <LoadingSpinner message="Loading dashboard data..." />
-      </div>
+      <DashboardLayout>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <LoadingSpinner message="Loading dashboard data..." />
+        </div>
+      </DashboardLayout>
     );
   }
 
   // Handle access denied specifically if it came from the hook
   if (!isLoading && staffError?.startsWith("Access denied")) {
     return (
-      <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
-        <ErrorMessage message={staffError} />
-        <Button
-          variant="primary"
-          onClick={() => navigate("/login")}
-          className="mt-4"
-        >
-          Go to Login
-        </Button>
-      </div>
+      <DashboardLayout>
+        <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
+          <ErrorMessage message={staffError} />
+          <Button
+            variant="primary"
+            onClick={() => navigate("/login")}
+            className="mt-4"
+          >
+            Go to Login
+          </Button>
+        </div>
+      </DashboardLayout>
     );
   }
 
   // Handle general errors
   if (displayError) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
+      <DashboardLayout>
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <ErrorMessage message={displayError} />
         </main>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Page Title and Restaurant ID section */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+    <DashboardLayout title="Restaurant Dashboard">
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+              <ChartBarIcon className="h-8 w-8 text-white" />
+            </div>
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-slate-900">
                 {user?.restaurantName
                   ? `${user.restaurantName} Dashboard`
                   : "Restaurant Dashboard"}
               </h1>
+              <p className="text-slate-600 mt-2">
+                Monitor your restaurant's performance and manage your team
+              </p>
               {user?.restaurantId && (
-                <div className="mt-2 flex items-center">
-                  <span className="text-sm font-medium text-gray-500 mr-2">
+                <div className="mt-3 flex items-center space-x-3">
+                  <span className="text-sm font-medium text-slate-500">
                     Restaurant ID:
                   </span>
-                  <span className="text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-sm text-slate-700 bg-white px-3 py-1 rounded-lg border border-slate-200">
                     {user.restaurantId}
                   </span>
                   <button
                     onClick={handleCopyId}
-                    className="ml-2 p-1.5 bg-gray-200 hover:bg-gray-300 rounded text-xs text-gray-700 transition-colors"
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
                     aria-label="Copy Restaurant ID"
                   >
                     {copied ? "Copied!" : "Copy"}
@@ -233,305 +253,298 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
               )}
             </div>
-            {/* Optional: Add a primary action button here if needed for Soft UI style */}
           </div>
         </div>
 
+        {/* Error Message */}
         {displayError && (
-          <div className="mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
             <ErrorMessage message={displayError} />
           </div>
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {/* Total Staff Card - Link to /staff-results */}
-          <Link to="/staff-results" className="block hover:no-underline">
-            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                  <svg
-                    className="h-6 w-6 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 016-6h6a6 6 0 016 6v1h-3"
-                    />
-                  </svg>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Total Staff Card */}
+          <Link to="/staff-results" className="block group">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                  <UsersIcon className="h-6 w-6 text-white" />
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dt className="text-sm font-medium text-gray-500 truncate">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
                     Total Staff
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900">
                     {staffData.length}
-                  </dd>
+                  </p>
                 </div>
               </div>
-              <p className="text-xs text-blue-500 mt-3 text-right">
-                View Details &rarr;
-              </p>
-            </Card>
-          </Link>
-
-          {/* Quizzes Active Card - Link to /quiz-management */}
-          <Link to="/quiz-management" className="block hover:no-underline">
-            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                  <svg
-                    className="h-6 w-6 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Quizzes Active
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {totalQuizzes}
-                  </dd>
-                </div>
-              </div>
-              <p className="text-xs text-green-500 mt-3 text-right">
-                Manage Quizzes &rarr;
-              </p>
-            </Card>
-          </Link>
-
-          {/* Menus Active Card - Link to /menu */}
-          <Link to="/menu" className="block hover:no-underline">
-            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                  <svg
-                    className="h-6 w-6 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Menus Active
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {menus.length}
-                  </dd>
-                </div>
-              </div>
-              <p className="text-xs text-yellow-600 mt-3 text-right">
-                Manage Menus &rarr;
-              </p>
-            </Card>
-          </Link>
-
-          {/* Overall Average Performance Card - Link to /staff-results */}
-          <Link to="/staff-results" className="block hover:no-underline">
-            <Card className="bg-white shadow-lg rounded-xl p-6 h-full hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
-                  <svg
-                    className="h-6 w-6 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Avg. Performance
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {overallAveragePerformance}%
-                  </dd>
-                </div>
-              </div>
-              <p className="text-xs text-purple-500 mt-3 text-right">
-                View Staff Results &rarr;
-              </p>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Actions Grid: Menu Upload and Invite Staff */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* Menu Upload Section */}
-          <Card className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Upload New Menu (PDF)
-            </h2>
-            <div className="space-y-4">
-              <Button
-                variant="secondary"
-                onClick={openPdfUploadModal}
-                className="mb-2 w-full text-sm py-2 truncate"
-              >
-                Select PDF to Upload
-              </Button>
-              {uploadMessage && (
-                <p
-                  className={`mt-3 text-xs ${
-                    uploadMessage.includes("success")
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
+              <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
+                <span>View Details</span>
+                <svg
+                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  {uploadMessage}
-                </p>
-              )}
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
             </div>
-          </Card>
+          </Link>
 
-          {/* Invite Staff Section */}
-          <Card className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Invite New Staff Member
-            </h2>
-            <form onSubmit={handleInviteFormSubmit} className="space-y-4">
-              <div className="relative w-full">
-                <input
-                  type="email"
-                  placeholder="Enter staff member's email..."
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  aria-label="Invite staff member"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <svg
-                    className="h-5 w-5 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+          {/* Quizzes Active Card */}
+          <Link to="/quiz-management" className="block group">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                  <AcademicCapIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
+                    Quizzes Active
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {totalQuizzes}
+                  </p>
                 </div>
               </div>
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={isStaffInviteLoading}
-                className="w-full text-sm py-2"
-              >
-                {isStaffInviteLoading ? <LoadingSpinner /> : "Invite Staff"}
-              </Button>
-              {inviteMessage && (
-                <p className="text-green-600 text-center mt-2">
-                  {inviteMessage}
+              <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                <span>Manage Quizzes</span>
+                <svg
+                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Menus Active Card */}
+          <Link to="/menu" className="block group">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-lg">
+                  <DocumentTextIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
+                    Menus Active
+                  </p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {menus.length}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center text-amber-600 text-sm font-medium">
+                <span>Manage Menus</span>
+                <svg
+                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Average Performance Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                <ChartBarIcon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Avg. Performance
                 </p>
-              )}
-              {inviteError && (
-                <p className="text-red-600 text-center mt-2">{inviteError}</p>
-              )}
-            </form>
-          </Card>
+                <p className="text-2xl font-bold text-slate-900">
+                  {overallAveragePerformance}%
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(
+                      parseFloat(overallAveragePerformance),
+                      100
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Staff Performance Visualizations Section */}
-        {averageScoreChartData && staffData.length > 0 && (
-          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Staff Performance Visualizations
-            </h2>
-            <div className="mt-6 bg-white p-6 rounded-lg shadow">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                Average Score by Staff
+        {/* Action Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+              <h3 className="text-xl font-semibold text-slate-900">
+                Quick Actions
               </h3>
-              {averageScoreChartData ? (
-                <div style={{ height: "400px", position: "relative" }}>
-                  <BarChart
-                    data={averageScoreChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          max: 110,
-                          title: {
-                            display: true,
-                            text: "Average Score (%)",
-                          },
-                          ticks: {
-                            callback: function (value, index, ticks) {
-                              if (value === 110) {
-                                return null;
-                              }
-                              return value + "%";
-                            },
-                          },
-                        },
-                        x: {
-                          title: {
-                            display: true,
-                            text: "Staff Member",
-                          },
-                        },
-                      },
-                    }}
+            </div>
+            <div className="p-6 space-y-4">
+              <button
+                onClick={openPdfUploadModal}
+                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <DocumentArrowUpIcon className="h-5 w-5" />
+                <span>Upload Menu PDF</span>
+              </button>
+
+              <Link
+                to="/quiz-management"
+                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Create New Quiz</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Invite Staff */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+              <h3 className="text-xl font-semibold text-slate-900">
+                Invite Staff
+              </h3>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleInviteFormSubmit} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="invite-email"
+                    className="block text-sm font-medium text-slate-700 mb-2"
+                  >
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="invite-email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter staff email"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   />
                 </div>
-              ) : (
-                <p className="text-gray-500">
-                  No average score data to display.
-                </p>
+
+                <button
+                  type="submit"
+                  disabled={isStaffInviteLoading || !inviteEmail.trim()}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  {isStaffInviteLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <LoadingSpinner />
+                      <span>Sending...</span>
+                    </div>
+                  ) : (
+                    "Send Invitation"
+                  )}
+                </button>
+              </form>
+
+              {/* Feedback Messages */}
+              {inviteMessage && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-700">{inviteMessage}</p>
+                </div>
+              )}
+
+              {inviteError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{inviteError}</p>
+                </div>
               )}
             </div>
-          </Card>
-        )}
-        {!averageScoreChartData && !staffLoading && staffData.length > 0 && (
-          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <p className="text-gray-500 text-center py-4">
-              Visualizations are being generated or no staff data available for
-              charts.
-            </p>
-          </Card>
-        )}
-        {staffData.length === 0 && !staffLoading && (
-          <Card className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <p className="text-gray-500 text-center py-4">
-              No staff data available to display performance visualizations.
-            </p>
-          </Card>
-        )}
-      </main>
+          </div>
+        </div>
 
-      {/* PDF Upload Modal for Dashboard */}
+        {/* Performance Chart */}
+        {averageScoreChartData && staffData.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+              <h3 className="text-xl font-semibold text-slate-900">
+                Staff Performance Overview
+              </h3>
+            </div>
+            <div className="p-6">
+              <BarChart
+                data={averageScoreChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      display: false,
+                    },
+                    tooltip: {
+                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      titleColor: "white",
+                      bodyColor: "white",
+                      borderColor: "rgba(59, 130, 246, 0.5)",
+                      borderWidth: 1,
+                    },
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      max: 100,
+                      grid: {
+                        color: "rgba(148, 163, 184, 0.1)",
+                      },
+                      ticks: {
+                        color: "rgba(100, 116, 139, 0.8)",
+                        callback: function (value, index, ticks) {
+                          return value + "%";
+                        },
+                      },
+                    },
+                    x: {
+                      grid: {
+                        display: false,
+                      },
+                      ticks: {
+                        color: "rgba(100, 116, 139, 0.8)",
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PDF Upload Modal */}
       {isPdfUploadModalOpen && (
         <PdfMenuUpload
           isOpen={isPdfUploadModalOpen}
@@ -539,7 +552,7 @@ const RestaurantDashboard: React.FC = () => {
           onFileSelected={handleFileSelectedForDashboardUpload}
         />
       )}
-    </div>
+    </DashboardLayout>
   );
 };
 
