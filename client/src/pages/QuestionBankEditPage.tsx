@@ -16,9 +16,9 @@ const QuestionBankEditPage: React.FC = () => {
     >
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
               <BookOpenIcon className="h-8 w-8 text-white" />
             </div>
             <div>

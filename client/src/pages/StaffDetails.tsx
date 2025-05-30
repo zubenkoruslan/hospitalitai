@@ -12,6 +12,8 @@ import { useStaffDetails } from "../hooks/useStaffDetails";
 import { ClientQuizAttemptDetails } from "../types/quizTypes";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
+import DashboardLayout from "../components/layout/DashboardLayout";
+import { UserIcon } from "@heroicons/react/24/outline";
 
 // --- Main Component ---
 const StaffDetails: React.FC = () => {
@@ -68,219 +70,207 @@ const StaffDetails: React.FC = () => {
   // --- Render Logic ---
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow flex items-center justify-center">
+      <DashboardLayout
+        title="Loading Staff Details"
+        breadcrumb={[
+          { name: "Staff Management", href: "/staff-management" },
+          { name: "Loading..." },
+        ]}
+      >
+        <div className="flex items-center justify-center min-h-96">
           <LoadingSpinner message="Loading staff details..." />
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
-        <main className="max-w-4xl mx-auto py-6 px-4">
-          <ErrorMessage message={error} />
-        </main>
-      </div>
+      <DashboardLayout
+        title="Error"
+        breadcrumb={[
+          { name: "Staff Management", href: "/staff-management" },
+          { name: "Error" },
+        ]}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <UserIcon className="h-8 w-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">
+              Error Loading Staff Details
+            </h1>
+            <ErrorMessage message={error} />
+          </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (!staffDetails) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
-        <main className="max-w-4xl mx-auto py-6 px-4">
-          <ErrorMessage message="Staff member not found." />
-        </main>
-      </div>
+      <DashboardLayout
+        title="Staff Not Found"
+        breadcrumb={[
+          { name: "Staff Management", href: "/staff-management" },
+          { name: "Not Found" },
+        ]}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+            <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <UserIcon className="h-8 w-8 text-slate-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-700 mb-4">
+              Staff Member Not Found
+            </h1>
+            <p className="text-slate-600">
+              The requested staff member could not be found.
+            </p>
+          </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        <div className="mb-4">
-          <Button
-            variant="secondary"
-            onClick={() => navigate(-1)}
-            className="text-sm"
-          >
-            &larr; Back
-          </Button>
-        </div>
-
-        {successMessage && (
-          <div className="mb-4">
-            <SuccessNotification
-              message={successMessage}
-              onDismiss={() => setSuccessMessage(null)}
-            />
-          </div>
-        )}
-        {/* Removed commented out roleErrorText display */}
-
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-            {staffDetails.name}
-          </h1>
-        </div>
-
-        <Card className="bg-white shadow-lg rounded-xl p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Contact & Employment
-              </h2>
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-700">Email:</span>{" "}
-                  {staffDetails.email}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-700">Joined:</span>{" "}
-                  {formatDate(staffDetails.createdAt)}
-                </p>
-              </div>
+    <DashboardLayout
+      title={staffDetails.name}
+      breadcrumb={[
+        { name: "Staff Management", href: "/staff-management" },
+        { name: staffDetails.name },
+      ]}
+    >
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
+              <UserIcon className="h-8 w-8 text-white" />
             </div>
-
             <div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Role & Performance Summary
-              </h2>
+              <h1 className="text-3xl font-bold text-slate-900">
+                {staffDetails.name}
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Staff member details and performance overview
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Staff Information */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">
+            Staff Information
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm font-medium text-slate-500">Name:</span>
+              <p className="text-slate-900">{staffDetails.name}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-slate-500">Email:</span>
+              <p className="text-slate-900">{staffDetails.email}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-slate-500">Role:</span>
+              <p className="text-slate-900">
+                {staffDetails.assignedRoleName || "No role assigned"}
+              </p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-slate-500">
+                Average Score:
+              </span>
+              <p className="text-slate-900">
+                {staffDetails.averageScore !== null
+                  ? `${staffDetails.averageScore}%`
+                  : "No scores yet"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quiz Results */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Quiz Results
+            </h2>
+          </div>
+          <div className="p-6">
+            {staffDetails.aggregatedQuizPerformance.length > 0 ? (
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-base font-medium text-gray-700 mb-1">
-                    Assigned Role {/* Changed label */}
-                  </h3>
-                  <p className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md inline-block">
-                    {staffDetails.assignedRoleName || "Not Set"}{" "}
-                    {/* Changed field */}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-base font-medium text-gray-700 mb-1">
-                    Overall Average Score
-                  </h3>
-                  <p
-                    className={`text-2xl font-bold ${
-                      staffDetails.averageScore === null
-                        ? "text-gray-500"
-                        : staffDetails.averageScore >= 70
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
+                {staffDetails.aggregatedQuizPerformance.map((quizAgg) => (
+                  <div
+                    key={quizAgg.quizId}
+                    className="p-4 bg-slate-50 rounded-lg border border-slate-200"
                   >
-                    {staffDetails.averageScore !== null
-                      ? `${staffDetails.averageScore.toFixed(1)}%`
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8">
-          Quiz Performance
-        </h2>
-        {/* Display loading spinner here only if a refresh action triggers loading, not the initial page load covered above */}
-        {/* {loading && <LoadingSpinner message="Refreshing details..." />} */}
-        {staffDetails.aggregatedQuizPerformance.length === 0 && !loading && (
-          <Card className="p-4 text-center text-gray-500">
-            No quiz performance data available for this staff member.
-          </Card>
-        )}
-        <div className="space-y-6">
-          {staffDetails.aggregatedQuizPerformance.map((quizAgg) => (
-            <Card
-              key={quizAgg.quizId}
-              className="p-4 shadow-md rounded-lg bg-white"
-            >
-              <h3 className="text-xl font-semibold text-gray-700 mb-3">
-                {quizAgg.quizTitle}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 text-sm">
-                <div>
-                  <span className="font-medium text-gray-600">
-                    Average Score:{" "}
-                  </span>
-                  <span
-                    className={`font-bold ${
-                      (quizAgg.averageScorePercent ?? 0) >= 70
-                        ? "text-green-600"
-                        : "text-red-500"
-                    }`}
-                  >
-                    {quizAgg.averageScorePercent?.toFixed(1) ?? "N/A"}%
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Attempts: </span>
-                  {quizAgg.numberOfAttempts}
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">
-                    Last Attempt:{" "}
-                  </span>
-                  {quizAgg.lastCompletedAt
-                    ? formatDate(quizAgg.lastCompletedAt)
-                    : "N/A"}
-                </div>
-              </div>
-
-              {quizAgg.attempts && quizAgg.attempts.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <h4 className="text-md font-semibold text-gray-600 mb-2">
-                    All Attempts:
-                  </h4>
-                  <ul className="space-y-2 max-h-60 overflow-y-auto">
-                    {quizAgg.attempts.map((attempt, index) => (
-                      <li
-                        key={attempt._id}
-                        className="text-sm p-3 bg-gray-50 hover:bg-gray-100 rounded-md flex flex-col sm:flex-row justify-between sm:items-center"
-                      >
-                        <div className="mb-2 sm:mb-0">
-                          <span className="font-medium">
-                            Attempt {quizAgg.attempts.length - index}
-                          </span>
-                          <span className="text-gray-500 ml-2">
-                            (
-                            {new Date(attempt.attemptDate).toLocaleDateString()}{" "}
-                            {new Date(attempt.attemptDate).toLocaleTimeString()}
-                            )
-                          </span>
-                          <span
-                            className={`font-semibold ml-3 ${
-                              attempt.score >= attempt.totalQuestions * 0.7
-                                ? "text-green-600"
-                                : "text-red-500"
-                            }`}
-                          >
-                            Score: {attempt.score}/{attempt.totalQuestions}
-                          </span>
-                        </div>
-                        {attempt.hasIncorrectAnswers && (
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-slate-900">
+                          {quizAgg.quizTitle}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          Score:{" "}
+                          {quizAgg.averageScorePercent?.toFixed(1) ?? "N/A"}%
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {quizAgg.lastCompletedAt
+                            ? formatDate(quizAgg.lastCompletedAt)
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                            (quizAgg.averageScorePercent ?? 0) >= 70
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {quizAgg.averageScorePercent !== null
+                            ? (quizAgg.averageScorePercent >= 70
+                                ? "Passed"
+                                : "Failed") +
+                              ` (${quizAgg.averageScorePercent.toFixed(1)}%)`
+                            : "N/A"}
+                        </span>
+                        {quizAgg.attempts.length > 0 && (
                           <Button
                             variant="secondary"
-                            className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-none shadow-none focus:outline-none focus:ring-0 self-start sm:self-center whitespace-nowrap"
-                            onClick={() => handleOpenAttemptModal(attempt._id)}
+                            onClick={() =>
+                              handleOpenAttemptModal(
+                                quizAgg.attempts[quizAgg.attempts.length - 1]
+                                  ._id
+                              )
+                            }
+                            className="text-xs px-3 py-1"
                           >
-                            View Incorrect Answers
+                            View Details
                           </Button>
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Card>
-          ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <UserIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No quiz results yet
+                </h3>
+                <p className="text-slate-500">
+                  This staff member hasn't completed any quizzes.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      </main>
+      </div>
 
       {isModalOpen &&
         modalDataForIncorrectAnswers && ( // Added check for modalDataForIncorrectAnswers
@@ -293,7 +283,7 @@ const StaffDetails: React.FC = () => {
             // error={modalError}
           />
         )}
-    </div>
+    </DashboardLayout>
   );
 };
 

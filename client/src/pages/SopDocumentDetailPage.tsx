@@ -9,7 +9,7 @@ import {
   updateSopCategory,
   deleteSopCategory,
 } from "../services/api"; // Adjusted path and added updateSopDocumentTitle
-import Navbar from "../components/Navbar"; // Added Navbar import
+import DashboardLayout from "../components/layout/DashboardLayout";
 import RecursiveCategoryList, {
   CategoryModalTriggers,
 } from "../components/sop/RecursiveCategoryList"; // Updated import
@@ -27,6 +27,11 @@ import {
   EyeIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline"; // Example icons for future edit/delete functionality
+import ErrorMessage from "../components/common/ErrorMessage";
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import SuccessNotification from "../components/common/SuccessNotification";
+import AiQuestionReviewModal from "../components/questionBank/AiQuestionReviewModal";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 
 const SopDocumentDetailPage: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
@@ -361,260 +366,249 @@ const SopDocumentDetailPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-5 flex items-center justify-between">
-            <Link
-              to="/sop-management"
-              className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors duration-150 ease-in-out group"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2 text-indigo-500 group-hover:text-indigo-700" />
-              Back to SOP Management
-            </Link>
-            {/* Placeholder for future actions like a global edit/delete button for the doc */}
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-          {/* Document Header Section */}
-          <div className="p-6 md:p-8 border-b border-slate-200">
-            <div className="flex items-start justify-between mb-3">
-              {isEditingTitle ? (
-                <div className="flex-grow mr-4">
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={handleTitleChange}
-                    onBlur={handleSaveTitle} // Save on blur
-                    onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()} // Save on Enter
-                    autoFocus
-                    className="text-3xl font-bold text-slate-800 w-full border-b-2 border-indigo-500 focus:outline-none py-1.5"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Press Enter to save or click away.
-                  </p>
-                </div>
-              ) : (
-                <h1 className="text-3xl font-bold text-slate-800 flex-grow break-words mr-2">
-                  {document.title}
-                </h1>
-              )}
-              <button
-                onClick={() => {
-                  if (isEditingTitle) {
-                    handleSaveTitle();
-                  } else {
-                    setNewTitle(document.title);
-                    setIsEditingTitle(true);
-                  }
-                }}
-                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0"
-                title={isEditingTitle ? "Save Title" : "Edit Title"}
-              >
-                <PencilIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Display Description */}
-            <div className="mb-4">
-              {isEditingDescription ? (
-                <div className="mt-2">
-                  <textarea
-                    value={newDescription}
-                    onChange={handleDescriptionChange}
-                    onBlur={handleSaveDescription}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" &&
-                      !e.shiftKey &&
-                      handleSaveDescription()
-                    } // Save on Enter (not Shift+Enter)
-                    autoFocus
-                    rows={4}
-                    className="text-md text-slate-700 w-full border-2 border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm p-2 resize-y"
-                    placeholder="Enter document description..."
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Press Enter (without Shift) to save or click away.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-start justify-between group">
-                  <p className="text-md text-slate-600 whitespace-pre-wrap flex-grow">
-                    {document.description || (
-                      <span className="italic text-slate-400">
-                        No description provided. Click the pencil to add one.
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setNewDescription(document.description || "");
-                      setIsEditingDescription(true);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-                    title="Edit Description"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Document Details Grid */}
-          <div className="p-6 md:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 border-b border-slate-200">
-            {[
-              {
-                label: "Status",
-                value:
-                  document.status.charAt(0).toUpperCase() +
-                  document.status.slice(1),
-                colorClass:
-                  document.status === "processed"
-                    ? "text-green-600"
-                    : document.status === "processing_error"
-                    ? "text-red-600"
-                    : "text-yellow-600",
-              },
-              {
-                label: "File Type",
-                value: (document.fileType || "N/A").toUpperCase(),
-              },
-              {
-                label: "Uploaded At",
-                value: document.uploadedAt
-                  ? format(new Date(document.uploadedAt), "MMM yyyy")
-                  : "N/A",
-              },
-              {
-                label: "Last Updated",
-                value: document.updatedAt
-                  ? format(new Date(document.updatedAt), "dd MMM yyyy, p")
-                  : "N/A",
-              },
-            ].map((detail) => (
-              <div
-                key={detail.label}
-                className="bg-slate-50 p-4 rounded-lg shadow-sm border border-slate-200"
-              >
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                  {detail.label}
-                </h3>
-                <p
-                  className={`text-md font-medium ${
-                    detail.colorClass || "text-slate-800"
-                  }`}
-                >
-                  {detail.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {document.errorMessage && document.status === "processing_error" && (
-            <div className="m-6 md:m-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">
-              <h3 className="text-lg font-semibold mb-1">Processing Error:</h3>
-              <p className="text-sm">{document.errorMessage}</p>
-            </div>
-          )}
-
-          {/* Categories Section */}
-          <div className="p-6 md:p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-semibold text-slate-700">
-                Document Content & Categories
-              </h2>
-              <div className="flex items-center space-x-3">
-                {" "}
-                {/* Container for buttons */}
+      <DashboardLayout>
+        <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+            {/* Document Header Section */}
+            <div className="p-6 md:p-8 border-b border-slate-200">
+              <div className="flex items-start justify-between mb-3">
+                {isEditingTitle ? (
+                  <div className="flex-grow mr-4">
+                    <input
+                      type="text"
+                      value={newTitle}
+                      onChange={handleTitleChange}
+                      onBlur={handleSaveTitle} // Save on blur
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()} // Save on Enter
+                      autoFocus
+                      className="text-3xl font-bold text-slate-800 w-full border-b-2 border-indigo-500 focus:outline-none py-1.5"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Press Enter to save or click away.
+                    </p>
+                  </div>
+                ) : (
+                  <h1 className="text-3xl font-bold text-slate-800 flex-grow break-words mr-2">
+                    {document.title}
+                  </h1>
+                )}
                 <button
-                  onClick={handleAddTopLevelCategory}
-                  className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                  onClick={() => {
+                    if (isEditingTitle) {
+                      handleSaveTitle();
+                    } else {
+                      setNewTitle(document.title);
+                      setIsEditingTitle(true);
+                    }
+                  }}
+                  className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0"
+                  title={isEditingTitle ? "Save Title" : "Edit Title"}
                 >
-                  <PlusIcon className="h-5 w-5 mr-1.5" />
-                  Add Category
+                  <PencilIcon className="h-5 w-5" />
                 </button>
               </div>
-            </div>
 
-            {document.categories && document.categories.length > 0 ? (
-              <RecursiveCategoryList
-                categories={document.categories}
-                {...categoryModalTriggers}
-              />
-            ) : (
-              <div className="text-center py-10 px-6 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
-                <svg
-                  className="mx-auto h-12 w-12 text-slate-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    vectorEffect="non-scaling-stroke"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                  />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-slate-900">
-                  No categories found.
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  This document may not have been processed yet, or it has no
-                  structured content.
-                </p>
-                {(document.status === "pending_upload" ||
-                  document.status === "pending_processing" ||
-                  document.status === "processing") && (
-                  <p className="mt-2 text-sm text-blue-600">
-                    Processing is currently in progress.
-                  </p>
+              {/* Display Description */}
+              <div className="mb-4">
+                {isEditingDescription ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={newDescription}
+                      onChange={handleDescriptionChange}
+                      onBlur={handleSaveDescription}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" &&
+                        !e.shiftKey &&
+                        handleSaveDescription()
+                      } // Save on Enter (not Shift+Enter)
+                      autoFocus
+                      rows={4}
+                      className="text-md text-slate-700 w-full border-2 border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm p-2 resize-y"
+                      placeholder="Enter document description..."
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Press Enter (without Shift) to save or click away.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between group">
+                    <p className="text-md text-slate-600 whitespace-pre-wrap flex-grow">
+                      {document.description || (
+                        <span className="italic text-slate-400">
+                          No description provided. Click the pencil to add one.
+                        </span>
+                      )}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setNewDescription(document.description || "");
+                        setIsEditingDescription(true);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                      title="Edit Description"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
 
-          {(document.status === "pending_upload" ||
-            document.status === "pending_processing" ||
-            document.status === "processing") &&
-            document.categories.length === 0 && (
-              <div className="p-6 md:p-8 mt-0 border-t border-slate-200">
-                <div className="p-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg flex items-center">
-                  <svg
-                    className="animate-spin h-5 w-5 mr-3 text-blue-500"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
+            {/* Document Details Grid */}
+            <div className="p-6 md:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 border-b border-slate-200">
+              {[
+                {
+                  label: "Status",
+                  value:
+                    document.status.charAt(0).toUpperCase() +
+                    document.status.slice(1),
+                  colorClass:
+                    document.status === "processed"
+                      ? "text-green-600"
+                      : document.status === "processing_error"
+                      ? "text-red-600"
+                      : "text-yellow-600",
+                },
+                {
+                  label: "File Type",
+                  value: (document.fileType || "N/A").toUpperCase(),
+                },
+                {
+                  label: "Uploaded At",
+                  value: document.uploadedAt
+                    ? format(new Date(document.uploadedAt), "MMM yyyy")
+                    : "N/A",
+                },
+                {
+                  label: "Last Updated",
+                  value: document.updatedAt
+                    ? format(new Date(document.updatedAt), "dd MMM yyyy, p")
+                    : "N/A",
+                },
+              ].map((detail) => (
+                <div
+                  key={detail.label}
+                  className="bg-slate-50 p-4 rounded-lg shadow-sm border border-slate-200"
+                >
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    {detail.label}
+                  </h3>
+                  <p
+                    className={`text-md font-medium ${
+                      detail.colorClass || "text-slate-800"
+                    }`}
                   >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  <span>
-                    This document is currently being processed. Categories will
-                    appear once complete.
-                  </span>
+                    {detail.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {document.errorMessage &&
+              document.status === "processing_error" && (
+                <div className="m-6 md:m-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-1">
+                    Processing Error:
+                  </h3>
+                  <p className="text-sm">{document.errorMessage}</p>
+                </div>
+              )}
+
+            {/* Categories Section */}
+            <div className="p-6 md:p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-slate-700">
+                  Document Content & Categories
+                </h2>
+                <div className="flex items-center space-x-3">
+                  {" "}
+                  {/* Container for buttons */}
+                  <button
+                    onClick={handleAddTopLevelCategory}
+                    className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    <PlusIcon className="h-5 w-5 mr-1.5" />
+                    Add Category
+                  </button>
                 </div>
               </div>
-            )}
-        </div>
-      </main>
+
+              {document.categories && document.categories.length > 0 ? (
+                <RecursiveCategoryList
+                  categories={document.categories}
+                  {...categoryModalTriggers}
+                />
+              ) : (
+                <div className="text-center py-10 px-6 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
+                  <svg
+                    className="mx-auto h-12 w-12 text-slate-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      vectorEffect="non-scaling-stroke"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                    />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-slate-900">
+                    No categories found.
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    This document may not have been processed yet, or it has no
+                    structured content.
+                  </p>
+                  {(document.status === "pending_upload" ||
+                    document.status === "pending_processing" ||
+                    document.status === "processing") && (
+                    <p className="mt-2 text-sm text-blue-600">
+                      Processing is currently in progress.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {(document.status === "pending_upload" ||
+              document.status === "pending_processing" ||
+              document.status === "processing") &&
+              document.categories.length === 0 && (
+                <div className="p-6 md:p-8 mt-0 border-t border-slate-200">
+                  <div className="p-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg flex items-center">
+                    <svg
+                      className="animate-spin h-5 w-5 mr-3 text-blue-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span>
+                      This document is currently being processed. Categories
+                      will appear once complete.
+                    </span>
+                  </div>
+                </div>
+              )}
+          </div>
+        </main>
+      </DashboardLayout>
       {/* Modal Render */}
       {isCategoryModalOpen && (
         <CategoryFormModal

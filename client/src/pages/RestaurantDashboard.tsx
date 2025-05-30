@@ -23,6 +23,8 @@ import {
   PlusIcon,
   ArrowUpOnSquareIcon,
   DocumentArrowUpIcon,
+  HomeIcon,
+  TrophyIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to check if a quiz is completed regardless of capitalization
@@ -221,10 +223,10 @@ const RestaurantDashboard: React.FC = () => {
     <DashboardLayout title="Restaurant Dashboard">
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-              <ChartBarIcon className="h-8 w-8 text-white" />
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+              <HomeIcon className="h-8 w-8 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">
@@ -269,7 +271,7 @@ const RestaurantDashboard: React.FC = () => {
           <Link to="/staff-results" className="block group">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
                   <UsersIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -304,7 +306,7 @@ const RestaurantDashboard: React.FC = () => {
           <Link to="/quiz-management" className="block group">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-green-600 rounded-xl shadow-lg">
                   <AcademicCapIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -339,7 +341,7 @@ const RestaurantDashboard: React.FC = () => {
           <Link to="/menu" className="block group">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
                   <DocumentTextIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -373,7 +375,7 @@ const RestaurantDashboard: React.FC = () => {
           {/* Average Performance Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg">
+              <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
                 <ChartBarIcon className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -388,7 +390,7 @@ const RestaurantDashboard: React.FC = () => {
             <div className="mt-4">
               <div className="w-full bg-slate-200 rounded-full h-2">
                 <div
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                   style={{
                     width: `${Math.min(
                       parseFloat(overallAveragePerformance),
@@ -405,15 +407,15 @@ const RestaurantDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Quick Actions */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
-              <h3 className="text-xl font-semibold text-slate-900">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900">
                 Quick Actions
-              </h3>
+              </h2>
             </div>
             <div className="p-6 space-y-4">
               <button
                 onClick={openPdfUploadModal}
-                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
               >
                 <DocumentArrowUpIcon className="h-5 w-5" />
                 <span>Upload Menu PDF</span>
@@ -421,7 +423,7 @@ const RestaurantDashboard: React.FC = () => {
 
               <Link
                 to="/quiz-management"
-                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
               >
                 <PlusIcon className="h-5 w-5" />
                 <span>Create New Quiz</span>
@@ -431,10 +433,10 @@ const RestaurantDashboard: React.FC = () => {
 
           {/* Invite Staff */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
-              <h3 className="text-xl font-semibold text-slate-900">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900">
                 Invite Staff
-              </h3>
+              </h2>
             </div>
             <div className="p-6">
               <form onSubmit={handleInviteFormSubmit} className="space-y-4">
@@ -459,7 +461,7 @@ const RestaurantDashboard: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isStaffInviteLoading || !inviteEmail.trim()}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="w-full px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 >
                   {isStaffInviteLoading ? (
                     <div className="flex items-center justify-center space-x-2">
@@ -491,10 +493,10 @@ const RestaurantDashboard: React.FC = () => {
         {/* Performance Chart */}
         {averageScoreChartData && staffData.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
-              <h3 className="text-xl font-semibold text-slate-900">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900">
                 Staff Performance Overview
-              </h3>
+              </h2>
             </div>
             <div className="p-6">
               <BarChart

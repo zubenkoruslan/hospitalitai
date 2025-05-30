@@ -160,13 +160,11 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
           }}
           role="button" // Indicate it's an interactive element
           aria-label="Drop PDF file here or click to select a file"
-          className={`p-6 py-10 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors duration-200 ease-in-out 
-            ${
-              isDraggingOver
-                ? "border-sky-500 bg-sky-50"
-                : "border-slate-300 hover:border-slate-400 bg-slate-50"
-            }
-            `} // Removed isUploading opacity/cursor changes
+          className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-xl transition-all duration-200 ${
+            isDraggingOver
+              ? "border-blue-500 bg-blue-50"
+              : "border-slate-300 hover:border-slate-400"
+          }`}
         >
           <input
             ref={fileInputRef}
@@ -176,26 +174,37 @@ const PdfMenuUpload: React.FC<PdfMenuUploadProps> = ({
             onChange={handleFileChange}
             className="hidden"
           />
-          <ArrowUpTrayIcon
-            className={`mx-auto h-12 w-12 mb-3 ${
-              isDraggingOver ? "text-sky-600" : "text-slate-400"
+          <svg
+            className={`mx-auto h-12 w-12 ${
+              isDraggingOver ? "text-blue-600" : "text-slate-400"
             }`}
-          />
+            stroke="currentColor"
+            fill="none"
+            viewBox="0 0 48 48"
+            aria-hidden="true"
+          >
+            <path
+              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="flex text-sm text-gray-600">
+            <p
+              className={`pl-1 font-medium ${
+                isDraggingOver ? "text-blue-700" : "text-slate-700"
+              }`}
+            >
+              {isDraggingOver ? "Drop your PDF here" : "Upload a PDF menu file"}
+            </p>
+          </div>
           <p
-            className={`text-sm font-medium ${
-              isDraggingOver ? "text-sky-700" : "text-slate-700"
+            className={`text-xs ${
+              isDraggingOver ? "text-blue-600" : "text-slate-500"
             }`}
           >
-            {selectedFile
-              ? selectedFile.name
-              : "Drag & drop your PDF here, or click to select"}
-          </p>
-          <p
-            className={`text-xs mt-1 ${
-              isDraggingOver ? "text-sky-600" : "text-slate-500"
-            }`}
-          >
-            PDF only, max 5MB
+            PDF up to 10MB
           </p>
         </div>
 

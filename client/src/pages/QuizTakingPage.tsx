@@ -3,6 +3,7 @@ import {
   // Link, // Removed Link
   useParams,
   useNavigate /*, useLocation*/,
+  Navigate,
 } from "react-router-dom"; // useLocation might be used for quizTitle
 import { useAuth } from "../context/AuthContext";
 import {
@@ -30,6 +31,12 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
+import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
+import {
+  AcademicCapIcon,
+  ClockIcon,
+  CheckCircleIcon,
+} from "@heroicons/react/24/outline";
 
 // --- Interfaces ---
 // Old QuizQuestion and QuizForTaking interfaces are no longer needed
@@ -67,7 +74,7 @@ const getLocalStorageKey = (quizId: string | undefined) => {
 // --- Main Component ---
 const QuizTakingPage: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
-  const { user: _user } = useAuth(); // Prefixed user
+  const { user } = useAuth();
   const navigate = useNavigate();
   // const location = useLocation(); // Potentially for quizTitle
 
@@ -537,10 +544,10 @@ const QuizTakingPage: React.FC = () => {
   const _isLastQuestionLocal = _isLastQuestion; // Prefixed isLastQuestion, and renamed to avoid conflict with line 634
   const _allAnsweredLocal = _allAnswered; // Prefixed allAnswered, and renamed to avoid conflict with line 635
 
-  // --- Main Render ---
+  // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
         <Navbar />
         <main className="flex-grow flex items-center justify-center max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
           <LoadingSpinner message="Loading quiz questions..." />
@@ -549,28 +556,39 @@ const QuizTakingPage: React.FC = () => {
     );
   }
 
-  // Display error prominently if it occurs during question loading phase
-  if (error && questions.length === 0 && !submissionResult) {
+  // Redirect to /dashboard if user is not authorized (not staff)
+  if (!user || user.role !== "staff") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Show quiz not found error
+  if (error) {
     return (
-      <div className="flex flex-col min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center">
-          <Card className="w-full max-w-lg p-8 text-center">
+        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
+          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <AcademicCapIcon className="h-8 w-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">
+              Quiz Not Available
+            </h1>
             <ErrorMessage message={error} />
             <Button
-              variant="primary"
+              variant="secondary"
               onClick={() => navigate("/staff/dashboard")}
-              className="mt-6"
+              className="mt-4"
             >
               Back to Dashboard
             </Button>
-          </Card>
+          </div>
         </main>
       </div>
     );
   }
 
-  // --- Submission Result Screen ---
+  // Show quiz results
   if (submissionResult) {
     const {
       score,
@@ -581,21 +599,33 @@ const QuizTakingPage: React.FC = () => {
       totalQuestionsAttempted > 0 ? (score / totalQuestionsAttempted) * 100 : 0;
 
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
         <Navbar />
         <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-green-600">
-              Quiz Completed!
-            </h1>
-            <p className="mt-2 text-xl text-gray-700">
-              Your Score: {score} / {totalQuestionsAttempted} (
-              {percentage.toFixed(1)}%)
-            </p>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
+            <div className="text-center mb-8">
+              <div className="p-3 bg-green-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <CheckCircleIcon className="h-8 w-8 text-green-600" />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 mb-4">
+                Quiz Complete!
+              </h1>
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4">
+                  Your Score: {score}/{totalQuestionsAttempted} (
+                  {percentage.toFixed(1)}%)
+                </h2>
+                <p className="text-slate-600">
+                  {percentage >= 70
+                    ? "Congratulations! You passed the quiz."
+                    : "Keep studying and try again."}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+            <h2 className="text-2xl font-semibold text-slate-900 mb-6 text-center">
               Review Your Answers
             </h2>
             {gradedQuestions && gradedQuestions.length > 0 ? (
@@ -603,18 +633,18 @@ const QuizTakingPage: React.FC = () => {
                 {gradedQuestions.map((q, index) => (
                   <div
                     key={q.questionId}
-                    className={`p-4 rounded-lg shadow-sm ${
+                    className={`p-4 rounded-lg border ${
                       q.isCorrect
-                        ? "bg-green-50 border-l-4 border-green-400"
-                        : "bg-red-50 border-l-4 border-red-400"
+                        ? "bg-green-50 border-green-200"
+                        : "bg-red-50 border-red-200"
                     }`}
                   >
-                    <p className="font-semibold text-gray-800 mb-1">
+                    <p className="font-semibold text-slate-900 mb-2">
                       Question {index + 1}:{" "}
                       {questions.find((origQ) => origQ._id === q.questionId)
                         ?.questionText || "Question text not found"}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-600 mb-2">
                       Your answer:{" "}
                       {renderAnswer(
                         q.answerGiven,
@@ -633,26 +663,19 @@ const QuizTakingPage: React.FC = () => {
                         )}
                       </p>
                     )}
-                    {q.explanation && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <p className="text-xs text-gray-600">
-                          <span className="font-semibold">Explanation:</span>{" "}
-                          {q.explanation}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500">
-                No graded questions to display.
+              <p className="text-center text-slate-500">
+                No review data available.
               </p>
             )}
-            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+
+            <div className="flex justify-center mt-8 space-x-4">
               <Button
-                onClick={() => navigate("/staff/dashboard")}
                 variant="primary"
+                onClick={() => navigate("/staff/dashboard")}
               >
                 Back to Dashboard
               </Button>
@@ -666,7 +689,7 @@ const QuizTakingPage: React.FC = () => {
   // --- Current Question Display ---
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
         <Navbar />
         <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
           <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
@@ -694,33 +717,23 @@ const QuizTakingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar
         isBlockingNavigation={isQuizInProgress}
         onAttemptBlockedNavigation={confirmNavigation}
       />
-
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-        {/* Page Title Header */}
-        <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                {quizTitle}
-              </h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Question {currentQuestionIndex + 1} of {questions.length}
-              </p>
+        {/* Header Section */}
+        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm mb-8">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+              <AcademicCapIcon className="h-8 w-8 text-white" />
             </div>
             <div>
-              <Button
-                onClick={handleCancelQuiz}
-                variant="secondary"
-                className="text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-300"
-                disabled={isCancelling || isSubmitting}
-              >
-                {isCancelling ? "Cancelling..." : "Cancel & Exit"}
-              </Button>
+              <h1 className="text-3xl font-bold text-slate-900">{quizTitle}</h1>
+              <p className="text-slate-600 mt-2">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </p>
             </div>
           </div>
         </div>

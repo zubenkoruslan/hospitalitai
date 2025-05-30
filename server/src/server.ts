@@ -33,6 +33,8 @@ import aiRoutes from "./routes/aiRoutes";
 import restaurantRoutes from "./routes/restaurantRoutes";
 import sopDocumentRoutes from "./routes/sopDocumentRoutes";
 import sopDocumentEditRoutes from "./routes/sopDocumentEditRoutes"; // Import new edit routes
+import invitationRoutes from "./routes/invitation"; // Import invitation routes
+import passwordResetRoutes from "./routes/passwordReset"; // Import password reset routes
 
 // Import and start the menu import worker
 import "./workers/menuImportWorker"; // This will start the worker
@@ -99,6 +101,7 @@ app.get("/health", (_req: Request, res: Response) => {
 
 // Mount API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", passwordResetRoutes); // Mount password reset routes under /api/auth
 app.use("/api/menus", menuRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/quizzes", quizRoutes);
@@ -111,6 +114,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/sop-documents", sopDocumentRoutes);
 app.use("/api/sop-documents", sopDocumentEditRoutes);
+app.use("/api/invitations", invitationRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

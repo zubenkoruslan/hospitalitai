@@ -143,53 +143,63 @@ const SopUploadModal: React.FC<SopUploadModalProps> = ({
           <div
             {...getRootProps()}
             tabIndex={0}
-            className={`p-6 py-10 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors duration-200 ease-in-out
-              ${
-                isDragActive
-                  ? "border-sky-500 bg-sky-50"
-                  : "border-slate-300 hover:border-slate-400 bg-slate-50"
-              }
-              ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors duration-200 ${
+              isDragActive
+                ? "border-blue-500 bg-blue-50"
+                : "border-slate-300 hover:border-slate-400"
+            }`}
           >
             <input {...getInputProps()} />
-            <ArrowUpTrayIcon
-              className={`mx-auto h-12 w-12 mb-3 ${
-                isDragActive ? "text-sky-600" : "text-slate-400"
+            <svg
+              className={`mx-auto h-12 w-12 ${
+                isDragActive ? "text-blue-600" : "text-slate-400"
               }`}
-            />
-            <p
-              className={`text-sm font-medium ${
-                isDragActive ? "text-sky-700" : "text-slate-700"
-              }`}
+              stroke="currentColor"
+              fill="none"
+              viewBox="0 0 48 48"
+              aria-hidden="true"
             >
-              {file
-                ? file.name
-                : isDragActive
-                ? "Drop the file here..."
-                : "Drag & drop your SOP file here, or click to select"}
-            </p>
-            {file && (
-              <div className="mt-1 text-xs text-slate-500">
-                <span>({(file.size / 1024).toFixed(2)} KB) </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFile(null);
+              <path
+                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div className="flex text-sm text-slate-600">
+              <label
+                htmlFor="file-upload"
+                className={`relative cursor-pointer rounded-md font-medium ${
+                  isDragActive ? "text-blue-700" : "text-slate-700"
+                } hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500`}
+              >
+                <span>Upload a file</span>
+                <input
+                  id="file-upload"
+                  name="file-upload"
+                  type="file"
+                  className="sr-only"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setFile(e.target.files[0]);
+                      setLocalError(null);
+                    } else {
+                      setLocalError(
+                        "Invalid file type or too many files selected."
+                      );
+                    }
                   }}
-                  className="ml-2 text-red-500 hover:text-red-700 font-medium items-center inline-flex"
-                  aria-label="Remove selected file"
-                >
-                  <XMarkIcon className="h-3 w-3 mr-0.5" /> Remove
-                </button>
-              </div>
-            )}
+                  accept=".pdf,.doc,.docx,.txt"
+                />
+              </label>
+              <p className="pl-1">or drag and drop</p>
+            </div>
             <p
-              className={`text-xs mt-1 ${
-                isDragActive ? "text-sky-600" : "text-slate-500"
+              className={`text-xs ${
+                isDragActive ? "text-blue-600" : "text-slate-500"
               }`}
             >
-              PDF, DOCX, TXT, MD up to 10MB
+              PDF, DOC, DOCX, TXT up to 10MB
             </p>
           </div>
         </div>

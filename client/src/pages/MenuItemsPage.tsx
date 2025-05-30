@@ -692,38 +692,47 @@ const MenuItemsPage: React.FC = () => {
     >
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-8 border border-amber-100 shadow-sm">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="p-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl shadow-lg">
-              <DocumentTextIcon className="h-8 w-8 text-white" />
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            {/* Title and Description Section */}
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
+                <DocumentTextIcon className="h-8 w-8 text-white" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold text-slate-900">
+                  {menuDetails.name}
+                </h1>
+                {menuDetails.description && (
+                  <p className="text-slate-600 text-lg">
+                    {menuDetails.description}
+                  </p>
+                )}
+                <p className="text-sm text-slate-500">
+                  Manage menu items and categories
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                {menuDetails.name}
-              </h1>
-              {menuDetails.description && (
-                <p className="text-slate-600 mt-2">{menuDetails.description}</p>
-              )}
-            </div>
-          </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              variant="secondary"
-              onClick={openMenuDetailsModal}
-              className="flex items-center space-x-2"
-            >
-              <PencilIcon className="h-4 w-4" />
-              <span>Edit Menu Details</span>
-            </Button>
-            <Button
-              variant="primary"
-              onClick={openAddModal}
-              className="flex items-center space-x-2"
-            >
-              <PlusIcon className="h-4 w-4" />
-              <span>Add New Item</span>
-            </Button>
+            {/* Action Buttons Section */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <Button
+                variant="secondary"
+                onClick={openMenuDetailsModal}
+                className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+              >
+                <PencilIcon className="h-4 w-4" />
+                <span>Edit Menu Details</span>
+              </Button>
+              <Button
+                variant="primary"
+                onClick={openAddModal}
+                className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Add New Item</span>
+              </Button>
+            </div>
           </div>
         </div>
 

@@ -3,6 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Button from "./common/Button";
 import ErrorMessage from "./common/ErrorMessage";
+import PasswordInput, {
+  validatePasswordStrength,
+} from "./common/PasswordInput";
+import ConfirmPasswordInput from "./common/ConfirmPasswordInput";
 
 const SignupForm: React.FC = () => {
   const [name, setName] = useState("");
@@ -21,6 +25,14 @@ const SignupForm: React.FC = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+
+    // Validate password strength
+    if (!validatePasswordStrength(password)) {
+      setError(
+        "Password must be at least 6 characters and contain uppercase, lowercase, and number."
+      );
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -86,7 +98,7 @@ const SignupForm: React.FC = () => {
   const labelClasses = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-lg w-full space-y-8 bg-white p-10 shadow-xl rounded-2xl">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-700">
@@ -166,43 +178,28 @@ const SignupForm: React.FC = () => {
               />
             </div>
           </div>
-          <div>
-            <label htmlFor="password" className={labelClasses}>
-              Password (min. 6 characters)
-            </label>
-            <div className="mt-1">
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                className={inputClasses}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="confirmPassword" className={labelClasses}>
-              Confirm Password
-            </label>
-            <div className="mt-1">
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className={inputClasses}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
+          {/* Password Fields */}
+          <PasswordInput
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            disabled={isLoading}
+            placeholder="Enter your password"
+            id="password"
+            name="password"
+            autoComplete="new-password"
+          />
+
+          <ConfirmPasswordInput
+            value={confirmPassword}
+            originalPassword={password}
+            onChange={setConfirmPassword}
+            disabled={isLoading}
+            placeholder="Confirm your password"
+            id="confirmPassword"
+            name="confirmPassword"
+            autoComplete="new-password"
+          />
 
           {/* Conditional Fields */}
           {role === "restaurant" && (
@@ -251,14 +248,13 @@ const SignupForm: React.FC = () => {
           )}
 
           <div className="mt-8">
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50"
-              isLoading={isLoading}
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               Sign Up
-            </Button>
+            </button>
           </div>
         </form>
         <div className="text-sm text-center">

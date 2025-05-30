@@ -17,6 +17,8 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import Card from "../components/common/Card";
 import KPICard from "../components/settings/KPICard";
+import StaffInvitationForm from "../components/staff/StaffInvitationForm";
+import PendingInvitationsTable from "../components/staff/PendingInvitationsTable";
 import {
   StaffMemberWithData,
   SortField,
@@ -365,9 +367,9 @@ const StaffManagement: React.FC = () => {
     <DashboardLayout title="Staff & Role Management">
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
+        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
               <UsersIcon className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -446,7 +448,7 @@ const StaffManagement: React.FC = () => {
                 onClick={() => setSelectedRoleId(null)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   selectedRoleId === null
-                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                    ? "bg-emerald-600 text-white shadow-lg"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
@@ -458,7 +460,7 @@ const StaffManagement: React.FC = () => {
                   onClick={() => setSelectedRoleId(role._id)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     selectedRoleId === role._id
-                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                      ? "bg-emerald-600 text-white shadow-lg"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
@@ -483,7 +485,7 @@ const StaffManagement: React.FC = () => {
                   <select
                     value={selectedRoleId || ""}
                     onChange={(e) => setSelectedRoleId(e.target.value || null)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-sm"
+                    className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-sm"
                   >
                     <option value="">All Roles ({staffList.length})</option>
                     {rolesList.map((role) => (
@@ -542,7 +544,7 @@ const StaffManagement: React.FC = () => {
                             {col.field === "name" && (
                               <Link
                                 to={`/staff/${staff._id}`}
-                                className="font-medium text-sky-600 hover:text-sky-800 group-hover:underline"
+                                className="font-medium text-emerald-600 hover:text-emerald-800 group-hover:underline"
                               >
                                 {staff.name}
                               </Link>
@@ -577,7 +579,7 @@ const StaffManagement: React.FC = () => {
                                     assignRoleLoading === staff._id ||
                                     rolesLoading
                                   }
-                                  className="block w-full max-w-[150px] pl-3 pr-8 py-1 border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-xs"
+                                  className="block w-full max-w-[150px] pl-3 pr-8 py-1 border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-xs"
                                   aria-label={`Assign role to ${staff.name}`}
                                 >
                                   <option value="">Unassigned</option>
@@ -597,7 +599,7 @@ const StaffManagement: React.FC = () => {
                               <div className="flex items-center justify-end space-x-2">
                                 <Link
                                   to={`/staff/${staff._id}`}
-                                  className="text-sky-600 hover:text-sky-800 transition-colors text-xs font-medium py-1 px-2 rounded-md hover:bg-sky-50"
+                                  className="text-emerald-600 hover:text-emerald-800 transition-colors text-xs font-medium py-1 px-2 rounded-md hover:bg-emerald-50"
                                   title="View Details"
                                 >
                                   View
@@ -637,6 +639,28 @@ const StaffManagement: React.FC = () => {
               </p>
             )}
           </Card>
+        </div>
+
+        {/* Staff Invitation Management Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <StaffInvitationForm
+            onSuccess={(message) => {
+              setMessage(message);
+              // Clear the message after 5 seconds
+              setTimeout(() => setMessage(null), 5000);
+            }}
+            onError={(error) => {
+              setError(error);
+              // Clear the error after 5 seconds
+              setTimeout(() => setError(null), 5000);
+            }}
+          />
+          <PendingInvitationsTable
+            onInvitationCancelled={() => {
+              setMessage("Invitation cancelled successfully");
+              setTimeout(() => setMessage(null), 3000);
+            }}
+          />
         </div>
 
         <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">

@@ -451,10 +451,11 @@ const StaffDashboard: React.FC = () => {
     // Show main loader if auth is still loading
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
-        <DashboardLayout />
-        <main className="flex-grow flex items-center justify-center">
-          <LoadingSpinner message="Loading dashboard..." />
-        </main>
+        <DashboardLayout title="Loading">
+          <main className="flex-grow flex items-center justify-center">
+            <LoadingSpinner message="Loading dashboard..." />
+          </main>
+        </DashboardLayout>
       </div>
     );
   }
@@ -463,9 +464,9 @@ const StaffDashboard: React.FC = () => {
     <DashboardLayout title="Staff Dashboard">
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100 shadow-sm">
+        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg">
+            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
               <AcademicCapIcon className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -485,71 +486,60 @@ const StaffDashboard: React.FC = () => {
         </div>
 
         {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Overall Progress */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                <ChartBarIcon className="h-6 w-6 text-white" />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Quizzes Completed */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Quizzes Available
+                <p className="text-sm font-medium text-slate-600">
+                  Quizzes Completed
                 </p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {quizzes.length}
+                  {completedQuizzes.length}
                 </p>
+              </div>
+              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                <CheckCircleIcon className="h-6 w-6 text-white" />
               </div>
             </div>
           </div>
 
-          {/* Ranking */}
-          {rankingData.myRank !== null && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-lg">
-                  <TrophyIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Your Rank
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    #{rankingData.myRank} of {rankingData.totalRankedStaff}
-                  </p>
-                </div>
+          {/* Certificates Earned */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">
+                  Certificates Earned
+                </p>
+                <p className="text-2xl font-bold text-slate-900">
+                  {completedQuizzes.length}
+                </p>
+              </div>
+              <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
+                <TrophyIcon className="h-6 w-6 text-white" />
               </div>
             </div>
-          )}
+          </div>
 
           {/* Average Score */}
-          {rankingData.myAverageScore !== null && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg">
-                  <CheckCircleIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Avg. Score
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {rankingData.myAverageScore.toFixed(1)}%
-                  </p>
-                </div>
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">
+                  Average Score
+                </p>
+                <p className="text-2xl font-bold text-slate-900">
+                  {rankingData?.myAverageScore !== null &&
+                  rankingData?.myAverageScore !== undefined
+                    ? `${rankingData.myAverageScore.toFixed(1)}%`
+                    : "N/A"}
+                </p>
               </div>
-              <div className="mt-4">
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${Math.min(rankingData.myAverageScore, 100)}%`,
-                    }}
-                  ></div>
-                </div>
+              <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
+                <ChartBarIcon className="h-6 w-6 text-white" />
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Error Message */}
@@ -561,7 +551,7 @@ const StaffDashboard: React.FC = () => {
 
         {/* Quizzes Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
             <h2 className="text-xl font-semibold text-slate-900">
               Available Quizzes
             </h2>

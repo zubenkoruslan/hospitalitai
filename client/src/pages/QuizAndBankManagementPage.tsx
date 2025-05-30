@@ -463,9 +463,9 @@ const QuizAndBankManagementPage: React.FC = () => {
     <DashboardLayout title="Quiz & Question Bank Management">
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-8 border border-indigo-100 shadow-sm">
+        <div className="bg-indigo-50 rounded-2xl p-8 border border-indigo-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg">
+            <div className="p-3 bg-indigo-600 rounded-xl shadow-lg">
               <AcademicCapIcon className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -497,7 +497,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
         {/* Question Banks Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
             <div className="flex justify-between items-center">
               <div
                 className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
@@ -582,23 +582,10 @@ const QuizAndBankManagementPage: React.FC = () => {
 
         {/* Quizzes Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <AcademicCapIcon className="h-6 w-6 text-slate-700 mr-3" />
-                <h2 className="text-xl font-semibold text-slate-900">
-                  Quizzes
-                </h2>
-              </div>
-              <Button
-                variant="primary"
-                onClick={() => setIsGenerateQuizModalOpen(true)}
-                className="flex items-center space-x-2"
-              >
-                <PlusIcon className="h-4 w-4" />
-                <span>Create Quiz</span>
-              </Button>
-            </div>
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Quiz Management
+            </h2>
           </div>
 
           <div className="p-6">

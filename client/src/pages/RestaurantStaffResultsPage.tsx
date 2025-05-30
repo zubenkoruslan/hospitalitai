@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSummary } from "../hooks/useStaffSummary"; // Import the new hook
 import { useQuizCount } from "../hooks/useQuizCount"; // Import the quiz count hook
-import Navbar from "../components/Navbar"; // Import Navbar
+import DashboardLayout from "../components/layout/DashboardLayout"; // Updated import
 import LoadingSpinner from "../components/common/LoadingSpinner"; // Import common LoadingSpinner
 import ErrorMessage from "../components/common/ErrorMessage"; // Import common ErrorMessage
 import ScoreDistributionChart from "../components/charts/ScoreDistributionChart"; // Import the chart
@@ -19,6 +19,12 @@ import { Filters, StaffMemberWithData } from "../types/staffTypes";
 import KPICard from "../components/settings/KPICard"; // Added KPICard import
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
+import {
+  ChartBarIcon,
+  UsersIcon,
+  AcademicCapIcon,
+  TrophyIcon,
+} from "@heroicons/react/24/outline"; // Added icons
 
 // Helper function to format percentages (moved from StaffManagement.tsx)
 const formatPercentage = (value: number | null) =>
@@ -244,64 +250,119 @@ const RestaurantStaffResultsPage: React.FC = () => {
   }, [staffData, calculateAndSetKPIs]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-        <div>
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-              Staff Quiz Results & Performance Analytics
-            </h1>
+    <DashboardLayout title="Staff Results & Analytics">
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
+              <ChartBarIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                Staff Results & Performance Analytics
+              </h1>
+              <p className="text-slate-600 mt-2">
+                Track staff quiz performance and training progress
+              </p>
+            </div>
           </div>
+        </div>
 
-          {loading && <LoadingSpinner message="Loading staff results..." />}
-          {error && <ErrorMessage message={error} />}
-          {!loading && !error && (
-            <>
-              {/* KPIs Section */}
-              <Card className="mb-6">
-                <h2 className="text-xl font-semibold mb-4 text-gray-700">
-                  Key Performance Indicators
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <KPICard
-                    title="Total Staff"
-                    value={totalStaff === null ? "N/A" : totalStaff.toString()}
-                    isLoading={staffLoading} // Use staffLoading for individual KPI cards
-                  />
-                  <KPICard
-                    title="Avg. Quiz Score"
-                    value={formatPercentage(avgQuizScore)}
-                    isLoading={staffLoading}
-                  />
+        {/* Loading and Error States */}
+        {loading && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
+            <div className="text-center">
+              <LoadingSpinner message="Loading staff results..." />
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <ErrorMessage message={error} />
+          </div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* KPIs Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h2 className="text-xl font-semibold text-slate-900 mb-6">
+                Key Performance Indicators
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <UsersIcon className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-700">
+                        Total Staff
+                      </h3>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {totalStaff === null ? "N/A" : totalStaff.toString()}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </Card>
+                <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <TrophyIcon className="h-6 w-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-700">
+                        Avg. Quiz Score
+                      </h3>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {formatPercentage(avgQuizScore)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-              <div className="mb-4 flex justify-end">
-                <button
-                  onClick={() =>
-                    setShowDistributionChart(!showDistributionChart)
-                  }
-                  className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  {showDistributionChart
-                    ? "Hide Overall Score Distribution"
-                    : "Show Overall Score Distribution"}
-                </button>
+            {/* Score Distribution Chart */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Score Distribution
+                  </h2>
+                  <button
+                    onClick={() =>
+                      setShowDistributionChart(!showDistributionChart)
+                    }
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    {showDistributionChart ? "Hide Chart" : "Show Chart"}
+                  </button>
+                </div>
               </div>
 
               {showDistributionChart && (
-                <ScoreDistributionChart
-                  staffData={staffData}
-                  selectedCategory={selectedPerformanceCategory}
-                  onSelectCategory={setSelectedPerformanceCategory}
-                />
+                <div className="p-6">
+                  <ScoreDistributionChart
+                    staffData={staffData}
+                    selectedCategory={selectedPerformanceCategory}
+                    onSelectCategory={setSelectedPerformanceCategory}
+                  />
+                </div>
               )}
+            </div>
 
-              <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mt-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            {/* Staff Results Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900">
                   Detailed Staff Performance
                 </h2>
+              </div>
+
+              <div className="p-6">
                 <StaffResultsFilter
                   filters={filters}
                   staffData={staffData}
@@ -310,17 +371,19 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   onCategoryChange={setSelectedPerformanceCategory}
                   onResetFilters={resetFilters}
                 />
-                <StaffResultsTable
-                  staff={filteredAndSortedStaff}
-                  expandedStaffId={expandedStaffId}
-                  onToggleExpand={toggleExpand}
-                />
-              </Card>
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+                <div className="mt-6">
+                  <StaffResultsTable
+                    staff={filteredAndSortedStaff}
+                    expandedStaffId={expandedStaffId}
+                    onToggleExpand={toggleExpand}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </DashboardLayout>
   );
 };
 

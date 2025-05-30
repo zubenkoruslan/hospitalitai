@@ -30,6 +30,7 @@ import {
   PlusIcon,
   DocumentCheckIcon,
   XMarkIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper to normalize category names for grouping (e.g., to title case)
@@ -658,10 +659,10 @@ const MenuUploadPage: React.FC = () => {
     >
       <div className="space-y-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-              <DocumentArrowUpIcon className="h-8 w-8 text-white" />
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+              <ArrowUpTrayIcon className="h-8 w-8 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Upload Menu</h1>
@@ -745,13 +746,10 @@ const MenuUploadPage: React.FC = () => {
 
         {/* File Upload Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
-            <div className="flex items-center space-x-3">
-              <CloudArrowUpIcon className="h-6 w-6 text-blue-600" />
-              <h2 className="text-xl font-semibold text-slate-900">
-                1. Select Menu File
-              </h2>
-            </div>
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Upload New Menu
+            </h2>
           </div>
 
           <div className="p-6">
@@ -839,7 +837,7 @@ const MenuUploadPage: React.FC = () => {
               {selectedFile && !uploadPreview && !isLoading && (
                 <button
                   onClick={() => handleUploadPreview()}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center space-x-2">
                     <DocumentCheckIcon className="h-5 w-5" />
@@ -894,7 +892,7 @@ const MenuUploadPage: React.FC = () => {
           <>
             {/* Processing Summary */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
+              <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
                 <div className="flex items-center space-x-3">
                   <CheckCircleIcon className="h-6 w-6 text-green-600" />
                   <h2 className="text-xl font-semibold text-slate-900">
@@ -986,7 +984,7 @@ const MenuUploadPage: React.FC = () => {
                         (item: ParsedMenuItem) => item.userAction !== "ignore"
                       )
                     }
-                    className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
                     {renderButtonContent(
                       isCheckingConflicts,
@@ -1006,7 +1004,7 @@ const MenuUploadPage: React.FC = () => {
                           item.userAction !== "ignore"
                       )
                     }
-                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                    className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
                     {renderButtonContent(
                       isFinalizingImport,
@@ -1038,9 +1036,9 @@ const MenuUploadPage: React.FC = () => {
             {/* Import Status */}
             {(importJobId || importResult) && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-slate-200">
+                <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
                   <div className="flex items-center space-x-3">
-                    <InformationCircleIcon className="h-6 w-6 text-blue-600" />
+                    <InformationCircleIcon className="h-6 w-6 text-green-600" />
                     <h2 className="text-xl font-semibold text-slate-900">
                       3. Import Status
                     </h2>
@@ -1176,7 +1174,7 @@ const MenuUploadPage: React.FC = () => {
                                   state: { newMenuImported: true },
                                 })
                               }
-                              className="mt-4 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+                              className="mt-4 px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
                             >
                               Back to Menus
                             </button>
@@ -1227,7 +1225,7 @@ const MenuUploadPage: React.FC = () => {
             {/* Items Table */}
             {uploadPreview.parsedItems.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-slate-200">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <DocumentCheckIcon className="h-6 w-6 text-blue-600" />

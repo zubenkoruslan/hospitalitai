@@ -1341,3 +1341,191 @@ export const getMenuImportJobStatus = async (
 
 // Make the Axios instance available as a default export
 export default api;
+
+// ===== STAFF INVITATION API METHODS =====
+
+// Invitation Types
+export interface InvitationDetails {
+  email: string;
+  restaurantName: string;
+  name?: string;
+}
+
+export interface SendInvitationRequest {
+  email: string;
+  name?: string;
+  assignedRoleId?: string;
+}
+
+export interface AcceptInvitationRequest {
+  password: string;
+  name?: string;
+}
+
+export interface InvitationResponse {
+  message: string;
+  invitationId: string;
+}
+
+export interface AcceptInvitationResponse {
+  message: string;
+  user: any; // You can create a more specific type based on your User model
+}
+
+export interface PendingInvitation {
+  _id: string;
+  email: string;
+  name?: string;
+  status: "pending" | "completed" | "expired";
+  createdAt: string;
+  expiresAt: string;
+  invitedBy: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+}
+
+/**
+ * Sends a staff invitation email
+ * @param invitationData - Email, optional name, and optional role assignment
+ * @returns Promise with invitation confirmation
+ */
+export const sendStaffInvitation = async (
+  invitationData: SendInvitationRequest
+): Promise<InvitationResponse> => {
+  const response = await api.post<InvitationResponse>(
+    "/invitations/staff",
+    invitationData
+  );
+  return response.data;
+};
+
+/**
+ * Gets invitation details by token (public endpoint)
+ * @param token - The invitation token from the URL
+ * @returns Promise with invitation details
+ */
+export const getInvitationDetails = async (
+  token: string
+): Promise<InvitationDetails> => {
+  const response = await api.get<InvitationDetails>(
+    `/invitations/details/${token}`
+  );
+  return response.data;
+};
+
+/**
+ * Accepts an invitation and creates user account
+ * @param token - The invitation token
+ * @param userData - Password and optional name
+ * @returns Promise with acceptance confirmation
+ */
+export const acceptInvitation = async (
+  token: string,
+  userData: AcceptInvitationRequest
+): Promise<AcceptInvitationResponse> => {
+  const response = await api.post<AcceptInvitationResponse>(
+    `/invitations/accept/${token}`,
+    userData
+  );
+  return response.data;
+};
+
+/**
+ * Gets all pending invitations for the restaurant
+ * @returns Promise with list of pending invitations
+ */
+export const getRestaurantInvitations = async (): Promise<
+  PendingInvitation[]
+> => {
+  const response = await api.get<{ invitations: PendingInvitation[] }>(
+    "/invitations/restaurant"
+  );
+  return response.data.invitations;
+};
+
+/**
+ * Cancels a pending invitation
+ * @param invitationId - The ID of the invitation to cancel
+ * @returns Promise with cancellation confirmation
+ */
+export const cancelInvitation = async (
+  invitationId: string
+): Promise<{ message: string }> => {
+  const response = await api.delete<{ message: string }>(
+    `/invitations/${invitationId}`
+  );
+  return response.data;
+};
+
+// ===== PASSWORD RESET API METHODS =====
+
+// Password Reset Types
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface VerifyResetTokenResponse {
+  valid: boolean;
+  email?: string;
+  userName?: string;
+}
+
+export interface ResetPasswordRequest {
+  password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
+/**
+ * Request password reset email
+ * @param email - User's email address
+ * @returns Promise with confirmation message
+ */
+export const requestPasswordReset = async (
+  email: string
+): Promise<ForgotPasswordResponse> => {
+  const response = await api.post<ForgotPasswordResponse>(
+    "/auth/forgot-password",
+    { email }
+  );
+  return response.data;
+};
+
+/**
+ * Verify if password reset token is valid
+ * @param token - Reset token from URL
+ * @returns Promise with token validity and user info
+ */
+export const verifyResetToken = async (
+  token: string
+): Promise<VerifyResetTokenResponse> => {
+  const response = await api.get<VerifyResetTokenResponse>(
+    `/auth/verify-reset-token/${token}`
+  );
+  return response.data;
+};
+
+/**
+ * Reset password using token
+ * @param token - Reset token from URL
+ * @param password - New password
+ * @returns Promise with success confirmation
+ */
+export const resetPassword = async (
+  token: string,
+  password: string
+): Promise<ResetPasswordResponse> => {
+  const response = await api.post<ResetPasswordResponse>(
+    `/auth/reset-password/${token}`,
+    { password }
+  );
+  return response.data;
+};

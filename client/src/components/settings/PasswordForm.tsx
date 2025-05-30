@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import PasswordInput, {
+  validatePasswordStrength,
+} from "../common/PasswordInput";
+import ConfirmPasswordInput from "../common/ConfirmPasswordInput";
 
 // Define basic password data structure
 interface PasswordChangeData {
@@ -10,12 +14,11 @@ interface PasswordChangeData {
 export interface PasswordFormProps {
   onSubmit: (data: PasswordChangeData) => Promise<void> | void;
   isLoading?: boolean; // Optional: for loading state during submission
-  // passwordError?: string | null; // Optional: for displaying server-side password errors
 }
 
 const PasswordForm: React.FC<PasswordFormProps> = ({
   onSubmit,
-  isLoading /*, passwordError */,
+  isLoading = false,
 }) => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -26,76 +29,96 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
     e.preventDefault();
     setError(null);
 
+    // Validate current password
+    if (!currentPassword.trim()) {
+      setError("Current password is required.");
+      return;
+    }
+
+    // Validate new password strength
+    if (!validatePasswordStrength(newPassword)) {
+      setError(
+        "New password must be at least 6 characters and contain uppercase, lowercase, and number."
+      );
+      return;
+    }
+
+    // Validate password confirmation
     if (newPassword !== confirmPassword) {
       setError("New passwords do not match.");
       return;
     }
-    // Basic password complexity: at least 6 characters
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters long.");
+
+    // Check if new password is different from current
+    if (currentPassword === newPassword) {
+      setError("New password must be different from your current password.");
       return;
     }
-    // Add more complexity rules if needed (uppercase, number, special char)
 
     onSubmit({ currentPassword, newPassword, confirmPassword });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {/* {passwordError && <p className="text-sm text-red-600">{passwordError}</p>} */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Current Password Field */}
       <div>
         <label
           htmlFor="current-password"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-slate-700 mb-2"
         >
           Current Password
         </label>
-        <input
-          type="password"
-          id="current-password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          required
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-        />
+        <div className="relative">
+          <input
+            type="password"
+            id="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            placeholder="Enter your current password"
+          />
+        </div>
       </div>
-      <div>
-        <label
-          htmlFor="new-password"
-          className="block text-sm font-medium text-gray-700"
-        >
-          New Password
-        </label>
-        <input
-          type="password"
-          id="new-password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-        />
-      </div>
-      <div>
-        <label
-          htmlFor="confirm-password"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Confirm New Password
-        </label>
-        <input
-          type="password"
-          id="confirm-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-        />
-      </div>
+
+      {/* New Password Field with Enhanced Validation */}
+      <PasswordInput
+        label="New Password"
+        value={newPassword}
+        onChange={setNewPassword}
+        disabled={isLoading}
+        placeholder="Create a new password"
+        id="new-password"
+        name="new-password"
+        autoComplete="new-password"
+      />
+
+      {/* Confirm New Password Field */}
+      <ConfirmPasswordInput
+        label="Confirm New Password"
+        value={confirmPassword}
+        originalPassword={newPassword}
+        onChange={setConfirmPassword}
+        disabled={isLoading}
+        placeholder="Confirm your new password"
+        id="confirm-password"
+        name="confirm-password"
+        autoComplete="new-password"
+      />
+
       <button
         type="submit"
-        disabled={isLoading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-sky-300 disabled:cursor-not-allowed"
+        disabled={
+          isLoading || !currentPassword || !newPassword || !confirmPassword
+        }
+        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
       >
         {isLoading ? "Updating Password..." : "Change Password"}
       </button>

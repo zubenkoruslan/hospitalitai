@@ -44,12 +44,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       roles: ["restaurant"],
     },
     {
-      name: "Menu Upload",
-      href: "/menu/upload",
-      icon: DocumentTextIcon,
-      roles: ["restaurant"],
-    },
-    {
       name: "Quiz Management",
       href: "/quiz-management",
       icon: AcademicCapIcon,
@@ -88,7 +82,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -115,7 +109,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
               <div className="flex-shrink-0 flex items-center px-4">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-blue-600">
                   HospitalityAI
                 </h1>
               </div>
@@ -128,7 +122,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       to={item.href}
                       className={`${
                         isCurrentPage(item.href)
-                          ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                          ? "bg-blue-600 text-white shadow-lg"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       } group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200`}
                       onClick={() => setSidebarOpen(false)}
@@ -144,7 +138,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {/* Mobile user section */}
             <div className="flex-shrink-0 flex border-t border-slate-200 p-4">
               <div className="flex items-center">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
                   <span className="text-sm font-medium text-white">
                     {user?.name?.charAt(0).toUpperCase() || "U"}
                   </span>
@@ -172,7 +166,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <div className="flex-1 flex flex-col min-h-0 bg-white/80 backdrop-blur-sm border-r border-slate-200/50 shadow-lg">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <div className="flex items-center flex-shrink-0 px-6">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold text-blue-600">
                 HospitalityAI
               </h1>
             </div>
@@ -185,7 +179,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     to={item.href}
                     className={`${
                       isCurrentPage(item.href)
-                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105"
+                        ? "bg-blue-600 text-white shadow-lg scale-105"
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     } group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:scale-105`}
                   >
@@ -200,7 +194,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           {/* Desktop user section */}
           <div className="flex-shrink-0 flex border-t border-slate-200/50 p-4">
             <div className="flex items-center w-full">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+              <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center shadow-lg">
                 <span className="text-sm font-medium text-white">
                   {user?.name?.charAt(0).toUpperCase() || "U"}
                 </span>
@@ -278,7 +272,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             <div className="ml-4 flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
                   <span className="text-xs font-medium text-white">
                     {user?.name?.charAt(0).toUpperCase() || "U"}
                   </span>
