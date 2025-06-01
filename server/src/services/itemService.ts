@@ -36,6 +36,14 @@ export interface ItemUpdateData {
   isDairyFree?: boolean;
   isVegetarian?: boolean;
   isVegan?: boolean;
+  // Wine-specific fields
+  wineStyle?: string;
+  producer?: string;
+  grapeVariety?: string[];
+  vintage?: number;
+  region?: string;
+  servingOptions?: Array<{ size: string; price: number }>;
+  suggestedPairingsText?: string[];
   // menuId is generally not updated this way, handled by separate move/link logic if needed
 }
 
@@ -327,6 +335,44 @@ class ItemService {
       preparedUpdate.isVegetarian = Boolean(updateData.isVegetarian);
     if (updateData.isVegan !== undefined)
       preparedUpdate.isVegan = Boolean(updateData.isVegan);
+
+    // Handle wine-specific fields
+    if (updateData.wineStyle !== undefined) {
+      preparedUpdate.wineStyle = updateData.wineStyle?.trim() || null;
+    }
+    if (updateData.producer !== undefined) {
+      preparedUpdate.producer = updateData.producer?.trim() || null;
+    }
+    if (updateData.grapeVariety !== undefined) {
+      preparedUpdate.grapeVariety = Array.isArray(updateData.grapeVariety)
+        ? updateData.grapeVariety.map((g) => g.trim()).filter((g) => g)
+        : [];
+    }
+    if (updateData.vintage !== undefined) {
+      if (
+        updateData.vintage &&
+        (updateData.vintage < 1000 ||
+          updateData.vintage > new Date().getFullYear() + 10)
+      ) {
+        throw new AppError("Vintage must be a valid year", 400);
+      }
+      preparedUpdate.vintage = updateData.vintage || null;
+    }
+    if (updateData.region !== undefined) {
+      preparedUpdate.region = updateData.region?.trim() || null;
+    }
+    if (updateData.servingOptions !== undefined) {
+      preparedUpdate.servingOptions = Array.isArray(updateData.servingOptions)
+        ? updateData.servingOptions.filter((opt) => opt.size && opt.price >= 0)
+        : [];
+    }
+    if (updateData.suggestedPairingsText !== undefined) {
+      preparedUpdate.suggestedPairingsText = Array.isArray(
+        updateData.suggestedPairingsText
+      )
+        ? updateData.suggestedPairingsText.map((p) => p.trim()).filter((p) => p)
+        : [];
+    }
 
     if (Object.keys(preparedUpdate).length === 0) {
       throw new AppError("No valid update data provided", 400);

@@ -7,7 +7,9 @@ import {
   SubmitQuizAttemptRequestBody,
   UpdateQuizRequestBody, // Added UpdateQuizRequestBody import
 } from "../types/quizTypes"; // Added import
-import { IQuiz } from "../models/QuizModel"; // Added IQuiz import
+import QuizModel, { IQuiz } from "../models/QuizModel"; // Added IQuiz import
+import NotificationService from "../services/notificationService";
+import User from "../models/User";
 
 // Removed local GenerateQuizFromBanksRequestBody interface
 // Removed local SubmitQuizAttemptRequestBody interface
@@ -51,6 +53,50 @@ export const generateQuizFromBanksController = async (
     };
 
     const newQuiz = await QuizService.generateQuizFromBanksService(quizData);
+
+    // Create notifications for staff members when a new quiz is created
+    try {
+      let staffToNotify = [];
+
+      // If quiz has target roles, notify only staff with those roles
+      if (newQuiz.targetRoles && newQuiz.targetRoles.length > 0) {
+        staffToNotify = await User.find({
+          restaurantId: restaurantId,
+          role: "staff",
+          assignedRoleId: { $in: newQuiz.targetRoles },
+        })
+          .select("_id")
+          .lean();
+      } else {
+        // If no target roles, notify all staff in the restaurant
+        staffToNotify = await User.find({
+          restaurantId: restaurantId,
+          role: "staff",
+        })
+          .select("_id")
+          .lean();
+      }
+
+      // Create notifications for all relevant staff members
+      if (staffToNotify.length > 0) {
+        const notifications = staffToNotify.map((staff) => ({
+          type: "new_quiz" as const,
+          content: `A new quiz "${newQuiz.title}" has been created and is available for you to take`,
+          userId: staff._id,
+          restaurantId: restaurantId,
+          relatedId: newQuiz._id,
+          metadata: { quizId: newQuiz._id },
+        }));
+
+        await NotificationService.createBulkNotifications(notifications);
+        console.log(
+          `Created ${notifications.length} notifications for new quiz: ${newQuiz.title}`
+        );
+      }
+    } catch (notificationError) {
+      console.error("Error creating quiz notifications:", notificationError);
+      // Don't fail the quiz creation if notifications fail
+    }
 
     res.status(201).json({
       message: "Quiz generated successfully from question banks.",
@@ -132,6 +178,42 @@ export const submitQuizAttemptController = async (
       quizObjectId,
       attemptData
     );
+
+    // Create completion notification for the staff member
+    try {
+      const quiz = await QuizModel.findById(quizObjectId)
+        .select("title")
+        .lean<Pick<IQuiz, "title">>();
+      if (quiz) {
+        const percentage = Math.round(
+          (result.score / result.totalQuestionsAttempted) * 100
+        );
+
+        await NotificationService.createNotification({
+          type: "completed_training",
+          content: `Congratulations! You completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
+          userId: staffUserId,
+          restaurantId: new mongoose.Types.ObjectId(req.user!.restaurantId!),
+          relatedId: quizObjectId,
+          metadata: {
+            quizId: quizObjectId,
+            score: result.score,
+            totalQuestions: result.totalQuestionsAttempted,
+            percentage: percentage,
+          },
+        });
+
+        console.log(
+          `Created completion notification for user ${staffUserId} completing quiz ${quiz.title}`
+        );
+      }
+    } catch (notificationError) {
+      console.error(
+        "Error creating completion notification:",
+        notificationError
+      );
+      // Don't fail the submission if notifications fail
+    }
 
     res.status(200).json({
       status: "success",

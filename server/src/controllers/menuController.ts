@@ -414,29 +414,86 @@ export const handleProcessMenuForConflictResolution = async (
         new AppError("User not authenticated or restaurantId missing", 401)
       );
     }
+
+    console.log(
+      "[handleProcessMenuForConflictResolution] Request body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
     const restaurantIdString = req.user.restaurantId.toString();
-    const { itemsToProcess } = req.body as ProcessConflictResolutionRequest;
+    const { itemsToProcess, targetMenuId } =
+      req.body as ProcessConflictResolutionRequest;
 
-    // Construct the request object for the service call
-    const conflictRequestData: ProcessConflictResolutionRequest = {
-      itemsToProcess,
-      restaurantId: restaurantIdString,
-    };
-
+    // Enhanced validation with detailed logging
     if (
       !itemsToProcess ||
       !Array.isArray(itemsToProcess) ||
       itemsToProcess.length === 0
     ) {
+      console.error(
+        "[handleProcessMenuForConflictResolution] Invalid itemsToProcess:",
+        {
+          itemsToProcess,
+          isArray: Array.isArray(itemsToProcess),
+          length: itemsToProcess?.length,
+        }
+      );
       return next(
         new AppError("itemsToProcess must be a non-empty array.", 400)
       );
     }
+
+    // Log each item for debugging
+    itemsToProcess.forEach((item, index) => {
+      console.log(`[handleProcessMenuForConflictResolution] Item ${index}:`, {
+        id: item.id,
+        hasFields: !!item.fields,
+        itemType: item.fields?.itemType?.value,
+        name: item.fields?.name?.value,
+        category: item.fields?.category?.value,
+        userAction: item.userAction,
+        importAction: item.importAction,
+      });
+    });
+
+    // Construct the request object for the service call
+    const conflictRequestData: ProcessConflictResolutionRequest = {
+      itemsToProcess,
+      restaurantId: restaurantIdString,
+      targetMenuId: targetMenuId,
+    };
+
+    console.log(
+      "[handleProcessMenuForConflictResolution] Calling service with:",
+      {
+        restaurantId: restaurantIdString,
+        targetMenuId,
+        itemCount: itemsToProcess.length,
+      }
+    );
+
     const result = await MenuService.processMenuForConflictResolution(
       conflictRequestData // Pass the single object argument
     );
+
+    console.log("[handleProcessMenuForConflictResolution] Service result:", {
+      processedItemsCount: result.processedItems.length,
+      summary: result.summary,
+    });
+
     res.status(200).json(result);
   } catch (error) {
+    console.error("[handleProcessMenuForConflictResolution] Error:", error);
+
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      console.error("[handleProcessMenuForConflictResolution] Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+
     next(error);
   }
 };

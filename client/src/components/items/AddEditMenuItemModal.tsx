@@ -26,6 +26,7 @@ const baseInitialFormData = {
   isVegetarian: false,
   isVegan: false,
   // Wine-specific fields
+  wineStyle: "",
   producer: "",
   grapeVariety: "",
   vintage: "",
@@ -176,6 +177,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             isDairyFree: currentItem.isDairyFree ?? false,
             isVegetarian: currentItem.isVegetarian ?? false,
             isVegan: currentItem.isVegan ?? false,
+            wineStyle: currentItem.wineStyle || "",
             producer: currentItem.producer || "",
             grapeVariety: currentItem.grapeVariety?.join(", ") || "",
             vintage: currentItem.vintage?.toString() || "",
@@ -370,6 +372,12 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
     // Wine-specific validation
     if (itemType === "wine") {
+      // Wine style is required for wine items
+      if (!formData.wineStyle?.trim()) {
+        setFormError("Wine style is required for wine items.");
+        return;
+      }
+
       if (
         formData.vintage &&
         (isNaN(parseInt(formData.vintage)) ||
@@ -494,6 +502,33 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         {/* Wine-specific fields in new order */}
         {itemType === "wine" && (
           <>
+            {/* Wine Style - Required for wine items */}
+            <div>
+              <label
+                htmlFor="wineStyle"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Wine Style <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="wineStyle"
+                name="wineStyle"
+                value={formData.wineStyle}
+                onChange={handleInputChange}
+                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                disabled={isSubmitting}
+                required
+              >
+                <option value="">Select wine style...</option>
+                <option value="still">Still</option>
+                <option value="sparkling">Sparkling</option>
+                <option value="champagne">Champagne</option>
+                <option value="dessert">Dessert</option>
+                <option value="fortified">Fortified</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
             {/* Grape Variety */}
             <div>
               <label

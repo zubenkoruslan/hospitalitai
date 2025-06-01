@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSummary } from "../hooks/useStaffSummary"; // Import the new hook
 import { useQuizCount } from "../hooks/useQuizCount"; // Import the quiz count hook
-import DashboardLayout from "../components/layout/DashboardLayout"; // Updated import
+import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner"; // Import common LoadingSpinner
 import ErrorMessage from "../components/common/ErrorMessage"; // Import common ErrorMessage
 import ScoreDistributionChart from "../components/charts/ScoreDistributionChart"; // Import the chart
@@ -250,140 +250,149 @@ const RestaurantStaffResultsPage: React.FC = () => {
   }, [staffData, calculateAndSetKPIs]);
 
   return (
-    <DashboardLayout title="Staff Results & Analytics">
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
-              <ChartBarIcon className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                Staff Results & Performance Analytics
-              </h1>
-              <p className="text-slate-600 mt-2">
-                Track staff quiz performance and training progress
-              </p>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
+                    <ChartBarIcon className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-slate-900">
+                      Staff Results & Performance Analytics
+                    </h1>
+                    <p className="text-slate-600 mt-2">
+                      Track staff quiz performance and training progress
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading and Error States */}
+              {loading && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
+                  <div className="text-center">
+                    <LoadingSpinner message="Loading staff results..." />
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                  <ErrorMessage message={error} />
+                </div>
+              )}
+
+              {!loading && !error && (
+                <>
+                  {/* KPIs Section */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h2 className="text-xl font-semibold text-slate-900 mb-6">
+                      Key Performance Indicators
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <UsersIcon className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-700">
+                              Total Staff
+                            </h3>
+                            <p className="text-2xl font-bold text-slate-900">
+                              {totalStaff === null
+                                ? "N/A"
+                                : totalStaff.toString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-emerald-100 rounded-lg">
+                            <TrophyIcon className="h-6 w-6 text-emerald-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-700">
+                              Avg. Quiz Score
+                            </h3>
+                            <p className="text-2xl font-bold text-slate-900">
+                              {formatPercentage(avgQuizScore)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Score Distribution Chart */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Score Distribution
+                        </h2>
+                        <button
+                          onClick={() =>
+                            setShowDistributionChart(!showDistributionChart)
+                          }
+                          className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        >
+                          {showDistributionChart ? "Hide Chart" : "Show Chart"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showDistributionChart && (
+                      <div className="p-6">
+                        <ScoreDistributionChart
+                          staffData={staffData}
+                          selectedCategory={selectedPerformanceCategory}
+                          onSelectCategory={setSelectedPerformanceCategory}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Staff Results Table */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                      <h2 className="text-xl font-semibold text-slate-900">
+                        Detailed Staff Performance
+                      </h2>
+                    </div>
+
+                    <div className="p-6">
+                      <StaffResultsFilter
+                        filters={filters}
+                        staffData={staffData}
+                        selectedCategory={selectedPerformanceCategory}
+                        onFilterChange={handleFilterChange}
+                        onCategoryChange={setSelectedPerformanceCategory}
+                        onResetFilters={resetFilters}
+                      />
+                      <div className="mt-6">
+                        <StaffResultsTable
+                          staff={filteredAndSortedStaff}
+                          expandedStaffId={expandedStaffId}
+                          onToggleExpand={toggleExpand}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Loading and Error States */}
-        {loading && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
-            <div className="text-center">
-              <LoadingSpinner message="Loading staff results..." />
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage message={error} />
-          </div>
-        )}
-
-        {!loading && !error && (
-          <>
-            {/* KPIs Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h2 className="text-xl font-semibold text-slate-900 mb-6">
-                Key Performance Indicators
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <UsersIcon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-slate-700">
-                        Total Staff
-                      </h3>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {totalStaff === null ? "N/A" : totalStaff.toString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <TrophyIcon className="h-6 w-6 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-slate-700">
-                        Avg. Quiz Score
-                      </h3>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {formatPercentage(avgQuizScore)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Score Distribution Chart */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Score Distribution
-                  </h2>
-                  <button
-                    onClick={() =>
-                      setShowDistributionChart(!showDistributionChart)
-                    }
-                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                  >
-                    {showDistributionChart ? "Hide Chart" : "Show Chart"}
-                  </button>
-                </div>
-              </div>
-
-              {showDistributionChart && (
-                <div className="p-6">
-                  <ScoreDistributionChart
-                    staffData={staffData}
-                    selectedCategory={selectedPerformanceCategory}
-                    onSelectCategory={setSelectedPerformanceCategory}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Staff Results Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                <h2 className="text-xl font-semibold text-slate-900">
-                  Detailed Staff Performance
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <StaffResultsFilter
-                  filters={filters}
-                  staffData={staffData}
-                  selectedCategory={selectedPerformanceCategory}
-                  onFilterChange={handleFilterChange}
-                  onCategoryChange={setSelectedPerformanceCategory}
-                  onResetFilters={resetFilters}
-                />
-                <div className="mt-6">
-                  <StaffResultsTable
-                    staff={filteredAndSortedStaff}
-                    expandedStaffId={expandedStaffId}
-                    onToggleExpand={toggleExpand}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </DashboardLayout>
+      </main>
+    </div>
   );
 };
 

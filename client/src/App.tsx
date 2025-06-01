@@ -36,9 +36,9 @@ import MenuUploadPage from "./pages/MenuUploadPage";
 import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import NotificationsPage from "./pages/NotificationsPage";
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
-// import NotificationsPage from "./pages/NotificationsPage"; // Removed
 
 // Component to handle authenticated user redirection based on role
 const AuthRedirect: React.FC = () => {
@@ -267,6 +267,14 @@ function App() {
               />
 
               {/* Shared Protected Routes */}
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute>
+                    <NotificationsPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/settings"
                 element={

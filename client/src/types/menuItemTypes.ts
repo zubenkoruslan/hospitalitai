@@ -70,6 +70,7 @@ export interface MenuItemFormData {
   isVegan: boolean;
 
   // Wine-specific fields (optional, used only when itemType is "wine")
+  wineStyle?: string; // Wine style for form input
   producer?: string;
   grapeVariety?: string; // Comma-separated string for form input
   vintage?: string; // Use string for form input, will be converted to number

@@ -745,6 +745,48 @@ export const validateUpdateItemBody: ValidationChain[] = [
   body("isDairyFree", "isDairyFree must be a boolean").optional().isBoolean(),
   body("isVegetarian", "isVegetarian must be a boolean").optional().isBoolean(),
   body("isVegan", "isVegan must be a boolean").optional().isBoolean(),
+  // Wine-specific field validations
+  body("wineStyle", "Wine style must be a valid option")
+    .optional()
+    .isIn(["still", "sparkling", "champagne", "dessert", "fortified", "other"]),
+  body("producer", "Producer must be a string").optional().isString().trim(),
+  body("grapeVariety", "Grape variety must be an array of strings")
+    .optional()
+    .isArray(),
+  body("grapeVariety.*", "Each grape variety must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body("vintage", "Vintage must be a valid year")
+    .optional()
+    .isInt({ min: 1000, max: new Date().getFullYear() + 10 }),
+  body("region", "Region must be a string").optional().isString().trim(),
+  body("servingOptions", "Serving options must be an array")
+    .optional()
+    .isArray(),
+  body("servingOptions.*.size", "Serving option size must be a string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+  body(
+    "servingOptions.*.price",
+    "Serving option price must be a non-negative number"
+  )
+    .optional()
+    .isFloat({ min: 0 }),
+  body(
+    "suggestedPairingsText",
+    "Suggested pairings must be an array of strings"
+  )
+    .optional()
+    .isArray(),
+  body("suggestedPairingsText.*", "Each pairing must be a non-empty string")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
 ];
 
 // === Question Controller Validators (AI Generation) ===
@@ -998,9 +1040,26 @@ export const validateFinalMenuImportData = [
         }
         // Validate wine-specific fields if itemType is 'wine'
         if (item.fields.itemType.value === "wine") {
+          if (!item.fields.wineStyle || !item.fields.wineStyle.value) {
+            throw new Error(
+              `Wine style is required for wine item at index ${i}.`
+            );
+          }
+
+          // For wine items during conflict resolution, wine style is optional but must be valid if provided
           if (
-            !item.fields.wineStyle ||
-            typeof item.fields.wineStyle.value !== "string" ||
+            item.fields.wineStyle &&
+            item.fields.wineStyle.value &&
+            typeof item.fields.wineStyle.value !== "string"
+          ) {
+            throw new Error(
+              `Wine style value for item at index ${i} must be a string if provided.`
+            );
+          }
+
+          if (
+            item.fields.wineStyle &&
+            item.fields.wineStyle.value &&
             ![
               "still",
               "sparkling",
@@ -1011,19 +1070,8 @@ export const validateFinalMenuImportData = [
             ].includes(item.fields.wineStyle.value)
           ) {
             throw new Error(
-              `Wine style for item at index ${i} (action: '${item.importAction}') must be one of: still, sparkling, champagne, dessert, fortified, other.`
+              `Wine style for item at index ${i} must be one of: still, sparkling, champagne, dessert, fortified, other.`
             );
-          }
-          // Validate wineServingOptions if provided
-          if (
-            item.fields.wineServingOptions &&
-            item.fields.wineServingOptions.value
-          ) {
-            if (!Array.isArray(item.fields.wineServingOptions.value)) {
-              throw new Error(
-                `Wine serving options for item at index ${i} (action: '${item.importAction}') must be an array if provided.`
-              );
-            }
           }
         }
         // etc. for isVegan, isVegetarian
@@ -1055,15 +1103,160 @@ export const validateProcessConflictResolutionData: ValidationChain[] = [
     .withMessage("Each item name.value must be a non-empty string.")
     .isLength({ min: 1, max: 100 }) // Assuming item names can be up to 100, align with MenuItem model if different
     .withMessage("Item name.value must be between 1 and 100 characters."),
-  // Optionally, add more checks for other fields if they are critical for conflict resolution logic
-  // e.g., itemType, category presence/type.
-  // body("itemsToProcess.*.fields.itemType.value")
-  //   .isIn(ITEM_TYPES) // Assuming ITEM_TYPES is accessible here or defined
-  //   .withMessage(`Item itemType.value must be one of: ${ITEM_TYPES.join(", ")}`),
-  // body("itemsToProcess.*.fields.category.value")
-  //   .isString()
-  //   .notEmpty()
-  //   .withMessage("Item category.value must be a non-empty string."),
+
+  // Add validation for required fields that might be missing
+  body("itemsToProcess.*.fields.itemType")
+    .isObject()
+    .withMessage("Each item fields must have an itemType object."),
+  body("itemsToProcess.*.fields.itemType.value")
+    .isString()
+    .isIn(["food", "beverage", "wine"])
+    .withMessage("Item itemType.value must be one of: food, beverage, wine."),
+
+  body("itemsToProcess.*.fields.category")
+    .isObject()
+    .withMessage("Each item fields must have a category object."),
+  body("itemsToProcess.*.fields.category.value")
+    .isString()
+    .notEmpty()
+    .withMessage("Item category.value must be a non-empty string."),
+
+  // Validate wine-specific fields for wine items
+  body("itemsToProcess").custom((items, { req }) => {
+    if (!Array.isArray(items)) return true; // Already handled by isArray
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // Check if this is a wine item
+      if (item.fields?.itemType?.value === "wine") {
+        // For wine items during conflict resolution, wine style is optional but must be valid if provided
+        if (
+          item.fields.wineStyle &&
+          item.fields.wineStyle.value &&
+          typeof item.fields.wineStyle.value !== "string"
+        ) {
+          throw new Error(
+            `Wine style value for item at index ${i} must be a string if provided.`
+          );
+        }
+
+        if (
+          item.fields.wineStyle &&
+          item.fields.wineStyle.value &&
+          ![
+            "still",
+            "sparkling",
+            "champagne",
+            "dessert",
+            "fortified",
+            "other",
+          ].includes(item.fields.wineStyle.value)
+        ) {
+          throw new Error(
+            `Wine style for item at index ${i} must be one of: still, sparkling, champagne, dessert, fortified, other.`
+          );
+        }
+
+        // Validate other wine fields if they exist
+        if (
+          item.fields.wineProducer &&
+          typeof item.fields.wineProducer.value !== "string" &&
+          item.fields.wineProducer.value !== null
+        ) {
+          throw new Error(
+            `Wine producer value for item at index ${i} must be a string or null if provided.`
+          );
+        }
+
+        if (
+          item.fields.wineVintage &&
+          item.fields.wineVintage.value !== null &&
+          typeof item.fields.wineVintage.value !== "number" &&
+          typeof item.fields.wineVintage.value !== "string"
+        ) {
+          throw new Error(
+            `Wine vintage value for item at index ${i} must be a number, string, or null if provided.`
+          );
+        }
+
+        if (
+          item.fields.wineRegion &&
+          typeof item.fields.wineRegion.value !== "string" &&
+          item.fields.wineRegion.value !== null
+        ) {
+          throw new Error(
+            `Wine region value for item at index ${i} must be a string or null if provided.`
+          );
+        }
+
+        if (
+          item.fields.wineGrapeVariety &&
+          typeof item.fields.wineGrapeVariety.value !== "string" &&
+          item.fields.wineGrapeVariety.value !== null
+        ) {
+          throw new Error(
+            `Wine grape variety value for item at index ${i} must be a string or null if provided.`
+          );
+        }
+
+        if (
+          item.fields.winePairings &&
+          typeof item.fields.winePairings.value !== "string" &&
+          item.fields.winePairings.value !== null
+        ) {
+          throw new Error(
+            `Wine pairings value for item at index ${i} must be a string or null if provided.`
+          );
+        }
+
+        if (
+          item.fields.wineServingOptions &&
+          item.fields.wineServingOptions.value !== null &&
+          !Array.isArray(item.fields.wineServingOptions.value)
+        ) {
+          throw new Error(
+            `Wine serving options value for item at index ${i} must be an array or null if provided.`
+          );
+        }
+      }
+
+      // Validate other common fields
+      if (
+        item.fields.price &&
+        item.fields.price.value !== null &&
+        typeof item.fields.price.value !== "number"
+      ) {
+        throw new Error(
+          `Price value for item at index ${i} must be a number or null if provided.`
+        );
+      }
+
+      if (
+        item.fields.ingredients &&
+        !Array.isArray(item.fields.ingredients.value) &&
+        item.fields.ingredients.value !== null
+      ) {
+        throw new Error(
+          `Ingredients value for item at index ${i} must be an array or null if provided.`
+        );
+      }
+
+      // Validate boolean fields
+      const booleanFields = ["isGlutenFree", "isVegan", "isVegetarian"];
+      for (const fieldName of booleanFields) {
+        if (
+          item.fields[fieldName] &&
+          typeof item.fields[fieldName].value !== "boolean"
+        ) {
+          throw new Error(
+            `${fieldName} value for item at index ${i} must be a boolean if provided.`
+          );
+        }
+      }
+    }
+    return true;
+  }),
 ];
 
 // You might have other validators here...

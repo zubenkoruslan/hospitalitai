@@ -8,6 +8,7 @@ import {
   UserAPIResponse,
   PasswordChangeData,
 } from "../types/authTypes";
+import NotificationService from "./notificationService";
 
 // Interface for data passed to signup methods
 interface SignupData {
@@ -152,6 +153,55 @@ class AuthService {
       await newUser.save({ session });
 
       await session.commitTransaction();
+
+      // Create notifications after successful registration
+      try {
+        // Notify restaurant managers about new staff member
+        const restaurantManagers = await User.find({
+          restaurantId: finalRestaurantId,
+          role: { $in: ["restaurant", "restaurantAdmin", "manager"] },
+        })
+          .select("_id")
+          .lean();
+
+        if (restaurantManagers.length > 0) {
+          const managerNotifications = restaurantManagers.map((manager) => ({
+            type: "new_staff" as const,
+            content: `New staff member "${newUser.name}" has joined your restaurant`,
+            userId: manager._id,
+            restaurantId: finalRestaurantId,
+            relatedId: newUser._id,
+            metadata: { staffId: newUser._id, staffName: newUser.name },
+          }));
+
+          await NotificationService.createBulkNotifications(
+            managerNotifications
+          );
+          console.log(
+            `Created ${managerNotifications.length} notifications for new staff member: ${newUser.name}`
+          );
+        }
+
+        // Create welcome notification for the new staff member
+        await NotificationService.createNotification({
+          type: "new_assignment" as const,
+          content: `Welcome to ${restaurantName}! You can now start taking training quizzes and assignments`,
+          userId: newUser._id,
+          restaurantId: finalRestaurantId,
+          metadata: { welcomeMessage: true },
+        });
+
+        console.log(
+          `Created welcome notification for new staff member: ${newUser.name}`
+        );
+      } catch (notificationError) {
+        console.error(
+          "Error creating staff registration notifications:",
+          notificationError
+        );
+        // Don't fail the registration if notifications fail
+      }
+
       return { user: newUser, restaurantId: finalRestaurantId, restaurantName };
     } catch (error: any) {
       await session.abortTransaction();

@@ -8,7 +8,7 @@ import api, {
 } from "../services/api";
 import EditableMenuTable from "../components/menu/EditableMenuTable";
 import Spinner from "../components/common/Spinner";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import Navbar from "../components/Navbar";
 import {
   MenuUploadPreview,
   ParsedMenuItem,
@@ -651,638 +651,660 @@ const MenuUploadPage: React.FC = () => {
   };
 
   return (
-    <DashboardLayout
-      breadcrumb={[
-        { name: "Menu Management", href: "/menu" },
-        { name: "Upload Menu" },
-      ]}
-    >
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-              <ArrowUpTrayIcon className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Upload Menu</h1>
-              <p className="text-slate-600 mt-2">
-                Upload your menu PDF and let AI extract and organize your items
-                automatically
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`p-2 rounded-full ${
-                    selectedFile ? "bg-green-100" : "bg-blue-100"
-                  }`}
-                >
-                  <DocumentArrowUpIcon
-                    className={`h-5 w-5 ${
-                      selectedFile ? "text-green-600" : "text-blue-600"
-                    }`}
-                  />
-                </div>
-                <span
-                  className={`font-medium ${
-                    selectedFile ? "text-green-700" : "text-blue-700"
-                  }`}
-                >
-                  1. Upload File
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`p-2 rounded-full ${
-                    uploadPreview ? "bg-green-100" : "bg-slate-100"
-                  }`}
-                >
-                  <CogIcon
-                    className={`h-5 w-5 ${
-                      uploadPreview ? "text-green-600" : "text-slate-400"
-                    }`}
-                  />
-                </div>
-                <span
-                  className={`font-medium ${
-                    uploadPreview ? "text-green-700" : "text-slate-500"
-                  }`}
-                >
-                  2. AI Processing
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`p-2 rounded-full ${
-                    importResult ? "bg-green-100" : "bg-slate-100"
-                  }`}
-                >
-                  <CheckCircleIcon
-                    className={`h-5 w-5 ${
-                      importResult ? "text-green-600" : "text-slate-400"
-                    }`}
-                  />
-                </div>
-                <span
-                  className={`font-medium ${
-                    importResult ? "text-green-700" : "text-slate-500"
-                  }`}
-                >
-                  3. Complete
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* File Upload Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Upload New Menu
-            </h2>
-          </div>
-
-          <div className="p-6">
-            <div className="space-y-6">
-              {/* File Input */}
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="menu-file-input"
-                />
-                <label
-                  htmlFor="menu-file-input"
-                  className="block w-full p-8 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 cursor-pointer group"
-                >
-                  <div className="text-center">
-                    <DocumentArrowUpIcon className="mx-auto h-12 w-12 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                    <div className="mt-4">
-                      <p className="text-lg font-medium text-slate-700 group-hover:text-blue-700">
-                        {selectedFile
-                          ? selectedFile.name
-                          : "Click to upload your menu PDF"}
-                      </p>
-                      <p className="text-sm text-slate-500 mt-1">
-                        PDF files only, up to 10MB
-                      </p>
-                    </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                    <ArrowUpTrayIcon className="h-8 w-8 text-white" />
                   </div>
-                </label>
+                  <div>
+                    <h1 className="text-3xl font-bold text-slate-900">
+                      Upload Menu
+                    </h1>
+                    <p className="text-slate-600 mt-2">
+                      Upload your menu PDF and let AI extract and organize your
+                      items automatically
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Menu Selection */}
-              {availableMenus.length > 0 && (
-                <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                    Target Menu
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Select existing menu to update (optional)
-                      </label>
-                      <select
-                        value={selectedTargetMenuId || ""}
-                        onChange={(e) =>
-                          setSelectedTargetMenuId(e.target.value || undefined)
-                        }
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        disabled={isLoadingMenus}
+              {/* Progress Steps */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-8">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`p-2 rounded-full ${
+                          selectedFile ? "bg-green-100" : "bg-blue-100"
+                        }`}
                       >
-                        <option value="">Create new menu</option>
-                        {availableMenus.map((menu) => (
-                          <option key={menu._id} value={menu._id}>
-                            {menu.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {selectedTargetMenuId && (
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          id="replace-all-items"
-                          checked={replaceAllItems}
-                          onChange={(e) => setReplaceAllItems(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        <DocumentArrowUpIcon
+                          className={`h-5 w-5 ${
+                            selectedFile ? "text-green-600" : "text-blue-600"
+                          }`}
                         />
-                        <label
-                          htmlFor="replace-all-items"
-                          className="text-sm text-slate-700"
-                        >
-                          Replace all existing items (instead of
-                          updating/adding)
-                        </label>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Upload Button */}
-              {selectedFile && !uploadPreview && !isLoading && (
-                <button
-                  onClick={() => handleUploadPreview()}
-                  className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    <DocumentCheckIcon className="h-5 w-5" />
-                    <span>Process Menu with AI</span>
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="flex items-center justify-center space-x-4">
-              <Spinner size="lg" />
-              <div className="text-center">
-                <p className="text-lg font-medium text-slate-700">
-                  AI is processing your menu...
-                </p>
-                <p className="text-sm text-slate-500 mt-1">
-                  This may take a few moments
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <div className="flex items-start space-x-3">
-              <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="text-lg font-semibold text-red-800">
-                  Upload Error
-                </h3>
-                <p className="text-red-700 mt-1">{error}</p>
-                <button
-                  onClick={() => setError(null)}
-                  className="mt-3 text-sm text-red-600 hover:text-red-800 font-medium"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AI Processing Results */}
-        {uploadPreview && (
-          <>
-            {/* Processing Summary */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
-                <div className="flex items-center space-x-3">
-                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    2. AI Processing Complete
-                  </h2>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <div className="text-2xl font-bold text-blue-700">
-                      {uploadPreview.parsedItems.length}
+                      <span
+                        className={`font-medium ${
+                          selectedFile ? "text-green-700" : "text-blue-700"
+                        }`}
+                      >
+                        1. Upload File
+                      </span>
                     </div>
-                    <div className="text-sm text-blue-600 font-medium">
-                      Items Found
-                    </div>
-                  </div>
 
-                  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                    <div className="text-2xl font-bold text-green-700">
-                      {
-                        uploadPreview.parsedItems.filter(
-                          (item) => item.userAction === "keep"
-                        ).length
-                      }
-                    </div>
-                    <div className="text-sm text-green-600 font-medium">
-                      To Import
-                    </div>
-                  </div>
-
-                  <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                    <div className="text-2xl font-bold text-amber-700">
-                      {uploadPreview.detectedCategories?.length || 0}
-                    </div>
-                    <div className="text-sm text-amber-600 font-medium">
-                      Categories
-                    </div>
-                  </div>
-
-                  <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                    <div className="text-2xl font-bold text-purple-700">
-                      {
-                        uploadPreview.parsedItems.filter(
-                          (item) =>
-                            item.fields.category?.value &&
-                            !["food", "beverage"].includes(
-                              item.fields.category.value as string
-                            )
-                        ).length
-                      }
-                    </div>
-                    <div className="text-sm text-purple-600 font-medium">
-                      Wine Items
-                    </div>
-                  </div>
-                </div>
-
-                {/* Global Errors */}
-                {uploadPreview.globalErrors &&
-                  uploadPreview.globalErrors.length > 0 && (
-                    <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                      <div className="flex items-start space-x-3">
-                        <InformationCircleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="font-semibold text-amber-800">
-                            Processing Notes:
-                          </h4>
-                          <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
-                            {uploadPreview.globalErrors.map(
-                              (gError: string, index: number) => (
-                                <li key={index}>{gError}</li>
-                              )
-                            )}
-                          </ul>
-                        </div>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`p-2 rounded-full ${
+                          uploadPreview ? "bg-green-100" : "bg-slate-100"
+                        }`}
+                      >
+                        <CogIcon
+                          className={`h-5 w-5 ${
+                            uploadPreview ? "text-green-600" : "text-slate-400"
+                          }`}
+                        />
                       </div>
+                      <span
+                        className={`font-medium ${
+                          uploadPreview ? "text-green-700" : "text-slate-500"
+                        }`}
+                      >
+                        2. AI Processing
+                      </span>
                     </div>
-                  )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-4 mt-6 pt-6 border-t border-slate-200">
-                  <button
-                    onClick={handleConflictCheck}
-                    disabled={
-                      buttonDisabled ||
-                      !uploadPreview.parsedItems.some(
-                        (item: ParsedMenuItem) => item.userAction !== "ignore"
-                      )
-                    }
-                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                  >
-                    {renderButtonContent(
-                      isCheckingConflicts,
-                      "Check Item Conflicts",
-                      "Checking..."
-                    )}
-                  </button>
-
-                  <button
-                    onClick={handleFinalizeImport}
-                    disabled={
-                      buttonDisabled ||
-                      !uploadPreview.parsedItems.some(
-                        (item: ParsedMenuItem) =>
-                          item.importAction &&
-                          item.importAction !== "skip" &&
-                          item.userAction !== "ignore"
-                      )
-                    }
-                    className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                  >
-                    {renderButtonContent(
-                      isFinalizingImport,
-                      "Finalize Import",
-                      "Importing..."
-                    )}
-                  </button>
-                </div>
-
-                {/* Conflict Error */}
-                {conflictError && (
-                  <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-start space-x-3">
-                      <XMarkIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-red-800">
-                          Conflict Check Error:
-                        </h4>
-                        <p className="text-red-700 text-sm mt-1">
-                          {conflictError}
-                        </p>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`p-2 rounded-full ${
+                          importResult ? "bg-green-100" : "bg-slate-100"
+                        }`}
+                      >
+                        <CheckCircleIcon
+                          className={`h-5 w-5 ${
+                            importResult ? "text-green-600" : "text-slate-400"
+                          }`}
+                        />
                       </div>
+                      <span
+                        className={`font-medium ${
+                          importResult ? "text-green-700" : "text-slate-500"
+                        }`}
+                      >
+                        3. Complete
+                      </span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
 
-            {/* Import Status */}
-            {(importJobId || importResult) && (
+              {/* File Upload Section */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-3">
-                    <InformationCircleIcon className="h-6 w-6 text-green-600" />
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      3. Import Status
-                    </h2>
-                  </div>
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Upload New Menu
+                  </h2>
                 </div>
 
                 <div className="p-6">
-                  {importJobId && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-                      <div className="flex items-center space-x-3">
-                        <CogIcon className="h-5 w-5 text-blue-600 animate-spin" />
-                        <div>
-                          <p className="font-medium text-blue-800">
-                            Menu import is processing in the background
-                          </p>
-                          <p className="text-sm text-blue-600 mt-1">
-                            Job ID: {importJobId}
-                          </p>
+                  <div className="space-y-6">
+                    {/* File Input */}
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="menu-file-input"
+                      />
+                      <label
+                        htmlFor="menu-file-input"
+                        className="block w-full p-8 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 cursor-pointer group"
+                      >
+                        <div className="text-center">
+                          <DocumentArrowUpIcon className="mx-auto h-12 w-12 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                          <div className="mt-4">
+                            <p className="text-lg font-medium text-slate-700 group-hover:text-blue-700">
+                              {selectedFile
+                                ? selectedFile.name
+                                : "Click to upload your menu PDF"}
+                            </p>
+                            <p className="text-sm text-slate-500 mt-1">
+                              PDF files only, up to 10MB
+                            </p>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Menu Selection */}
+                    {availableMenus.length > 0 && (
+                      <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                          Target Menu
+                        </h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                              Select existing menu to update (optional)
+                            </label>
+                            <select
+                              value={selectedTargetMenuId || ""}
+                              onChange={(e) =>
+                                setSelectedTargetMenuId(
+                                  e.target.value || undefined
+                                )
+                              }
+                              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                              disabled={isLoadingMenus}
+                            >
+                              <option value="">Create new menu</option>
+                              {availableMenus.map((menu) => (
+                                <option key={menu._id} value={menu._id}>
+                                  {menu.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {selectedTargetMenuId && (
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                id="replace-all-items"
+                                checked={replaceAllItems}
+                                onChange={(e) =>
+                                  setReplaceAllItems(e.target.checked)
+                                }
+                                className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                              />
+                              <label
+                                htmlFor="replace-all-items"
+                                className="text-sm text-slate-700"
+                              >
+                                Replace all existing items (instead of
+                                updating/adding)
+                              </label>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <button
-                        onClick={handleCheckJobStatus}
-                        disabled={isLoadingJobStatus}
-                        className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-400 transition-colors"
-                      >
-                        {renderButtonContent(
-                          isLoadingJobStatus,
-                          "Check Status",
-                          "Checking..."
-                        )}
-                      </button>
+                    )}
 
-                      {jobStatusError && (
-                        <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
-                          <p className="text-sm text-red-700">
-                            <strong>Status Error:</strong> {jobStatusError}
-                          </p>
+                    {/* Upload Button */}
+                    {selectedFile && !uploadPreview && !isLoading && (
+                      <button
+                        onClick={() => handleUploadPreview()}
+                        className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <DocumentCheckIcon className="h-5 w-5" />
+                          <span>Process Menu with AI</span>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading State */}
+              {isLoading && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                  <div className="flex items-center justify-center space-x-4">
+                    <Spinner size="lg" />
+                    <div className="text-center">
+                      <p className="text-lg font-medium text-slate-700">
+                        AI is processing your menu...
+                      </p>
+                      <p className="text-sm text-slate-500 mt-1">
+                        This may take a few moments
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                  <div className="flex items-start space-x-3">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-red-800">
+                        Upload Error
+                      </h3>
+                      <p className="text-red-700 mt-1">{error}</p>
+                      <button
+                        onClick={() => setError(null)}
+                        className="mt-3 text-sm text-red-600 hover:text-red-800 font-medium"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Processing Results */}
+              {uploadPreview && (
+                <>
+                  {/* Processing Summary */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          2. AI Processing Complete
+                        </h2>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                          <div className="text-2xl font-bold text-blue-700">
+                            {uploadPreview.parsedItems.length}
+                          </div>
+                          <div className="text-sm text-blue-600 font-medium">
+                            Items Found
+                          </div>
+                        </div>
+
+                        <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                          <div className="text-2xl font-bold text-green-700">
+                            {
+                              uploadPreview.parsedItems.filter(
+                                (item) => item.userAction === "keep"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-sm text-green-600 font-medium">
+                            To Import
+                          </div>
+                        </div>
+
+                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                          <div className="text-2xl font-bold text-amber-700">
+                            {uploadPreview.detectedCategories?.length || 0}
+                          </div>
+                          <div className="text-sm text-amber-600 font-medium">
+                            Categories
+                          </div>
+                        </div>
+
+                        <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                          <div className="text-2xl font-bold text-purple-700">
+                            {
+                              uploadPreview.parsedItems.filter(
+                                (item) =>
+                                  item.fields.category?.value &&
+                                  !["food", "beverage"].includes(
+                                    item.fields.category.value as string
+                                  )
+                              ).length
+                            }
+                          </div>
+                          <div className="text-sm text-purple-600 font-medium">
+                            Wine Items
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Global Errors */}
+                      {uploadPreview.globalErrors &&
+                        uploadPreview.globalErrors.length > 0 && (
+                          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                            <div className="flex items-start space-x-3">
+                              <InformationCircleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <h4 className="font-semibold text-amber-800">
+                                  Processing Notes:
+                                </h4>
+                                <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
+                                  {uploadPreview.globalErrors.map(
+                                    (gError: string, index: number) => (
+                                      <li key={index}>{gError}</li>
+                                    )
+                                  )}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-4 mt-6 pt-6 border-t border-slate-200">
+                        <button
+                          onClick={handleConflictCheck}
+                          disabled={
+                            buttonDisabled ||
+                            !uploadPreview.parsedItems.some(
+                              (item: ParsedMenuItem) =>
+                                item.userAction !== "ignore"
+                            )
+                          }
+                          className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                        >
+                          {renderButtonContent(
+                            isCheckingConflicts,
+                            "Check Item Conflicts",
+                            "Checking..."
+                          )}
+                        </button>
+
+                        <button
+                          onClick={handleFinalizeImport}
+                          disabled={
+                            buttonDisabled ||
+                            !uploadPreview.parsedItems.some(
+                              (item: ParsedMenuItem) =>
+                                item.importAction &&
+                                item.importAction !== "skip" &&
+                                item.userAction !== "ignore"
+                            )
+                          }
+                          className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                        >
+                          {renderButtonContent(
+                            isFinalizingImport,
+                            "Finalize Import",
+                            "Importing..."
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Conflict Error */}
+                      {conflictError && (
+                        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                          <div className="flex items-start space-x-3">
+                            <XMarkIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-red-800">
+                                Conflict Check Error:
+                              </h4>
+                              <p className="text-red-700 text-sm mt-1">
+                                {conflictError}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
 
-                  {importResult && (
-                    <div
-                      className={`rounded-xl p-6 border ${
-                        importResult.overallStatus === "failed" ||
-                        importResult.itemsErrored > 0
-                          ? "bg-red-50 border-red-200"
-                          : "bg-green-50 border-green-200"
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        {importResult.overallStatus === "failed" ||
-                        importResult.itemsErrored > 0 ? (
-                          <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
-                        ) : (
-                          <CheckCircleIcon className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
-                        )}
-                        <div className="flex-1">
-                          <h3
-                            className={`text-lg font-semibold ${
-                              importResult.overallStatus === "failed" ||
-                              importResult.itemsErrored > 0
-                                ? "text-red-800"
-                                : "text-green-800"
-                            }`}
-                          >
-                            Import {importResult.overallStatus}:{" "}
-                            {importResult.message}
-                          </h3>
+                  {/* Import Status */}
+                  {(importJobId || importResult) && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center space-x-3">
+                          <InformationCircleIcon className="h-6 w-6 text-green-600" />
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            3. Import Status
+                          </h2>
+                        </div>
+                      </div>
 
-                          {importResult.menuName && (
-                            <p
-                              className={`mt-1 ${
-                                importResult.overallStatus === "failed" ||
-                                importResult.itemsErrored > 0
-                                  ? "text-red-700"
-                                  : "text-green-700"
-                              }`}
-                            >
-                              Menu: {importResult.menuName} (ID: ...
-                              {importResult.menuId?.slice(-6)})
-                            </p>
-                          )}
-
-                          <div
-                            className={`mt-3 grid grid-cols-2 md:grid-cols-5 gap-4 ${
-                              importResult.overallStatus === "failed" ||
-                              importResult.itemsErrored > 0
-                                ? "text-red-700"
-                                : "text-green-700"
-                            }`}
-                          >
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {importResult.itemsProcessed}
-                              </div>
-                              <div className="text-xs font-medium">
-                                Processed
+                      <div className="p-6">
+                        {importJobId && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-center space-x-3">
+                              <CogIcon className="h-5 w-5 text-blue-600 animate-spin" />
+                              <div>
+                                <p className="font-medium text-blue-800">
+                                  Menu import is processing in the background
+                                </p>
+                                <p className="text-sm text-blue-600 mt-1">
+                                  Job ID: {importJobId}
+                                </p>
                               </div>
                             </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {importResult.itemsCreated}
-                              </div>
-                              <div className="text-xs font-medium">Created</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {importResult.itemsUpdated}
-                              </div>
-                              <div className="text-xs font-medium">Updated</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {importResult.itemsSkipped}
-                              </div>
-                              <div className="text-xs font-medium">Skipped</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {importResult.itemsErrored}
-                              </div>
-                              <div className="text-xs font-medium">Errored</div>
-                            </div>
-                          </div>
-
-                          {(importResult.overallStatus === "completed" ||
-                            importResult.overallStatus === "partial") && (
                             <button
-                              onClick={() =>
-                                navigate("/menu", {
-                                  state: { newMenuImported: true },
-                                })
-                              }
-                              className="mt-4 px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
+                              onClick={handleCheckJobStatus}
+                              disabled={isLoadingJobStatus}
+                              className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-400 transition-colors"
                             >
-                              Back to Menus
+                              {renderButtonContent(
+                                isLoadingJobStatus,
+                                "Check Status",
+                                "Checking..."
+                              )}
                             </button>
-                          )}
 
-                          {/* Error Details */}
-                          {importResult.itemsErrored > 0 &&
-                            importResult.errorDetails && (
-                              <div className="mt-4 bg-white rounded-lg p-4 border border-red-300">
-                                <h4 className="font-semibold text-red-800 mb-2">
-                                  Error Details:
-                                </h4>
-                                <div className="max-h-40 overflow-y-auto">
-                                  <ul className="space-y-1">
-                                    {importResult.errorDetails.map(
-                                      (d: ImportResultItemDetail) => (
-                                        <li
-                                          key={d.id}
-                                          className="text-sm text-red-700 bg-red-50 rounded p-2"
-                                        >
-                                          <strong>"{d.name}"</strong> (ID:{" "}
-                                          {d.id.slice(0, 8)}) - {d.status}:{" "}
-                                          {d.errorReason}
-                                        </li>
-                                      )
-                                    )}
-                                  </ul>
-                                </div>
-
-                                {importResult.errorReport && (
-                                  <button
-                                    onClick={handleDownloadErrorReport}
-                                    className="mt-3 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
-                                  >
-                                    Download Error Report (.csv)
-                                  </button>
-                                )}
+                            {jobStatusError && (
+                              <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
+                                <p className="text-sm text-red-700">
+                                  <strong>Status Error:</strong>{" "}
+                                  {jobStatusError}
+                                </p>
                               </div>
                             )}
-                        </div>
+                          </div>
+                        )}
+
+                        {importResult && (
+                          <div
+                            className={`rounded-xl p-6 border ${
+                              importResult.overallStatus === "failed" ||
+                              importResult.itemsErrored > 0
+                                ? "bg-red-50 border-red-200"
+                                : "bg-green-50 border-green-200"
+                            }`}
+                          >
+                            <div className="flex items-start space-x-3">
+                              {importResult.overallStatus === "failed" ||
+                              importResult.itemsErrored > 0 ? (
+                                <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
+                              ) : (
+                                <CheckCircleIcon className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
+                              )}
+                              <div className="flex-1">
+                                <h3
+                                  className={`text-lg font-semibold ${
+                                    importResult.overallStatus === "failed" ||
+                                    importResult.itemsErrored > 0
+                                      ? "text-red-800"
+                                      : "text-green-800"
+                                  }`}
+                                >
+                                  Import {importResult.overallStatus}:{" "}
+                                  {importResult.message}
+                                </h3>
+
+                                {importResult.menuName && (
+                                  <p
+                                    className={`mt-1 ${
+                                      importResult.overallStatus === "failed" ||
+                                      importResult.itemsErrored > 0
+                                        ? "text-red-700"
+                                        : "text-green-700"
+                                    }`}
+                                  >
+                                    Menu: {importResult.menuName} (ID: ...
+                                    {importResult.menuId?.slice(-6)})
+                                  </p>
+                                )}
+
+                                <div
+                                  className={`mt-3 grid grid-cols-2 md:grid-cols-5 gap-4 ${
+                                    importResult.overallStatus === "failed" ||
+                                    importResult.itemsErrored > 0
+                                      ? "text-red-700"
+                                      : "text-green-700"
+                                  }`}
+                                >
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold">
+                                      {importResult.itemsProcessed}
+                                    </div>
+                                    <div className="text-xs font-medium">
+                                      Processed
+                                    </div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold">
+                                      {importResult.itemsCreated}
+                                    </div>
+                                    <div className="text-xs font-medium">
+                                      Created
+                                    </div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold">
+                                      {importResult.itemsUpdated}
+                                    </div>
+                                    <div className="text-xs font-medium">
+                                      Updated
+                                    </div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold">
+                                      {importResult.itemsSkipped}
+                                    </div>
+                                    <div className="text-xs font-medium">
+                                      Skipped
+                                    </div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold">
+                                      {importResult.itemsErrored}
+                                    </div>
+                                    <div className="text-xs font-medium">
+                                      Errored
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {(importResult.overallStatus === "completed" ||
+                                  importResult.overallStatus === "partial") && (
+                                  <button
+                                    onClick={() =>
+                                      navigate("/menu", {
+                                        state: { newMenuImported: true },
+                                      })
+                                    }
+                                    className="mt-4 px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
+                                  >
+                                    Back to Menus
+                                  </button>
+                                )}
+
+                                {/* Error Details */}
+                                {importResult.itemsErrored > 0 &&
+                                  importResult.errorDetails && (
+                                    <div className="mt-4 bg-white rounded-lg p-4 border border-red-300">
+                                      <h4 className="font-semibold text-red-800 mb-2">
+                                        Error Details:
+                                      </h4>
+                                      <div className="max-h-40 overflow-y-auto">
+                                        <ul className="space-y-1">
+                                          {importResult.errorDetails.map(
+                                            (d: ImportResultItemDetail) => (
+                                              <li
+                                                key={d.id}
+                                                className="text-sm text-red-700 bg-red-50 rounded p-2"
+                                              >
+                                                <strong>"{d.name}"</strong> (ID:{" "}
+                                                {d.id.slice(0, 8)}) - {d.status}
+                                                : {d.errorReason}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+
+                                      {importResult.errorReport && (
+                                        <button
+                                          onClick={handleDownloadErrorReport}
+                                          className="mt-3 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+                                        >
+                                          Download Error Report (.csv)
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
 
-            {/* Items Table */}
-            {uploadPreview.parsedItems.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <DocumentCheckIcon className="h-6 w-6 text-blue-600" />
-                      <h2 className="text-xl font-semibold text-slate-900">
-                        4. Edit & Confirm Items
-                      </h2>
+                  {/* Items Table */}
+                  {uploadPreview.parsedItems.length > 0 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <DocumentCheckIcon className="h-6 w-6 text-blue-600" />
+                            <h2 className="text-xl font-semibold text-slate-900">
+                              4. Edit & Confirm Items
+                            </h2>
+                          </div>
+                          <button
+                            onClick={handleAddNewCategory}
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            disabled={!uploadPreview}
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                            <span>Add Category</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-6">
+                        <EditableMenuTable
+                          groupedItems={groupedAndSortedItems.categories}
+                          categoryOrder={groupedAndSortedItems.order}
+                          expandedCategories={expandedCategories}
+                          toggleCategoryExpansion={toggleCategoryExpansion}
+                          availableCategories={allUniqueCategories}
+                          onItemsChange={(updatedItems: ParsedMenuItem[]) =>
+                            setUploadPreview(
+                              (currentPreview: MenuUploadPreview | null) =>
+                                currentPreview
+                                  ? {
+                                      ...currentPreview,
+                                      parsedItems: updatedItems,
+                                    }
+                                  : null
+                            )
+                          }
+                          onRenameCategory={handleRenameCategory}
+                          onDeleteCategory={handleDeleteCategory}
+                          onItemMove={handleItemMove}
+                        />
+                      </div>
                     </div>
-                    <button
-                      onClick={handleAddNewCategory}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                      disabled={!uploadPreview}
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                      <span>Add Category</span>
-                    </button>
-                  </div>
-                </div>
+                  )}
+                </>
+              )}
 
-                <div className="p-6">
-                  <EditableMenuTable
-                    groupedItems={groupedAndSortedItems.categories}
-                    categoryOrder={groupedAndSortedItems.order}
-                    expandedCategories={expandedCategories}
-                    toggleCategoryExpansion={toggleCategoryExpansion}
-                    availableCategories={allUniqueCategories}
-                    onItemsChange={(updatedItems: ParsedMenuItem[]) =>
-                      setUploadPreview(
-                        (currentPreview: MenuUploadPreview | null) =>
-                          currentPreview
-                            ? { ...currentPreview, parsedItems: updatedItems }
-                            : null
-                      )
-                    }
-                    onRenameCategory={handleRenameCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                    onItemMove={handleItemMove}
-                  />
+              {/* No Items Message */}
+              {uploadPreview && uploadPreview.parsedItems.length === 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+                  <InformationCircleIcon className="mx-auto h-12 w-12 text-amber-600 mb-4" />
+                  <h3 className="text-lg font-semibold text-amber-800 mb-2">
+                    No Items Found
+                  </h3>
+                  <p className="text-amber-700">
+                    No items were parsed from the menu, or preview is not
+                    available.
+                  </p>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* No Items Message */}
-        {uploadPreview && uploadPreview.parsedItems.length === 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-            <InformationCircleIcon className="mx-auto h-12 w-12 text-amber-600 mb-4" />
-            <h3 className="text-lg font-semibold text-amber-800 mb-2">
-              No Items Found
-            </h3>
-            <p className="text-amber-700">
-              No items were parsed from the menu, or preview is not available.
-            </p>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-    </DashboardLayout>
+        </div>
+      </main>
+    </div>
   );
 };
 

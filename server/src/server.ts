@@ -35,6 +35,7 @@ import sopDocumentRoutes from "./routes/sopDocumentRoutes";
 import sopDocumentEditRoutes from "./routes/sopDocumentEditRoutes"; // Import new edit routes
 import invitationRoutes from "./routes/invitation"; // Import invitation routes
 import passwordResetRoutes from "./routes/passwordReset"; // Import password reset routes
+import notificationRoutes from "./routes/notifications"; // Import notification routes
 
 // Import and start the menu import worker
 import "./workers/menuImportWorker"; // This will start the worker
@@ -115,6 +116,7 @@ app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/sop-documents", sopDocumentRoutes);
 app.use("/api/sop-documents", sopDocumentEditRoutes);
 app.use("/api/invitations", invitationRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

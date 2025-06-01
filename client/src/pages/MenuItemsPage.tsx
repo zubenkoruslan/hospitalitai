@@ -8,7 +8,7 @@ import {
   updateMenu,
   deleteMenuCategory,
 } from "../services/api";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
@@ -612,230 +612,238 @@ const MenuItemsPage: React.FC = () => {
   // --- Render Logic ---
   if (loading && !menuDetails) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Menu Management", href: "/menu" },
-          { name: "Loading..." },
-        ]}
-      >
-        <div className="flex items-center justify-center py-12">
-          <LoadingSpinner message="Loading menu items..." />
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner message="Loading menu items..." />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Menu Management", href: "/menu" },
-          { name: "Error" },
-        ]}
-      >
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <DocumentTextIcon className="h-8 w-8 text-red-600" />
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+                  <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <DocumentTextIcon className="h-8 w-8 text-red-600" />
+                  </div>
+                  <h1 className="text-2xl font-bold text-red-600 mb-4">
+                    Error Loading Menu
+                  </h1>
+                  <ErrorMessage message={error} />
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate("/menu")}
+                    className="mt-6"
+                  >
+                    ← Back to Menus
+                  </Button>
+                </div>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-red-600 mb-4">
-              Error Loading Menu
-            </h1>
-            <ErrorMessage message={error} />
-            <Button
-              variant="secondary"
-              onClick={() => navigate("/menu")}
-              className="mt-6"
-            >
-              ← Back to Menus
-            </Button>
           </div>
-        </div>
-      </DashboardLayout>
+        </main>
+      </div>
     );
   }
 
   if (!menuDetails) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Menu Management", href: "/menu" },
-          { name: "Not Found" },
-        ]}
-      >
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-            <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <DocumentTextIcon className="h-8 w-8 text-slate-600" />
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+                  <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <DocumentTextIcon className="h-8 w-8 text-slate-600" />
+                  </div>
+                  <h1 className="text-2xl font-bold text-slate-700 mb-4">
+                    Menu Not Found
+                  </h1>
+                  <p className="text-slate-600 mb-6">
+                    The requested menu could not be found.
+                  </p>
+                  <Button variant="secondary" onClick={() => navigate("/menu")}>
+                    ← Back to Menus
+                  </Button>
+                </div>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-slate-700 mb-4">
-              Menu Not Found
-            </h1>
-            <p className="text-slate-600 mb-6">
-              The requested menu could not be found.
-            </p>
-            <Button variant="secondary" onClick={() => navigate("/menu")}>
-              ← Back to Menus
-            </Button>
           </div>
-        </div>
-      </DashboardLayout>
+        </main>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout
-      breadcrumb={[
-        { name: "Menu Management", href: "/menu" },
-        { name: menuDetails.name },
-      ]}
-    >
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            {/* Title and Description Section */}
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                <DocumentTextIcon className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                  {/* Title and Description Section */}
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
+                      <DocumentTextIcon className="h-8 w-8 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <h1 className="text-3xl font-bold text-slate-900">
+                        {menuDetails.name}
+                      </h1>
+                      {menuDetails.description && (
+                        <p className="text-slate-600 text-lg">
+                          {menuDetails.description}
+                        </p>
+                      )}
+                      <p className="text-sm text-slate-500">
+                        Manage menu items and categories
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Section */}
+                  <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                    <Button
+                      variant="secondary"
+                      onClick={openMenuDetailsModal}
+                      className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                      <span>Edit Menu Details</span>
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={openAddModal}
+                      className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      <span>Add New Item</span>
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h1 className="text-3xl font-bold text-slate-900">
-                  {menuDetails.name}
-                </h1>
-                {menuDetails.description && (
-                  <p className="text-slate-600 text-lg">
-                    {menuDetails.description}
-                  </p>
-                )}
-                <p className="text-sm text-slate-500">
-                  Manage menu items and categories
-                </p>
-              </div>
+
+              {/* Success and Error Messages */}
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+                  <SuccessNotification
+                    message={successMessage}
+                    onDismiss={() => setSuccessMessage(null)}
+                  />
+                </div>
+              )}
+
+              {/* Display hook's error if not in loading state and menuDetails exist */}
+              {error && !loading && menuDetails && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                  <ErrorMessage message={error} onDismiss={clearError} />
+                </div>
+              )}
+
+              {/* Loading state for items if menuDetails are already loaded */}
+              {loading && menuDetails && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
+                  <div className="text-center">
+                    <LoadingSpinner message="Loading items..." />
+                  </div>
+                </div>
+              )}
+
+              {/* Render tabs */}
+              {renderTabs()}
+
+              {/* Render categorized items or placeholder */}
+              {!loading && renderCategorizedItems()}
             </div>
 
-            {/* Action Buttons Section */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-              <Button
-                variant="secondary"
-                onClick={openMenuDetailsModal}
-                className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
-              >
-                <PencilIcon className="h-4 w-4" />
-                <span>Edit Menu Details</span>
-              </Button>
-              <Button
-                variant="primary"
-                onClick={openAddModal}
-                className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
-              >
-                <PlusIcon className="h-4 w-4" />
-                <span>Add New Item</span>
-              </Button>
-            </div>
-          </div>
-        </div>
+            {/* Modals */}
+            {isAddEditModalOpen && (
+              <AddEditMenuItemModal
+                isOpen={isAddEditModalOpen}
+                onClose={closeModal}
+                onSubmit={handleMenuItemFormSubmit}
+                currentItem={currentItem}
+                isSubmitting={isSubmittingItem}
+                menuId={menuId ?? ""}
+                allItemsInMenu={items}
+                restaurantId={restaurantId ?? ""}
+                itemType={
+                  currentItem?.itemType ?? // Use existing item's type when editing
+                  (activeTab === "beverage"
+                    ? "beverage"
+                    : activeTab === "wine"
+                    ? "wine"
+                    : "food") // Default to activeTab for new items
+                }
+                availableCategories={
+                  currentItem?.itemType === "beverage"
+                    ? uniqueBeverageCategories
+                    : currentItem?.itemType === "food"
+                    ? uniqueFoodCategories
+                    : currentItem?.itemType === "wine"
+                    ? uniqueWineCategories
+                    : activeTab === "beverage" // Fallback to activeTab for new items
+                    ? uniqueBeverageCategories
+                    : activeTab === "wine"
+                    ? uniqueWineCategories
+                    : uniqueFoodCategories // Default to food categories for new items if food tab active or other cases
+                }
+              />
+            )}
 
-        {/* Success and Error Messages */}
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-            <SuccessNotification
-              message={successMessage}
-              onDismiss={() => setSuccessMessage(null)}
+            {/* Delete Confirmation Modal (Use the new component) */}
+            {isDeleteModalOpen && currentItem && (
+              <DeleteMenuItemModal
+                isOpen={isDeleteModalOpen}
+                onClose={closeModal}
+                onConfirm={handleDeleteMenuItemConfirm}
+                itemName={currentItem.name}
+                isSubmitting={isSubmittingItem}
+              />
+            )}
+
+            {menuDetails && (
+              <MenuDetailsEditModal
+                isOpen={isMenuDetailsModalOpen}
+                onClose={closeMenuDetailsModal}
+                onSubmit={handleSaveMenuDetails}
+                initialName={menuDetails.name} // Pass current name
+                initialDescription={menuDetails.description || ""} // Pass current description
+                isSaving={isSavingMenuDetails}
+                error={menuDetailsError}
+              />
+            )}
+
+            {/* Delete Category Modal */}
+            <DeleteCategoryModal
+              isOpen={isDeleteCategoryModalOpen}
+              onClose={closeDeleteCategoryModal}
+              onConfirm={handleConfirmDeleteCategory}
+              categoryName={categoryToDelete}
+              isDeleting={isDeletingCategory}
             />
           </div>
-        )}
-
-        {/* Display hook's error if not in loading state and menuDetails exist */}
-        {error && !loading && menuDetails && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage message={error} onDismiss={clearError} />
-          </div>
-        )}
-
-        {/* Loading state for items if menuDetails are already loaded */}
-        {loading && menuDetails && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
-            <div className="text-center">
-              <LoadingSpinner message="Loading items..." />
-            </div>
-          </div>
-        )}
-
-        {/* Render tabs */}
-        {renderTabs()}
-
-        {/* Render categorized items or placeholder */}
-        {!loading && renderCategorizedItems()}
-      </div>
-
-      {/* Modals */}
-      {isAddEditModalOpen && (
-        <AddEditMenuItemModal
-          isOpen={isAddEditModalOpen}
-          onClose={closeModal}
-          onSubmit={handleMenuItemFormSubmit}
-          currentItem={currentItem}
-          isSubmitting={isSubmittingItem}
-          menuId={menuId ?? ""}
-          allItemsInMenu={items}
-          restaurantId={restaurantId ?? ""}
-          itemType={
-            currentItem?.itemType ?? // Use existing item's type when editing
-            (activeTab === "beverage"
-              ? "beverage"
-              : activeTab === "wine"
-              ? "wine"
-              : "food") // Default to activeTab for new items
-          }
-          availableCategories={
-            currentItem?.itemType === "beverage"
-              ? uniqueBeverageCategories
-              : currentItem?.itemType === "food"
-              ? uniqueFoodCategories
-              : currentItem?.itemType === "wine"
-              ? uniqueWineCategories
-              : activeTab === "beverage" // Fallback to activeTab for new items
-              ? uniqueBeverageCategories
-              : activeTab === "wine"
-              ? uniqueWineCategories
-              : uniqueFoodCategories // Default to food categories for new items if food tab active or other cases
-          }
-        />
-      )}
-
-      {/* Delete Confirmation Modal (Use the new component) */}
-      {isDeleteModalOpen && currentItem && (
-        <DeleteMenuItemModal
-          isOpen={isDeleteModalOpen}
-          onClose={closeModal}
-          onConfirm={handleDeleteMenuItemConfirm}
-          itemName={currentItem.name}
-          isSubmitting={isSubmittingItem}
-        />
-      )}
-
-      {menuDetails && (
-        <MenuDetailsEditModal
-          isOpen={isMenuDetailsModalOpen}
-          onClose={closeMenuDetailsModal}
-          onSubmit={handleSaveMenuDetails}
-          initialName={menuDetails.name} // Pass current name
-          initialDescription={menuDetails.description || ""} // Pass current description
-          isSaving={isSavingMenuDetails}
-          error={menuDetailsError}
-        />
-      )}
-
-      {/* Delete Category Modal */}
-      <DeleteCategoryModal
-        isOpen={isDeleteCategoryModalOpen}
-        onClose={closeDeleteCategoryModal}
-        onConfirm={handleConfirmDeleteCategory}
-        categoryName={categoryToDelete}
-        isDeleting={isDeletingCategory}
-      />
-    </DashboardLayout>
+        </div>
+      </main>
+    </div>
   );
 };
 

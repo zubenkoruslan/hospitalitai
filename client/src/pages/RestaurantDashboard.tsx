@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { inviteStaff, getStaffList } from "../services/api"; // Added inviteStaff, getStaffList
-import DashboardLayout from "../components/layout/DashboardLayout";
+import { useNotifications } from "../context/NotificationContext";
+import { getStaffList } from "../services/api"; // Added getStaffList
+import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
 import { useMenus } from "../hooks/useMenus";
@@ -25,6 +26,11 @@ import {
   DocumentArrowUpIcon,
   HomeIcon,
   TrophyIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  BellIcon,
+  ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to check if a quiz is completed regardless of capitalization
@@ -56,11 +62,8 @@ const RestaurantDashboard: React.FC = () => {
     fetchMenus,
   } = useMenus();
 
-  // State for Invite Staff
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [isStaffInviteLoading, setIsStaffInviteLoading] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
-  const [inviteError, setInviteError] = useState<string | null>(null);
+  // Get notifications for recent notifications section
+  const { notifications } = useNotifications();
 
   // Chart Data State
   const [averageScoreChartData, setAverageScoreChartData] =
@@ -114,33 +117,28 @@ const RestaurantDashboard: React.FC = () => {
     navigate("/menu-upload-path", { state: { fileToUpload: file } });
   };
 
-  const handleActualInviteStaff = async (emailToInvite: string) => {
-    setInviteMessage(null);
-    setInviteError(null);
-    if (!user || !user.restaurantId) {
-      setInviteError("Cannot invite staff without restaurant information.");
-      return;
-    }
-    setIsStaffInviteLoading(true);
-    try {
-      await inviteStaff({ email: emailToInvite });
-      setInviteMessage(`Invitation sent to ${emailToInvite}.`);
-      setInviteEmail("");
-      // Optionally, refresh staffData if useStaffSummary hook doesn't auto-update on new staff
-      // This might require making staffData mutable or calling a refresh function from the hook
-    } catch (err: any) {
-      setInviteError(err.response?.data?.message || "Failed to invite staff.");
-    } finally {
-      setIsStaffInviteLoading(false);
-    }
+  // Helper function to format notification time
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+
+    return date.toLocaleDateString();
   };
 
-  const handleInviteFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (inviteEmail.trim()) {
-      handleActualInviteStaff(inviteEmail.trim());
-    }
-  };
+  // Get recent notifications (limit to 4)
+  const recentNotifications = notifications?.slice(0, 4) || [];
 
   // Effect to prepare chart data when staffData (from useStaffSummary) changes
   useEffect(() => {
@@ -172,70 +170,84 @@ const RestaurantDashboard: React.FC = () => {
 
   if (authIsLoading) {
     return (
-      <DashboardLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner message="Authenticating..." />
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <LoadingSpinner message="Authenticating..." />
+          </div>
+        </main>
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-          <LoadingSpinner message="Loading dashboard data..." />
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <LoadingSpinner message="Loading dashboard data..." />
+          </div>
+        </main>
+      </div>
     );
   }
 
   // Handle access denied specifically if it came from the hook
   if (!isLoading && staffError?.startsWith("Access denied")) {
     return (
-      <DashboardLayout>
-        <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
-          <ErrorMessage message={staffError} />
-          <Button
-            variant="primary"
-            onClick={() => navigate("/login")}
-            className="mt-4"
-          >
-            Go to Login
-          </Button>
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+              <p className="text-gray-600">{staffError}</p>
+              <Button
+                variant="primary"
+                onClick={() => navigate("/login")}
+                className="mt-4"
+              >
+                Go to Login
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
     );
   }
 
   // Handle general errors
   if (displayError) {
     return (
-      <DashboardLayout>
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <ErrorMessage message={displayError} />
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+              <p className="text-gray-600">{displayError}</p>
+            </div>
+          </div>
         </main>
-      </DashboardLayout>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout title="Restaurant Dashboard">
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-              <HomeIcon className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                {user?.restaurantName
-                  ? `${user.restaurantName} Dashboard`
-                  : "Restaurant Dashboard"}
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">
+                Restaurant Dashboard
               </h1>
-              <p className="text-slate-600 mt-2">
-                Monitor your restaurant's performance and manage your team
+              <p className="text-gray-600 mt-2">
+                Welcome back, {user?.restaurantName}! Here's your overview.
               </p>
               {user?.restaurantId && (
                 <div className="mt-3 flex items-center space-x-3">
@@ -255,296 +267,319 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Error Message */}
-        {displayError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage message={displayError} />
-          </div>
-        )}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Total Staff Card */}
-          <Link to="/staff-results" className="block group">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                  <UsersIcon className="h-6 w-6 text-white" />
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Total Staff Card */}
+              <Link to="/staff-results" className="block group">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                      <UsersIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">
+                        Total Staff
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {staffData.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
+                    <span>View Details</span>
+                    <svg
+                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Total Staff
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {staffData.length}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
-                <span>View Details</span>
-                <svg
-                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </div>
-            </div>
-          </Link>
-
-          {/* Quizzes Active Card */}
-          <Link to="/quiz-management" className="block group">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-green-600 rounded-xl shadow-lg">
-                  <AcademicCapIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Quizzes Active
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {totalQuizzes}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
-                <span>Manage Quizzes</span>
-                <svg
-                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </div>
-            </div>
-          </Link>
-
-          {/* Menus Active Card */}
-          <Link to="/menu" className="block group">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                  <DocumentTextIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Menus Active
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {menus.length}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-amber-600 text-sm font-medium">
-                <span>Manage Menus</span>
-                <svg
-                  className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </div>
-            </div>
-          </Link>
-
-          {/* Average Performance Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
-                <ChartBarIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Avg. Performance
-                </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {overallAveragePerformance}%
-                </p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div
-                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                  style={{
-                    width: `${Math.min(
-                      parseFloat(overallAveragePerformance),
-                      100
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quick Actions */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Quick Actions
-              </h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <button
-                onClick={openPdfUploadModal}
-                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
-              >
-                <DocumentArrowUpIcon className="h-5 w-5" />
-                <span>Upload Menu PDF</span>
-              </button>
-
-              <Link
-                to="/quiz-management"
-                className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
-              >
-                <PlusIcon className="h-5 w-5" />
-                <span>Create New Quiz</span>
               </Link>
-            </div>
-          </div>
 
-          {/* Invite Staff */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Invite Staff
-              </h2>
-            </div>
-            <div className="p-6">
-              <form onSubmit={handleInviteFormSubmit} className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="invite-email"
-                    className="block text-sm font-medium text-slate-700 mb-2"
-                  >
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="invite-email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="Enter staff email"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+              {/* Quizzes Active Card */}
+              <Link to="/quiz-management" className="block group">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-green-600 rounded-xl shadow-lg">
+                      <AcademicCapIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">
+                        Quizzes Active
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {totalQuizzes}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                    <span>Manage Quizzes</span>
+                    <svg
+                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
                 </div>
+              </Link>
 
-                <button
-                  type="submit"
-                  disabled={isStaffInviteLoading || !inviteEmail.trim()}
-                  className="w-full px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  {isStaffInviteLoading ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <LoadingSpinner />
-                      <span>Sending...</span>
+              {/* Menus Active Card */}
+              <Link to="/menu" className="block group">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
+                      <DocumentTextIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">
+                        Menus Active
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {menus.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center text-amber-600 text-sm font-medium">
+                    <span>Manage Menus</span>
+                    <svg
+                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Average Performance Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
+                    <ChartBarIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      Avg. Performance
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {overallAveragePerformance}%
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          parseFloat(overallAveragePerformance),
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Quick Actions
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  <button
+                    onClick={openPdfUploadModal}
+                    className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
+                  >
+                    <DocumentArrowUpIcon className="h-5 w-5" />
+                    <span>Upload Menu PDF</span>
+                  </button>
+
+                  <Link
+                    to="/quiz-management"
+                    className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    <span>Create New Quiz</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Recent Notifications */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Recent Notifications
+                  </h2>
+                </div>
+                <div className="p-6">
+                  {recentNotifications.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentNotifications.map((notification) => (
+                        <div
+                          key={notification._id}
+                          className={`p-3 rounded-lg border transition-colors ${
+                            notification.isRead
+                              ? "bg-gray-50 border-gray-200"
+                              : "bg-blue-50 border-blue-200"
+                          }`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-1">
+                              <span className="text-lg">
+                                {notification.type === "new_quiz" && "🎯"}
+                                {notification.type === "completed_training" &&
+                                  "🎉"}
+                                {notification.type === "new_staff" && "👋"}
+                                {notification.type === "new_assignment" && "📋"}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={`text-sm ${
+                                  notification.isRead
+                                    ? "text-gray-600"
+                                    : "text-gray-900 font-medium"
+                                }`}
+                              >
+                                {notification.content}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatNotificationTime(notification.createdAt)}
+                              </p>
+                            </div>
+                            {!notification.isRead && (
+                              <div className="flex-shrink-0">
+                                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    "Send Invitation"
+                    <div className="text-center py-8">
+                      <div className="text-gray-400 mb-2">
+                        <svg
+                          className="mx-auto h-12 w-12"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1}
+                            d="M15 17h5l-5 5-5-5h5V3h-5l5-5 5 5h-5v14z"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        No recent notifications
+                      </p>
+                    </div>
                   )}
-                </button>
-              </form>
 
-              {/* Feedback Messages */}
-              {inviteMessage && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-700">{inviteMessage}</p>
+                  {recentNotifications.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <Link
+                        to="/staff-management"
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                      >
+                        View all notifications →
+                      </Link>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
 
-              {inviteError && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{inviteError}</p>
+            {/* Performance Chart */}
+            {averageScoreChartData && staffData.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Staff Performance Overview
+                  </h2>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Chart */}
-        {averageScoreChartData && staffData.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Staff Performance Overview
-              </h2>
-            </div>
-            <div className="p-6">
-              <BarChart
-                data={averageScoreChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
-                    },
-                    tooltip: {
-                      backgroundColor: "rgba(15, 23, 42, 0.9)",
-                      titleColor: "white",
-                      bodyColor: "white",
-                      borderColor: "rgba(59, 130, 246, 0.5)",
-                      borderWidth: 1,
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      max: 100,
-                      grid: {
-                        color: "rgba(148, 163, 184, 0.1)",
-                      },
-                      ticks: {
-                        color: "rgba(100, 116, 139, 0.8)",
-                        callback: function (value, index, ticks) {
-                          return value + "%";
+                <div className="p-6">
+                  <BarChart
+                    data={averageScoreChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: false,
+                        },
+                        tooltip: {
+                          backgroundColor: "rgba(15, 23, 42, 0.9)",
+                          titleColor: "white",
+                          bodyColor: "white",
+                          borderColor: "rgba(59, 130, 246, 0.5)",
+                          borderWidth: 1,
                         },
                       },
-                    },
-                    x: {
-                      grid: {
-                        display: false,
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          max: 100,
+                          grid: {
+                            color: "rgba(148, 163, 184, 0.1)",
+                          },
+                          ticks: {
+                            color: "rgba(100, 116, 139, 0.8)",
+                            callback: function (value, index, ticks) {
+                              return value + "%";
+                            },
+                          },
+                        },
+                        x: {
+                          grid: {
+                            display: false,
+                          },
+                          ticks: {
+                            color: "rgba(100, 116, 139, 0.8)",
+                          },
+                        },
                       },
-                      ticks: {
-                        color: "rgba(100, 116, 139, 0.8)",
-                      },
-                    },
-                  },
-                }}
-              />
-            </div>
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
 
       {/* PDF Upload Modal */}
       {isPdfUploadModalOpen && (
@@ -554,7 +589,7 @@ const RestaurantDashboard: React.FC = () => {
           onFileSelected={handleFileSelectedForDashboardUpload}
         />
       )}
-    </DashboardLayout>
+    </div>
   );
 };
 

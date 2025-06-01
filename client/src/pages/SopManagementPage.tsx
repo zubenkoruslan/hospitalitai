@@ -13,7 +13,7 @@ import {
   // getSopDocumentStatus // Might need this later for status polling
 } from "../services/api"; // Corrected path
 import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
-import DashboardLayout from "../components/layout/DashboardLayout"; // Updated import
+import Navbar from "../components/Navbar";
 import SopUploadModal from "../components/sop/SopUploadModal"; // Added
 import Button from "../components/common/Button"; // For consistent button styling
 import Card from "../components/common/Card"; // For layout consistency
@@ -155,209 +155,228 @@ const SopManagementPage: React.FC = () => {
   }, []);
 
   return (
-    <DashboardLayout title="SOP & Policy Management">
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                <DocumentTextIcon className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                      <DocumentTextIcon className="h-8 w-8 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold text-slate-900">
+                        SOP & Policy Management
+                      </h1>
+                      <p className="text-slate-600 mt-2">
+                        Upload and manage your standard operating procedures
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={() => setIsUploadModalOpen(true)}
+                    disabled={isUploading}
+                    className="flex items-center space-x-2"
+                  >
+                    <ArrowUpTrayIcon className="h-5 w-5" />
+                    <span>Upload Document</span>
+                  </Button>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  SOP & Policy Management
-                </h1>
-                <p className="text-slate-600 mt-2">
-                  Upload and manage your standard operating procedures
-                </p>
+
+              {/* Messages */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                  <ErrorMessage
+                    message={error}
+                    onDismiss={() => setError(null)}
+                  />
+                </div>
+              )}
+              {deleteSuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+                  <SuccessNotification
+                    message={deleteSuccess}
+                    onDismiss={() => setDeleteSuccess(null)}
+                  />
+                </div>
+              )}
+              {deleteError && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                  <ErrorMessage
+                    message={deleteError}
+                    onDismiss={() => setDeleteError(null)}
+                  />
+                </div>
+              )}
+              {uploadSuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+                  <SuccessNotification
+                    message={uploadSuccess}
+                    onDismiss={() => setUploadSuccess(null)}
+                  />
+                </div>
+              )}
+
+              {/* SOP Documents List */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Uploaded SOP Documents
+                  </h2>
+                </div>
+
+                <div className="p-6">
+                  {isLoading && (
+                    <div className="text-center py-12">
+                      <LoadingSpinner message="Loading documents..." />
+                    </div>
+                  )}
+
+                  {!isLoading && !error && sopDocuments.length === 0 && (
+                    <div className="text-center py-12">
+                      <DocumentTextIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">
+                        No SOP documents yet
+                      </h3>
+                      <p className="text-slate-500 mb-6">
+                        Upload your first SOP document to get started with staff
+                        training.
+                      </p>
+                      <Button
+                        variant="primary"
+                        onClick={() => setIsUploadModalOpen(true)}
+                        className="flex items-center space-x-2 mx-auto"
+                      >
+                        <ArrowUpTrayIcon className="h-4 w-4" />
+                        <span>Upload Document</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isLoading && !error && sopDocuments.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            {[
+                              "Title",
+                              "Description",
+                              "Status",
+                              "Uploaded At",
+                              "Actions",
+                            ].map((header) => (
+                              <th
+                                key={header}
+                                scope="col"
+                                className={`px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider ${
+                                  header === "Actions"
+                                    ? "text-right"
+                                    : "text-left"
+                                }`}
+                              >
+                                {header}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-200">
+                          {sopDocuments.map((doc) => (
+                            <tr
+                              key={doc._id}
+                              onClick={() =>
+                                navigate(`/sop-management/${doc._id}`)
+                              }
+                              className="hover:bg-slate-50 cursor-pointer transition-colors duration-150 group"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                                {doc.title}
+                              </td>
+                              <td
+                                className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate"
+                                title={doc.description}
+                              >
+                                {doc.description || (
+                                  <span className="italic text-slate-400">
+                                    N/A
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span
+                                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    doc.status === "processed"
+                                      ? "bg-green-100 text-green-800"
+                                      : doc.status === "processing" ||
+                                        doc.status === "pending_processing" ||
+                                        doc.status === "pending_upload"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : doc.status === "processing_error"
+                                      ? "bg-red-100 text-red-800"
+                                      : doc.status === "archived"
+                                      ? "bg-gray-100 text-gray-800"
+                                      : "bg-slate-100 text-slate-800"
+                                  }`}
+                                >
+                                  {doc.status.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                {doc.uploadedAt
+                                  ? format(
+                                      new Date(doc.uploadedAt),
+                                      "MMM d, yyyy"
+                                    )
+                                  : "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSopDocument(doc._id, doc.title);
+                                  }}
+                                  disabled={deletingId === doc._id}
+                                  className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors duration-150 p-2 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                  title="Delete Document"
+                                >
+                                  {deletingId === doc._id ? (
+                                    <div className="animate-spin h-5 w-5">
+                                      <LoadingSpinner />
+                                    </div>
+                                  ) : (
+                                    <TrashIcon className="h-5 w-5" />
+                                  )}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <Button
-              variant="primary"
-              onClick={() => setIsUploadModalOpen(true)}
-              disabled={isUploading}
-              className="flex items-center space-x-2"
-            >
-              <ArrowUpTrayIcon className="h-5 w-5" />
-              <span>Upload Document</span>
-            </Button>
-          </div>
-        </div>
 
-        {/* Messages */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage message={error} onDismiss={() => setError(null)} />
-          </div>
-        )}
-        {deleteSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-            <SuccessNotification
-              message={deleteSuccess}
-              onDismiss={() => setDeleteSuccess(null)}
-            />
-          </div>
-        )}
-        {deleteError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage
-              message={deleteError}
-              onDismiss={() => setDeleteError(null)}
-            />
-          </div>
-        )}
-        {uploadSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-            <SuccessNotification
-              message={uploadSuccess}
-              onDismiss={() => setUploadSuccess(null)}
-            />
-          </div>
-        )}
-
-        {/* SOP Documents List */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Uploaded SOP Documents
-            </h2>
-          </div>
-
-          <div className="p-6">
-            {isLoading && (
-              <div className="text-center py-12">
-                <LoadingSpinner message="Loading documents..." />
-              </div>
-            )}
-
-            {!isLoading && !error && sopDocuments.length === 0 && (
-              <div className="text-center py-12">
-                <DocumentTextIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">
-                  No SOP documents yet
-                </h3>
-                <p className="text-slate-500 mb-6">
-                  Upload your first SOP document to get started with staff
-                  training.
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={() => setIsUploadModalOpen(true)}
-                  className="flex items-center space-x-2 mx-auto"
-                >
-                  <ArrowUpTrayIcon className="h-4 w-4" />
-                  <span>Upload Document</span>
-                </Button>
-              </div>
-            )}
-
-            {!isLoading && !error && sopDocuments.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      {[
-                        "Title",
-                        "Description",
-                        "Status",
-                        "Uploaded At",
-                        "Actions",
-                      ].map((header) => (
-                        <th
-                          key={header}
-                          scope="col"
-                          className={`px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider ${
-                            header === "Actions" ? "text-right" : "text-left"
-                          }`}
-                        >
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-slate-200">
-                    {sopDocuments.map((doc) => (
-                      <tr
-                        key={doc._id}
-                        onClick={() => navigate(`/sop-management/${doc._id}`)}
-                        className="hover:bg-slate-50 cursor-pointer transition-colors duration-150 group"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                          {doc.title}
-                        </td>
-                        <td
-                          className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate"
-                          title={doc.description}
-                        >
-                          {doc.description || (
-                            <span className="italic text-slate-400">N/A</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              doc.status === "processed"
-                                ? "bg-green-100 text-green-800"
-                                : doc.status === "processing" ||
-                                  doc.status === "pending_processing" ||
-                                  doc.status === "pending_upload"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : doc.status === "processing_error"
-                                ? "bg-red-100 text-red-800"
-                                : doc.status === "archived"
-                                ? "bg-gray-100 text-gray-800"
-                                : "bg-slate-100 text-slate-800"
-                            }`}
-                          >
-                            {doc.status.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {doc.uploadedAt
-                            ? format(new Date(doc.uploadedAt), "MMM d, yyyy")
-                            : "N/A"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSopDocument(doc._id, doc.title);
-                            }}
-                            disabled={deletingId === doc._id}
-                            className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors duration-150 p-2 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            title="Delete Document"
-                          >
-                            {deletingId === doc._id ? (
-                              <div className="animate-spin h-5 w-5">
-                                <LoadingSpinner />
-                              </div>
-                            ) : (
-                              <TrashIcon className="h-5 w-5" />
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {/* Upload Modal */}
+            {isUploadModalOpen && (
+              <SopUploadModal
+                isOpen={isUploadModalOpen}
+                onClose={handleModalClose}
+                onUpload={handleUploadSop}
+                isUploading={isUploading}
+                uploadError={uploadError}
+              />
             )}
           </div>
         </div>
-      </div>
-
-      {/* Upload Modal */}
-      {isUploadModalOpen && (
-        <SopUploadModal
-          isOpen={isUploadModalOpen}
-          onClose={handleModalClose}
-          onUpload={handleUploadSop}
-          isUploading={isUploading}
-          uploadError={uploadError}
-        />
-      )}
-    </DashboardLayout>
+      </main>
+    </div>
   );
 };
 

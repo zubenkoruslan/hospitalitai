@@ -1,6 +1,7 @@
 import React, { useState, ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import NotificationBell from "../common/NotificationBell";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -9,6 +10,7 @@ import {
   UsersIcon,
   ChartBarIcon,
   CogIcon,
+  BellIcon,
   Bars3Icon,
   XMarkIcon,
   ArrowRightOnRectangleIcon,
@@ -66,6 +68,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       href: "/staff-results",
       icon: ChartBarIcon,
       roles: ["restaurant"],
+    },
+    {
+      name: "Notifications",
+      href: "/notifications",
+      icon: BellIcon,
+      roles: ["restaurant", "staff"],
     },
     {
       name: "Settings",
@@ -267,6 +275,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </div>
 
             <div className="ml-4 flex items-center space-x-4">
+              {/* Notification Bell */}
+              <NotificationBell />
+
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
                   <span className="text-xs font-medium text-white">

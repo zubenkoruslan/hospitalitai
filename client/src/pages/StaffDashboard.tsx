@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { /* Link, */ useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import Navbar from "../components/Navbar";
 import api, {
   getAvailableQuizzesForStaff,
   getMyQuizProgress,
@@ -21,6 +21,9 @@ import {
   PlayIcon,
   ClockIcon,
   CheckCircleIcon,
+  ExclamationTriangleIcon,
+  BookOpenIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 
 // New interface for combining Quiz definition with its progress
@@ -450,139 +453,133 @@ const StaffDashboard: React.FC = () => {
   if (isLoading && !user) {
     // Show main loader if auth is still loading
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        <DashboardLayout title="Loading">
-          <main className="flex-grow flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
             <LoadingSpinner message="Loading dashboard..." />
-          </main>
-        </DashboardLayout>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <DashboardLayout title="Staff Dashboard">
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
-              <AcademicCapIcon className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">
                 Staff Dashboard
               </h1>
-              <p className="text-slate-600 mt-2">
-                Track your progress and continue your training journey
+              <p className="text-gray-600 mt-2">
+                Welcome back, {user?.name}! Here's your training overview.
               </p>
-              {user?.name && (
-                <p className="text-sm text-green-700 mt-2 font-medium">
-                  Welcome back, {user.name}!
-                </p>
-              )}
             </div>
-          </div>
-        </div>
 
-        {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Quizzes Completed */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">
-                  Quizzes Completed
-                </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {completedQuizzes.length}
-                </p>
+            {/* Stats Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {/* Quizzes Completed */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">
+                      Quizzes Completed
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {completedQuizzes.length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                    <CheckCircleIcon className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                <CheckCircleIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
 
-          {/* Certificates Earned */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">
-                  Certificates Earned
-                </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {completedQuizzes.length}
-                </p>
+              {/* Certificates Earned */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">
+                      Certificates Earned
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {completedQuizzes.length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
+                    <TrophyIcon className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                <TrophyIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
 
-          {/* Average Score */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">
-                  Average Score
-                </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {rankingData?.myAverageScore !== null &&
-                  rankingData?.myAverageScore !== undefined
-                    ? `${rankingData.myAverageScore.toFixed(1)}%`
-                    : "N/A"}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
-                <ChartBarIcon className="h-6 w-6 text-white" />
+              {/* Average Score */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">
+                      Average Score
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {rankingData?.myAverageScore !== null &&
+                      rankingData?.myAverageScore !== undefined
+                        ? `${rankingData.myAverageScore.toFixed(1)}%`
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
+                    <ChartBarIcon className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Error Message */}
-        {quizError && rankingError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-            <ErrorMessage message={quizError} />
-          </div>
-        )}
-
-        {/* Quizzes Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Available Quizzes
-            </h2>
-          </div>
-          <div className="p-6">
-            {quizzes.length === 0 ? (
-              <div className="text-center py-12">
-                <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">
-                  No quizzes available
-                </h3>
-                <p className="text-slate-500">
-                  Check back later for new training materials.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {quizzes.map((quizDisplayItem) => (
-                  <QuizItem
-                    key={quizDisplayItem._id}
-                    quizDisplayItem={quizDisplayItem}
-                    onViewAttemptIncorrectAnswers={
-                      handleOpenAttemptIncorrectAnswersModal
-                    }
-                  />
-                ))}
+            {/* Error Message */}
+            {quizError && rankingError && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                <ErrorMessage message={quizError} />
               </div>
             )}
+
+            {/* Quizzes Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Available Quizzes
+                </h2>
+              </div>
+              <div className="p-6">
+                {quizzes.length === 0 ? (
+                  <div className="text-center py-12">
+                    <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">
+                      No quizzes available
+                    </h3>
+                    <p className="text-slate-500">
+                      Check back later for new training materials.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {quizzes.map((quizDisplayItem) => (
+                      <QuizItem
+                        key={quizDisplayItem._id}
+                        quizDisplayItem={quizDisplayItem}
+                        onViewAttemptIncorrectAnswers={
+                          handleOpenAttemptIncorrectAnswersModal
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Modal */}
       {isIncorrectAnswersModalOpen && selectedAttemptForModal && (
@@ -592,7 +589,7 @@ const StaffDashboard: React.FC = () => {
           attemptDetails={selectedAttemptForModal}
         />
       )}
-    </DashboardLayout>
+    </div>
   );
 };
 

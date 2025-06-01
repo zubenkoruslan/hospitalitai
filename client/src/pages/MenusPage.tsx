@@ -6,8 +6,8 @@ import {
   deleteMenu,
   updateMenuActivationStatus,
 } from "../services/api";
-import DashboardLayout from "../components/layout/DashboardLayout";
 import Button from "../components/common/Button";
+import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
@@ -20,6 +20,8 @@ import {
   EyeIcon,
   PencilIcon,
   ClipboardDocumentListIcon,
+  DocumentIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 import { useMenus } from "../hooks/useMenus";
@@ -222,162 +224,151 @@ const MenusPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <DashboardLayout>
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-          {/* Modern Page Header */}
-          <div className="bg-white shadow-sm rounded-2xl p-8 mb-8 border border-slate-200">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-              <div className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
-                  Restaurant Menus
-                </h1>
-                <p className="text-slate-600 text-lg">
-                  Manage your restaurant's menus and menu items
-                </p>
-              </div>
-              {/* Action buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                <Button
-                  variant="primary"
-                  onClick={openAddModal}
-                  disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
-                >
-                  <PlusIcon className="h-5 w-5 mr-2" />
-                  Create Menu
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={openPdfUploadModal}
-                  disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
-                >
-                  <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                  Upload PDF
-                </Button>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    Menu Management
+                  </h1>
+                  <p className="text-gray-600 mt-2">
+                    Manage your restaurant's menus and menu items.
+                  </p>
+                </div>
+                <Link to="/menu-upload-path">
+                  <Button variant="primary">
+                    <PlusIcon className="h-5 w-5 mr-2" />
+                    Add New Menu
+                  </Button>
+                </Link>
               </div>
             </div>
-          </div>
 
-          {/* Notifications */}
-          {pageError && (
-            <div className="mb-6">
-              <ErrorMessage
-                message={pageError}
-                onDismiss={() => setPageError(null)}
-              />
-            </div>
-          )}
-          {successMessage && (
-            <div className="mb-6">
-              <SuccessNotification
-                message={successMessage}
-                onDismiss={() => setSuccessMessage(null)}
-              />
-            </div>
-          )}
-          {menusError && (
-            <div className="mb-6">
-              <ErrorMessage message={menusError} />
-            </div>
-          )}
-
-          {/* Main Content Area */}
-          <div className="bg-white shadow-sm rounded-2xl border border-slate-200 overflow-hidden">
-            {isLoading && menus.length === 0 && (
-              <div className="flex justify-center items-center py-20">
-                <LoadingSpinner message="Loading menus..." />
+            {/* Notifications */}
+            {pageError && (
+              <div className="mb-6">
+                <ErrorMessage
+                  message={pageError}
+                  onDismiss={() => setPageError(null)}
+                />
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-6">
+                <SuccessNotification
+                  message={successMessage}
+                  onDismiss={() => setSuccessMessage(null)}
+                />
+              </div>
+            )}
+            {menusError && (
+              <div className="mb-6">
+                <ErrorMessage message={menusError} />
               </div>
             )}
 
-            {!isLoading && menus.length === 0 && !menusError && (
-              <div className="text-center py-20 px-8">
-                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
-                  <DocumentTextIcon className="h-8 w-8 text-slate-400" />
+            {/* Main Content Area */}
+            <div className="bg-white shadow-sm rounded-2xl border border-slate-200 overflow-hidden">
+              {isLoading && menus.length === 0 && (
+                <div className="flex justify-center items-center py-20">
+                  <LoadingSpinner message="Loading menus..." />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                  No menus found
-                </h3>
-                <p className="text-slate-600 mb-8 max-w-md mx-auto">
-                  Get started by creating your first menu or uploading a PDF
-                  menu to automatically extract items.
-                </p>
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                  <Button
-                    variant="primary"
-                    onClick={openAddModal}
-                    className="w-full sm:w-auto"
-                  >
-                    <PlusIcon className="h-5 w-5 mr-2" /> Create First Menu
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={openPdfUploadModal}
-                    className="w-full sm:w-auto"
-                  >
-                    <ArrowUpTrayIcon className="h-5 w-5 mr-2" /> Upload PDF Menu
-                  </Button>
-                </div>
-              </div>
-            )}
+              )}
 
-            {menus.length > 0 && (
-              <div className="p-8">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {menus.map((menu) => (
-                    <div
-                      key={menu._id}
-                      className="bg-slate-50 border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-slate-300 transition-all duration-200 group"
+              {!isLoading && menus.length === 0 && !menusError && (
+                <div className="text-center py-20 px-8">
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
+                    <DocumentTextIcon className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                    No menus found
+                  </h3>
+                  <p className="text-slate-600 mb-8 max-w-md mx-auto">
+                    Get started by creating your first menu or uploading a PDF
+                    menu to automatically extract items.
+                  </p>
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <Button
+                      variant="primary"
+                      onClick={openAddModal}
+                      className="w-full sm:w-auto"
                     >
-                      <div className="flex flex-col h-full">
-                        <div className="flex-1">
-                          <Link
-                            to={`/menu/${menu._id}`}
-                            className="block hover:no-underline"
-                          >
-                            <h3 className="text-lg font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors mb-2">
-                              {menu.name}
-                            </h3>
-                          </Link>
-                          <p className="text-sm text-slate-600 line-clamp-2 min-h-[2.5rem]">
-                            {menu.description || (
-                              <span className="italic text-slate-400">
-                                No description provided
-                              </span>
-                            )}
-                          </p>
-                        </div>
+                      <PlusIcon className="h-5 w-5 mr-2" /> Create First Menu
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={openPdfUploadModal}
+                      className="w-full sm:w-auto"
+                    >
+                      <ArrowUpTrayIcon className="h-5 w-5 mr-2" /> Upload PDF
+                      Menu
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-                        <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
-                          <Link to={`/menu/${menu._id}`}>
-                            <Button
-                              variant="secondary"
-                              aria-label={`View items in ${menu.name}`}
-                              className="text-sm px-4 py-2"
+              {menus.length > 0 && (
+                <div className="p-8">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {menus.map((menu) => (
+                      <div
+                        key={menu._id}
+                        className="bg-slate-50 border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-slate-300 transition-all duration-200 group"
+                      >
+                        <div className="flex flex-col h-full">
+                          <div className="flex-1">
+                            <Link
+                              to={`/menu/${menu._id}`}
+                              className="block hover:no-underline"
                             >
-                              <EyeIcon className="h-4 w-4 mr-1" />
-                              View Items
+                              <h3 className="text-lg font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors mb-2">
+                                {menu.name}
+                              </h3>
+                            </Link>
+                            <p className="text-sm text-slate-600 line-clamp-2 min-h-[2.5rem]">
+                              {menu.description || (
+                                <span className="italic text-slate-400">
+                                  No description provided
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
+                            <Link to={`/menu/${menu._id}`}>
+                              <Button
+                                variant="secondary"
+                                aria-label={`View items in ${menu.name}`}
+                                className="text-sm px-4 py-2"
+                              >
+                                <EyeIcon className="h-4 w-4 mr-1" />
+                                View Items
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="destructive"
+                              onClick={() => openDeleteModal(menu)}
+                              aria-label={`Delete ${menu.name}`}
+                              className="text-sm p-2"
+                            >
+                              <TrashIcon className="h-4 w-4" />
                             </Button>
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            onClick={() => openDeleteModal(menu)}
-                            aria-label={`Delete ${menu.name}`}
-                            className="text-sm p-2"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </main>
-      </DashboardLayout>
+        </div>
+      </main>
 
       {/* Modern Add Menu Modal */}
       {isAddMenuModalOpen && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import { IQuestion, IQuestionBank } from "../types/questionBankTypes";
 import Button from "../components/common/Button";
@@ -398,547 +398,564 @@ const QuestionBankDetailPage: React.FC = () => {
 
   if (isLoading && !currentQuestionBank) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Quiz Management", href: "/quiz-management" },
-          { name: "Loading..." },
-        ]}
-      >
-        <div className="flex items-center justify-center py-12">
-          <LoadingSpinner message="Loading question bank details..." />
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner message="Loading question bank details..." />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Quiz Management", href: "/quiz-management" },
-          { name: "Error" },
-        ]}
-      >
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <BookOpenIcon className="h-8 w-8 text-red-600" />
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+                  <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <BookOpenIcon className="h-8 w-8 text-red-600" />
+                  </div>
+                  <h1 className="text-2xl font-bold text-red-600 mb-4">
+                    Error Loading Question Bank
+                  </h1>
+                  <ErrorMessage message={getErrorMessage(error)} />
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate("/quiz-management")}
+                    className="mt-6"
+                  >
+                    ← Back to Quiz Management
+                  </Button>
+                </div>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-red-600 mb-4">
-              Error Loading Question Bank
-            </h1>
-            <ErrorMessage message={getErrorMessage(error)} />
-            <Button
-              variant="secondary"
-              onClick={() => navigate("/quiz-management")}
-              className="mt-6"
-            >
-              ← Back to Quiz Management
-            </Button>
           </div>
-        </div>
-      </DashboardLayout>
+        </main>
+      </div>
     );
   }
 
   if (!currentQuestionBank) {
     return (
-      <DashboardLayout
-        breadcrumb={[
-          { name: "Quiz Management", href: "/quiz-management" },
-          { name: "Not Found" },
-        ]}
-      >
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-            <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <BookOpenIcon className="h-8 w-8 text-slate-600" />
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+                  <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <BookOpenIcon className="h-8 w-8 text-slate-600" />
+                  </div>
+                  <h1 className="text-2xl font-bold text-slate-700 mb-4">
+                    Question Bank Not Found
+                  </h1>
+                  <ErrorMessage message="Question bank not found." />
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate("/quiz-management")}
+                    className="mt-6"
+                  >
+                    ← Back to Quiz Management
+                  </Button>
+                </div>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-slate-700 mb-4">
-              Question Bank Not Found
-            </h1>
-            <ErrorMessage message="Question bank not found." />
-            <Button
-              variant="secondary"
-              onClick={() => navigate("/quiz-management")}
-              className="mt-6"
-            >
-              ← Back to Quiz Management
-            </Button>
           </div>
-        </div>
-      </DashboardLayout>
+        </main>
+      </div>
     );
   }
 
   // Main content rendering if bank is loaded
   return (
-    <DashboardLayout
-      breadcrumb={[
-        { name: "Quiz Management", href: "/quiz-management" },
-        { name: currentQuestionBank.name },
-      ]}
-    >
-      <div className="space-y-8">
-        {/* Header Section */}
-        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                <BookOpenIcon className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  {currentQuestionBank.name}
-                </h1>
-                <p className="text-slate-600 mt-2">
-                  Manage questions in this question bank
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              onClick={handleOpenEditBankModal}
-              className="flex items-center space-x-2"
-            >
-              <PencilIcon className="h-4 w-4" />
-              <span>Edit Details</span>
-            </Button>
-          </div>
-
-          {/* Bank Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-1">
-                Questions
-              </h3>
-              <p className="text-2xl font-bold text-slate-900">
-                {currentQuestionBank.questions.length}
-              </p>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-1">
-                Source Type
-              </h3>
-              <div className="flex items-center space-x-2">
-                {currentQuestionBank.sourceType === "MENU" && (
-                  <>
-                    <span className="inline-flex px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
-                      Menu
-                    </span>
-                    {currentQuestionBank.sourceMenuName && (
-                      <span className="text-sm text-slate-600">
-                        {currentQuestionBank.sourceMenuName}
-                      </span>
-                    )}
-                  </>
-                )}
-                {currentQuestionBank.sourceType === "SOP" && (
-                  <>
-                    <span className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                      SOP
-                    </span>
-                    {currentQuestionBank.sourceSopDocumentTitle && (
-                      <span className="text-sm text-slate-600">
-                        {currentQuestionBank.sourceSopDocumentTitle}
-                      </span>
-                    )}
-                  </>
-                )}
-                {currentQuestionBank.sourceType === "MANUAL" && (
-                  <span className="inline-flex px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
-                    Manual
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-1">
-                Categories
-              </h3>
-              <div className="flex flex-wrap gap-1">
-                {currentQuestionBank.categories &&
-                currentQuestionBank.categories.length > 0 ? (
-                  currentQuestionBank.categories.slice(0, 2).map((cat) => (
-                    <span
-                      key={cat}
-                      className="inline-flex px-2 py-1 text-xs bg-sky-100 text-sky-700 rounded-full"
-                    >
-                      {cat}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-slate-500 italic">None</span>
-                )}
-                {currentQuestionBank.categories &&
-                  currentQuestionBank.categories.length > 2 && (
-                    <span className="text-xs text-slate-500">
-                      +{currentQuestionBank.categories.length - 2} more
-                    </span>
-                  )}
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          {currentQuestionBank.description && (
-            <div className="mt-6 p-4 bg-white/50 backdrop-blur-sm rounded-xl">
-              <h3 className="text-sm font-medium text-slate-700 mb-2">
-                Description
-              </h3>
-              <p className="text-slate-600">
-                {currentQuestionBank.description}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Error Messages */}
-        {pageError && (
-          <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
-                <XCircleIcon className="h-6 w-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-red-900">
-                  Unable to Load Question Bank
-                </h3>
-                <p className="text-red-700 mt-1">{pageError}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Manage Questions Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-6">
-            Manage Questions
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              variant="primary"
-              onClick={() => setShowAddManualQuestionModal(true)}
-              className="flex items-center justify-center space-x-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Manual Question</span>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleOpenGenerateAiQuestions}
-              className="flex items-center justify-center space-x-2"
-            >
-              <SparklesIcon className="h-5 w-5" />
-              <span>Generate from Menu</span>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowGenerateSopAiModal(true)}
-              className="flex items-center justify-center space-x-2"
-            >
-              <DocumentTextIcon className="h-5 w-5" />
-              <span>Generate from SOP</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Bulk Actions */}
-        {selectedQuestionIds.length > 0 && (
-          <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <TrashIcon className="h-5 w-5 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">
-                    {selectedQuestionIds.length} question
-                    {selectedQuestionIds.length > 1 ? "s" : ""} selected
-                  </h3>
-                  <p className="text-sm text-slate-600">
-                    You can perform bulk actions on selected questions
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => setSelectedQuestionIds([])}
-                  className="text-sm"
-                >
-                  Clear Selection
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setIsConfirmBulkDeleteModalOpen(true)}
-                  className="text-sm"
-                >
-                  Delete Selected
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Questions List */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Questions ({currentQuestionBank.questions.length})
-              </h2>
-              {currentQuestionBank.questions.length > 0 && (
-                <div className="flex items-center space-x-3">
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                      <BookOpenIcon className="h-8 w-8 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold text-slate-900">
+                        {currentQuestionBank.name}
+                      </h1>
+                      <p className="text-slate-600 mt-2">
+                        Manage questions in this question bank
+                      </p>
+                    </div>
+                  </div>
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      const allIds = currentQuestionBank.questions.map(
-                        (q) => q._id
-                      );
-                      setSelectedQuestionIds(
-                        selectedQuestionIds.length === allIds.length
-                          ? []
-                          : allIds
-                      );
-                    }}
-                    className="text-sm"
+                    onClick={handleOpenEditBankModal}
+                    className="flex items-center space-x-2"
                   >
-                    {selectedQuestionIds.length ===
-                    currentQuestionBank.questions.length
-                      ? "Deselect All"
-                      : "Select All"}
+                    <PencilIcon className="h-4 w-4" />
+                    <span>Edit Details</span>
                   </Button>
+                </div>
+
+                {/* Bank Info */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
+                    <h3 className="text-sm font-medium text-slate-700 mb-1">
+                      Questions
+                    </h3>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {currentQuestionBank.questions.length}
+                    </p>
+                  </div>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
+                    <h3 className="text-sm font-medium text-slate-700 mb-1">
+                      Source Type
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      {currentQuestionBank.sourceType === "MENU" && (
+                        <>
+                          <span className="inline-flex px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                            Menu
+                          </span>
+                          {currentQuestionBank.sourceMenuName && (
+                            <span className="text-sm text-slate-600">
+                              {currentQuestionBank.sourceMenuName}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {currentQuestionBank.sourceType === "SOP" && (
+                        <>
+                          <span className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                            SOP
+                          </span>
+                          {currentQuestionBank.sourceSopDocumentTitle && (
+                            <span className="text-sm text-slate-600">
+                              {currentQuestionBank.sourceSopDocumentTitle}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {currentQuestionBank.sourceType === "MANUAL" && (
+                        <span className="inline-flex px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                          Manual
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
+                    <h3 className="text-sm font-medium text-slate-700 mb-1">
+                      Categories
+                    </h3>
+                    <div className="flex flex-wrap gap-1">
+                      {currentQuestionBank.categories &&
+                      currentQuestionBank.categories.length > 0 ? (
+                        currentQuestionBank.categories
+                          .slice(0, 2)
+                          .map((cat) => (
+                            <span
+                              key={cat}
+                              className="inline-flex px-2 py-1 text-xs bg-sky-100 text-sky-700 rounded-full"
+                            >
+                              {cat}
+                            </span>
+                          ))
+                      ) : (
+                        <span className="text-sm text-slate-500 italic">
+                          None
+                        </span>
+                      )}
+                      {currentQuestionBank.categories &&
+                        currentQuestionBank.categories.length > 2 && (
+                          <span className="text-xs text-slate-500">
+                            +{currentQuestionBank.categories.length - 2} more
+                          </span>
+                        )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {currentQuestionBank.description && (
+                  <div className="mt-6 p-4 bg-white/50 backdrop-blur-sm rounded-xl">
+                    <h3 className="text-sm font-medium text-slate-700 mb-2">
+                      Description
+                    </h3>
+                    <p className="text-slate-600">
+                      {currentQuestionBank.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Error Messages */}
+              {pageError && (
+                <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+                      <XCircleIcon className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-red-900">
+                        Unable to Load Question Bank
+                      </h3>
+                      <p className="text-red-700 mt-1">{pageError}</p>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          <div className="p-6">
-            {currentQuestionBank.questions.length === 0 ? (
-              <div className="text-center py-12">
-                <BookOpenIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">
-                  No questions yet
-                </h3>
-                <p className="text-slate-500 mb-6">
-                  Add questions to this bank to get started with quiz creation.
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={() => setShowAddManualQuestionModal(true)}
-                  className="flex items-center space-x-2 mx-auto"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  <span>Add First Question</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {currentQuestionBank.questions.map((question) => (
-                  <QuestionListItem
-                    key={question._id}
-                    question={question}
-                    onRemove={requestRemoveQuestion}
-                    onEdit={handleOpenEditQuestionModal}
-                    isSelected={selectedQuestionIds.includes(question._id)}
-                    onToggleSelect={handleToggleSelectQuestion}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Modals */}
-      {showAddManualQuestionModal && bankId && (
-        <Modal
-          isOpen={showAddManualQuestionModal}
-          onClose={() => setShowAddManualQuestionModal(false)}
-          title="Add New Manual Question"
-        >
-          <AddManualQuestionForm
-            onQuestionAdded={handleManualQuestionSubmit}
-            onCloseRequest={() => setShowAddManualQuestionModal(false)}
-            initialBankCategories={currentQuestionBank.categories}
-            questionBankId={bankId}
-          />
-        </Modal>
-      )}
-
-      {showGenerateAiQuestionsModal &&
-        currentQuestionBank &&
-        selectedMenuForAi && (
-          <Modal
-            isOpen={showGenerateAiQuestionsModal}
-            onClose={() => {
-              setShowGenerateAiQuestionsModal(false);
-              setSelectedMenuForAi(null);
-            }}
-            title="Generate AI Questions for this Bank"
-          >
-            <GenerateAiQuestionsForm
-              bankId={currentQuestionBank._id}
-              menuId={selectedMenuForAi}
-              onAiQuestionsGenerated={handleAiQuestionsGenerated}
-              onCloseRequest={() => {
-                setShowGenerateAiQuestionsModal(false);
-                setSelectedMenuForAi(null);
-              }}
-              initialCategories={
-                currentQuestionBank.sourceType === "MENU"
-                  ? currentQuestionBank.categories
-                  : undefined
-              }
-            />
-          </Modal>
-        )}
-
-      {isMenuSelectionModalOpen && (
-        <Modal
-          isOpen={isMenuSelectionModalOpen}
-          onClose={() => setIsMenuSelectionModalOpen(false)}
-          title="Select Menu for AI Question Generation"
-          size="md"
-        >
-          <div className="p-4">
-            <p className="text-sm text-gray-700 mb-4">
-              Multiple active menus found. Please select which menu to use as
-              context for AI question generation.
-            </p>
-            {availableMenus.length === 0 && !isLoadingMenusForAi && (
-              <p className="text-sm text-gray-500">
-                No active menus available.
-              </p>
-            )}
-            {isLoadingMenusForAi && (
-              <LoadingSpinner message="Loading menus..." />
-            )}
-            <ul className="space-y-2 max-h-60 overflow-y-auto">
-              {availableMenus.map((menu) => (
-                <li key={menu._id}>
+              {/* Manage Questions Section */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-xl font-semibold text-slate-900 mb-6">
+                  Manage Questions
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowAddManualQuestionModal(true)}
+                    className="flex items-center justify-center space-x-2"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    <span>Add Manual Question</span>
+                  </Button>
                   <Button
                     variant="secondary"
-                    className="w-full text-left justify-start"
-                    onClick={() => handleMenuSelectForAi(menu._id)}
+                    onClick={handleOpenGenerateAiQuestions}
+                    className="flex items-center justify-center space-x-2"
                   >
-                    {menu.name}
+                    <SparklesIcon className="h-5 w-5" />
+                    <span>Generate from Menu</span>
                   </Button>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6 flex justify-end">
-              <Button
-                variant="primary"
-                onClick={() => setIsMenuSelectionModalOpen(false)}
-              >
-                Cancel
-              </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowGenerateSopAiModal(true)}
+                    className="flex items-center justify-center space-x-2"
+                  >
+                    <DocumentTextIcon className="h-5 w-5" />
+                    <span>Generate from SOP</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Bulk Actions */}
+              {selectedQuestionIds.length > 0 && (
+                <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-red-100 rounded-lg">
+                        <TrashIcon className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900">
+                          {selectedQuestionIds.length} question
+                          {selectedQuestionIds.length > 1 ? "s" : ""} selected
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          You can perform bulk actions on selected questions
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setSelectedQuestionIds([])}
+                        className="text-sm"
+                      >
+                        Clear Selection
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setIsConfirmBulkDeleteModalOpen(true)}
+                        className="text-sm"
+                      >
+                        Delete Selected
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Questions List */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Questions ({currentQuestionBank.questions.length})
+                    </h2>
+                    {currentQuestionBank.questions.length > 0 && (
+                      <div className="flex items-center space-x-3">
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            const allIds = currentQuestionBank.questions.map(
+                              (q) => q._id
+                            );
+                            setSelectedQuestionIds(
+                              selectedQuestionIds.length === allIds.length
+                                ? []
+                                : allIds
+                            );
+                          }}
+                          className="text-sm"
+                        >
+                          {selectedQuestionIds.length ===
+                          currentQuestionBank.questions.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {currentQuestionBank.questions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <BookOpenIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">
+                        No questions yet
+                      </h3>
+                      <p className="text-slate-500 mb-6">
+                        Add questions to this bank to get started with quiz
+                        creation.
+                      </p>
+                      <Button
+                        variant="primary"
+                        onClick={() => setShowAddManualQuestionModal(true)}
+                        className="flex items-center space-x-2 mx-auto"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        <span>Add First Question</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {currentQuestionBank.questions.map((question) => (
+                        <QuestionListItem
+                          key={question._id}
+                          question={question}
+                          onRemove={requestRemoveQuestion}
+                          onEdit={handleOpenEditQuestionModal}
+                          isSelected={selectedQuestionIds.includes(
+                            question._id
+                          )}
+                          onToggleSelect={handleToggleSelectQuestion}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Modals */}
+            {showAddManualQuestionModal && bankId && (
+              <Modal
+                isOpen={showAddManualQuestionModal}
+                onClose={() => setShowAddManualQuestionModal(false)}
+                title="Add New Manual Question"
+              >
+                <AddManualQuestionForm
+                  onQuestionAdded={handleManualQuestionSubmit}
+                  onCloseRequest={() => setShowAddManualQuestionModal(false)}
+                  initialBankCategories={currentQuestionBank.categories}
+                  questionBankId={bankId}
+                />
+              </Modal>
+            )}
+
+            {showGenerateAiQuestionsModal &&
+              currentQuestionBank &&
+              selectedMenuForAi && (
+                <Modal
+                  isOpen={showGenerateAiQuestionsModal}
+                  onClose={() => {
+                    setShowGenerateAiQuestionsModal(false);
+                    setSelectedMenuForAi(null);
+                  }}
+                  title="Generate AI Questions for this Bank"
+                >
+                  <GenerateAiQuestionsForm
+                    bankId={currentQuestionBank._id}
+                    menuId={selectedMenuForAi}
+                    onAiQuestionsGenerated={handleAiQuestionsGenerated}
+                    onCloseRequest={() => {
+                      setShowGenerateAiQuestionsModal(false);
+                      setSelectedMenuForAi(null);
+                    }}
+                    initialCategories={
+                      currentQuestionBank.sourceType === "MENU"
+                        ? currentQuestionBank.categories
+                        : undefined
+                    }
+                  />
+                </Modal>
+              )}
+
+            {isMenuSelectionModalOpen && (
+              <Modal
+                isOpen={isMenuSelectionModalOpen}
+                onClose={() => setIsMenuSelectionModalOpen(false)}
+                title="Select Menu for AI Question Generation"
+                size="md"
+              >
+                <div className="p-4">
+                  <p className="text-sm text-gray-700 mb-4">
+                    Multiple active menus found. Please select which menu to use
+                    as context for AI question generation.
+                  </p>
+                  {availableMenus.length === 0 && !isLoadingMenusForAi && (
+                    <p className="text-sm text-gray-500">
+                      No active menus available.
+                    </p>
+                  )}
+                  {isLoadingMenusForAi && (
+                    <LoadingSpinner message="Loading menus..." />
+                  )}
+                  <ul className="space-y-2 max-h-60 overflow-y-auto">
+                    {availableMenus.map((menu) => (
+                      <li key={menu._id}>
+                        <Button
+                          variant="secondary"
+                          className="w-full text-left justify-start"
+                          onClick={() => handleMenuSelectForAi(menu._id)}
+                        >
+                          {menu.name}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      variant="primary"
+                      onClick={() => setIsMenuSelectionModalOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </Modal>
+            )}
+
+            {isEditBankModalOpen && currentQuestionBank && (
+              <Modal
+                isOpen={isEditBankModalOpen}
+                onClose={handleCloseEditBankModal}
+                title={`Edit Bank: ${currentQuestionBank.name}`}
+              >
+                <EditQuestionBankForm
+                  bankToEdit={currentQuestionBank}
+                  onBankUpdated={handleBankDetailsUpdated}
+                  onCancel={handleCloseEditBankModal}
+                />
+              </Modal>
+            )}
+
+            {isConfirmRemoveModalOpen && questionToRemoveId && (
+              <Modal
+                isOpen={isConfirmRemoveModalOpen}
+                onClose={handleCancelRemoveQuestion}
+                title="Confirm Question Removal"
+                size="sm"
+              >
+                <ConfirmationModalContent
+                  message="Are you sure you want to remove this question from the bank? This action cannot be undone."
+                  onConfirm={executeRemoveQuestion}
+                  onCancel={handleCancelRemoveQuestion}
+                  confirmText="Remove Question"
+                  confirmButtonVariant="destructive"
+                />
+              </Modal>
+            )}
+
+            {isEditQuestionModalOpen && editingQuestion && (
+              <Modal
+                isOpen={isEditQuestionModalOpen}
+                onClose={handleCloseEditQuestionModal}
+                title="Edit Question"
+              >
+                <EditQuestionForm
+                  questionToEdit={editingQuestion}
+                  onQuestionUpdated={handleQuestionUpdatedInModal}
+                  onClose={handleCloseEditQuestionModal}
+                />
+              </Modal>
+            )}
+
+            {/* Confirmation Modal for Bulk Delete */}
+            {isConfirmBulkDeleteModalOpen && (
+              <Modal
+                isOpen={isConfirmBulkDeleteModalOpen}
+                onClose={handleCancelBulkDelete}
+                title="Confirm Bulk Delete"
+                size="sm"
+              >
+                <ConfirmationModalContent
+                  message={`Are you sure you want to delete ${selectedQuestionIds.length} selected question(s) from this bank? This action cannot be undone.`}
+                  onConfirm={executeBulkDelete}
+                  onCancel={handleCancelBulkDelete}
+                  confirmText={`Delete ${selectedQuestionIds.length} Question(s)`}
+                  confirmButtonVariant="destructive"
+                />
+              </Modal>
+            )}
+
+            {/* ADDED: Modal for SOP AI Question Generation */}
+            {showGenerateSopAiModal &&
+              currentQuestionBank &&
+              currentQuestionBank.sourceType === "SOP" &&
+              currentQuestionBank.sourceSopDocumentId && (
+                <Modal
+                  isOpen={showGenerateSopAiModal}
+                  onClose={() => setShowGenerateSopAiModal(false)}
+                  title={`Generate AI Questions from SOP: ${
+                    currentQuestionBank.sourceSopDocumentTitle || "SOP Document"
+                  }`}
+                >
+                  <GenerateAiQuestionsFormSop
+                    bankId={currentQuestionBank._id}
+                    bankName={currentQuestionBank.name}
+                    sopDocumentId={currentQuestionBank.sourceSopDocumentId}
+                    sopDocumentTitle={
+                      currentQuestionBank.sourceSopDocumentTitle
+                    }
+                    existingBankCategories={currentQuestionBank.categories}
+                    onQuestionsGenerated={(newQuestions) => {
+                      setShowGenerateSopAiModal(false);
+                      if (newQuestions && newQuestions.length > 0) {
+                        alert(
+                          `${newQuestions.length} AI questions generated from SOP and added to this bank.`
+                        );
+                      } else {
+                        alert(
+                          "SOP AI generation completed, but no new questions were created or some might have failed."
+                        );
+                      }
+                      if (bankId) fetchQuestionBankById(bankId);
+                    }}
+                    onCloseRequest={() => setShowGenerateSopAiModal(false)}
+                  />
+                </Modal>
+              )}
           </div>
-        </Modal>
-      )}
-
-      {isEditBankModalOpen && currentQuestionBank && (
-        <Modal
-          isOpen={isEditBankModalOpen}
-          onClose={handleCloseEditBankModal}
-          title={`Edit Bank: ${currentQuestionBank.name}`}
-        >
-          <EditQuestionBankForm
-            bankToEdit={currentQuestionBank}
-            onBankUpdated={handleBankDetailsUpdated}
-            onCancel={handleCloseEditBankModal}
-          />
-        </Modal>
-      )}
-
-      {isConfirmRemoveModalOpen && questionToRemoveId && (
-        <Modal
-          isOpen={isConfirmRemoveModalOpen}
-          onClose={handleCancelRemoveQuestion}
-          title="Confirm Question Removal"
-          size="sm"
-        >
-          <ConfirmationModalContent
-            message="Are you sure you want to remove this question from the bank? This action cannot be undone."
-            onConfirm={executeRemoveQuestion}
-            onCancel={handleCancelRemoveQuestion}
-            confirmText="Remove Question"
-            confirmButtonVariant="destructive"
-          />
-        </Modal>
-      )}
-
-      {isEditQuestionModalOpen && editingQuestion && (
-        <Modal
-          isOpen={isEditQuestionModalOpen}
-          onClose={handleCloseEditQuestionModal}
-          title="Edit Question"
-        >
-          <EditQuestionForm
-            questionToEdit={editingQuestion}
-            onQuestionUpdated={handleQuestionUpdatedInModal}
-            onClose={handleCloseEditQuestionModal}
-          />
-        </Modal>
-      )}
-
-      {/* Confirmation Modal for Bulk Delete */}
-      {isConfirmBulkDeleteModalOpen && (
-        <Modal
-          isOpen={isConfirmBulkDeleteModalOpen}
-          onClose={handleCancelBulkDelete}
-          title="Confirm Bulk Delete"
-          size="sm"
-        >
-          <ConfirmationModalContent
-            message={`Are you sure you want to delete ${selectedQuestionIds.length} selected question(s) from this bank? This action cannot be undone.`}
-            onConfirm={executeBulkDelete}
-            onCancel={handleCancelBulkDelete}
-            confirmText={`Delete ${selectedQuestionIds.length} Question(s)`}
-            confirmButtonVariant="destructive"
-          />
-        </Modal>
-      )}
-
-      {/* ADDED: Modal for SOP AI Question Generation */}
-      {showGenerateSopAiModal &&
-        currentQuestionBank &&
-        currentQuestionBank.sourceType === "SOP" &&
-        currentQuestionBank.sourceSopDocumentId && (
-          <Modal
-            isOpen={showGenerateSopAiModal}
-            onClose={() => setShowGenerateSopAiModal(false)}
-            title={`Generate AI Questions from SOP: ${
-              currentQuestionBank.sourceSopDocumentTitle || "SOP Document"
-            }`}
-          >
-            <GenerateAiQuestionsFormSop
-              bankId={currentQuestionBank._id}
-              bankName={currentQuestionBank.name}
-              sopDocumentId={currentQuestionBank.sourceSopDocumentId}
-              sopDocumentTitle={currentQuestionBank.sourceSopDocumentTitle}
-              existingBankCategories={currentQuestionBank.categories}
-              onQuestionsGenerated={(newQuestions) => {
-                setShowGenerateSopAiModal(false);
-                if (newQuestions && newQuestions.length > 0) {
-                  alert(
-                    `${newQuestions.length} AI questions generated from SOP and added to this bank.`
-                  );
-                } else {
-                  alert(
-                    "SOP AI generation completed, but no new questions were created or some might have failed."
-                  );
-                }
-                if (bankId) fetchQuestionBankById(bankId);
-              }}
-              onCloseRequest={() => setShowGenerateSopAiModal(false)}
-            />
-          </Modal>
-        )}
-    </DashboardLayout>
+        </div>
+      </main>
+    </div>
   );
 };
 

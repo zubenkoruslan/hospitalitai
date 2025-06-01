@@ -703,6 +703,61 @@ const transformMenuItemFormData = (
       .filter((s) => s !== "");
   }
 
+  // Handle wine-specific fields if itemType is wine
+  if (formData.itemType === "wine") {
+    // Handle wine style (required for wine items)
+    if (formData.wineStyle !== undefined) {
+      backendData.wineStyle = formData.wineStyle.trim() || undefined;
+    }
+
+    // Handle grape variety (comma-separated string to array)
+    if (formData.grapeVariety !== undefined) {
+      backendData.grapeVariety = formData.grapeVariety
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "");
+    }
+
+    // Handle vintage (string to number)
+    if (formData.vintage !== undefined) {
+      const vintageAsNumber = parseInt(formData.vintage);
+      backendData.vintage = isNaN(vintageAsNumber)
+        ? undefined
+        : vintageAsNumber;
+    }
+
+    // Handle producer (keep as string, just trim)
+    if (formData.producer !== undefined) {
+      backendData.producer = formData.producer.trim() || undefined;
+    }
+
+    // Handle region (keep as string, just trim)
+    if (formData.region !== undefined) {
+      backendData.region = formData.region.trim() || undefined;
+    }
+
+    // Handle serving options (JSON string to array of objects)
+    if (formData.servingOptions !== undefined) {
+      try {
+        const servingOptionsArray = JSON.parse(formData.servingOptions);
+        backendData.servingOptions = Array.isArray(servingOptionsArray)
+          ? servingOptionsArray.filter((opt: any) => opt.size && opt.price)
+          : [];
+      } catch {
+        // If JSON parsing fails, try to handle as empty array
+        backendData.servingOptions = [];
+      }
+    }
+
+    // Handle suggested food pairings (comma-separated string to array)
+    if (formData.suggestedPairingsText !== undefined) {
+      backendData.suggestedPairingsText = formData.suggestedPairingsText
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "");
+    }
+  }
+
   // Remove properties that are purely for form state if any (e.g. empty string for itemType)
   if (backendData.itemType === "") {
     delete backendData.itemType; // Or handle as per backend validation if empty string is disallowed
@@ -1399,6 +1454,87 @@ export const sendStaffInvitation = async (
     invitationData
   );
   return response.data;
+};
+
+// ======================================
+// NOTIFICATION API FUNCTIONS
+// ======================================
+
+export interface Notification {
+  _id: string;
+  type: "new_assignment" | "completed_training" | "new_staff" | "new_quiz";
+  content: string;
+  userId: string;
+  restaurantId: string;
+  relatedId?: string;
+  isRead: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationResponse {
+  status: string;
+  notifications: Notification[]; // Changed from 'data' to 'notifications'
+}
+
+export interface UnreadCountResponse {
+  status: string;
+  count: number; // Changed from 'unreadCount' to 'count'
+}
+
+/**
+ * Get all notifications for the current user
+ */
+export const getNotifications = async (): Promise<Notification[]> => {
+  const response = await api.get<NotificationResponse>("/notifications");
+  return response.data.notifications; // Changed from 'data' to 'notifications'
+};
+
+/**
+ * Get unread notification count
+ */
+export const getUnreadNotificationCount = async (): Promise<number> => {
+  const response = await api.get<UnreadCountResponse>(
+    "/notifications/unread-count"
+  );
+  return response.data.count; // Changed from 'unreadCount' to 'count'
+};
+
+/**
+ * Mark a notification as read
+ */
+export const markNotificationAsRead = async (
+  notificationId: string
+): Promise<void> => {
+  await api.put(`/notifications/${notificationId}`);
+};
+
+/**
+ * Mark all notifications as read
+ */
+export const markAllNotificationsAsRead = async (): Promise<void> => {
+  await api.put("/notifications/mark-all-read");
+};
+
+/**
+ * Delete a notification
+ */
+export const deleteNotification = async (
+  notificationId: string
+): Promise<void> => {
+  await api.delete(`/notifications/${notificationId}`);
+};
+
+/**
+ * Create test notifications (for development/testing)
+ */
+export const createTestNotifications = async (): Promise<Notification[]> => {
+  const response = await api.post<{
+    status: string;
+    notifications: Notification[];
+  }>("/notifications/test");
+  return response.data.notifications;
 };
 
 /**
