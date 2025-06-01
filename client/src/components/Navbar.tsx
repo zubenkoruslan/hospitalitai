@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import NotificationBell from "./common/NotificationBell";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -13,6 +12,7 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 
 // Define props interface
@@ -278,8 +278,8 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Bottom row: Notifications and user profile - Fixed height container */}
           <div className="px-2 h-20 flex items-center">
             {!isExpanded ? (
-              /* Collapsed: Stacked layout centered in fixed height container */
-              <div className="flex flex-col space-y-2 items-center justify-center h-full">
+              /* Collapsed: Just user profile centered in fixed height container */
+              <div className="flex items-center justify-center h-full">
                 {/* User profile dropdown */}
                 <div className="relative">
                   <button
@@ -324,6 +324,21 @@ const Navbar: React.FC<NavbarProps> = ({
                           role="none"
                         ></div>
 
+                        {/* Notifications */}
+                        <NavLink
+                          to="/notifications"
+                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
+                          onClick={(e) => {
+                            handleNavigationClick(e, "/notifications");
+                            setIsDropdownOpen(false);
+                          }}
+                          role="menuitem"
+                          title="Notifications"
+                        >
+                          <BellIcon className="h-4 w-4 mr-3" />
+                          Notifications
+                        </NavLink>
+
                         {/* Settings */}
                         <NavLink
                           to="/settings"
@@ -356,13 +371,6 @@ const Navbar: React.FC<NavbarProps> = ({
                       </div>
                     </div>
                   )}
-                </div>
-
-                {/* Notification Bell */}
-                <div className="flex-shrink-0">
-                  <div className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors duration-150 ease-in-out">
-                    <NotificationBell />
-                  </div>
                 </div>
               </div>
             ) : (
@@ -416,6 +424,21 @@ const Navbar: React.FC<NavbarProps> = ({
                       aria-labelledby="user-menu-button"
                     >
                       <div className="px-1 py-1">
+                        {/* Notifications */}
+                        <NavLink
+                          to="/notifications"
+                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
+                          onClick={(e) => {
+                            handleNavigationClick(e, "/notifications");
+                            setIsDropdownOpen(false);
+                          }}
+                          role="menuitem"
+                          title="Notifications"
+                        >
+                          <BellIcon className="h-4 w-4 mr-3" />
+                          Notifications
+                        </NavLink>
+
                         {/* Settings */}
                         <NavLink
                           to="/settings"
@@ -449,24 +472,6 @@ const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   )}
                 </div>
-
-                {/* Notification Bell with text - Bottom */}
-                <NavLink
-                  to="/notifications"
-                  className="relative flex items-center rounded-lg hover:bg-slate-100 transition-colors duration-150 ease-in-out h-10 text-slate-600 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                  onClick={(e) => handleNavigationClick(e, "/notifications")}
-                >
-                  {/* Fixed icon position to match navigation and user icons */}
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                    <div className="w-5 h-5 flex items-center justify-center">
-                      <NotificationBell />
-                    </div>
-                  </div>
-                  {/* Text positioned to align with navigation text */}
-                  <span className="ml-11 text-sm font-medium">
-                    Notifications
-                  </span>
-                </NavLink>
               </div>
             )}
           </div>

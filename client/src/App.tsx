@@ -6,10 +6,12 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ValidationProvider } from "./context/ValidationContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import NotificationBell from "./components/common/NotificationBell";
 
 // Import Pages and Components
 import LoginForm from "./components/LoginForm";
@@ -62,6 +64,24 @@ const AuthRedirect: React.FC = () => {
     // User is not logged in, redirect to homepage
     return <Navigate to="/" replace />;
   }
+};
+
+// Component to conditionally show floating notification bell on authenticated pages
+const FloatingNotificationBell: React.FC = () => {
+  const { user, token } = useAuth();
+  const location = useLocation();
+
+  // Only show on authenticated pages (not on login, signup, etc.)
+  const isAuthenticatedPage =
+    token &&
+    user &&
+    !["/", "/login", "/signup", "/forgot-password", "/auth-redirect"].includes(
+      location.pathname
+    ) &&
+    !location.pathname.startsWith("/reset-password") &&
+    !location.pathname.startsWith("/staff/accept-invitation");
+
+  return isAuthenticatedPage ? <NotificationBell /> : null;
 };
 
 function App() {
@@ -295,6 +315,7 @@ function App() {
               {/* Catch-all for 404 Not Found */}
               <Route path="*" element={<div>404 Not Found</div>} />
             </Routes>
+            <FloatingNotificationBell />
           </NotificationProvider>
         </ValidationProvider>
       </AuthProvider>

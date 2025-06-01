@@ -512,7 +512,7 @@ const RestaurantDashboard: React.FC = () => {
                   {recentNotifications.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <Link
-                        to="/staff-management"
+                        to="/notifications"
                         className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
                       >
                         View all notifications →
