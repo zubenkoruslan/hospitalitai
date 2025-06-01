@@ -12,6 +12,7 @@ import EditQuestionBankForm from "../components/questionBank/EditQuestionBankFor
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import GenerateAiQuestionsFormSop from "../components/questionBank/GenerateAiQuestionsFormSop";
+import AiQuestionsPreview from "../components/questionBank/AiQuestionsPreview";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { getMenusByRestaurant as fetchRestaurantMenus } from "../services/api";
@@ -147,6 +148,15 @@ const QuestionBankDetailPage: React.FC = () => {
   // ADDED: State for categories section expansion
   const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
 
+  // ADDED: State for AI Questions Preview
+  const [previewQuestions, setPreviewQuestions] = useState<IQuestion[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [selectedPreviewQuestionIds, setSelectedPreviewQuestionIds] = useState<
+    string[]
+  >([]);
+  const [isAddingApprovedQuestions, setIsAddingApprovedQuestions] =
+    useState(false);
+
   const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
     fetchQuestionBankById,
   ]);
@@ -214,17 +224,105 @@ const QuestionBankDetailPage: React.FC = () => {
     generatedQuestions: IQuestion[]
   ) => {
     setShowGenerateAiQuestionsModal(false);
+    setShowGenerateSopAiModal(false);
     setSelectedMenuForAi(null);
+
     if (generatedQuestions && generatedQuestions.length > 0) {
-      alert(
-        `${generatedQuestions.length} AI questions generated and are pending review.`
-      );
+      // Show preview modal instead of directly adding to bank
+      setPreviewQuestions(generatedQuestions);
+      setSelectedPreviewQuestionIds(generatedQuestions.map((q) => q._id)); // Pre-select all questions
+      setShowPreviewModal(true);
     } else {
-      alert(
-        "AI generation process completed, but no new questions were created or some might have failed."
-      );
+      alert("AI generation process completed, but no questions were created.");
     }
-    if (bankId) fetchQuestionBankById(bankId);
+  };
+
+  // NEW: Handler for SOP AI Questions Generated
+  const handleSopAiQuestionsGenerated = async (
+    generatedQuestions: IQuestion[]
+  ) => {
+    setShowGenerateSopAiModal(false);
+
+    if (generatedQuestions && generatedQuestions.length > 0) {
+      // Show preview modal instead of directly adding to bank
+      setPreviewQuestions(generatedQuestions);
+      setSelectedPreviewQuestionIds(generatedQuestions.map((q) => q._id)); // Pre-select all questions
+      setShowPreviewModal(true);
+    } else {
+      alert("AI generation process completed, but no questions were created.");
+    }
+  };
+
+  // NEW: Handler for approving and adding selected questions from preview
+  const handleApproveSelectedQuestions = async () => {
+    if (!currentQuestionBank || selectedPreviewQuestionIds.length === 0) {
+      alert("No questions selected to approve.");
+      return;
+    }
+
+    setIsAddingApprovedQuestions(true);
+    try {
+      let addedCount = 0;
+      const approvedQuestions = previewQuestions.filter((q) =>
+        selectedPreviewQuestionIds.includes(q._id)
+      );
+
+      for (const question of approvedQuestions) {
+        try {
+          await addQuestionToCurrentBank(question._id);
+          addedCount++;
+        } catch (err) {
+          console.error(`Failed to add question ${question._id}:`, err);
+        }
+      }
+
+      // Close preview and refresh bank
+      setShowPreviewModal(false);
+      setPreviewQuestions([]);
+      setSelectedPreviewQuestionIds([]);
+
+      if (bankId) {
+        await fetchQuestionBankById(bankId);
+      }
+
+      alert(
+        `${addedCount} out of ${selectedPreviewQuestionIds.length} questions added to the question bank successfully.`
+      );
+    } catch (err) {
+      console.error("Error adding approved questions:", err);
+      setPageError(
+        `Error adding questions to bank: ${
+          err instanceof Error ? err.message : "An unknown error occurred."
+        }`
+      );
+    } finally {
+      setIsAddingApprovedQuestions(false);
+    }
+  };
+
+  // NEW: Handler for closing preview modal
+  const handleClosePreviewModal = () => {
+    setShowPreviewModal(false);
+    setPreviewQuestions([]);
+    setSelectedPreviewQuestionIds([]);
+  };
+
+  // NEW: Handler for toggling preview question selection
+  const handleTogglePreviewQuestion = (questionId: string) => {
+    setSelectedPreviewQuestionIds((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
+  // NEW: Handler for selecting/deselecting all preview questions
+  const handleToggleAllPreviewQuestions = () => {
+    if (selectedPreviewQuestionIds.length === previewQuestions.length) {
+      setSelectedPreviewQuestionIds([]);
+    } else {
+      setSelectedPreviewQuestionIds(previewQuestions.map((q) => q._id));
+    }
   };
 
   // Helper to get error message
@@ -624,7 +722,13 @@ const QuestionBankDetailPage: React.FC = () => {
                 <h2 className="text-xl font-semibold text-slate-900 mb-6">
                   Manage Questions
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div
+                  className={`grid grid-cols-1 gap-4 ${
+                    currentQuestionBank.sourceType === "MANUAL"
+                      ? "md:grid-cols-1"
+                      : "md:grid-cols-2"
+                  }`}
+                >
                   <Button
                     variant="primary"
                     onClick={() => setShowAddManualQuestionModal(true)}
@@ -633,22 +737,30 @@ const QuestionBankDetailPage: React.FC = () => {
                     <PlusIcon className="h-5 w-5" />
                     <span>Add Manual Question</span>
                   </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleOpenGenerateAiQuestions}
-                    className="flex items-center justify-center space-x-2"
-                  >
-                    <SparklesIcon className="h-5 w-5" />
-                    <span>Generate from Menu</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowGenerateSopAiModal(true)}
-                    className="flex items-center justify-center space-x-2"
-                  >
-                    <DocumentTextIcon className="h-5 w-5" />
-                    <span>Generate from SOP</span>
-                  </Button>
+
+                  {/* Show Generate from Menu button only for MENU source type */}
+                  {currentQuestionBank.sourceType === "MENU" && (
+                    <Button
+                      variant="secondary"
+                      onClick={handleOpenGenerateAiQuestions}
+                      className="flex items-center justify-center space-x-2"
+                    >
+                      <SparklesIcon className="h-5 w-5" />
+                      <span>Generate from Menu</span>
+                    </Button>
+                  )}
+
+                  {/* Show Generate from SOP button only for SOP source type */}
+                  {currentQuestionBank.sourceType === "SOP" && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowGenerateSopAiModal(true)}
+                      className="flex items-center justify-center space-x-2"
+                    >
+                      <DocumentTextIcon className="h-5 w-5" />
+                      <span>Generate from SOP</span>
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -935,23 +1047,27 @@ const QuestionBankDetailPage: React.FC = () => {
                       currentQuestionBank.sourceSopDocumentTitle
                     }
                     existingBankCategories={currentQuestionBank.categories}
-                    onQuestionsGenerated={(newQuestions) => {
-                      setShowGenerateSopAiModal(false);
-                      if (newQuestions && newQuestions.length > 0) {
-                        alert(
-                          `${newQuestions.length} AI questions generated from SOP and added to this bank.`
-                        );
-                      } else {
-                        alert(
-                          "SOP AI generation completed, but no new questions were created or some might have failed."
-                        );
-                      }
-                      if (bankId) fetchQuestionBankById(bankId);
-                    }}
+                    onQuestionsGenerated={handleSopAiQuestionsGenerated}
                     onCloseRequest={() => setShowGenerateSopAiModal(false)}
                   />
                 </Modal>
               )}
+
+            {showPreviewModal && (
+              <Modal
+                isOpen={showPreviewModal}
+                onClose={handleClosePreviewModal}
+                title="AI Questions Preview"
+                size="xl"
+              >
+                <AiQuestionsPreview
+                  questions={previewQuestions}
+                  onApprove={handleApproveSelectedQuestions}
+                  onCancel={handleClosePreviewModal}
+                  isLoading={isAddingApprovedQuestions}
+                />
+              </Modal>
+            )}
           </div>
         </div>
       </main>
