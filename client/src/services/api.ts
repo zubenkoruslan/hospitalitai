@@ -1527,17 +1527,6 @@ export const deleteNotification = async (
 };
 
 /**
- * Create test notifications (for development/testing)
- */
-export const createTestNotifications = async (): Promise<Notification[]> => {
-  const response = await api.post<{
-    status: string;
-    notifications: Notification[];
-  }>("/notifications/test");
-  return response.data.notifications;
-};
-
-/**
  * Gets invitation details by token (public endpoint)
  * @param token - The invitation token from the URL
  * @returns Promise with invitation details

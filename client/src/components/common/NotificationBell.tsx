@@ -27,7 +27,6 @@ const NotificationBell: React.FC = () => {
     markAsRead,
     markAllAsRead,
     deleteNotificationById,
-    createTestNotificationsAction,
     clearError,
   } = useNotifications();
 
@@ -371,13 +370,6 @@ const NotificationBell: React.FC = () => {
                       You'll see updates about quizzes, training, and team
                       activities here.
                     </p>
-                    <Button
-                      variant="secondary"
-                      onClick={createTestNotificationsAction}
-                      className="text-xs"
-                    >
-                      Create Test Notifications
-                    </Button>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
@@ -413,14 +405,6 @@ const NotificationBell: React.FC = () => {
                     <ArrowTopRightOnSquareIcon className="h-3 w-3 mr-1" />
                     View All Notifications
                   </Link>
-                  {notifications && notifications.length > 0 && (
-                    <button
-                      onClick={createTestNotificationsAction}
-                      className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      Add Test Notifications
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

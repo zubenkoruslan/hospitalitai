@@ -5,6 +5,14 @@ export type QuestionType =
   | "multiple-choice-multiple"
   | "true-false";
 
+// NEW: Knowledge Category enum
+export enum KnowledgeCategory {
+  FOOD_KNOWLEDGE = "food-knowledge",
+  BEVERAGE_KNOWLEDGE = "beverage-knowledge",
+  WINE_KNOWLEDGE = "wine-knowledge",
+  PROCEDURES_KNOWLEDGE = "procedures-knowledge",
+}
+
 export interface IOption extends Document {
   text: string;
   isCorrect: boolean;
@@ -34,6 +42,13 @@ export interface IQuestion extends Document {
   explanation?: string;
   createdAt?: Date;
   updatedAt?: Date;
+
+  // NEW: Knowledge analytics fields
+  knowledgeCategory: KnowledgeCategory;
+  knowledgeSubcategories?: string[];
+  knowledgeCategoryAssignedBy: "manual" | "ai" | "restaurant_edit";
+  knowledgeCategoryAssignedAt: Date;
+  knowledgeCategoryLastEditedBy?: Types.ObjectId;
 }
 
 const QuestionSchema: Schema<IQuestion> = new Schema(
@@ -109,6 +124,43 @@ const QuestionSchema: Schema<IQuestion> = new Schema(
     },
     sopCategoryId: {
       type: Schema.Types.ObjectId,
+      required: false,
+      index: true,
+    },
+    knowledgeCategory: {
+      type: String,
+      enum: [
+        "food-knowledge",
+        "beverage-knowledge",
+        "wine-knowledge",
+        "procedures-knowledge",
+      ],
+      required: true,
+      index: true,
+    },
+    knowledgeSubcategories: {
+      type: [String],
+      required: false,
+      validate: {
+        validator: function (subcategories: string[]) {
+          return subcategories.length <= 3;
+        },
+        message: "Maximum 3 knowledge subcategories allowed",
+      },
+    },
+    knowledgeCategoryAssignedBy: {
+      type: String,
+      enum: ["manual", "ai", "restaurant_edit"],
+      required: true,
+    },
+    knowledgeCategoryAssignedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    knowledgeCategoryLastEditedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
       required: false,
       index: true,
     },

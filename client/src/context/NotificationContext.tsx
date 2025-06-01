@@ -15,7 +15,6 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-  createTestNotifications,
   Notification as ApiNotification,
 } from "../services/api";
 
@@ -32,7 +31,6 @@ interface NotificationContextType {
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   deleteNotificationById: (notificationId: string) => Promise<void>;
-  createTestNotificationsAction: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -161,20 +159,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     [] // Remove notifications dependency since we use functional updates
   );
 
-  const createTestNotificationsAction = useCallback(async () => {
-    try {
-      await createTestNotifications();
-      // Refresh notifications and unread count after creating test notifications
-      await fetchNotifications();
-      await fetchUnreadCount();
-    } catch (err: any) {
-      console.error("Error creating test notifications:", err);
-      setError(
-        err.response?.data?.message || "Failed to create test notifications"
-      );
-    }
-  }, [fetchNotifications, fetchUnreadCount]);
-
   // Auto-fetch notifications and unread count when user changes
   useEffect(() => {
     if (user) {
@@ -207,7 +191,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     markAsRead,
     markAllAsRead,
     deleteNotificationById,
-    createTestNotificationsAction,
     clearError,
   };
 
