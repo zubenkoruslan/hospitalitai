@@ -12,6 +12,14 @@ export type QuestionType =
   | "multiple-choice-multiple"
   | "true-false";
 
+// Knowledge category types (matching backend)
+export enum KnowledgeCategory {
+  FOOD_KNOWLEDGE = "food-knowledge",
+  BEVERAGE_KNOWLEDGE = "beverage-knowledge",
+  WINE_KNOWLEDGE = "wine-knowledge",
+  PROCEDURES_KNOWLEDGE = "procedures-knowledge",
+}
+
 export interface IQuestion {
   _id: string;
   questionText: string;
@@ -24,6 +32,13 @@ export interface IQuestion {
   createdAt: string;
   updatedAt: string;
   status: "active" | "pending_review" | "rejected";
+
+  // Knowledge Analytics fields
+  knowledgeCategory: KnowledgeCategory;
+  knowledgeSubcategories?: string[];
+  knowledgeCategoryAssignedBy: "manual" | "ai" | "restaurant_edit";
+  knowledgeCategoryAssignedAt: string;
+  knowledgeCategoryLastEditedBy?: string;
 }
 
 // Main interface for a Question Bank document on the client-side
@@ -38,7 +53,7 @@ export interface IQuestionBank {
   sourceMenuId?: string | null; // Added for Menu source
   sourceMenuName?: string; // Added for Menu source, if backend provides it
   categories: string[];
-  questions: string[]; // Array of question IDs
+  questions: string[] | IQuestion[]; // Array of question IDs or populated question objects
   questionCount: number;
   createdAt: string; // Date as string
   updatedAt: string; // Date as string
@@ -114,6 +129,10 @@ export interface NewQuestionClientData {
   options: Omit<IOption, "_id">[];
   categories: string[];
   questionBankId: string;
+
+  // Knowledge Analytics fields
+  knowledgeCategory: KnowledgeCategory;
+  knowledgeSubcategories?: string[];
 }
 
 // For updating an individual question (client-side)
@@ -124,6 +143,10 @@ export interface UpdateQuestionClientData {
   options?: Omit<IOption, "_id">[]; // Options might be entirely new or have existing _ids for merging on backend (if supported)
   categories?: string[];
   explanation?: string; // Ensure explanation is present
+
+  // Knowledge Analytics fields
+  knowledgeCategory?: KnowledgeCategory;
+  knowledgeSubcategories?: string[];
 }
 
 // Payload for the new AI Question Generation Process via /api/ai/generate-questions

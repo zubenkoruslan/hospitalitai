@@ -17,6 +17,8 @@ export const createQuestion = async (
       categories,
       difficulty,
       questionBankId,
+      knowledgeCategory,
+      knowledgeSubcategories,
     } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
@@ -38,6 +40,8 @@ export const createQuestion = async (
       createdBy: "manual",
       difficulty,
       questionBankId: new mongoose.Types.ObjectId(questionBankId),
+      knowledgeCategory,
+      knowledgeSubcategories,
     };
 
     // Validate questionBankId presence (moved from service for early check)

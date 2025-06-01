@@ -111,6 +111,19 @@ const QuestionBankDetailPage: React.FC = () => {
     addQuestionToCurrentBank,
   } = useQuestionBanks();
 
+  // Helper function to extract question ID from union type
+  const getQuestionId = (question: string | IQuestion): string => {
+    return typeof question === "string" ? question : question._id;
+  };
+
+  // Helper function to get questions as IQuestion objects
+  const getQuestionsAsObjects = (): IQuestion[] => {
+    if (!currentQuestionBank) return [];
+    return currentQuestionBank.questions.filter(
+      (q): q is IQuestion => typeof q === "object"
+    );
+  };
+
   // Local state for managing modals or forms for adding questions
   const [showAddManualQuestionModal, setShowAddManualQuestionModal] =
     useState(false);
@@ -453,7 +466,7 @@ const QuestionBankDetailPage: React.FC = () => {
     if (selectedQuestionIds.length === currentQuestionBank.questions.length) {
       setSelectedQuestionIds([]);
     } else {
-      setSelectedQuestionIds([...currentQuestionBank.questions]);
+      setSelectedQuestionIds(currentQuestionBank.questions.map(getQuestionId));
     }
   };
 
@@ -814,9 +827,8 @@ const QuestionBankDetailPage: React.FC = () => {
                         <Button
                           variant="secondary"
                           onClick={() => {
-                            const allIds = currentQuestionBank.questions.map(
-                              (q) => q._id
-                            );
+                            const allIds =
+                              currentQuestionBank.questions.map(getQuestionId);
                             setSelectedQuestionIds(
                               selectedQuestionIds.length === allIds.length
                                 ? []
@@ -857,7 +869,7 @@ const QuestionBankDetailPage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {currentQuestionBank.questions.map((question) => (
+                      {getQuestionsAsObjects().map((question) => (
                         <QuestionListItem
                           key={question._id}
                           question={question}

@@ -100,8 +100,8 @@ let genAI: GoogleGenerativeAI | null = null;
 let model: GenerativeModel | null = null;
 
 // --- START Batch Configuration ---
-const AI_CALL_BATCH_SIZE = 1; // Adjusted for potentially larger category-based payloads
-const DELAY_BETWEEN_BATCHES_MS = 20000; // Adjusted for potentially larger category-based payloads
+const AI_CALL_BATCH_SIZE = 3; // Adjusted for potentially larger category-based payloads
+const DELAY_BETWEEN_BATCHES_MS = 5000; // Adjusted for potentially larger category-based payloads
 // --- END Batch Configuration ---
 
 if (GEMINI_API_KEY) {

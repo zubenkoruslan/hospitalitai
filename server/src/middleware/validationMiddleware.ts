@@ -511,6 +511,33 @@ export const validateCreateQuestionBody: ValidationChain[] = [
     .optional()
     .isString()
     .trim(), // Add .isIn(['easy', 'medium', 'hard']) if difficulties are fixed
+
+  // Knowledge Analytics fields
+  body("knowledgeCategory", "Knowledge category must be a valid string")
+    .optional()
+    .isString()
+    .trim()
+    .isIn([
+      "food-knowledge",
+      "beverage-knowledge",
+      "wine-knowledge",
+      "procedures-knowledge",
+    ])
+    .withMessage(
+      "Knowledge category must be one of: food-knowledge, beverage-knowledge, wine-knowledge, procedures-knowledge"
+    ),
+  body("knowledgeSubcategories", "Knowledge subcategories must be an array")
+    .optional()
+    .isArray()
+    .withMessage("Knowledge subcategories must be an array"),
+  body(
+    "knowledgeSubcategories.*",
+    "Each knowledge subcategory must be a non-empty string"
+  )
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
 ];
 
 export const validateUpdateQuestionBody: ValidationChain[] = [
@@ -556,6 +583,33 @@ export const validateUpdateQuestionBody: ValidationChain[] = [
     .optional()
     .isString()
     .trim(), // Add .isIn(['easy', 'medium', 'hard']) if difficulties are fixed
+
+  // Knowledge Analytics fields
+  body("knowledgeCategory", "Knowledge category must be a valid string")
+    .optional()
+    .isString()
+    .trim()
+    .isIn([
+      "food-knowledge",
+      "beverage-knowledge",
+      "wine-knowledge",
+      "procedures-knowledge",
+    ])
+    .withMessage(
+      "Knowledge category must be one of: food-knowledge, beverage-knowledge, wine-knowledge, procedures-knowledge"
+    ),
+  body("knowledgeSubcategories", "Knowledge subcategories must be an array")
+    .optional()
+    .isArray()
+    .withMessage("Knowledge subcategories must be an array"),
+  body(
+    "knowledgeSubcategories.*",
+    "Each knowledge subcategory must be a non-empty string"
+  )
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
 ];
 
 // === QuestionBank Controller Validators ===

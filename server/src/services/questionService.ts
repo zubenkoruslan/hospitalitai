@@ -22,6 +22,10 @@ export interface NewQuestionData {
   createdBy: "ai" | "manual";
   difficulty?: "easy" | "medium" | "hard";
   questionBankId: mongoose.Types.ObjectId;
+
+  // Knowledge Analytics fields
+  knowledgeCategory?: string;
+  knowledgeSubcategories?: string[];
 }
 
 // Interface for the data allowed when updating an existing question
@@ -35,6 +39,10 @@ export interface UpdateQuestionData {
   }>;
   categories?: string[];
   difficulty?: "easy" | "medium" | "hard";
+
+  // Knowledge Analytics fields
+  knowledgeCategory?: string;
+  knowledgeSubcategories?: string[];
 }
 
 export const createQuestionService = async (
@@ -78,7 +86,19 @@ export const createQuestionService = async (
         );
       }
     }
-    const newQuestion = new QuestionModel(data);
+    // Prepare question data with knowledge analytics metadata
+    const questionData = {
+      ...data,
+      // Set knowledge analytics metadata
+      knowledgeCategoryAssignedBy: data.knowledgeCategory
+        ? "manual"
+        : undefined,
+      knowledgeCategoryAssignedAt: data.knowledgeCategory
+        ? new Date()
+        : undefined,
+    };
+
+    const newQuestion = new QuestionModel(questionData);
     await newQuestion.save();
     return newQuestion;
   } catch (error) {

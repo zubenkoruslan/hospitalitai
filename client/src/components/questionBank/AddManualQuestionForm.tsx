@@ -4,12 +4,14 @@ import {
   QuestionType,
   IOption,
   IQuestion,
+  KnowledgeCategory,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { createQuestion } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
+import KnowledgeCategorySelector from "../common/KnowledgeCategorySelector";
 
 interface AddManualQuestionFormProps {
   onQuestionAdded: (newQuestion: IQuestion) => void;
@@ -48,6 +50,14 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   const [explanation, setExplanation] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Knowledge Category State
+  const [selectedKnowledgeCategory, setSelectedKnowledgeCategory] =
+    useState<KnowledgeCategory>(KnowledgeCategory.FOOD_KNOWLEDGE);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
+    []
+  );
+
   const { formatErrorMessage } = useValidation();
 
   const handleOptionChange = (
@@ -162,6 +172,10 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         .map((cat) => cat.trim())
         .filter((cat) => cat),
       questionBankId: questionBankId,
+
+      // Knowledge Analytics fields
+      knowledgeCategory: selectedKnowledgeCategory,
+      knowledgeSubcategories: selectedSubcategories,
     };
 
     try {
@@ -321,6 +335,18 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
           disabled={isLoading}
         />
       </div>
+
+      {/* Knowledge Category Selection */}
+      <KnowledgeCategorySelector
+        selectedCategory={selectedKnowledgeCategory}
+        selectedSubcategories={selectedSubcategories}
+        onCategoryChange={setSelectedKnowledgeCategory}
+        onSubcategoriesChange={setSelectedSubcategories}
+        required={true}
+        disabled={isLoading}
+        showTooltips={true}
+        className="border-t pt-4"
+      />
 
       <div className="flex justify-end space-x-3 pt-4">
         <Button
