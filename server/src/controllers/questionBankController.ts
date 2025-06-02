@@ -1118,7 +1118,10 @@ export const generateAiQuestionsForSopBank = async (
       await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
         rawQuestions,
         restaurantIdString,
-        bankId
+        bankId,
+        {
+          sopCategoryName: bank.sourceType === "SOP" ? bank.name : undefined,
+        }
       );
 
     res.status(200).json({

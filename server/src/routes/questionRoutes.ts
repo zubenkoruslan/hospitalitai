@@ -7,6 +7,8 @@ import {
   deleteQuestion,
   generateAiQuestionsController,
   getPendingReviewQuestionsHandler,
+  batchTagQuestionsHandler,
+  validateQuestionTaggingHandler,
 } from "../controllers/questionController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import {
@@ -49,6 +51,21 @@ router
     restrictTo("restaurantAdmin", "manager", "restaurant", "staff"), // Staff can view all questions from their restaurant
     getAllQuestions
   );
+
+// Phase 3: AI Knowledge Category Tagging Routes
+router.post(
+  "/batch-tag",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
+  batchTagQuestionsHandler
+);
+
+router.get(
+  "/:questionId/validate-tagging",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
+  validateObjectId("questionId"),
+  handleValidationErrors,
+  validateQuestionTaggingHandler
+);
 
 router
   .route("/:questionId")

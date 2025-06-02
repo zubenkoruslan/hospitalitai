@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import AiQuestionService from "../services/AiQuestionService";
+import QuestionBankModel from "../models/QuestionBankModel";
 import { AppError } from "../utils/errorHandler"; // Corrected path
 
 interface GenerateQuestionsRequestBody {
@@ -123,12 +124,21 @@ export const generateAiQuestionsHandler = async (
         serviceParams
       );
 
-    // Save these questions with 'pending_review' status
+    // Get question bank for tagging context
+    const questionBank = await QuestionBankModel.findById(bankId);
+    const taggingContext = questionBank
+      ? {
+          menuCategories: questionBank.categories,
+        }
+      : undefined;
+
+    // Save these questions with 'pending_review' status and knowledge category tagging
     const pendingQuestions =
       await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
         rawGeneratedQuestions,
         user.restaurantId.toString(),
-        bankId
+        bankId,
+        taggingContext
       );
 
     res.status(201).json({

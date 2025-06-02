@@ -3,6 +3,7 @@ import QuestionModel, {
   IQuestion,
   QuestionType,
   IOption,
+  KnowledgeCategory,
 } from "../models/QuestionModel";
 import MenuItemModel, { IMenuItem } from "../models/MenuItemModel";
 import MenuModel, { IMenu } from "../models/MenuModel";
@@ -22,6 +23,10 @@ import {
 import { AppError } from "../utils/errorHandler"; // Added AppError import
 import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
 import { AI_MODEL_NAME } from "../utils/constants";
+import {
+  QuestionTaggingService,
+  TaggingContext,
+} from "./questionTaggingService";
 
 // Define the schema for the function call for Gemini to generate questions
 const questionGenerationFunctionSchema: FunctionDeclaration = {
@@ -143,8 +148,14 @@ if (GEMINI_API_KEY) {
   );
 }
 
-// System instruction for the AI - REVISED
-const _systemInstructionForQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for hospitality staff training. Your goal is to generate clear, accurate, and relevant questions based *strictly* on the provided menu item information and the additional context of other items/ingredients from the same menu.
+// System instruction for the AI - REVISED with Knowledge Category Integration
+const _systemInstructionForQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for hospitality staff training with knowledge category awareness. Your goal is to generate clear, accurate, and relevant questions based *strictly* on the provided menu item information and the additional context of other items/ingredients from the same menu.
+
+**KNOWLEDGE CATEGORIES**: Focus on these four knowledge categories when creating questions:
+1. **Food Knowledge**: Ingredients, allergens, nutrition, preparation methods, menu items, dietary restrictions, cooking methods, food safety
+2. **Beverage Knowledge**: Coffee, tea, soft drinks, juices, preparation techniques, equipment, temperature requirements
+3. **Wine Knowledge**: Varieties, regions, vintages, pairings, service, storage, tasting notes, production
+4. **Procedures Knowledge**: Safety protocols, hygiene standards, service procedures, opening/closing procedures, emergency protocols, customer service
 
 **CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
 
@@ -200,8 +211,14 @@ Output Format (ensure your function call adheres to this for EACH question - OMI
 Generate 'targetQuestionCount' questions based on these instructions, distributing them across the provided 'itemsInCategory'.
 `;
 
-// ADDED: System instruction for SOP/Policy Question Generation
-const _systemInstructionForSopQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for employee training based on Standard Operating Procedures (SOPs), policies, and instructional documents.
+// ADDED: System instruction for SOP/Policy Question Generation with Knowledge Category Integration
+const _systemInstructionForSopQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for employee training based on Standard Operating Procedures (SOPs), policies, and instructional documents with knowledge category awareness.
+
+**KNOWLEDGE CATEGORIES**: When creating questions, consider these four knowledge categories:
+1. **Food Knowledge**: Food safety protocols, ingredient handling, nutrition guidelines, allergen management, preparation standards
+2. **Beverage Knowledge**: Beverage preparation protocols, equipment operation, temperature standards, ingredient handling
+3. **Wine Knowledge**: Wine service protocols, storage procedures, pairing guidelines, temperature requirements
+4. **Procedures Knowledge**: Safety protocols, hygiene standards, service procedures, opening/closing procedures, emergency protocols, customer service standards
 
 **CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
 
@@ -716,16 +733,19 @@ class AiQuestionService {
   /**
    * Saves an array of raw AI-generated questions to the database with a 'pending_review' status.
    * Associates them with a specific restaurant and, optionally, a specific question bank.
+   * Includes AI-powered knowledge category tagging for Phase 3 functionality.
    *
    * @param rawQuestions Array of raw question data from AI.
    * @param restaurantIdString The ID of the restaurant.
    * @param questionBankId The ID of the question bank to associate these questions with.
+   * @param taggingContext Optional context for knowledge category tagging (menu/SOP context).
    * @returns A promise that resolves to an array of the saved IQuestion documents.
    */
   public static async saveGeneratedQuestionsAsPendingReview(
     rawQuestions: RawAiGeneratedQuestion[],
     restaurantIdString: string,
-    questionBankId: string // MODIFIED: Made questionBankId mandatory
+    questionBankId: string, // MODIFIED: Made questionBankId mandatory
+    taggingContext?: TaggingContext
   ): Promise<IQuestion[]> {
     const savedQuestions: IQuestion[] = [];
     const restaurantId = new mongoose.Types.ObjectId(restaurantIdString);
@@ -748,6 +768,20 @@ class AiQuestionService {
           continue;
         }
 
+        // AI-powered knowledge category tagging
+        const knowledgeTagging =
+          QuestionTaggingService.determineKnowledgeCategory(rawQ.questionText, {
+            ...taggingContext,
+            existingCategories: rawQ.category ? [rawQ.category] : [],
+          });
+
+        console.log(
+          `[AI Tagging] Question: "${rawQ.questionText.substring(0, 50)}..." ` +
+            `→ ${knowledgeTagging.knowledgeCategory} (${(
+              knowledgeTagging.confidence * 100
+            ).toFixed(1)}% confidence)`
+        );
+
         const questionData: Partial<IQuestion> = {
           questionText: rawQ.questionText,
           questionType: rawQ.questionType as QuestionType,
@@ -764,6 +798,12 @@ class AiQuestionService {
           createdBy: "ai",
           status: "pending_review",
           questionBankId: bankId, // ADDED: Assign the bankId
+
+          // Knowledge Analytics fields from AI tagging
+          knowledgeCategory: knowledgeTagging.knowledgeCategory,
+          knowledgeSubcategories: knowledgeTagging.knowledgeSubcategories,
+          knowledgeCategoryAssignedBy: "ai",
+          knowledgeCategoryAssignedAt: new Date(),
         };
 
         const newQuestion = new QuestionModel(questionData);

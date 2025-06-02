@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { AppError } from "../utils/errorHandler";
 import * as QuestionService from "./../services/questionService"; // Adjusted path
-import QuestionModel from "../models/QuestionModel"; // Import QuestionModel
+import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
+import { QuestionTaggingService } from "../services/questionTaggingService";
 
 export const createQuestion = async (
   req: Request,
@@ -330,6 +331,181 @@ export const generateAiQuestionsController = async (
         error
       );
     }
+    next(error);
+  }
+};
+
+/**
+ * AI Batch Tagging Controller - Phase 3 Feature
+ * Tags multiple questions with knowledge categories using AI
+ */
+export const batchTagQuestionsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+
+    const { questionIds, forceRetag = false } = req.body;
+
+    if (
+      !questionIds ||
+      !Array.isArray(questionIds) ||
+      questionIds.length === 0
+    ) {
+      return next(
+        new AppError("questionIds array is required and must not be empty", 400)
+      );
+    }
+
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
+
+    // Find questions to tag
+    const questionsToTag = await QuestionModel.find({
+      _id: { $in: questionIds.map((id) => new mongoose.Types.ObjectId(id)) },
+      restaurantId: restaurantId,
+      ...(forceRetag ? {} : { knowledgeCategory: { $exists: false } }), // Only tag untagged questions unless forced
+    });
+
+    if (questionsToTag.length === 0) {
+      return next(
+        new AppError(
+          "No questions found to tag or all questions already have categories",
+          404
+        )
+      );
+    }
+
+    const taggedQuestions: IQuestion[] = [];
+    const taggingErrors: string[] = [];
+
+    for (const question of questionsToTag) {
+      try {
+        // Determine knowledge category using AI tagging service
+        const taggingResult = QuestionTaggingService.determineKnowledgeCategory(
+          question.questionText,
+          {
+            existingCategories: question.categories,
+          }
+        );
+
+        // Update question with knowledge category data
+        question.knowledgeCategory = taggingResult.knowledgeCategory;
+        question.knowledgeSubcategories = taggingResult.knowledgeSubcategories;
+        question.knowledgeCategoryAssignedBy = "ai";
+        question.knowledgeCategoryAssignedAt = new Date();
+
+        const savedQuestion = await question.save();
+        taggedQuestions.push(savedQuestion);
+
+        console.log(
+          `[Batch Tagging] Question ${
+            question._id
+          }: "${question.questionText.substring(0, 50)}..." ` +
+            `→ ${taggingResult.knowledgeCategory} (${(
+              taggingResult.confidence * 100
+            ).toFixed(1)}% confidence)`
+        );
+      } catch (error) {
+        const errorMsg = `Question ${question._id}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`;
+        taggingErrors.push(errorMsg);
+        console.error(`[Batch Tagging Error] ${errorMsg}`);
+      }
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: `Successfully tagged ${taggedQuestions.length} questions`,
+      data: {
+        taggedCount: taggedQuestions.length,
+        errorCount: taggingErrors.length,
+        taggedQuestions: taggedQuestions.map((q) => ({
+          _id: q._id,
+          questionText: q.questionText.substring(0, 100) + "...",
+          knowledgeCategory: q.knowledgeCategory,
+          knowledgeSubcategories: q.knowledgeSubcategories,
+          confidence: "AI-tagged",
+        })),
+        errors: taggingErrors.length > 0 ? taggingErrors : undefined,
+      },
+    });
+  } catch (error) {
+    console.error("Batch tagging error:", error);
+    next(error);
+  }
+};
+
+/**
+ * Validate Knowledge Category Tagging Controller - Phase 3 Feature
+ * Validates AI tagging quality for a question
+ */
+export const validateQuestionTaggingHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { questionId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(questionId)) {
+      return next(new AppError("Invalid question ID format", 400));
+    }
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+
+    const restaurantId = new mongoose.Types.ObjectId(req.user.restaurantId);
+
+    const question = await QuestionModel.findOne({
+      _id: questionId,
+      restaurantId: restaurantId,
+    });
+
+    if (!question) {
+      return next(new AppError("Question not found", 404));
+    }
+
+    if (!question.knowledgeCategory) {
+      return next(
+        new AppError(
+          "Question does not have a knowledge category assigned",
+          400
+        )
+      );
+    }
+
+    // Validate the current tagging
+    const validation = QuestionTaggingService.validateTagging(
+      question.questionText,
+      question.knowledgeCategory,
+      question.knowledgeSubcategories || []
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        questionId: question._id,
+        currentCategory: question.knowledgeCategory,
+        currentSubcategories: question.knowledgeSubcategories,
+        validation: {
+          isValid: validation.isValid,
+          confidence: validation.confidence,
+          suggestions: validation.suggestions,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Question validation error:", error);
     next(error);
   }
 };
