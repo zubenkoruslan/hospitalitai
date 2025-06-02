@@ -39,6 +39,7 @@ import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import KnowledgeAnalyticsDashboard from "./pages/KnowledgeAnalyticsDashboard";
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 
@@ -156,6 +157,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="restaurant">
                     <RestaurantStaffResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/knowledge-analytics"
+                element={
+                  <ProtectedRoute requiredRole="restaurant">
+                    <KnowledgeAnalyticsDashboard />
                   </ProtectedRoute>
                 }
               />
