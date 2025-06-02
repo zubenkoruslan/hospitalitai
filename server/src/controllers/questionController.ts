@@ -19,7 +19,6 @@ export const createQuestion = async (
       difficulty,
       questionBankId,
       knowledgeCategory,
-      knowledgeSubcategories,
     } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
@@ -42,7 +41,6 @@ export const createQuestion = async (
       difficulty,
       questionBankId: new mongoose.Types.ObjectId(questionBankId),
       knowledgeCategory,
-      knowledgeSubcategories,
     };
 
     // Validate questionBankId presence (moved from service for early check)
@@ -396,7 +394,6 @@ export const batchTagQuestionsHandler = async (
 
         // Update question with knowledge category data
         question.knowledgeCategory = taggingResult.knowledgeCategory;
-        question.knowledgeSubcategories = taggingResult.knowledgeSubcategories;
         question.knowledgeCategoryAssignedBy = "ai";
         question.knowledgeCategoryAssignedAt = new Date();
 
@@ -430,7 +427,6 @@ export const batchTagQuestionsHandler = async (
           _id: q._id,
           questionText: q.questionText.substring(0, 100) + "...",
           knowledgeCategory: q.knowledgeCategory,
-          knowledgeSubcategories: q.knowledgeSubcategories,
           confidence: "AI-tagged",
         })),
         errors: taggingErrors.length > 0 ? taggingErrors : undefined,
@@ -487,8 +483,7 @@ export const validateQuestionTaggingHandler = async (
     // Validate the current tagging
     const validation = QuestionTaggingService.validateTagging(
       question.questionText,
-      question.knowledgeCategory,
-      question.knowledgeSubcategories || []
+      question.knowledgeCategory
     );
 
     res.status(200).json({
@@ -496,7 +491,6 @@ export const validateQuestionTaggingHandler = async (
       data: {
         questionId: question._id,
         currentCategory: question.knowledgeCategory,
-        currentSubcategories: question.knowledgeSubcategories,
         validation: {
           isValid: validation.isValid,
           confidence: validation.confidence,

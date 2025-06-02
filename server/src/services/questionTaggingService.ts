@@ -3,7 +3,6 @@ import { KnowledgeCategory } from "../models/QuestionModel";
 
 export interface TaggingResult {
   knowledgeCategory: KnowledgeCategory;
-  knowledgeSubcategories: string[];
   confidence: number;
   reasoning?: string;
 }
@@ -23,11 +22,6 @@ export class QuestionTaggingService {
         "ingredients",
         "allergen",
         "allergens",
-        "nutrition",
-        "nutritional",
-        "preparation",
-        "recipe",
-        "cooking",
         "menu",
         "dish",
         "food",
@@ -44,25 +38,19 @@ export class QuestionTaggingService {
         "gluten",
         "dairy",
         "nuts",
-        "calories",
-        "carbohydrates",
-        "fiber",
-        "vitamin",
-        "mineral",
+        "gluten-free",
+        "dairy-free",
+        "nut-free",
       ],
       secondary: [
-        "taste",
-        "flavor",
-        "texture",
-        "temperature",
-        "garnish",
-        "presentation",
-        "portion",
-        "serving",
-        "plating",
-        "kitchen",
-        "chef",
-        "cook",
+        "contains",
+        "made with",
+        "includes",
+        "free from",
+        "suitable for",
+        "dietary",
+        "restriction",
+        "allergy",
       ],
     },
     [KnowledgeCategory.BEVERAGE_KNOWLEDGE]: {
@@ -83,13 +71,24 @@ export class QuestionTaggingService {
         "cream",
         "sugar",
         "syrup",
-        "brewing",
-        "temperature",
-        "steamed",
         "iced",
         "hot",
         "cold",
         "blended",
+        "cocktail",
+        "martini",
+        "mojito",
+        "whiskey",
+        "vodka",
+        "gin",
+        "rum",
+        "beer",
+        "ale",
+        "lager",
+        "mixed drink",
+        "shot",
+        "liqueur",
+        "spirits",
       ],
       secondary: [
         "caffeine",
@@ -97,12 +96,14 @@ export class QuestionTaggingService {
         "organic",
         "fresh",
         "squeeze",
-        "machine",
-        "grinder",
-        "filter",
         "roast",
         "bean",
         "leaf",
+        "alcohol",
+        "bartender",
+        "shaken",
+        "stirred",
+        "garnish",
       ],
     },
     [KnowledgeCategory.WINE_KNOWLEDGE]: {
@@ -126,16 +127,11 @@ export class QuestionTaggingService {
         "tannin",
         "acidity",
         "pairing",
-        "decanting",
-        "serving temperature",
       ],
       secondary: [
         "bottle",
         "glass",
         "cork",
-        "cellar",
-        "aging",
-        "harvest",
         "terroir",
         "sommelier",
         "tasting",
@@ -187,84 +183,6 @@ export class QuestionTaggingService {
     },
   };
 
-  // Subcategory mappings
-  private static readonly SUBCATEGORY_KEYWORDS = {
-    [KnowledgeCategory.FOOD_KNOWLEDGE]: {
-      ingredients: ["ingredient", "contains", "made with", "includes"],
-      allergens: [
-        "allergen",
-        "allergy",
-        "nuts",
-        "dairy",
-        "gluten",
-        "shellfish",
-        "soy",
-      ],
-      preparation: [
-        "prepared",
-        "cooked",
-        "grilled",
-        "fried",
-        "baked",
-        "steamed",
-      ],
-      nutrition: ["calories", "fat", "protein", "carbs", "sodium", "vitamin"],
-      "menu-items": ["appetizer", "entree", "dessert", "side", "salad", "soup"],
-      "dietary-restrictions": [
-        "vegetarian",
-        "vegan",
-        "gluten-free",
-        "dairy-free",
-      ],
-      "cooking-methods": [
-        "grilling",
-        "frying",
-        "baking",
-        "sautéing",
-        "roasting",
-      ],
-      "food-safety": [
-        "temperature",
-        "storage",
-        "expiration",
-        "cross-contamination",
-      ],
-    },
-    [KnowledgeCategory.BEVERAGE_KNOWLEDGE]: {
-      coffee: ["coffee", "espresso", "latte", "cappuccino", "americano"],
-      tea: ["tea", "green tea", "black tea", "herbal", "chai"],
-      "soft-drinks": ["soda", "cola", "sprite", "juice", "smoothie"],
-      juices: ["orange juice", "apple juice", "fresh squeezed"],
-      preparation: ["brewing", "steaming", "grinding", "temperature"],
-      equipment: ["machine", "grinder", "filter", "steamer"],
-      temperature: ["hot", "iced", "cold", "steamed", "chilled"],
-    },
-    [KnowledgeCategory.WINE_KNOWLEDGE]: {
-      varieties: ["cabernet", "merlot", "chardonnay", "pinot", "sauvignon"],
-      regions: ["napa", "tuscany", "bordeaux", "burgundy", "region"],
-      vintages: ["vintage", "year", "2020", "2019", "aged"],
-      pairings: ["pairing", "pairs with", "complement", "match"],
-      service: ["serving", "temperature", "decanting", "glass"],
-      storage: ["cellar", "storage", "aging", "bottle"],
-      "tasting-notes": ["tasting", "notes", "flavor", "aroma", "finish"],
-      production: ["harvest", "fermentation", "bottling", "vineyard"],
-    },
-    [KnowledgeCategory.PROCEDURES_KNOWLEDGE]: {
-      safety: ["safety", "emergency", "fire", "first aid", "evacuation"],
-      hygiene: ["hygiene", "hand washing", "cleaning", "sanitizing"],
-      "service-standards": ["greeting", "customer service", "professional"],
-      "opening-procedures": ["opening", "start of shift", "setup"],
-      "closing-procedures": ["closing", "end of shift", "cleanup"],
-      "emergency-protocols": [
-        "emergency",
-        "fire drill",
-        "evacuation",
-        "incident",
-      ],
-      "customer-service": ["customer", "guest", "service", "complaint"],
-    },
-  };
-
   /**
    * Determines knowledge category for a question using AI-powered analysis
    */
@@ -299,23 +217,15 @@ export class QuestionTaggingService {
       topScore > 0 ? (topScore - secondHighest) / topScore : 0
     );
 
-    // Determine subcategories
-    const subcategories = this.determineSubcategories(
-      normalizedText,
-      topCategory
-    );
-
     // Generate reasoning
     const reasoning = this.generateReasoning(
       questionText,
       topCategory,
-      subcategories,
       confidence
     );
 
     return {
       knowledgeCategory: topCategory,
-      knowledgeSubcategories: subcategories,
       confidence,
       reasoning,
     };
@@ -417,35 +327,11 @@ export class QuestionTaggingService {
   }
 
   /**
-   * Determine relevant subcategories for the selected category
-   */
-  private static determineSubcategories(
-    text: string,
-    category: KnowledgeCategory
-  ): string[] {
-    const subcategories: string[] = [];
-    const categorySubcategories = this.SUBCATEGORY_KEYWORDS[category];
-
-    if (!categorySubcategories) return subcategories;
-
-    Object.entries(categorySubcategories).forEach(([subcategory, keywords]) => {
-      const hasKeyword = keywords.some((keyword) => text.includes(keyword));
-      if (hasKeyword) {
-        subcategories.push(subcategory);
-      }
-    });
-
-    // Limit to 3 subcategories (highest relevance)
-    return subcategories.slice(0, 3);
-  }
-
-  /**
    * Generate human-readable reasoning for the categorization
    */
   private static generateReasoning(
     questionText: string,
     category: KnowledgeCategory,
-    subcategories: string[],
     confidence: number
   ): string {
     const categoryNames = {
@@ -463,10 +349,6 @@ export class QuestionTaggingService {
       reasoning += "with moderate confidence";
     } else {
       reasoning += "with low confidence - may need manual review";
-    }
-
-    if (subcategories.length > 0) {
-      reasoning += `. Subcategories: ${subcategories.join(", ")}`;
     }
 
     return reasoning;
@@ -497,8 +379,7 @@ export class QuestionTaggingService {
    */
   static validateTagging(
     questionText: string,
-    assignedCategory: KnowledgeCategory,
-    assignedSubcategories: string[]
+    assignedCategory: KnowledgeCategory
   ): {
     isValid: boolean;
     confidence: number;
@@ -515,15 +396,6 @@ export class QuestionTaggingService {
       suggestions.push(
         `AI suggests ${autoTagging.knowledgeCategory} instead of ${assignedCategory}`
       );
-    }
-
-    if (
-      autoTagging.knowledgeSubcategories.length > assignedSubcategories.length
-    ) {
-      const missing = autoTagging.knowledgeSubcategories.filter(
-        (sub) => !assignedSubcategories.includes(sub)
-      );
-      suggestions.push(`Consider adding subcategories: ${missing.join(", ")}`);
     }
 
     return {

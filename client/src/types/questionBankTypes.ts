@@ -35,7 +35,6 @@ export interface IQuestion {
 
   // Knowledge Analytics fields
   knowledgeCategory: KnowledgeCategory;
-  knowledgeSubcategories?: string[];
   knowledgeCategoryAssignedBy: "manual" | "ai" | "restaurant_edit";
   knowledgeCategoryAssignedAt: string;
   knowledgeCategoryLastEditedBy?: string;
@@ -132,7 +131,6 @@ export interface NewQuestionClientData {
 
   // Knowledge Analytics fields
   knowledgeCategory: KnowledgeCategory;
-  knowledgeSubcategories?: string[];
 }
 
 // For updating an individual question (client-side)
@@ -146,7 +144,6 @@ export interface UpdateQuestionClientData {
 
   // Knowledge Analytics fields
   knowledgeCategory?: KnowledgeCategory;
-  knowledgeSubcategories?: string[];
 }
 
 // Payload for the new AI Question Generation Process via /api/ai/generate-questions

@@ -801,7 +801,6 @@ class AiQuestionService {
 
           // Knowledge Analytics fields from AI tagging
           knowledgeCategory: knowledgeTagging.knowledgeCategory,
-          knowledgeSubcategories: knowledgeTagging.knowledgeSubcategories,
           knowledgeCategoryAssignedBy: "ai",
           knowledgeCategoryAssignedAt: new Date(),
         };

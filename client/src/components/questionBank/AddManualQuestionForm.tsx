@@ -54,9 +54,6 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   // Knowledge Category State
   const [selectedKnowledgeCategory, setSelectedKnowledgeCategory] =
     useState<KnowledgeCategory>(KnowledgeCategory.FOOD_KNOWLEDGE);
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
-    []
-  );
 
   const { formatErrorMessage } = useValidation();
 
@@ -175,7 +172,6 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
 
       // Knowledge Analytics fields
       knowledgeCategory: selectedKnowledgeCategory,
-      knowledgeSubcategories: selectedSubcategories,
     };
 
     try {
@@ -339,9 +335,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
       {/* Knowledge Category Selection */}
       <KnowledgeCategorySelector
         selectedCategory={selectedKnowledgeCategory}
-        selectedSubcategories={selectedSubcategories}
         onCategoryChange={setSelectedKnowledgeCategory}
-        onSubcategoriesChange={setSelectedSubcategories}
         required={true}
         disabled={isLoading}
         showTooltips={true}
