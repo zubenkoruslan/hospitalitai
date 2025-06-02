@@ -17,12 +17,78 @@ interface MenuCategoryDisplayItem {
   name: string;
 }
 
-const QUESTION_FOCUS_AREAS = [
-  { id: "Name", label: "Item Name" },
-  { id: "Ingredients", label: "Ingredients" },
-  { id: "Dietary", label: "Dietary Information" },
-  { id: "Description", label: "Description Details" },
-];
+// Dynamic focus areas based on category type
+const FOCUS_AREAS_BY_TYPE = {
+  wine: [
+    { id: "Varieties", label: "Wine Varieties" },
+    { id: "Regions", label: "Wine Regions" },
+    { id: "Vintages", label: "Vintages" },
+    { id: "Pairings", label: "Wine Pairings" },
+    { id: "Service", label: "Wine Service" },
+    { id: "Styles", label: "Wine Styles" },
+    { id: "Producers", label: "Producers" },
+    { id: "TastingNotes", label: "Tasting Notes" },
+  ],
+  beverage: [
+    { id: "Preparation", label: "Drink Preparation" },
+    { id: "Ingredients", label: "Ingredients" },
+    { id: "Techniques", label: "Mixing Techniques" },
+    { id: "Equipment", label: "Equipment" },
+    { id: "Temperature", label: "Temperature" },
+    { id: "Garnishes", label: "Garnishes" },
+  ],
+  food: [
+    { id: "Name", label: "Item Name" },
+    { id: "Ingredients", label: "Ingredients" },
+    { id: "Dietary", label: "Dietary Information" },
+    { id: "Description", label: "Description Details" },
+    { id: "Allergens", label: "Allergens" },
+    { id: "Preparation", label: "Preparation Methods" },
+  ],
+  procedures: [
+    { id: "Safety", label: "Safety Protocols" },
+    { id: "Hygiene", label: "Hygiene Standards" },
+    { id: "Service", label: "Service Procedures" },
+    { id: "Emergency", label: "Emergency Protocols" },
+    { id: "CustomerService", label: "Customer Service" },
+    { id: "Compliance", label: "Compliance Standards" },
+  ],
+};
+
+// Helper function to determine category type from category names
+const getCategoryType = (categoryNames: string[]) => {
+  const combinedText = categoryNames.join(" ").toLowerCase();
+
+  // Check for wine indicators
+  if (
+    /wine|vintage|grape|vineyard|cabernet|merlot|chardonnay|pinot|sauvignon|bordeaux|tuscany|napa|rioja|chianti|prosecco|riesling|syrah|shiraz|tempranillo|sangiovese|nebbiolo|moscato|chablis|barolo|brunello/i.test(
+      combinedText
+    )
+  ) {
+    return "wine";
+  }
+
+  // Check for beverage indicators (excluding wine)
+  if (
+    /beverage|drink|cocktail|coffee|tea|juice|smoothie|soda|beer|ale|lager|spirits|liqueur/i.test(
+      combinedText
+    )
+  ) {
+    return "beverage";
+  }
+
+  // Check for procedure indicators
+  if (
+    /procedure|protocol|safety|hygiene|policy|sop|standard|guideline|emergency/i.test(
+      combinedText
+    )
+  ) {
+    return "procedures";
+  }
+
+  // Default to food
+  return "food";
+};
 
 interface GenerateAiQuestionsFormProps {
   bankId: string;
@@ -62,6 +128,15 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
   const [errorMenuCategories, setErrorMenuCategories] = useState<string | null>(
     null
   );
+
+  // Determine current focus areas based on selected categories
+  const currentCategoryType = getCategoryType(selectedMenuCategories);
+  const currentFocusAreas = FOCUS_AREAS_BY_TYPE[currentCategoryType];
+
+  // Clear selected focus areas when category type changes
+  useEffect(() => {
+    setSelectedFocusAreas([]);
+  }, [currentCategoryType]);
 
   // Effect to fetch available categories when menuId changes
   useEffect(() => {
@@ -179,7 +254,9 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       return;
     }
     if (selectedFocusAreas.length === 0) {
-      setFormError("Please select at least one Question Focus Area.");
+      setFormError(
+        `Please select at least one Question Focus Area for ${currentCategoryType} questions.`
+      );
       return;
     }
     if (targetQuestionCountPerItemFocus <= 0) {
@@ -331,28 +408,39 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
       <div className="pt-2">
         <label className={`${commonLabelClass} mb-1`}>
           Question Focus Areas (Select at least one)
+          {selectedMenuCategories.length > 0 && (
+            <span className="text-xs text-gray-500 ml-2">
+              - {currentCategoryType} categories
+            </span>
+          )}
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-2 gap-x-4 gap-y-2 p-2 border rounded-md bg-gray-50">
-          {QUESTION_FOCUS_AREAS.map((area) => (
-            <div key={area.id} className="flex items-center">
-              <input
-                id={`focus-${area.id}-${bankId}`}
-                type="checkbox"
-                value={area.id}
-                checked={selectedFocusAreas.includes(area.id)}
-                onChange={() => handleFocusAreaChange(area.id)}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
-                disabled={internalIsLoading}
-              />
-              <label
-                htmlFor={`focus-${area.id}-${bankId}`}
-                className="ml-2 text-sm text-gray-600"
-              >
-                {area.label}
-              </label>
-            </div>
-          ))}
-        </div>
+        {selectedMenuCategories.length === 0 ? (
+          <div className="p-3 text-sm text-gray-500 bg-gray-50 rounded-md border">
+            Please select menu categories first to see relevant focus areas.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-x-4 gap-y-2 p-2 border rounded-md bg-gray-50">
+            {currentFocusAreas.map((area) => (
+              <div key={area.id} className="flex items-center">
+                <input
+                  id={`focus-${area.id}-${bankId}`}
+                  type="checkbox"
+                  value={area.id}
+                  checked={selectedFocusAreas.includes(area.id)}
+                  onChange={() => handleFocusAreaChange(area.id)}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                  disabled={internalIsLoading}
+                />
+                <label
+                  htmlFor={`focus-${area.id}-${bankId}`}
+                  className="ml-2 text-sm text-gray-600"
+                >
+                  {area.label}
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* REMOVED: Question Difficulty Selection */}

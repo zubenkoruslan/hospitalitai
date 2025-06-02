@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
 import { useMenus } from "../hooks/useMenus";
+import { useCategoriesAnalytics } from "../hooks/useCategoriesAnalytics";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -15,6 +16,12 @@ import PdfMenuUpload from "../components/menu/PdfMenuUpload"; // Corrected impor
 import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
+import { Doughnut } from "react-chartjs-2"; // Added Doughnut chart import
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(ArcElement, Tooltip, Legend);
+
 import {
   UsersIcon,
   AcademicCapIcon,
@@ -61,13 +68,18 @@ const RestaurantDashboard: React.FC = () => {
     error: menuError,
     fetchMenus,
   } = useMenus();
+  const {
+    categoriesData,
+    loading: categoriesLoading,
+    error: categoriesError,
+  } = useCategoriesAnalytics();
 
   // Get notifications for recent notifications section
   const { notifications } = useNotifications();
 
-  // Chart Data State
-  const [averageScoreChartData, setAverageScoreChartData] =
-    useState<ChartData<"bar"> | null>(null);
+  // Chart Data State for Knowledge Categories
+  const [categoriesChartData, setCategoriesChartData] =
+    useState<ChartData<"doughnut"> | null>(null);
 
   // Keep other state
   const [copied, setCopied] = useState(false);
@@ -140,33 +152,67 @@ const RestaurantDashboard: React.FC = () => {
   // Get recent notifications (limit to 4)
   const recentNotifications = notifications?.slice(0, 4) || [];
 
-  // Effect to prepare chart data when staffData (from useStaffSummary) changes
+  // Effect to prepare chart data when categoriesData changes
   useEffect(() => {
-    if (staffData && staffData.length > 0) {
-      const labels = staffData.map((staff) => staff.name);
+    if (categoriesData && categoriesData.length > 0) {
+      // Define knowledge category labels and colors
+      const categoryLabels = {
+        "food-knowledge": "Food Knowledge",
+        "beverage-knowledge": "Beverage Knowledge",
+        "wine-knowledge": "Wine Knowledge",
+        "procedures-knowledge": "Procedures Knowledge",
+      };
 
-      const averageScores = staffData.map((staff) => staff.averageScore ?? 0);
-      setAverageScoreChartData({
+      const categoryColors = {
+        "food-knowledge": "rgba(34, 197, 94, 0.8)", // Green
+        "beverage-knowledge": "rgba(59, 130, 246, 0.8)", // Blue
+        "wine-knowledge": "rgba(147, 51, 234, 0.8)", // Purple
+        "procedures-knowledge": "rgba(249, 115, 22, 0.8)", // Orange
+      };
+
+      const labels = categoriesData.map(
+        (cat) =>
+          categoryLabels[cat.category as keyof typeof categoryLabels] ||
+          cat.category
+      );
+      const accuracyData = categoriesData.map(
+        (cat) => Math.round(cat.averageAccuracy * 10) / 10
+      );
+      const backgroundColors = categoriesData.map(
+        (cat) =>
+          categoryColors[cat.category as keyof typeof categoryColors] ||
+          "rgba(75, 192, 192, 0.8)"
+      );
+
+      setCategoriesChartData({
         labels,
         datasets: [
           {
-            label: "Average Score (%)",
-            data: averageScores,
-            backgroundColor: "rgba(75, 192, 192, 0.6)",
-            borderColor: "rgba(75, 192, 192, 1)",
-            borderWidth: 1,
+            label: "Average Accuracy (%)",
+            data: accuracyData,
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map((color) =>
+              color.replace("0.8", "1")
+            ),
+            borderWidth: 2,
+            hoverOffset: 10,
           },
         ],
       });
     } else {
-      setAverageScoreChartData(null);
+      setCategoriesChartData(null);
     }
-  }, [staffData]);
+  }, [categoriesData]);
 
   // Combine loading and error states for overall display
   const isLoading =
-    authIsLoading || staffLoading || quizCountLoading || menuLoading;
-  const displayError = staffError || quizCountError || menuError;
+    authIsLoading ||
+    staffLoading ||
+    quizCountLoading ||
+    menuLoading ||
+    categoriesLoading;
+  const displayError =
+    staffError || quizCountError || menuError || categoriesError;
 
   if (authIsLoading) {
     return (
@@ -523,57 +569,139 @@ const RestaurantDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Performance Chart */}
-            {averageScoreChartData && staffData.length > 0 && (
+            {/* Knowledge Categories Performance Chart */}
+            {categoriesChartData && categoriesData.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
                   <h2 className="text-xl font-semibold text-slate-900">
-                    Staff Performance Overview
+                    Knowledge Categories Performance
                   </h2>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Average scores across the four knowledge areas
+                  </p>
                 </div>
                 <div className="p-6">
-                  <BarChart
-                    data={averageScoreChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          display: false,
-                        },
-                        tooltip: {
-                          backgroundColor: "rgba(15, 23, 42, 0.9)",
-                          titleColor: "white",
-                          bodyColor: "white",
-                          borderColor: "rgba(59, 130, 246, 0.5)",
-                          borderWidth: 1,
-                        },
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          max: 100,
-                          grid: {
-                            color: "rgba(148, 163, 184, 0.1)",
-                          },
-                          ticks: {
-                            color: "rgba(100, 116, 139, 0.8)",
-                            callback: function (value, index, ticks) {
-                              return value + "%";
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    {/* Doughnut Chart */}
+                    <div className="flex justify-center">
+                      <div className="w-80 h-80">
+                        <Doughnut
+                          data={categoriesChartData}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                              legend: {
+                                display: false, // We'll show a custom legend
+                              },
+                              tooltip: {
+                                backgroundColor: "rgba(15, 23, 42, 0.9)",
+                                titleColor: "white",
+                                bodyColor: "white",
+                                borderColor: "rgba(59, 130, 246, 0.5)",
+                                borderWidth: 1,
+                                padding: 12,
+                                cornerRadius: 8,
+                                callbacks: {
+                                  label: function (context) {
+                                    const label = context.label || "";
+                                    const value = context.parsed || 0;
+                                    return ` ${label}: ${value}%`;
+                                  },
+                                },
+                              },
                             },
-                          },
-                        },
-                        x: {
-                          grid: {
-                            display: false,
-                          },
-                          ticks: {
-                            color: "rgba(100, 116, 139, 0.8)",
-                          },
-                        },
-                      },
-                    }}
-                  />
+                            cutout: "50%",
+                            rotation: -90,
+                            circumference: 360,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Custom Legend and Stats */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                        Performance Breakdown
+                      </h3>
+
+                      {categoriesData.map((cat, index) => {
+                        const categoryLabels = {
+                          "food-knowledge": "Food Knowledge",
+                          "beverage-knowledge": "Beverage Knowledge",
+                          "wine-knowledge": "Wine Knowledge",
+                          "procedures-knowledge": "Procedures Knowledge",
+                        };
+
+                        const categoryColors = {
+                          "food-knowledge": "bg-green-500",
+                          "beverage-knowledge": "bg-blue-500",
+                          "wine-knowledge": "bg-purple-500",
+                          "procedures-knowledge": "bg-orange-500",
+                        };
+
+                        const label =
+                          categoryLabels[
+                            cat.category as keyof typeof categoryLabels
+                          ] || cat.category;
+                        const colorClass =
+                          categoryColors[
+                            cat.category as keyof typeof categoryColors
+                          ] || "bg-gray-500";
+
+                        return (
+                          <div
+                            key={cat.category}
+                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div
+                                className={`w-4 h-4 rounded-full ${colorClass}`}
+                              ></div>
+                              <span className="font-medium text-slate-700">
+                                {label}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-slate-900">
+                                {Math.round(cat.averageAccuracy * 10) / 10}%
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {cat.totalQuestions} questions
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Overall Stats */}
+                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-slate-900 mb-2">
+                          Overall Performance
+                        </h4>
+                        <div className="text-sm text-slate-600 space-y-1">
+                          <div>
+                            Total Staff:{" "}
+                            <span className="font-medium text-slate-900">
+                              {staffData.length}
+                            </span>
+                          </div>
+                          <div>
+                            Categories Tracked:{" "}
+                            <span className="font-medium text-slate-900">
+                              {categoriesData.length}
+                            </span>
+                          </div>
+                          <div>
+                            Average Score:{" "}
+                            <span className="font-medium text-slate-900">
+                              {overallAveragePerformance}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

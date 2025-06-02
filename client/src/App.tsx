@@ -40,6 +40,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import KnowledgeAnalyticsDashboard from "./pages/KnowledgeAnalyticsDashboard";
+import AdvancedAnalyticsDashboard from "./pages/AdvancedAnalyticsDashboard";
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
 
@@ -165,6 +166,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="restaurant">
                     <KnowledgeAnalyticsDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/advanced-analytics"
+                element={
+                  <ProtectedRoute requiredRole="restaurant">
+                    <AdvancedAnalyticsDashboard />
                   </ProtectedRoute>
                 }
               />

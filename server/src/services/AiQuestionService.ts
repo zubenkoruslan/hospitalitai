@@ -153,9 +153,14 @@ const _systemInstructionForQuestionGeneration = `System: You are an AI assistant
 
 **KNOWLEDGE CATEGORIES**: Focus on these four knowledge categories when creating questions:
 1. **Food Knowledge**: Ingredients, allergens, nutrition, preparation methods, menu items, dietary restrictions, cooking methods, food safety
-2. **Beverage Knowledge**: Coffee, tea, soft drinks, juices, preparation techniques, equipment, temperature requirements
-3. **Wine Knowledge**: Varieties, regions, vintages, pairings, service, storage, tasting notes, production
+2. **Beverage Knowledge**: Coffee, tea, soft drinks, juices, cocktails, mixed drinks, preparation techniques, equipment, temperature requirements
+3. **Wine Knowledge**: Varieties, regions, vintages, pairings, service, storage, tasting notes, production, grape types, wine styles, serving temperature
 4. **Procedures Knowledge**: Safety protocols, hygiene standards, service procedures, opening/closing procedures, emergency protocols, customer service
+
+**IMPORTANT - CATEGORY-SPECIFIC QUESTION FOCUS**:
+- **For WINE menu categories** (e.g., "Wine List", "Wines", "Red Wines", "White Wines", etc.): Focus on Wine Knowledge aspects like grape varieties, wine regions, vintages, wine pairings, serving temperature, wine styles, producers, tasting notes
+- **For BEVERAGE menu categories** (e.g., "Cocktails", "Drinks", "Beverages"): Focus on Beverage Knowledge aspects like drink preparation, ingredients, mixing techniques, garnishes
+- **For FOOD menu categories** (e.g., "Starters", "Mains", "Desserts"): Focus on Food Knowledge aspects like ingredients, allergens, preparation methods, dietary restrictions
 
 **CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
 
@@ -1020,10 +1025,34 @@ class AiQuestionService {
       // No need to include item.category here as it's passed as categoryName for the batch
     }));
 
+    // Determine if this is a wine-related category
+    const isWineCategory =
+      /wine/i.test(categoryName) ||
+      itemsInCategory.some(
+        (item) =>
+          (item.itemType as string) === "wine" || /wine/i.test(item.name || "")
+      );
+
+    const isBeverageCategory =
+      !isWineCategory &&
+      (/beverage|drink|cocktail|coffee|tea/i.test(categoryName) ||
+        itemsInCategory.some((item) => item.itemType === "beverage"));
+
     let promptString = `Category: ${categoryName}\n`;
     promptString += `Target Question Count: ${targetQuestionCount}\n`;
     promptString += `Question Types: ${questionTypes.join(", ")}\n`;
-    promptString += `Focus Areas: ${questionFocusAreas.join(", ")}\n`;
+
+    // Adjust focus areas based on category type
+    if (isWineCategory) {
+      promptString += `Focus Areas (Wine-Specific): Wine Varieties, Wine Regions, Vintages, Wine Pairings, Wine Service, Wine Styles, Producers, Tasting Notes\n`;
+      promptString += `NOTE: This is a WINE category. Generate questions focused on WINE KNOWLEDGE, not food ingredients.\n`;
+    } else if (isBeverageCategory) {
+      promptString += `Focus Areas (Beverage-Specific): Drink Preparation, Ingredients, Mixing Techniques, Equipment, Temperature, Garnishes\n`;
+      promptString += `NOTE: This is a BEVERAGE category. Generate questions focused on BEVERAGE KNOWLEDGE.\n`;
+    } else {
+      promptString += `Focus Areas: ${questionFocusAreas.join(", ")}\n`;
+    }
+
     if (additionalContext) {
       promptString += `Additional Context: ${additionalContext}\n`;
     }

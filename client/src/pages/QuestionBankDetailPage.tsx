@@ -15,7 +15,11 @@ import GenerateAiQuestionsFormSop from "../components/questionBank/GenerateAiQue
 import AiQuestionsPreview from "../components/questionBank/AiQuestionsPreview";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
-import { getMenusByRestaurant as fetchRestaurantMenus } from "../services/api";
+import {
+  getMenusByRestaurant as fetchRestaurantMenus,
+  getPendingReviewQuestions,
+  processReviewedAiQuestions,
+} from "../services/api";
 import { IMenuClient } from "../types/menuTypes";
 import {
   BookOpenIcon,
@@ -27,6 +31,8 @@ import {
   SparklesIcon,
   DocumentTextIcon,
   XCircleIcon,
+  CheckIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 // Simple component to display a single question - to be expanded
@@ -116,7 +122,15 @@ const QuestionBankDetailPage: React.FC = () => {
     return typeof question === "string" ? question : question._id;
   };
 
-  // Helper function to get questions as IQuestion objects
+  // Helper function to get questions as IQuestion objects (active only)
+  const getActiveQuestionsAsObjects = (): IQuestion[] => {
+    if (!currentQuestionBank) return [];
+    return currentQuestionBank.questions.filter(
+      (q): q is IQuestion => typeof q === "object" && q.status === "active"
+    );
+  };
+
+  // Helper function to get all questions as IQuestion objects (for legacy compatibility)
   const getQuestionsAsObjects = (): IQuestion[] => {
     if (!currentQuestionBank) return [];
     return currentQuestionBank.questions.filter(
@@ -168,6 +182,24 @@ const QuestionBankDetailPage: React.FC = () => {
     string[]
   >([]);
   const [isAddingApprovedQuestions, setIsAddingApprovedQuestions] =
+    useState(false);
+
+  // ADDED: State for Questions tabs (Active vs Pending Review)
+  const [activeQuestionsTab, setActiveQuestionsTab] = useState<
+    "active" | "pending"
+  >("active");
+
+  // ADDED: State for Pending Review Questions
+  const [pendingQuestions, setPendingQuestions] = useState<IQuestion[]>([]);
+  const [isLoadingPendingQuestions, setIsLoadingPendingQuestions] =
+    useState(false);
+  const [pendingQuestionsError, setPendingQuestionsError] = useState<
+    string | null
+  >(null);
+  const [selectedPendingQuestionIds, setSelectedPendingQuestionIds] = useState<
+    string[]
+  >([]);
+  const [isProcessingPendingQuestions, setIsProcessingPendingQuestions] =
     useState(false);
 
   const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
@@ -385,6 +417,11 @@ const QuestionBankDetailPage: React.FC = () => {
     if (bankId) {
       fetchQuestionBankById(bankId);
     }
+    // If we're on the pending tab and the edited question was a pending question,
+    // refresh the pending questions list
+    if (activeQuestionsTab === "pending") {
+      fetchPendingQuestionsForBank();
+    }
     handleCloseEditQuestionModal();
   };
 
@@ -463,10 +500,11 @@ const QuestionBankDetailPage: React.FC = () => {
 
   const handleToggleSelectAll = () => {
     if (!currentQuestionBank || !currentQuestionBank.questions) return;
-    if (selectedQuestionIds.length === currentQuestionBank.questions.length) {
+    const activeQuestions = getActiveQuestionsAsObjects();
+    if (selectedQuestionIds.length === activeQuestions.length) {
       setSelectedQuestionIds([]);
     } else {
-      setSelectedQuestionIds(currentQuestionBank.questions.map(getQuestionId));
+      setSelectedQuestionIds(activeQuestions.map((q) => q._id));
     }
   };
 
@@ -505,6 +543,273 @@ const QuestionBankDetailPage: React.FC = () => {
     } finally {
       setIsConfirmBulkDeleteModalOpen(false);
     }
+  };
+
+  // ADDED: Pending review questions handlers
+  const fetchPendingQuestionsForBank = useCallback(async () => {
+    if (!bankId) return;
+
+    setIsLoadingPendingQuestions(true);
+    setPendingQuestionsError(null);
+    try {
+      const allPendingQuestions = await getPendingReviewQuestions();
+      // Filter pending questions for this specific bank
+      const bankPendingQuestions = allPendingQuestions.filter(
+        (q) => q.questionBankId === bankId
+      );
+      setPendingQuestions(bankPendingQuestions || []);
+    } catch (err) {
+      setPendingQuestionsError(
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch pending questions."
+      );
+      console.error(err);
+    } finally {
+      setIsLoadingPendingQuestions(false);
+    }
+  }, [bankId]);
+
+  const handleTogglePendingQuestion = (questionId: string) => {
+    setSelectedPendingQuestionIds((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
+  const handleToggleAllPendingQuestions = () => {
+    if (selectedPendingQuestionIds.length === pendingQuestions.length) {
+      setSelectedPendingQuestionIds([]);
+    } else {
+      setSelectedPendingQuestionIds(pendingQuestions.map((q) => q._id));
+    }
+  };
+
+  const handleApprovePendingQuestions = async () => {
+    if (!bankId || selectedPendingQuestionIds.length === 0) {
+      setPageError("Please select at least one question to approve.");
+      return;
+    }
+
+    setIsProcessingPendingQuestions(true);
+    try {
+      await processReviewedAiQuestions(bankId, {
+        acceptedQuestions: selectedPendingQuestionIds.map((id) => ({
+          _id: id,
+        })),
+        updatedQuestions: [],
+        deletedQuestionIds: [],
+      });
+
+      setPageError(null);
+      setSelectedPendingQuestionIds([]);
+      fetchPendingQuestionsForBank(); // Refresh pending questions
+      if (bankId) fetchQuestionBankById(bankId); // Refresh bank to update active questions count
+    } catch (err) {
+      setPageError(
+        err instanceof Error ? err.message : "Failed to approve questions."
+      );
+      console.error("Error approving questions:", err);
+    } finally {
+      setIsProcessingPendingQuestions(false);
+    }
+  };
+
+  const handleRejectPendingQuestions = async () => {
+    if (!bankId || selectedPendingQuestionIds.length === 0) {
+      setPageError("Please select at least one question to reject.");
+      return;
+    }
+
+    setIsProcessingPendingQuestions(true);
+    try {
+      await processReviewedAiQuestions(bankId, {
+        acceptedQuestions: [],
+        updatedQuestions: [],
+        deletedQuestionIds: selectedPendingQuestionIds,
+      });
+
+      setPageError(null);
+      setSelectedPendingQuestionIds([]);
+      fetchPendingQuestionsForBank(); // Refresh pending questions
+    } catch (err) {
+      setPageError(
+        err instanceof Error ? err.message : "Failed to reject questions."
+      );
+      console.error("Error rejecting questions:", err);
+    } finally {
+      setIsProcessingPendingQuestions(false);
+    }
+  };
+
+  // Fetch pending questions when switching to pending tab
+  useEffect(() => {
+    if (activeQuestionsTab === "pending") {
+      fetchPendingQuestionsForBank();
+    }
+  }, [activeQuestionsTab, fetchPendingQuestionsForBank]);
+
+  // ADDED: Render pending review questions
+  const renderPendingReviewQuestions = () => {
+    if (isLoadingPendingQuestions) {
+      return (
+        <div className="text-center py-12">
+          <LoadingSpinner message="Loading pending questions..." />
+        </div>
+      );
+    }
+
+    if (pendingQuestionsError) {
+      return (
+        <div className="text-center py-12">
+          <ErrorMessage
+            message={pendingQuestionsError}
+            onDismiss={() => setPendingQuestionsError(null)}
+          />
+        </div>
+      );
+    }
+
+    if (pendingQuestions.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-2">
+            No pending questions
+          </h3>
+          <p className="text-slate-500">
+            All AI-generated questions for this bank have been reviewed and
+            processed.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Header with bulk actions */}
+        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
+          <div className="flex items-center space-x-4">
+            <input
+              type="checkbox"
+              className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              checked={
+                selectedPendingQuestionIds.length === pendingQuestions.length
+              }
+              onChange={handleToggleAllPendingQuestions}
+              disabled={isProcessingPendingQuestions}
+            />
+            <span className="text-sm font-medium text-slate-700">
+              {selectedPendingQuestionIds.length} of {pendingQuestions.length}{" "}
+              selected
+            </span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="primary"
+              onClick={handleApprovePendingQuestions}
+              disabled={
+                selectedPendingQuestionIds.length === 0 ||
+                isProcessingPendingQuestions
+              }
+              className="text-sm"
+            >
+              <CheckIcon className="h-4 w-4 mr-2" />
+              Approve Selected ({selectedPendingQuestionIds.length})
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectPendingQuestions}
+              disabled={
+                selectedPendingQuestionIds.length === 0 ||
+                isProcessingPendingQuestions
+              }
+              className="text-sm"
+            >
+              <XMarkIcon className="h-4 w-4 mr-2" />
+              Reject Selected ({selectedPendingQuestionIds.length})
+            </Button>
+          </div>
+        </div>
+
+        {/* Questions list */}
+        <div className="space-y-4">
+          {pendingQuestions.map((question) => (
+            <div
+              key={question._id}
+              className="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow relative"
+            >
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  checked={selectedPendingQuestionIds.includes(question._id)}
+                  onChange={() => handleTogglePendingQuestion(question._id)}
+                  disabled={isProcessingPendingQuestions}
+                />
+                <div className="flex-grow pr-20">
+                  <p className="font-semibold text-gray-800 mb-2">
+                    {question.questionText}
+                  </p>
+                  <div className="text-sm text-gray-600 mb-2 flex flex-wrap gap-4">
+                    <span>
+                      <strong>Type:</strong>{" "}
+                      {question.questionType.replace("-", " ")}
+                    </span>
+                    <span>
+                      <strong>Category:</strong>{" "}
+                      {question.categories?.join(", ") || "N/A"}
+                    </span>
+                    <span>
+                      <strong>Knowledge:</strong> {question.knowledgeCategory}
+                    </span>
+                  </div>
+                  {question.options && question.options.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Options:
+                      </p>
+                      <ul className="list-disc list-inside pl-4 text-sm text-gray-600">
+                        {question.options.map((opt, index) => (
+                          <li
+                            key={index}
+                            className={
+                              opt.isCorrect
+                                ? "font-semibold text-green-600"
+                                : ""
+                            }
+                          >
+                            {opt.text} {opt.isCorrect ? "(Correct)" : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {question.explanation && (
+                    <p className="text-sm text-gray-600 italic">
+                      <strong>Explanation:</strong> {question.explanation}
+                    </p>
+                  )}
+                </div>
+                {/* Edit button positioned in top-right */}
+                <div className="absolute top-4 right-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleOpenEditQuestionModal(question)}
+                    disabled={isProcessingPendingQuestions}
+                    className="text-xs px-3 py-1.5"
+                  >
+                    <PencilIcon className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   if (isLoading && !currentQuestionBank) {
@@ -626,10 +931,10 @@ const QuestionBankDetailPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
                     <h3 className="text-sm font-medium text-slate-700 mb-1">
-                      Questions
+                      Active Questions
                     </h3>
                     <p className="text-2xl font-bold text-slate-900">
-                      {currentQuestionBank.questions.length}
+                      {getActiveQuestionsAsObjects().length}
                     </p>
                   </div>
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
@@ -820,69 +1125,102 @@ const QuestionBankDetailPage: React.FC = () => {
                 <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-slate-900">
-                      Questions ({currentQuestionBank.questions.length})
+                      Questions Management
                     </h2>
-                    {currentQuestionBank.questions.length > 0 && (
-                      <div className="flex items-center space-x-3">
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            const allIds =
-                              currentQuestionBank.questions.map(getQuestionId);
-                            setSelectedQuestionIds(
-                              selectedQuestionIds.length === allIds.length
-                                ? []
-                                : allIds
-                            );
-                          }}
-                          className="text-sm"
-                        >
-                          {selectedQuestionIds.length ===
-                          currentQuestionBank.questions.length
-                            ? "Deselect All"
-                            : "Select All"}
-                        </Button>
-                      </div>
-                    )}
+                    {activeQuestionsTab === "active" &&
+                      getActiveQuestionsAsObjects().length > 0 && (
+                        <div className="flex items-center space-x-3">
+                          <Button
+                            variant="secondary"
+                            onClick={handleToggleSelectAll}
+                            className="text-sm"
+                          >
+                            {selectedQuestionIds.length ===
+                            getActiveQuestionsAsObjects().length
+                              ? "Deselect All"
+                              : "Select All"}
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 </div>
 
                 <div className="p-6">
-                  {currentQuestionBank.questions.length === 0 ? (
-                    <div className="text-center py-12">
-                      <BookOpenIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">
-                        No questions yet
-                      </h3>
-                      <p className="text-slate-500 mb-6">
-                        Add questions to this bank to get started with quiz
-                        creation.
-                      </p>
-                      <Button
-                        variant="primary"
-                        onClick={() => setShowAddManualQuestionModal(true)}
-                        className="flex items-center space-x-2 mx-auto"
+                  {/* Tabs */}
+                  <div className="border-b border-slate-200 mb-6">
+                    <nav className="-mb-px flex space-x-8">
+                      <button
+                        onClick={() => setActiveQuestionsTab("active")}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                          activeQuestionsTab === "active"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                        }`}
                       >
-                        <PlusIcon className="h-4 w-4" />
-                        <span>Add First Question</span>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {getQuestionsAsObjects().map((question) => (
-                        <QuestionListItem
-                          key={question._id}
-                          question={question}
-                          onRemove={requestRemoveQuestion}
-                          onEdit={handleOpenEditQuestionModal}
-                          isSelected={selectedQuestionIds.includes(
-                            question._id
-                          )}
-                          onToggleSelect={handleToggleSelectQuestion}
-                        />
-                      ))}
-                    </div>
+                        Active Questions ({getActiveQuestionsAsObjects().length}
+                        )
+                      </button>
+                      <button
+                        onClick={() => setActiveQuestionsTab("pending")}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                          activeQuestionsTab === "pending"
+                            ? "border-amber-500 text-amber-600"
+                            : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        Pending Review
+                        {pendingQuestions.length > 0 && (
+                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            {pendingQuestions.length}
+                          </span>
+                        )}
+                      </button>
+                    </nav>
+                  </div>
+
+                  {/* Tab Content */}
+                  {activeQuestionsTab === "active" && (
+                    <>
+                      {getActiveQuestionsAsObjects().length === 0 ? (
+                        <div className="text-center py-12">
+                          <BookOpenIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">
+                            No active questions yet
+                          </h3>
+                          <p className="text-slate-500 mb-6">
+                            Add questions to this bank to get started with quiz
+                            creation.
+                          </p>
+                          <Button
+                            variant="primary"
+                            onClick={() => setShowAddManualQuestionModal(true)}
+                            className="flex items-center space-x-2 mx-auto"
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                            <span>Add First Question</span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {getActiveQuestionsAsObjects().map((question) => (
+                            <QuestionListItem
+                              key={question._id}
+                              question={question}
+                              onRemove={requestRemoveQuestion}
+                              onEdit={handleOpenEditQuestionModal}
+                              isSelected={selectedQuestionIds.includes(
+                                question._id
+                              )}
+                              onToggleSelect={handleToggleSelectQuestion}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
+
+                  {activeQuestionsTab === "pending" &&
+                    renderPendingReviewQuestions()}
                 </div>
               </div>
             </div>

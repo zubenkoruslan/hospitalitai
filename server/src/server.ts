@@ -37,6 +37,7 @@ import invitationRoutes from "./routes/invitation"; // Import invitation routes
 import passwordResetRoutes from "./routes/passwordReset"; // Import password reset routes
 import notificationRoutes from "./routes/notifications"; // Import notification routes
 import analyticsRoutes from "./routes/analyticsRoutes"; // Import analytics routes
+import debugRoutes from "./routes/debugRoutes"; // Import debug routes
 
 // Import and start the menu import worker
 import "./workers/menuImportWorker"; // This will start the worker
@@ -119,6 +120,7 @@ app.use("/api/sop-documents", sopDocumentEditRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/debug", debugRoutes);
 
 // Global error handler - must be after all routes
 app.use(errorHandler);

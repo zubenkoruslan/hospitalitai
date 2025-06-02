@@ -107,7 +107,7 @@ const KnowledgeAnalyticsDashboard: React.FC = () => {
 
         const response = await fetch("/api/analytics/restaurant", {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
             "Content-Type": "application/json",
           },
         });

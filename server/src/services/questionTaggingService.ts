@@ -127,6 +127,24 @@ export class QuestionTaggingService {
         "tannin",
         "acidity",
         "pairing",
+        "bordeaux",
+        "burgundy",
+        "napa",
+        "tuscany",
+        "rioja",
+        "chianti",
+        "prosecco",
+        "riesling",
+        "gewürztraminer",
+        "syrah",
+        "shiraz",
+        "tempranillo",
+        "sangiovese",
+        "nebbiolo",
+        "moscato",
+        "chablis",
+        "barolo",
+        "brunello",
       ],
       secondary: [
         "bottle",
@@ -138,6 +156,22 @@ export class QuestionTaggingService {
         "notes",
         "bouquet",
         "finish",
+        "decant",
+        "cellar",
+        "aging",
+        "oak",
+        "dry",
+        "sweet",
+        "full-bodied",
+        "light-bodied",
+        "crisp",
+        "smooth",
+        "bold",
+        "elegant",
+        "complex",
+        "fruity",
+        "earthy",
+        "mineral",
       ],
     },
     [KnowledgeCategory.PROCEDURES_KNOWLEDGE]: {
@@ -292,11 +326,32 @@ export class QuestionTaggingService {
     if (context.menuCategories?.length) {
       const menuText = context.menuCategories.join(" ").toLowerCase();
 
-      if (menuText.includes("wine") || menuText.includes("alcohol")) {
-        scores[KnowledgeCategory.WINE_KNOWLEDGE] += 1;
-      } else if (menuText.includes("drink") || menuText.includes("beverage")) {
+      // Strong wine indicators
+      if (
+        menuText.includes("wine") ||
+        menuText.includes("vintage") ||
+        menuText.includes("grape") ||
+        menuText.includes("vineyard") ||
+        menuText.includes("cabernet") ||
+        menuText.includes("chardonnay") ||
+        menuText.includes("pinot") ||
+        menuText.includes("sauvignon") ||
+        menuText.includes("merlot")
+      ) {
+        scores[KnowledgeCategory.WINE_KNOWLEDGE] += 2;
+      }
+      // Beverage indicators (excluding wine)
+      else if (
+        menuText.includes("drink") ||
+        menuText.includes("beverage") ||
+        menuText.includes("cocktail") ||
+        menuText.includes("coffee") ||
+        menuText.includes("tea")
+      ) {
         scores[KnowledgeCategory.BEVERAGE_KNOWLEDGE] += 1;
-      } else {
+      }
+      // Food items (default for menu items)
+      else {
         scores[KnowledgeCategory.FOOD_KNOWLEDGE] += 1;
       }
     }

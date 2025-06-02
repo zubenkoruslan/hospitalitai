@@ -1654,3 +1654,22 @@ export const resetPassword = async (
   );
   return response.data;
 };
+
+// Analytics Endpoints
+
+export interface CategoryAnalytics {
+  category: string;
+  averageAccuracy: number;
+  staffParticipation: number;
+  totalQuestions: number;
+  improvementTrend: number;
+}
+
+export const getCategoriesAnalytics = async (): Promise<
+  CategoryAnalytics[]
+> => {
+  const response = await api.get<{ status: string; data: CategoryAnalytics[] }>(
+    "/analytics/categories"
+  );
+  return response.data.data;
+};

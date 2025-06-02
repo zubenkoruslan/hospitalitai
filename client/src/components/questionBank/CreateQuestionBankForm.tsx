@@ -28,13 +28,13 @@ import { useValidation } from "../../context/ValidationContext";
 import SopCategoryRecursiveSelector from "./SopCategoryRecursiveSelector"; // Import the new component
 
 // Keywords to identify beverage categories (case-insensitive check)
+// Note: Wine is excluded as it should be treated as its own category type
 const BEVERAGE_CATEGORY_KEYWORDS = [
   "beverage",
   "drink",
   "coffee",
   "tea",
   "soda",
-  "wine",
   "beer",
   "cocktail",
   "juice",
@@ -43,6 +43,40 @@ const BEVERAGE_CATEGORY_KEYWORDS = [
   "water",
   "spirit",
   "liqueur",
+];
+
+// Keywords to identify wine categories specifically
+const WINE_CATEGORY_KEYWORDS = [
+  "wine",
+  "vintage",
+  "grape",
+  "vineyard",
+  "cabernet",
+  "merlot",
+  "chardonnay",
+  "pinot",
+  "sauvignon",
+  "bordeaux",
+  "tuscany",
+  "napa",
+  "rioja",
+  "chianti",
+  "prosecco",
+  "riesling",
+  "syrah",
+  "shiraz",
+  "tempranillo",
+  "sangiovese",
+  "nebbiolo",
+  "moscato",
+  "chablis",
+  "barolo",
+  "brunello",
+  "sparkling",
+  "champagne",
+  "red",
+  "white",
+  "rosé",
 ];
 
 interface CreateQuestionBankFormProps {
@@ -90,15 +124,17 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
   const [areAllCategoriesSelected, setAreAllCategoriesSelected] =
     useState(false);
 
-  // ADDED: State for beverage category handling
+  // ADDED: State for beverage and wine category handling
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]); // All items of the selected menu
+  const [wineItemCategories, setWineItemCategories] = useState<string[]>([]); // Unique categories of wine items
   const [beverageItemCategories, setBeverageItemCategories] = useState<
     string[]
-  >([]); // Unique categories of beverage items
+  >([]); // Unique categories of beverage items (excluding wine)
   const [nonBeverageItemCategories, setNonBeverageItemCategories] = useState<
     string[]
-  >([]); // Unique categories of non-beverage items
-  const [isBeverageMenu, setIsBeverageMenu] = useState<boolean>(false); // True if menu contains any beverage items/categories
+  >([]); // Unique categories of non-beverage/non-wine items
+  const [isWineMenu, setIsWineMenu] = useState<boolean>(false); // True if menu contains wine categories
+  const [isBeverageMenu, setIsBeverageMenu] = useState<boolean>(false); // True if menu contains any beverage items/categories (excluding wine)
   const [includeBeverageCategoriesInBank, setIncludeBeverageCategoriesInBank] =
     useState<boolean>(false); // Checkbox state
   const [
@@ -173,8 +209,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
     const loadCategories = async () => {
       if (!selectedMenuId) {
         setMenuItems([]);
+        setWineItemCategories([]);
         setBeverageItemCategories([]);
         setNonBeverageItemCategories([]);
+        setIsWineMenu(false);
         setIsBeverageMenu(false);
         setSelectedCategories([]);
         setSelectedBeverageCategoriesForBank([]);
@@ -190,15 +228,12 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setMenuItems(menuWithItems.items || []); // Store all items
 
         const allItems = menuWithItems.items || [];
+        const wineCats: string[] = [];
         const bevCats: string[] = [];
         const nonBevCats: string[] = [];
         const uniqueItemCategories = new Set<string>();
 
         allItems.forEach((item) => {
-          const categoryLower = item.category?.toLowerCase() || "";
-          const isBeverage = BEVERAGE_CATEGORY_KEYWORDS.some((keyword) =>
-            categoryLower.includes(keyword)
-          );
           if (item.category) {
             uniqueItemCategories.add(item.category); // Add to overall unique set first
           }
@@ -206,18 +241,35 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
 
         uniqueItemCategories.forEach((cat) => {
           const categoryLower = cat.toLowerCase();
-          const isBeverage = BEVERAGE_CATEGORY_KEYWORDS.some((keyword) =>
-            categoryLower.includes(keyword)
-          );
-          if (isBeverage) {
-            bevCats.push(cat);
+
+          // Check for wine first (wine categories should not be treated as general beverages)
+          const isWine =
+            WINE_CATEGORY_KEYWORDS.some((keyword) =>
+              categoryLower.includes(keyword)
+            ) ||
+            allItems.some(
+              (item) => item.category === cat && item.itemType === "wine"
+            );
+
+          if (isWine) {
+            wineCats.push(cat);
           } else {
-            nonBevCats.push(cat);
+            // Check for other beverages (excluding wine)
+            const isBeverage = BEVERAGE_CATEGORY_KEYWORDS.some((keyword) =>
+              categoryLower.includes(keyword)
+            );
+            if (isBeverage) {
+              bevCats.push(cat);
+            } else {
+              nonBevCats.push(cat);
+            }
           }
         });
 
+        setWineItemCategories(Array.from(new Set(wineCats)));
         setBeverageItemCategories(Array.from(new Set(bevCats)));
         setNonBeverageItemCategories(Array.from(new Set(nonBevCats)));
+        setIsWineMenu(wineCats.length > 0);
         setIsBeverageMenu(bevCats.length > 0);
 
         // Reset selections when menu changes
@@ -229,8 +281,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
       } catch (err: any) {
         console.error("Error fetching menu categories:", err);
         setCategoriesError(formatErrorMessage(err));
+        setWineItemCategories([]);
         setBeverageItemCategories([]);
         setNonBeverageItemCategories([]);
+        setIsWineMenu(false);
         setIsBeverageMenu(false);
       }
       setIsLoadingCategories(false);
@@ -240,8 +294,10 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
     } else {
       // Clear all menu related states if no menu is selected
       setMenuItems([]);
+      setWineItemCategories([]);
       setBeverageItemCategories([]);
       setNonBeverageItemCategories([]);
+      setIsWineMenu(false);
       setIsBeverageMenu(false);
       setSelectedCategories([]);
       setSelectedBeverageCategoriesForBank([]);
@@ -673,9 +729,69 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
                 {selectedMenuId &&
                   !isLoadingCategories &&
                   !categoriesError &&
-                  (nonBeverageItemCategories.length > 0 ||
+                  (wineItemCategories.length > 0 ||
+                    nonBeverageItemCategories.length > 0 ||
                     beverageItemCategories.length > 0) && (
                     <>
+                      {/* Wine Categories Selection */}
+                      {isWineMenu && wineItemCategories.length > 0 && (
+                        <div className="p-3 border border-purple-200 rounded-md bg-purple-50">
+                          <label className="block text-sm font-medium text-purple-700 mb-2">
+                            Select Wine Categories for Bank
+                          </label>
+                          <label className="flex items-center mb-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                              checked={
+                                selectedCategories.length ===
+                                  wineItemCategories.length &&
+                                wineItemCategories.length > 0
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedCategories(wineItemCategories);
+                                } else {
+                                  setSelectedCategories([]);
+                                }
+                              }}
+                              disabled={wineItemCategories.length === 0}
+                            />
+                            <span className="ml-2 text-sm text-purple-600">
+                              Select All Wine Categories
+                            </span>
+                          </label>
+                          <div className="max-h-40 overflow-y-auto space-y-1 pl-2 border-l-2 border-purple-100">
+                            {wineItemCategories.map((category) => (
+                              <label
+                                key={category}
+                                className="flex items-center"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                  value={category}
+                                  checked={selectedCategories.includes(
+                                    category
+                                  )}
+                                  onChange={(e) => {
+                                    const cat = e.target.value;
+                                    setSelectedCategories((prev) =>
+                                      prev.includes(cat)
+                                        ? prev.filter((c) => c !== cat)
+                                        : [...prev, cat]
+                                    );
+                                  }}
+                                />
+                                <span className="ml-2 text-sm text-purple-800">
+                                  {category}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Non-Beverage Categories Selection */}
                       {nonBeverageItemCategories.length > 0 && (
                         <div className="p-3 border border-gray-200 rounded-md bg-gray-50">

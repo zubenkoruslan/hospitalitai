@@ -179,6 +179,27 @@ export const submitQuizAttemptController = async (
       attemptData
     );
 
+    // Update knowledge analytics when quiz is completed
+    try {
+      const { KnowledgeAnalyticsService } = await import(
+        "../services/knowledgeAnalyticsService"
+      );
+      await KnowledgeAnalyticsService.updateAnalyticsOnQuizCompletion(
+        staffUserId,
+        new mongoose.Types.ObjectId(req.user!.restaurantId!),
+        new mongoose.Types.ObjectId(result.attemptId)
+      );
+      console.log(
+        `Updated knowledge analytics for user ${staffUserId} after quiz completion`
+      );
+    } catch (analyticsError) {
+      console.error(
+        "Error updating knowledge analytics on quiz completion:",
+        analyticsError
+      );
+      // Don't fail the submission if analytics update fails
+    }
+
     // Create completion notification for the staff member
     try {
       const quiz = await QuizModel.findById(quizObjectId)

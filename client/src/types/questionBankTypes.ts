@@ -32,6 +32,7 @@ export interface IQuestion {
   createdAt: string;
   updatedAt: string;
   status: "active" | "pending_review" | "rejected";
+  questionBankId?: string; // Bank ID for pending questions
 
   // Knowledge Analytics fields
   knowledgeCategory: KnowledgeCategory;

@@ -13,6 +13,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   BellIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
 // Define props interface
@@ -142,6 +143,11 @@ const Navbar: React.FC<NavbarProps> = ({
       name: "Quiz Results",
       path: "/staff-results",
       icon: ChartBarIcon,
+    },
+    {
+      name: "Advanced Analytics",
+      path: "/advanced-analytics",
+      icon: ChartPieIcon,
     },
   ];
 
