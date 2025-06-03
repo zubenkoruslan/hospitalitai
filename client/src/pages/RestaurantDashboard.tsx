@@ -17,10 +17,17 @@ import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Add
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
 import { Doughnut } from "react-chartjs-2"; // Added Doughnut chart import
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Title,
+  ChartOptions,
+} from "chart.js";
 
-// Register Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend);
+// Register Chart.js components - Including all required components for Doughnut charts
+ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 import {
   UsersIcon,
@@ -152,8 +159,62 @@ const RestaurantDashboard: React.FC = () => {
   // Get recent notifications (limit to 4)
   const recentNotifications = notifications?.slice(0, 4) || [];
 
+  // Enhanced chart options with better styling and responsive design
+  const chartOptions: ChartOptions<"doughnut"> = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        display: false, // We'll show a custom legend
+      },
+      tooltip: {
+        enabled: true,
+        backgroundColor: "rgba(15, 23, 42, 0.9)",
+        titleColor: "white",
+        bodyColor: "white",
+        borderColor: "rgba(59, 130, 246, 0.5)",
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        titleFont: {
+          size: 14,
+          weight: "bold",
+        },
+        bodyFont: {
+          size: 13,
+        },
+        callbacks: {
+          label: function (context) {
+            const label = context.label || "";
+            const value = context.parsed || 0;
+            return ` ${label}: ${value}%`;
+          },
+        },
+      },
+      title: {
+        display: false,
+      },
+    },
+    cutout: "50%",
+    rotation: -90,
+    circumference: 360,
+    animation: {
+      animateRotate: true,
+      animateScale: false,
+      duration: 1000,
+    },
+    elements: {
+      arc: {
+        borderWidth: 2,
+        hoverBorderWidth: 3,
+      },
+    },
+  };
+
   // Effect to prepare chart data when categoriesData changes
   useEffect(() => {
+    console.log("Categories data received:", categoriesData); // Debug logging
+
     if (categoriesData && categoriesData.length > 0) {
       // Define knowledge category labels and colors
       const categoryLabels = {
@@ -175,31 +236,40 @@ const RestaurantDashboard: React.FC = () => {
           categoryLabels[cat.category as keyof typeof categoryLabels] ||
           cat.category
       );
-      const accuracyData = categoriesData.map(
+
+      const averageScoreData = categoriesData.map(
         (cat) => Math.round(cat.averageAccuracy * 10) / 10
       );
+
       const backgroundColors = categoriesData.map(
         (cat) =>
           categoryColors[cat.category as keyof typeof categoryColors] ||
           "rgba(75, 192, 192, 0.8)"
       );
 
-      setCategoriesChartData({
+      const borderColors = backgroundColors.map((color) =>
+        color.replace("0.8", "1")
+      );
+
+      const chartData = {
         labels,
         datasets: [
           {
-            label: "Average Accuracy (%)",
-            data: accuracyData,
+            label: "Average Score (%)",
+            data: averageScoreData,
             backgroundColor: backgroundColors,
-            borderColor: backgroundColors.map((color) =>
-              color.replace("0.8", "1")
-            ),
+            borderColor: borderColors,
             borderWidth: 2,
             hoverOffset: 10,
+            hoverBorderWidth: 3,
           },
         ],
-      });
+      };
+
+      console.log("Chart data prepared:", chartData); // Debug logging
+      setCategoriesChartData(chartData);
     } else {
+      console.log("No categories data or empty array"); // Debug logging
       setCategoriesChartData(null);
     }
   }, [categoriesData]);
@@ -227,13 +297,90 @@ const RestaurantDashboard: React.FC = () => {
     );
   }
 
+  // Enhanced skeleton loading component
+  const SkeletonCard = ({ className = "" }: { className?: string }) => (
+    <div
+      className={`bg-white rounded-2xl border border-slate-200 p-6 ${className}`}
+    >
+      <div className="animate-pulse">
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 bg-slate-200 rounded-xl"></div>
+          <div className="space-y-2">
+            <div className="h-4 bg-slate-200 rounded w-20"></div>
+            <div className="h-6 bg-slate-200 rounded w-12"></div>
+          </div>
+        </div>
+        <div className="mt-4 h-4 bg-slate-200 rounded w-24"></div>
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
-            <LoadingSpinner message="Loading dashboard data..." />
+            <div className="max-w-7xl mx-auto">
+              {/* Header skeleton */}
+              <div className="mb-8 bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl p-8 border border-blue-100/50">
+                <div className="animate-pulse">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-8 h-8 bg-slate-200 rounded-xl"></div>
+                    <div className="h-8 bg-slate-200 rounded w-80"></div>
+                  </div>
+                  <div className="h-5 bg-slate-200 rounded w-96 mb-4"></div>
+                  <div className="h-12 bg-slate-200 rounded-xl w-80"></div>
+                </div>
+              </div>
+
+              {/* Stats grid skeleton */}
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+
+              {/* Action cards skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <div className="animate-pulse">
+                    <div className="h-6 bg-slate-200 rounded w-32 mb-4"></div>
+                    <div className="space-y-3">
+                      <div className="h-12 bg-slate-200 rounded-xl"></div>
+                      <div className="h-12 bg-slate-200 rounded-xl"></div>
+                      <div className="h-10 bg-slate-200 rounded-xl"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <div className="animate-pulse">
+                    <div className="h-6 bg-slate-200 rounded w-40 mb-4"></div>
+                    <div className="space-y-3">
+                      <div className="h-16 bg-slate-200 rounded-xl"></div>
+                      <div className="h-16 bg-slate-200 rounded-xl"></div>
+                      <div className="h-16 bg-slate-200 rounded-xl"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart skeleton */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="animate-pulse">
+                  <div className="h-6 bg-slate-200 rounded w-64 mb-6"></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="w-80 h-80 bg-slate-200 rounded-full mx-auto"></div>
+                    <div className="space-y-4">
+                      <div className="h-20 bg-slate-200 rounded-xl"></div>
+                      <div className="h-20 bg-slate-200 rounded-xl"></div>
+                      <div className="h-20 bg-slate-200 rounded-xl"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -287,245 +434,347 @@ const RestaurantDashboard: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Restaurant Dashboard
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Welcome back, {user?.restaurantName}! Here's your overview.
-              </p>
-              {user?.restaurantId && (
-                <div className="mt-3 flex items-center space-x-3">
-                  <span className="text-sm font-medium text-slate-500">
-                    Restaurant ID:
-                  </span>
-                  <span className="text-sm text-slate-700 bg-white px-3 py-1 rounded-lg border border-slate-200">
-                    {user.restaurantId}
-                  </span>
-                  <button
-                    onClick={handleCopyId}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
-                    aria-label="Copy Restaurant ID"
-                  >
-                    {copied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Total Staff Card */}
-              <Link to="/staff-results" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                      <UsersIcon className="h-6 w-6 text-white" />
+            {/* Enhanced Header with gradient background */}
+            <div className="mb-8 bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl p-8 border border-blue-100/50 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg">
+                      <HomeIcon className="h-6 w-6 text-white" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">
-                        Total Staff
-                      </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {staffData.length}
-                      </p>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Restaurant Dashboard
+                    </h1>
+                  </div>
+                  <p className="text-slate-600 text-lg mb-4">
+                    Welcome back,{" "}
+                    <span className="font-semibold text-slate-800">
+                      {user?.restaurantName}
+                    </span>
+                    ! Here's your comprehensive overview.
+                  </p>
+                  {user?.restaurantId && (
+                    <div className="flex items-center space-x-3 bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50">
+                      <span className="text-sm font-medium text-slate-600">
+                        Restaurant ID:
+                      </span>
+                      <code className="text-sm text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-mono">
+                        {user.restaurantId}
+                      </code>
+                      <button
+                        onClick={handleCopyId}
+                        className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                          copied
+                            ? "bg-green-600 text-white shadow-lg"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg"
+                        }`}
+                        aria-label="Copy Restaurant ID"
+                      >
+                        {copied ? (
+                          <span className="flex items-center space-x-1">
+                            <CheckCircleIcon className="h-3 w-3" />
+                            <span>Copied!</span>
+                          </span>
+                        ) : (
+                          "Copy ID"
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick stats summary */}
+                <div className="hidden lg:flex items-center space-x-6 text-right">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {staffData.length}
+                    </div>
+                    <div className="text-xs text-slate-500 uppercase tracking-wide">
+                      Staff
                     </div>
                   </div>
-                  <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
-                    <span>View Details</span>
-                    <svg
-                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {totalQuizzes}
+                    </div>
+                    <div className="text-xs text-slate-500 uppercase tracking-wide">
+                      Quizzes
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {overallAveragePerformance}%
+                    </div>
+                    <div className="text-xs text-slate-500 uppercase tracking-wide">
+                      Avg Score
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced Stats Grid with animations */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+              {/* Total Staff Card */}
+              <Link to="/staff-results" className="block group">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                  {/* Gradient overlay on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <UsersIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                          Total Staff
+                        </p>
+                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {staffData.length}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center text-blue-600 text-sm font-medium group-hover:text-blue-700">
+                      <span>View Details</span>
+                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                    </div>
                   </div>
                 </div>
               </Link>
 
               {/* Quizzes Active Card */}
               <Link to="/quiz-management" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-green-600 rounded-xl shadow-lg">
-                      <AcademicCapIcon className="h-6 w-6 text-white" />
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <AcademicCapIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                          Quizzes Active
+                        </p>
+                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {totalQuizzes}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">
-                        Quizzes Active
-                      </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {totalQuizzes}
-                      </p>
+                    <div className="mt-4 flex items-center text-green-600 text-sm font-medium group-hover:text-green-700">
+                      <span>Manage Quizzes</span>
+                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
-                  </div>
-                  <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
-                    <span>Manage Quizzes</span>
-                    <svg
-                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
                   </div>
                 </div>
               </Link>
 
               {/* Menus Active Card */}
               <Link to="/menu" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 group-hover:scale-105">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                      <DocumentTextIcon className="h-6 w-6 text-white" />
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50 to-amber-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <DocumentTextIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                          Menus Active
+                        </p>
+                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {menus.length}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">
-                        Menus Active
-                      </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {menus.length}
-                      </p>
+                    <div className="mt-4 flex items-center text-amber-600 text-sm font-medium group-hover:text-amber-700">
+                      <span>Manage Menus</span>
+                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
-                  </div>
-                  <div className="mt-4 flex items-center text-amber-600 text-sm font-medium">
-                    <span>Manage Menus</span>
-                    <svg
-                      className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
                   </div>
                 </div>
               </Link>
 
-              {/* Average Performance Card */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
-                    <ChartBarIcon className="h-6 w-6 text-white" />
+              {/* Enhanced Average Performance Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                      <ChartBarIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                        Avg. Performance
+                      </p>
+                      <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        {overallAveragePerformance}%
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">
-                      Avg. Performance
-                    </p>
-                    <p className="text-2xl font-bold text-slate-900">
-                      {overallAveragePerformance}%
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(
-                          parseFloat(overallAveragePerformance),
-                          100
-                        )}%`,
-                      }}
-                    ></div>
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-500">Progress</span>
+                      <span className="text-xs font-medium text-purple-600">
+                        {overallAveragePerformance}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-1000 ease-out shadow-sm"
+                        style={{
+                          width: `${Math.min(
+                            parseFloat(overallAveragePerformance),
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Action Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Enhanced Action Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Quick Actions */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Quick Actions
-                  </h2>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-blue-600 rounded-lg">
+                      <ClockIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Quick Actions
+                    </h2>
+                  </div>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Streamline your workflow
+                  </p>
                 </div>
                 <div className="p-6 space-y-4">
                   <button
                     onClick={openPdfUploadModal}
-                    className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
+                    className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                   >
-                    <DocumentArrowUpIcon className="h-5 w-5" />
+                    <DocumentArrowUpIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
                     <span>Upload Menu PDF</span>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </div>
                   </button>
 
                   <Link
                     to="/quiz-management"
-                    className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
+                    className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-medium rounded-xl hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                   >
-                    <PlusIcon className="h-5 w-5" />
+                    <PlusIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
                     <span>Create New Quiz</span>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </div>
+                  </Link>
+
+                  {/* Additional action */}
+                  <Link
+                    to="/staff-results"
+                    className="w-full group flex items-center justify-center space-x-3 px-6 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-all duration-200 border border-slate-200"
+                  >
+                    <TrophyIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                    <span>View Analytics</span>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </div>
                   </Link>
                 </div>
               </div>
 
-              {/* Recent Notifications */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Recent Notifications
-                  </h2>
+              {/* Enhanced Recent Notifications */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 bg-orange-500 rounded-lg">
+                        <BellIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-slate-900">
+                        Recent Notifications
+                      </h2>
+                    </div>
+                    {recentNotifications.length > 0 && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                        {recentNotifications.filter((n) => !n.isRead).length}{" "}
+                        new
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Stay updated with your team
+                  </p>
                 </div>
                 <div className="p-6">
                   {recentNotifications.length > 0 ? (
                     <div className="space-y-3">
-                      {recentNotifications.map((notification) => (
+                      {recentNotifications.map((notification, index) => (
                         <div
                           key={notification._id}
-                          className={`p-3 rounded-lg border transition-colors ${
+                          className={`group p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${
                             notification.isRead
-                              ? "bg-gray-50 border-gray-200"
-                              : "bg-blue-50 border-blue-200"
+                              ? "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                              : "bg-blue-50 border-blue-200 hover:bg-blue-100"
                           }`}
+                          style={{
+                            animationDelay: `${index * 0.1}s`,
+                          }}
                         >
                           <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 mt-1">
-                              <span className="text-lg">
-                                {notification.type === "new_quiz" && "🎯"}
-                                {notification.type === "completed_training" &&
-                                  "🎉"}
-                                {notification.type === "new_staff" && "👋"}
-                                {notification.type === "new_assignment" && "📋"}
-                              </span>
+                            <div className="flex-shrink-0 mt-0.5">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  notification.isRead
+                                    ? "bg-slate-200"
+                                    : "bg-blue-200"
+                                }`}
+                              >
+                                {notification.type === "new_quiz" && (
+                                  <AcademicCapIcon className="h-4 w-4 text-slate-600" />
+                                )}
+                                {notification.type === "completed_training" && (
+                                  <TrophyIcon className="h-4 w-4 text-green-600" />
+                                )}
+                                {notification.type === "new_staff" && (
+                                  <UsersIcon className="h-4 w-4 text-blue-600" />
+                                )}
+                                {notification.type === "new_assignment" && (
+                                  <ClipboardDocumentIcon className="h-4 w-4 text-purple-600" />
+                                )}
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`text-sm ${
+                                className={`text-sm leading-relaxed ${
                                   notification.isRead
-                                    ? "text-gray-600"
-                                    : "text-gray-900 font-medium"
+                                    ? "text-slate-600"
+                                    : "text-slate-900 font-medium"
                                 }`}
                               >
                                 {notification.content}
                               </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {formatNotificationTime(notification.createdAt)}
-                              </p>
+                              <div className="flex items-center mt-2 space-x-2">
+                                <ClockIcon className="h-3 w-3 text-slate-400" />
+                                <p className="text-xs text-slate-500">
+                                  {formatNotificationTime(
+                                    notification.createdAt
+                                  )}
+                                </p>
+                              </div>
                             </div>
                             {!notification.isRead && (
                               <div className="flex-shrink-0">
-                                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                <div className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-pulse"></div>
                               </div>
                             )}
                           </div>
@@ -533,35 +782,27 @@ const RestaurantDashboard: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-2">
-                        <svg
-                          className="mx-auto h-12 w-12"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1}
-                            d="M15 17h5l-5 5-5-5h5V3h-5l5-5 5 5h-5v14z"
-                          />
-                        </svg>
+                    <div className="text-center py-12">
+                      <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                        <BellIcon className="h-8 w-8 text-slate-400" />
                       </div>
-                      <p className="text-sm text-gray-500">
-                        No recent notifications
+                      <h3 className="text-sm font-medium text-slate-900 mb-1">
+                        No notifications yet
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        You'll see updates about your team's progress here
                       </p>
                     </div>
                   )}
 
                   {recentNotifications.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="mt-6 pt-4 border-t border-slate-200">
                       <Link
                         to="/notifications"
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                        className="group flex items-center justify-center w-full px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200 rounded-lg hover:bg-blue-50"
                       >
-                        View all notifications →
+                        <span>View all notifications</span>
+                        <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
                       </Link>
                     </div>
                   )}
@@ -569,57 +810,121 @@ const RestaurantDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Knowledge Categories Performance Chart */}
-            {categoriesChartData && categoriesData.length > 0 && (
+            {/* Enhanced Knowledge Categories Performance Chart */}
+            {categoriesLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Knowledge Categories Performance
-                  </h2>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Average scores across the four knowledge areas
-                  </p>
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-purple-600 rounded-lg">
+                      <ChartBarIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Knowledge Categories Performance
+                    </h2>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="animate-pulse">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="w-80 h-80 bg-slate-200 rounded-full mx-auto"></div>
+                      <div className="space-y-4">
+                        <div className="h-20 bg-slate-200 rounded-xl"></div>
+                        <div className="h-20 bg-slate-200 rounded-xl"></div>
+                        <div className="h-20 bg-slate-200 rounded-xl"></div>
+                        <div className="h-16 bg-slate-200 rounded-xl"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : categoriesError ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-red-500 rounded-lg">
+                      <ExclamationTriangleIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Knowledge Categories Performance
+                    </h2>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="text-center py-12">
+                    <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                      <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+                    </div>
+                    <h3 className="text-sm font-medium text-slate-900 mb-2">
+                      Analytics Unavailable
+                    </h3>
+                    <p className="text-sm text-red-600 mb-1">
+                      {categoriesError}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Please try refreshing the page or check back later
+                    </p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="mt-4 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200"
+                    >
+                      Refresh Page
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : categoriesChartData &&
+              categoriesData &&
+              categoriesData.length > 0 ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 bg-purple-600 rounded-lg">
+                        <ChartBarIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Knowledge Categories Performance
+                        </h2>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Average scores across the four knowledge areas
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-purple-600">
+                        {overallAveragePerformance}%
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">
+                        Overall
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                    {/* Doughnut Chart */}
+                    {/* Enhanced Doughnut Chart */}
                     <div className="flex justify-center">
-                      <div className="w-80 h-80">
+                      <div className="w-80 h-80 relative">
                         <Doughnut
                           data={categoriesChartData}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: true,
-                            plugins: {
-                              legend: {
-                                display: false, // We'll show a custom legend
-                              },
-                              tooltip: {
-                                backgroundColor: "rgba(15, 23, 42, 0.9)",
-                                titleColor: "white",
-                                bodyColor: "white",
-                                borderColor: "rgba(59, 130, 246, 0.5)",
-                                borderWidth: 1,
-                                padding: 12,
-                                cornerRadius: 8,
-                                callbacks: {
-                                  label: function (context) {
-                                    const label = context.label || "";
-                                    const value = context.parsed || 0;
-                                    return ` ${label}: ${value}%`;
-                                  },
-                                },
-                              },
-                            },
-                            cutout: "50%",
-                            rotation: -90,
-                            circumference: 360,
-                          }}
+                          options={chartOptions}
                         />
+                        {/* Center text overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-slate-900">
+                              {overallAveragePerformance}%
+                            </div>
+                            <div className="text-sm text-slate-500">
+                              Overall
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Custom Legend and Stats */}
+                    {/* Enhanced Custom Legend and Stats */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-slate-900 mb-4">
                         Performance Breakdown
@@ -652,11 +957,11 @@ const RestaurantDashboard: React.FC = () => {
                         return (
                           <div
                             key={cat.category}
-                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
                           >
                             <div className="flex items-center space-x-3">
                               <div
-                                className={`w-4 h-4 rounded-full ${colorClass}`}
+                                className={`w-4 h-4 rounded-full ${colorClass} shadow-sm`}
                               ></div>
                               <span className="font-medium text-slate-700">
                                 {label}
@@ -674,7 +979,7 @@ const RestaurantDashboard: React.FC = () => {
                         );
                       })}
 
-                      {/* Overall Stats */}
+                      {/* Enhanced Overall Stats */}
                       <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
                         <h4 className="font-semibold text-slate-900 mb-2">
                           Overall Performance
@@ -700,7 +1005,66 @@ const RestaurantDashboard: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Link to enhanced analytics */}
+                      <div className="mt-4">
+                        <Link
+                          to="/knowledge-analytics"
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors duration-200"
+                        >
+                          <ChartBarIcon className="h-4 w-4 mr-2" />
+                          View Detailed Analytics
+                        </Link>
+                      </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-slate-400 rounded-lg">
+                      <ChartBarIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Knowledge Categories Performance
+                    </h2>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="text-center py-16">
+                    <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                      <ChartBarIcon className="h-10 w-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">
+                      No Analytics Data Yet
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-4 max-w-sm mx-auto">
+                      Analytics will appear once your staff begin completing
+                      quizzes across the four knowledge categories
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2 mb-6">
+                      <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                        Food Knowledge
+                      </span>
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                        Beverage Knowledge
+                      </span>
+                      <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                        Wine Knowledge
+                      </span>
+                      <span className="px-3 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
+                        Procedures Knowledge
+                      </span>
+                    </div>
+                    <Link
+                      to="/quiz-management"
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create Your First Quiz
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -708,6 +1072,46 @@ const RestaurantDashboard: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Floating Action Button */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <div className="relative group">
+          {/* Quick actions menu */}
+          <div className="absolute bottom-16 right-0 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
+            <div className="bg-white rounded-lg shadow-xl border border-slate-200 p-2 space-y-1 min-w-48">
+              <button
+                onClick={openPdfUploadModal}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors duration-150"
+              >
+                <DocumentArrowUpIcon className="h-4 w-4" />
+                <span>Upload Menu PDF</span>
+              </button>
+              <Link
+                to="/quiz-management"
+                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-green-50 hover:text-green-700 rounded-md transition-colors duration-150"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Create Quiz</span>
+              </Link>
+              <Link
+                to="/staff-results"
+                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors duration-150"
+              >
+                <TrophyIcon className="h-4 w-4" />
+                <span>View Analytics</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Main FAB */}
+          <button
+            className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 flex items-center justify-center group-hover:rotate-45"
+            aria-label="Quick Actions"
+          >
+            <PlusIcon className="h-6 w-6" />
+          </button>
+        </div>
+      </div>
 
       {/* PDF Upload Modal */}
       {isPdfUploadModalOpen && (

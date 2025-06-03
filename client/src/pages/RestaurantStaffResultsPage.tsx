@@ -24,7 +24,138 @@ import {
   UsersIcon,
   AcademicCapIcon,
   TrophyIcon,
-} from "@heroicons/react/24/outline"; // Added icons
+  ClockIcon,
+  BoltIcon,
+  CakeIcon,
+  GiftIcon,
+  ClipboardDocumentListIcon,
+  FireIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/outline"; // Added new icons
+
+// Enhanced interfaces for Phase 5 leaderboard features
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  roleName?: string;
+  overallAverageScore: number;
+  totalQuestions: number;
+  completionTime?: number;
+  totalQuizzes?: number;
+}
+
+interface CategoryChampion {
+  userId: string;
+  name: string;
+  roleName?: string;
+  averageScore: number;
+  totalQuestions: number;
+  averageCompletionTime?: number;
+}
+
+interface LeaderboardData {
+  timePeriod: string;
+  topPerformers: LeaderboardEntry[];
+  categoryChampions: {
+    foodKnowledge: CategoryChampion | null;
+    beverageKnowledge: CategoryChampion | null;
+    wineKnowledge: CategoryChampion | null;
+    proceduresKnowledge: CategoryChampion | null;
+  };
+  lastUpdated: string;
+}
+
+// Enhanced hook for leaderboard data
+const useLeaderboardData = (timePeriod: string = "all") => {
+  const [leaderboardData, setLeaderboardData] =
+    useState<LeaderboardData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLeaderboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(
+          `/api/analytics/leaderboards?timePeriod=${timePeriod}&limit=10`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch leaderboard data");
+        }
+
+        const result = await response.json();
+        setLeaderboardData(result.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboardData();
+  }, [timePeriod]);
+
+  return { leaderboardData, loading, error };
+};
+
+// Category configuration for visual consistency
+const CATEGORY_CONFIG = {
+  foodKnowledge: {
+    icon: CakeIcon,
+    label: "Food Knowledge",
+    color: "#10B981", // Green
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    textColor: "text-green-700",
+    iconColor: "text-green-600",
+  },
+  beverageKnowledge: {
+    icon: BoltIcon,
+    label: "Beverage Knowledge",
+    color: "#3B82F6", // Blue
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
+    textColor: "text-blue-700",
+    iconColor: "text-blue-600",
+  },
+  wineKnowledge: {
+    icon: GiftIcon,
+    label: "Wine Knowledge",
+    color: "#8B5CF6", // Purple
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
+    textColor: "text-purple-700",
+    iconColor: "text-purple-600",
+  },
+  proceduresKnowledge: {
+    icon: ClipboardDocumentListIcon,
+    label: "Procedures Knowledge",
+    color: "#F59E0B", // Orange
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+    textColor: "text-orange-700",
+    iconColor: "text-orange-600",
+  },
+};
+
+// Helper function to format completion time
+const formatCompletionTime = (seconds?: number): string => {
+  if (!seconds) return "N/A";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSeconds}s`;
+};
 
 // Helper function to format percentages (moved from StaffManagement.tsx)
 const formatPercentage = (value: number | null) =>
@@ -41,17 +172,163 @@ const calculateStaffCompletionRate = (staff: StaffMemberWithData): number => {
   return 0;
 };
 
-// Helper Components (Assuming LoadingSpinner and ErrorMessage exist elsewhere or define here)
-// // Removed LoadingSpinner definition
-// // Removed ErrorMessage definition
+// Top Performers Leaderboard Component
+const TopPerformersLeaderboard: React.FC<{
+  topPerformers: LeaderboardEntry[];
+}> = ({ topPerformers }) => {
+  const navigate = useNavigate();
 
-// Helper function to check if a quiz is completed regardless of capitalization
-// // Removed local definition of isCompletedQuiz
+  const getRankBadge = (rank: number) => {
+    if (rank === 1) return "🥇";
+    if (rank === 2) return "🥈";
+    if (rank === 3) return "🥉";
+    return `#${rank}`;
+  };
 
-// Enhanced bar chart component for visualizing score distribution
-// // Removed ScoreDistributionChart definition
+  const getRankStyle = (rank: number) => {
+    if (rank === 1) return "bg-yellow-50 border-yellow-200 text-yellow-800";
+    if (rank === 2) return "bg-gray-50 border-gray-200 text-gray-800";
+    if (rank === 3) return "bg-orange-50 border-orange-200 text-orange-800";
+    return "bg-slate-50 border-slate-200 text-slate-800";
+  };
+
+  const handleStaffClick = (userId: string) => {
+    console.log("Navigating to staff ID:", userId, "Type:", typeof userId);
+    window.open(`/staff/${userId}`, "_blank");
+  };
+
+  return (
+    <div className="space-y-3">
+      {topPerformers.map((performer) => (
+        <div
+          key={performer.userId}
+          className={`p-4 rounded-lg border ${getRankStyle(
+            performer.rank
+          )} hover:bg-gray-100 transition-colors cursor-pointer`}
+          onClick={() => handleStaffClick(performer.userId)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="text-2xl font-bold">
+                {getRankBadge(performer.rank)}
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+                  {performer.name}
+                </p>
+                {performer.roleName && (
+                  <p className="text-sm text-slate-600">{performer.roleName}</p>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-bold text-slate-900">
+                {Math.round(performer.overallAverageScore)}%
+              </div>
+              <div className="text-sm text-slate-600">
+                {performer.totalQuestions} questions
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Category Champions Component
+const CategoryChampions: React.FC<{
+  categoryChampions: LeaderboardData["categoryChampions"];
+}> = ({ categoryChampions }) => {
+  const navigate = useNavigate();
+
+  const handleStaffClick = (userId: string) => {
+    console.log("Navigating to staff ID:", userId, "Type:", typeof userId);
+    window.open(`/staff/${userId}`, "_blank");
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {Object.entries(categoryChampions).map(([categoryKey, champion]) => {
+        const config =
+          CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
+        const IconComponent = config.icon;
+
+        return (
+          <div
+            key={categoryKey}
+            className={`${config.bgColor} ${
+              config.borderColor
+            } rounded-xl p-6 border ${
+              champion ? "hover:shadow-md transition-shadow" : ""
+            }`}
+          >
+            <div className="flex items-center space-x-3 mb-4">
+              <IconComponent className={`h-6 w-6 ${config.iconColor}`} />
+              <h3 className={`font-semibold ${config.textColor}`}>
+                {config.label}
+              </h3>
+            </div>
+
+            {champion ? (
+              <div
+                className="cursor-pointer"
+                onClick={() => handleStaffClick(champion.userId)}
+              >
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrophyIcon className="h-5 w-5 text-yellow-500" />
+                  <p className="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+                    {champion.name}
+                  </p>
+                </div>
+                {champion.roleName && (
+                  <p className="text-sm text-slate-600 mb-2">
+                    {champion.roleName}
+                  </p>
+                )}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Average Score:</span>
+                    <span className="font-medium">
+                      {Math.round(champion.averageScore)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Questions:</span>
+                    <span className="font-medium">
+                      {champion.totalQuestions}
+                    </span>
+                  </div>
+                  {champion.averageCompletionTime && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Avg Time:</span>
+                      <span className="font-medium">
+                        {formatCompletionTime(champion.averageCompletionTime)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <SparklesIcon className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-slate-500 text-sm">No champion yet</p>
+                <p className="text-slate-400 text-xs">
+                  Complete quizzes to compete
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const RestaurantStaffResultsPage: React.FC = () => {
+  // Phase 5: Enhanced state for leaderboards
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("all");
+
   // Use custom hooks for data
   const {
     staffData,
@@ -64,17 +341,21 @@ const RestaurantStaffResultsPage: React.FC = () => {
     error: quizCountError,
   } = useQuizCount();
 
-  // Remove totalQuizzes state, it now comes from the hook
-  // const [totalQuizzes, setTotalQuizzes] = useState<number>(0);
+  // Phase 5: Enhanced leaderboard data hook
+  const {
+    leaderboardData,
+    loading: leaderboardLoading,
+    error: leaderboardError,
+  } = useLeaderboardData(selectedTimePeriod);
 
   // Combine loading and error states
-  const loading = staffLoading || quizCountLoading;
-  const error = staffError || quizCountError;
+  const loading = staffLoading || quizCountLoading || leaderboardLoading;
+  const error = staffError || quizCountError || leaderboardError;
 
   // Keep other state specific to this page
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
   const { user: _user } = useAuth();
-  const _navigate = useNavigate();
+  const navigate = useNavigate();
 
   // Filtering state
   const [filters, setFilters] = useState<Filters>({
@@ -99,19 +380,6 @@ const RestaurantStaffResultsPage: React.FC = () => {
     useState<ChartData<"bar"> | null>(null);
   const [completionRateChartData, setCompletionRateChartData] =
     useState<ChartData<"bar"> | null>(null);
-
-  // Remove the incorrect placeholder useEffect for totalQuizzes
-  /*
-  useEffect(() => {
-      // Placeholder: Calculate max taken from the data provided by the hook
-      // Ideally, fetch this separately from '/quiz/count'
-      const maxTaken = staffData.reduce(
-          (max, staff) => Math.max(max, staff.quizzesTaken ?? 0),
-          0
-      );
-      setTotalQuizzes(maxTaken);
-  }, [staffData])
-  */
 
   const toggleExpand = useCallback((staffId: string) => {
     setExpandedStaffId((prev) => (prev === staffId ? null : staffId));
@@ -262,13 +530,29 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
                     <ChartBarIcon className="h-8 w-8 text-white" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h1 className="text-3xl font-bold text-slate-900">
                       Staff Results & Performance Analytics
                     </h1>
                     <p className="text-slate-600 mt-2">
-                      Track staff quiz performance and training progress
+                      Track staff quiz performance, leaderboards, and training
+                      progress
                     </p>
+                  </div>
+                  {/* Phase 5: Time Period Filter */}
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Time Period:
+                    </label>
+                    <select
+                      value={selectedTimePeriod}
+                      onChange={(e) => setSelectedTimePeriod(e.target.value)}
+                      className="px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="month">Last Month</option>
+                      <option value="week">Last Week</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -277,7 +561,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
               {loading && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
                   <div className="text-center">
-                    <LoadingSpinner message="Loading staff results..." />
+                    <LoadingSpinner message="Loading staff results and leaderboards..." />
                   </div>
                 </div>
               )}
@@ -290,12 +574,12 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
               {!loading && !error && (
                 <>
-                  {/* KPIs Section */}
+                  {/* Phase 5: Enhanced KPIs with Leaderboard Metrics */}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <h2 className="text-xl font-semibold text-slate-900 mb-6">
                       Key Performance Indicators
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
                         <div className="flex items-center space-x-3">
                           <div className="p-2 bg-blue-100 rounded-lg">
@@ -328,6 +612,99 @@ const RestaurantStaffResultsPage: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                      <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-yellow-100 rounded-lg">
+                            <FireIcon className="h-6 w-6 text-yellow-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-700">
+                              Top Performer
+                            </h3>
+                            <p className="text-lg font-bold text-slate-900">
+                              {leaderboardData?.topPerformers?.[0]?.name ||
+                                "N/A"}
+                            </p>
+                            {leaderboardData?.topPerformers?.[0] && (
+                              <p className="text-sm text-slate-600">
+                                {Math.round(
+                                  leaderboardData.topPerformers[0]
+                                    .overallAverageScore
+                                )}
+                                % average score
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 5: Leaderboards Section */}
+                  <div className="grid grid-cols-1 gap-8">
+                    {/* Top Performers Leaderboard */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center space-x-3">
+                          <TrophyIcon className="h-6 w-6 text-yellow-600" />
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            Top Performers
+                          </h2>
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Highest overall quiz average scores (
+                          {selectedTimePeriod})
+                        </p>
+                      </div>
+                      <div className="p-6">
+                        {leaderboardData?.topPerformers?.length ? (
+                          <TopPerformersLeaderboard
+                            topPerformers={leaderboardData.topPerformers}
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <TrophyIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                            <p className="text-slate-500">
+                              No performance data available
+                            </p>
+                            <p className="text-slate-400 text-sm">
+                              Complete quizzes to see rankings
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 5: Category Champions */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center space-x-3">
+                        <AcademicCapIcon className="h-6 w-6 text-green-600" />
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Category Champions
+                        </h2>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Best performers in each knowledge category
+                      </p>
+                    </div>
+                    <div className="p-6">
+                      {leaderboardData?.categoryChampions ? (
+                        <CategoryChampions
+                          categoryChampions={leaderboardData.categoryChampions}
+                        />
+                      ) : (
+                        <div className="text-center py-8">
+                          <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <p className="text-slate-500">
+                            No category data available
+                          </p>
+                          <p className="text-slate-400 text-sm">
+                            Complete category-specific quizzes to see champions
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

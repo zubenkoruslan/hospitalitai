@@ -4,6 +4,14 @@ import { protect } from "../middleware/authMiddleware";
 import { Types } from "mongoose";
 import { KnowledgeCategory } from "../models/QuestionModel";
 import ReportGenerationService from "../services/reportGenerationService";
+import UserModel from "../models/User";
+import QuizAttemptModel from "../models/QuizAttempt";
+import UserKnowledgeAnalyticsModel from "../models/UserKnowledgeAnalytics";
+import {
+  getEnhancedRestaurantAnalytics,
+  getIndividualStaffAnalytics,
+  getLeaderboards,
+} from "../controllers/analyticsController";
 
 const router = express.Router();
 
@@ -43,44 +51,15 @@ router.get(
 /**
  * GET /api/analytics/staff/:staffId
  * Get detailed knowledge profile for a specific staff member
+ * Enhanced for Phase 5 - individual staff dashboard
  */
-router.get(
-  "/staff/:staffId",
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { user } = req as any;
-      const { staffId } = req.params;
+router.get("/staff/:staffId", getIndividualStaffAnalytics);
 
-      const restaurantId = new Types.ObjectId(user.restaurantId);
-      const userId = new Types.ObjectId(staffId);
-
-      const profile = await KnowledgeAnalyticsService.getStaffKnowledgeProfile(
-        userId,
-        restaurantId
-      );
-
-      if (!profile) {
-        res.status(404).json({
-          status: "error",
-          message: "Staff knowledge profile not found",
-        });
-        return;
-      }
-
-      res.status(200).json({
-        status: "success",
-        data: profile,
-      });
-    } catch (error) {
-      console.error("Error fetching staff knowledge profile:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to fetch staff knowledge profile",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-);
+/**
+ * GET /api/analytics/leaderboards
+ * Get leaderboard data for different metrics
+ */
+router.get("/leaderboards", getLeaderboards);
 
 /**
  * GET /api/analytics/category/:category
@@ -592,5 +571,129 @@ router.get(
     }
   }
 );
+
+/**
+ * GET /api/analytics/leaderboards
+ * Get leaderboard data for different metrics
+ * Enhanced for Phase 5 - leaderboards page
+ * Query params: timePeriod? ("week" | "month" | "all"), limit? (default 10)
+ */
+router.get(
+  "/leaderboards",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { user } = req as any;
+      const { timePeriod = "all", limit = "10" } = req.query;
+      const restaurantId = new Types.ObjectId(user.restaurantId);
+
+      // Validate time period
+      const validTimePeriods = ["week", "month", "all"];
+      if (!validTimePeriods.includes(timePeriod as string)) {
+        res.status(400).json({
+          status: "error",
+          message: "Invalid time period. Must be one of: week, month, all",
+        });
+        return;
+      }
+
+      // Get all staff with analytics data for this restaurant
+      const analyticsData = await UserKnowledgeAnalyticsModel.find({
+        restaurantId,
+      }).populate("userId", "name email assignedRoleId");
+
+      // Get user role information
+      const usersWithRoles = await Promise.all(
+        analyticsData.map(async (analytics) => {
+          const userDetails = await UserModel.findById(
+            analytics.userId._id
+          ).populate("assignedRoleId", "name");
+          return {
+            ...analytics.toObject(),
+            userDetails,
+          };
+        })
+      );
+
+      // Calculate Top Performers (based on overall accuracy with minimum questions threshold)
+      const topPerformers = usersWithRoles
+        .filter((analytics) => analytics.totalQuestionsAnswered >= 10) // Minimum 10 questions
+        .sort((a, b) => b.overallAccuracy - a.overallAccuracy)
+        .slice(0, 10)
+        .map((analytics, index) => ({
+          rank: index + 1,
+          userId: analytics.userId._id.toString(),
+          name: (analytics.userId as any).name,
+          roleName:
+            (analytics.userDetails?.assignedRoleId as any)?.name || "Staff",
+          overallAccuracy: analytics.overallAccuracy,
+          totalQuestions: analytics.totalQuestionsAnswered,
+          completionTime: analytics.averageQuizCompletionTime || 0,
+        }));
+
+      // Calculate Category Champions
+      const categories = [
+        "foodKnowledge",
+        "beverageKnowledge",
+        "wineKnowledge",
+        "proceduresKnowledge",
+      ];
+      const categoryChampions: any = {};
+
+      categories.forEach((category) => {
+        const categoryKey = category.replace("Knowledge", "-knowledge");
+        const champion = usersWithRoles
+          .filter(
+            (analytics: any) =>
+              analytics[category]?.totalQuestions >= 5 && // Minimum 5 questions in category
+              analytics[category]?.accuracy > 0
+          )
+          .sort(
+            (a: any, b: any) => b[category].accuracy - a[category].accuracy
+          )[0];
+
+        if (champion) {
+          const championAny = champion as any;
+          categoryChampions[category] = {
+            userId: championAny.userId._id.toString(),
+            name: championAny.userId.name,
+            roleName: championAny.userDetails?.assignedRoleId?.name || "Staff",
+            accuracy: championAny[category].accuracy,
+            totalQuestions: championAny[category].totalQuestions,
+            averageCompletionTime:
+              championAny[category].averageCompletionTime || 0,
+          };
+        } else {
+          categoryChampions[category] = null;
+        }
+      });
+
+      const leaderboards = {
+        timePeriod,
+        topPerformers,
+        categoryChampions,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      res.status(200).json({
+        status: "success",
+        data: leaderboards,
+      });
+    } catch (error) {
+      console.error("Error fetching leaderboards:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to fetch leaderboards",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/analytics/restaurant/enhanced
+ * Get enhanced restaurant overview analytics
+ * Enhanced for Phase 5 - restaurant overview dashboard
+ */
+router.get("/restaurant/enhanced", protect, getEnhancedRestaurantAnalytics);
 
 export default router;

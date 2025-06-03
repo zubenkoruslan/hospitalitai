@@ -9,6 +9,12 @@ export interface ICategoryStats {
   averageScore: number;
   lastAttemptDate?: Date;
 
+  // Completion time tracking
+  totalCompletionTime: number; // Total time in seconds
+  averageCompletionTime: number; // Average time per question in seconds
+  fastestCompletionTime?: number; // Fastest single question time
+  slowestCompletionTime?: number; // Slowest single question time
+
   // Subcategory breakdown
   subcategoryStats: Map<
     string,
@@ -53,6 +59,13 @@ export interface IUserKnowledgeAnalytics extends Document {
   overallAccuracy: number;
   lastUpdated: Date;
 
+  // Overall completion time tracking
+  totalQuizzesCompleted: number;
+  totalQuizCompletionTime: number; // Total time for all quizzes in seconds
+  averageQuizCompletionTime: number; // Average time per quiz in seconds
+  fastestQuizCompletionTime?: number; // Fastest complete quiz time
+  slowestQuizCompletionTime?: number; // Slowest complete quiz time
+
   // Trending data (last 30 days)
   last30Days: {
     foodKnowledge: ICategoryTrendData;
@@ -74,6 +87,12 @@ const CategoryStatsSchema = new Schema(
     accuracy: { type: Number, default: 0, min: 0, max: 100 },
     averageScore: { type: Number, default: 0, min: 0, max: 100 },
     lastAttemptDate: { type: Date, required: false },
+
+    // Completion time tracking
+    totalCompletionTime: { type: Number, default: 0, min: 0 },
+    averageCompletionTime: { type: Number, default: 0, min: 0 },
+    fastestCompletionTime: { type: Number, required: false },
+    slowestCompletionTime: { type: Number, required: false },
 
     subcategoryStats: {
       type: Map,
@@ -220,6 +239,31 @@ const UserKnowledgeAnalyticsSchema: Schema<IUserKnowledgeAnalytics> =
         type: Date,
         default: Date.now,
         required: true,
+      },
+
+      // Overall completion time tracking
+      totalQuizzesCompleted: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      totalQuizCompletionTime: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      averageQuizCompletionTime: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      fastestQuizCompletionTime: {
+        type: Number,
+        required: false,
+      },
+      slowestQuizCompletionTime: {
+        type: Number,
+        required: false,
       },
 
       // Trending data (last 30 days)
