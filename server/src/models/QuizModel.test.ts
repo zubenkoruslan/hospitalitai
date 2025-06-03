@@ -55,7 +55,7 @@ describe("Quiz Model Test", () => {
     expect(savedQuiz.totalUniqueQuestionsInSourceSnapshot).to.equal(
       quizData.totalUniqueQuestionsInSourceSnapshot
     );
-    expect(savedQuiz.isAvailable).to.be.true; // Default value
+    expect(savedQuiz.isAvailable).to.be.false; // Default value
     expect(savedQuiz.targetRoles).to.be.an("array").that.is.empty; // Default value
     expect(savedQuiz.createdAt).to.exist;
     expect(savedQuiz.updatedAt).to.exist;

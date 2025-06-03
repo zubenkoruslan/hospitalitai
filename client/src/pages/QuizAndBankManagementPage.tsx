@@ -27,6 +27,21 @@ import {
   AcademicCapIcon,
   BookOpenIcon,
   PlusIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  DocumentTextIcon,
+  ListBulletIcon,
+  ClockIcon,
+  UserGroupIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  PlayIcon,
+  PauseIcon,
+  ChartBarIcon,
+  SparklesIcon,
+  CogIcon,
+  QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
 
 // Question Bank Components
@@ -49,11 +64,13 @@ const QuizAndBankManagementPage: React.FC = () => {
   const [questionBanks, setQuestionBanks] = useState<IQuestionBank[]>([]);
   const [quizzes, setQuizzes] = useState<ClientIQuiz[]>([]);
 
-  // Question Bank filter state
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [questionBankSourceFilter, setQuestionBankSourceFilter] =
     useState<QuestionBankSourceFilterType>("ALL");
   const [isQuestionBankListVisible, setIsQuestionBankListVisible] =
     useState<boolean>(true);
+  const [quizSearchTerm, setQuizSearchTerm] = useState<string>("");
 
   const [isLoadingBanks, setIsLoadingBanks] = useState<boolean>(false);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState<boolean>(false);
@@ -62,6 +79,8 @@ const QuizAndBankManagementPage: React.FC = () => {
 
   // Expansion states
   const [isQuestionBanksExpanded, setIsQuestionBanksExpanded] =
+    useState<boolean>(true);
+  const [isQuizManagementExpanded, setIsQuizManagementExpanded] =
     useState<boolean>(true);
 
   // Modal States - Question Banks
@@ -113,15 +132,48 @@ const QuizAndBankManagementPage: React.FC = () => {
     }
   }, []);
 
-  // Filtered Question Banks based on questionBankSourceFilter
+  // Filtered Question Banks based on search and filter
   const filteredQuestionBanks = React.useMemo(() => {
-    if (questionBankSourceFilter === "ALL") {
-      return questionBanks;
+    let filtered = questionBanks;
+
+    // Apply source filter
+    if (questionBankSourceFilter !== "ALL") {
+      filtered = filtered.filter(
+        (bank) => bank.sourceType === questionBankSourceFilter
+      );
     }
-    return questionBanks.filter(
-      (bank) => bank.sourceType === questionBankSourceFilter
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (bank) =>
+          bank.name.toLowerCase().includes(search) ||
+          bank.description?.toLowerCase().includes(search) ||
+          bank.sourceSopDocumentTitle?.toLowerCase().includes(search) ||
+          bank.sourceMenuName?.toLowerCase().includes(search)
+      );
+    }
+
+    return filtered;
+  }, [questionBanks, questionBankSourceFilter, searchTerm]);
+
+  // Filtered Quizzes based on search
+  const filteredQuizzes = React.useMemo(() => {
+    if (!quizSearchTerm.trim()) return quizzes;
+
+    const search = quizSearchTerm.toLowerCase();
+    return quizzes.filter(
+      (quiz) =>
+        quiz.title.toLowerCase().includes(search) ||
+        quiz.description?.toLowerCase().includes(search) ||
+        quiz.targetRoles?.some((role) =>
+          (typeof role === "string" ? role : role.name)
+            .toLowerCase()
+            .includes(search)
+        )
     );
-  }, [questionBanks, questionBankSourceFilter]);
+  }, [quizzes, quizSearchTerm]);
 
   const fetchQuizzesList = useCallback(async () => {
     setIsLoadingQuizzes(true);
@@ -325,92 +377,184 @@ const QuizAndBankManagementPage: React.FC = () => {
     }, 300);
   };
 
+  // Statistics calculations
+  const stats = React.useMemo(() => {
+    const totalQuestions = questionBanks.reduce(
+      (sum, bank) =>
+        sum +
+        (Array.isArray(bank.questions)
+          ? bank.questions.length
+          : bank.questionCount || 0),
+      0
+    );
+    const activeQuizzes = quizzes.filter((quiz) => quiz.isAvailable).length;
+    const inactiveQuizzes = quizzes.filter((quiz) => !quiz.isAvailable).length;
+
+    return {
+      totalBanks: questionBanks.length,
+      totalQuestions,
+      totalQuizzes: quizzes.length,
+      activeQuizzes,
+      inactiveQuizzes,
+    };
+  }, [questionBanks, quizzes]);
+
+  // Question Bank List Item Component
+  const QuestionBankListItem: React.FC<{ bank: IQuestionBank }> = ({
+    bank,
+  }) => {
+    const getSourceIcon = (sourceType: string) => {
+      switch (sourceType) {
+        case "SOP":
+          return <DocumentTextIcon className="h-5 w-5 text-blue-600" />;
+        case "MENU":
+          return <ListBulletIcon className="h-5 w-5 text-emerald-600" />;
+        case "MANUAL":
+          return <PencilIcon className="h-5 w-5 text-amber-600" />;
+        default:
+          return <BookOpenIcon className="h-5 w-5 text-gray-600" />;
+      }
+    };
+
+    const getSourceColor = (sourceType: string) => {
+      switch (sourceType) {
+        case "SOP":
+          return "bg-blue-50 text-blue-700 border-blue-200";
+        case "MENU":
+          return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        case "MANUAL":
+          return "bg-amber-50 text-amber-700 border-amber-200";
+        default:
+          return "bg-gray-50 text-gray-700 border-gray-200";
+      }
+    };
+
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-md transition-all duration-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left side - Icon, Name, and Details */}
+            <div className="flex items-center space-x-4 flex-1 min-w-0">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center w-10 h-10 bg-gray-50 rounded-lg border border-gray-200">
+                  {getSourceIcon(bank.sourceType)}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3 mb-1">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    {bank.name}
+                  </h3>
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getSourceColor(
+                      bank.sourceType
+                    )}`}
+                  >
+                    {bank.sourceType}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <span className="flex items-center">
+                    <ClockIcon className="h-4 w-4 mr-1" />
+                    {new Date(bank.createdAt).toLocaleDateString()}
+                  </span>
+                  <span className="flex items-center">
+                    <QuestionMarkCircleIcon className="h-4 w-4 mr-1" />
+                    {Array.isArray(bank.questions)
+                      ? bank.questions.length
+                      : bank.questionCount || 0}{" "}
+                    questions
+                  </span>
+                </div>
+                {bank.description && (
+                  <p className="text-sm text-gray-600 mt-2 line-clamp-1">
+                    {bank.description}
+                  </p>
+                )}
+                {/* Linked content indicators */}
+                {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
+                  <div className="mt-2 text-xs text-blue-600">
+                    📄 Linked to: {bank.sourceSopDocumentTitle}
+                  </div>
+                )}
+                {bank.sourceType === "MENU" && bank.sourceMenuName && (
+                  <div className="mt-2 text-xs text-emerald-600">
+                    🍽️ Linked to: {bank.sourceMenuName}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right side - Action buttons */}
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <button
+                onClick={() => handleManageBankQuestions(bank._id)}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200 group"
+              >
+                <CogIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                Manage
+              </button>
+              <button
+                onClick={() => setBankToDelete(bank)}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-all duration-200 group"
+              >
+                <TrashIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render Question Bank List
   const renderQuestionBankList = () => {
     if (isLoadingBanks) {
-      return <LoadingSpinner message="Loading question banks..." />;
+      return (
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner message="Loading question banks..." />
+        </div>
+      );
     }
 
     if (filteredQuestionBanks.length === 0) {
+      const hasSearchOrFilter =
+        searchTerm.trim() || questionBankSourceFilter !== "ALL";
+
       return (
-        <p className="text-center text-gray-500 py-4">
-          No question banks found{" "}
-          {questionBankSourceFilter !== "ALL"
-            ? `for filter: ${questionBankSourceFilter}`
-            : ""}
-          .
-        </p>
+        <div className="text-center py-12">
+          <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {hasSearchOrFilter
+              ? "No question banks found"
+              : "No question banks yet"}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {hasSearchOrFilter
+              ? "Try adjusting your search or filter criteria"
+              : "Create your first question bank to get started with quizzes"}
+          </p>
+          {!hasSearchOrFilter && (
+            <Button
+              variant="primary"
+              onClick={() => setIsCreateBankModalOpen(true)}
+              disabled={!restaurantId}
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create Question Bank
+            </Button>
+          )}
+        </div>
       );
     }
 
     return (
-      <ul className="divide-y divide-gray-200">
+      <div className="space-y-3">
         {filteredQuestionBanks.map((bank) => (
-          <li key={bank._id} className="px-4 py-4 sm:px-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-grow">
-                <div className="flex items-center mb-1">
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-800">
-                    {bank.name}
-                  </h3>
-                </div>
-                <p className="text-sm text-gray-600 mb-3 pr-0 md:pr-4">
-                  {bank.description || (
-                    <span className="italic text-gray-400">
-                      No description provided.
-                    </span>
-                  )}
-                </p>
-
-                {/* Display SOP Title if applicable */}
-                {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
-                  <p className="text-xs text-gray-500 mb-2">
-                    <span className="font-medium">Linked SOP:</span>{" "}
-                    {bank.sourceSopDocumentTitle}
-                  </p>
-                )}
-                {/* Display Menu Name if applicable */}
-                {bank.sourceType === "MENU" && bank.sourceMenuName && (
-                  <p className="text-xs text-gray-500 mb-2">
-                    <span className="font-medium">Linked Menu:</span>{" "}
-                    {bank.sourceMenuName}
-                  </p>
-                )}
-
-                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                  <div className="flex items-center">
-                    <span className="font-medium text-gray-600 mr-1">
-                      Questions:
-                    </span>
-                    <span>
-                      {Array.isArray(bank.questions)
-                        ? bank.questions.length
-                        : bank.questionCount || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 flex flex-row sm:flex-row md:flex-col gap-2 mt-3 md:mt-0 w-full md:w-auto">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleManageBankQuestions(bank._id)}
-                  className="flex-1 md:flex-none w-full md:w-auto text-sm justify-center"
-                >
-                  Manage Questions
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setBankToDelete(bank)}
-                  className="flex-1 md:flex-none w-full md:w-auto text-sm justify-center"
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </li>
+          <QuestionBankListItem key={bank._id} bank={bank} />
         ))}
-      </ul>
+      </div>
     );
   };
 
@@ -422,19 +566,19 @@ const QuizAndBankManagementPage: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
               {/* Header Section */}
-              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
                       <AcademicCapIcon className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold text-slate-900">
+                      <h1 className="text-3xl font-bold text-white">
                         Quiz & Question Bank Management
                       </h1>
-                      <p className="text-slate-600 mt-2">
+                      <p className="text-slate-300 mt-2 font-medium">
                         Create quizzes, manage question banks, and track
-                        training materials.
+                        training materials
                       </p>
                     </div>
                   </div>
@@ -442,6 +586,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                     <Button
                       variant="secondary"
                       onClick={() => setIsCreateBankModalOpen(true)}
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
                     >
                       <BookOpenIcon className="h-5 w-5 mr-2" />
                       New Question Bank
@@ -449,10 +594,80 @@ const QuizAndBankManagementPage: React.FC = () => {
                     <Button
                       variant="primary"
                       onClick={() => setIsGenerateQuizModalOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
                     >
-                      <PlusIcon className="h-5 w-5 mr-2" />
+                      <SparklesIcon className="h-5 w-5 mr-2" />
                       Generate Quiz
                     </Button>
+                  </div>
+                </div>
+
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8">
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Question Banks
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.totalBanks}
+                        </p>
+                      </div>
+                      <BookOpenIcon className="h-8 w-8 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Total Questions
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.totalQuestions}
+                        </p>
+                      </div>
+                      <ListBulletIcon className="h-8 w-8 text-purple-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Total Quizzes
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.totalQuizzes}
+                        </p>
+                      </div>
+                      <AcademicCapIcon className="h-8 w-8 text-indigo-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Active Quizzes
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.activeQuizzes}
+                        </p>
+                      </div>
+                      <PlayIcon className="h-8 w-8 text-green-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Inactive
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.inactiveQuizzes}
+                        </p>
+                      </div>
+                      <PauseIcon className="h-8 w-8 text-orange-400" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -473,8 +688,8 @@ const QuizAndBankManagementPage: React.FC = () => {
               )}
 
               {/* Question Banks Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+              <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 px-6 py-4 border-b border-emerald-200">
                   <div className="flex justify-between items-center">
                     <div
                       className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
@@ -491,21 +706,24 @@ const QuizAndBankManagementPage: React.FC = () => {
                       aria-expanded={isQuestionBanksExpanded}
                       aria-controls="question-banks-content"
                     >
-                      <BookOpenIcon className="h-6 w-6 text-slate-700 mr-3" />
-                      <h2 className="text-xl font-semibold text-slate-900 mr-3">
+                      <BookOpenIcon className="h-6 w-6 text-emerald-700 mr-3" />
+                      <h2 className="text-xl font-semibold text-emerald-900 mr-3">
                         Question Banks
                       </h2>
+                      <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs font-medium px-2 py-1 rounded-full border border-emerald-200">
+                        {stats.totalBanks}
+                      </span>
                       {isQuestionBanksExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-slate-600" />
+                        <ChevronUpIcon className="h-5 w-5 text-emerald-600 ml-2" />
                       ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-slate-600" />
+                        <ChevronDownIcon className="h-5 w-5 text-emerald-600 ml-2" />
                       )}
                     </div>
                     <Button
                       variant="primary"
                       onClick={() => setIsCreateBankModalOpen(true)}
                       disabled={!restaurantId}
-                      className="flex items-center space-x-2"
+                      className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 border-emerald-600"
                     >
                       <PlusIcon className="h-4 w-4" />
                       <span>Create Question Bank</span>
@@ -515,34 +733,54 @@ const QuizAndBankManagementPage: React.FC = () => {
 
                 {isQuestionBanksExpanded && (
                   <div id="question-banks-content" className="p-6">
-                    {/* Filter UI for Question Banks */}
-                    <div className="mb-6 flex flex-wrap items-center gap-3">
-                      <span className="text-sm font-medium text-slate-700">
-                        Filter by source:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {(
-                          [
-                            "ALL",
-                            "SOP",
-                            "MENU",
-                            "MANUAL",
-                          ] as QuestionBankSourceFilterType[]
-                        ).map((type) => (
-                          <Button
-                            key={type}
-                            variant={
-                              questionBankSourceFilter === type
-                                ? "primary"
-                                : "secondary"
-                            }
-                            onClick={() => handleQuestionBankFilterChange(type)}
-                            className="px-3 py-1.5 text-sm"
-                          >
-                            {type.charAt(0).toUpperCase() +
-                              type.slice(1).toLowerCase()}
-                          </Button>
-                        ))}
+                    {/* Search and Filter Controls */}
+                    <div className="mb-6 space-y-4">
+                      {/* Search Bar */}
+                      <div className="relative max-w-md">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search question banks..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Filter Buttons */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <FunnelIcon className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm font-medium text-gray-700">
+                            Filter by source:
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(
+                            [
+                              "ALL",
+                              "SOP",
+                              "MENU",
+                              "MANUAL",
+                            ] as QuestionBankSourceFilterType[]
+                          ).map((type) => (
+                            <Button
+                              key={type}
+                              variant={
+                                questionBankSourceFilter === type
+                                  ? "primary"
+                                  : "secondary"
+                              }
+                              onClick={() =>
+                                handleQuestionBankFilterChange(type)
+                              }
+                              className="px-3 py-1.5 text-sm"
+                            >
+                              {type.charAt(0).toUpperCase() +
+                                type.slice(1).toLowerCase()}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -558,48 +796,122 @@ const QuizAndBankManagementPage: React.FC = () => {
               </div>
 
               {/* Quizzes Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Quiz Management
-                  </h2>
+              <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 px-6 py-4 border-b border-indigo-200">
+                  <div className="flex justify-between items-center">
+                    <div
+                      className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
+                      onClick={() =>
+                        setIsQuizManagementExpanded(!isQuizManagementExpanded)
+                      }
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          setIsQuizManagementExpanded(
+                            !isQuizManagementExpanded
+                          );
+                        }
+                      }}
+                      aria-expanded={isQuizManagementExpanded}
+                      aria-controls="quiz-management-content"
+                    >
+                      <AcademicCapIcon className="h-6 w-6 text-indigo-700 mr-3" />
+                      <h2 className="text-xl font-semibold text-indigo-900 mr-3">
+                        Quiz Management
+                      </h2>
+                      <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-1 rounded-full border border-indigo-200">
+                        {stats.totalQuizzes}
+                      </span>
+                      {isQuizManagementExpanded ? (
+                        <ChevronUpIcon className="h-5 w-5 text-indigo-600 ml-2" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5 text-indigo-600 ml-2" />
+                      )}
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={() => setIsGenerateQuizModalOpen(true)}
+                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+                    >
+                      <SparklesIcon className="h-4 w-4" />
+                      <span>Generate Quiz</span>
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="p-6">
-                  {isLoadingQuizzes && quizzes.length === 0 && (
-                    <div className="text-center py-12">
-                      <LoadingSpinner />
+                {isQuizManagementExpanded && (
+                  <div id="quiz-management-content" className="p-6">
+                    {/* Search and Filter Controls */}
+                    <div className="mb-6 space-y-4">
+                      {/* Search Bar */}
+                      <div className="relative max-w-md">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search quizzes..."
+                          value={quizSearchTerm}
+                          onChange={(e) => setQuizSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
                     </div>
-                  )}
-                  {!isLoadingQuizzes && quizzes.length === 0 && !error && (
-                    <div className="text-center py-12">
-                      <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">
-                        No quizzes found
-                      </h3>
-                      <p className="text-slate-500">
-                        Create your first quiz from your question banks!
-                      </p>
+
+                    <div className="transition-opacity duration-300 ease-in-out opacity-100">
+                      {isLoadingQuizzes && quizzes.length === 0 && (
+                        <div className="flex items-center justify-center py-12">
+                          <LoadingSpinner message="Loading quizzes..." />
+                        </div>
+                      )}
+                      {!isLoadingQuizzes &&
+                        filteredQuizzes.length === 0 &&
+                        !error && (
+                          <div className="text-center py-12">
+                            <AcademicCapIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                              {quizSearchTerm.trim()
+                                ? "No quizzes found"
+                                : "No quizzes yet"}
+                            </h3>
+                            <p className="text-gray-500 mb-6">
+                              {quizSearchTerm.trim()
+                                ? "Try adjusting your search criteria"
+                                : "Generate your first quiz from question banks"}
+                            </p>
+                            {!quizSearchTerm.trim() && (
+                              <Button
+                                variant="primary"
+                                onClick={() => setIsGenerateQuizModalOpen(true)}
+                                disabled={!restaurantId}
+                              >
+                                <SparklesIcon className="h-4 w-4 mr-2" />
+                                Generate Quiz
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      {!isLoadingQuizzes && filteredQuizzes.length > 0 && (
+                        <div className="space-y-3">
+                          <QuizList
+                            quizzes={filteredQuizzes}
+                            isLoading={false}
+                            onPreview={handleOpenEditQuizModal}
+                            onActivate={handleActivateQuiz}
+                            onDeactivate={handleDeactivateQuiz}
+                            onDelete={(quiz) => setQuizToDelete(quiz)}
+                            onViewProgress={handleViewQuizProgress}
+                            isDeletingQuizId={isDeletingQuizId}
+                          />
+                        </div>
+                      )}
+                      {isLoadingQuizzes && quizzes.length > 0 && (
+                        <div className="flex justify-center py-4">
+                          <LoadingSpinner />
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {!isLoadingQuizzes && quizzes.length > 0 && (
-                    <QuizList
-                      quizzes={quizzes}
-                      isLoading={false}
-                      onPreview={handleOpenEditQuizModal}
-                      onActivate={handleActivateQuiz}
-                      onDeactivate={handleDeactivateQuiz}
-                      onDelete={(quiz) => setQuizToDelete(quiz)}
-                      onViewProgress={handleViewQuizProgress}
-                      isDeletingQuizId={isDeletingQuizId}
-                    />
-                  )}
-                  {isLoadingQuizzes && quizzes.length > 0 && (
-                    <div className="my-4">
-                      <LoadingSpinner />
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 

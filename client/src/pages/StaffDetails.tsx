@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getQuizAttemptDetails } from "../services/api";
+import {
+  getQuizAttemptDetails,
+  getAllIncorrectAnswersForStaff,
+} from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -23,6 +26,19 @@ import {
   CakeIcon,
   GiftIcon,
   ClipboardDocumentListIcon,
+  ArrowLeftIcon,
+  CalendarIcon,
+  FireIcon,
+  ChevronRightIcon,
+  EyeIcon,
+  StarIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ArrowPathIcon,
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 
 // Import Chart.js components for radial chart
@@ -72,11 +88,26 @@ interface RecentQuiz {
   averageScore: string;
   completionTime: number;
   completedAt: string;
+  attemptId: string; // Added to support viewing details of specific attempts
 }
 
 interface RestaurantComparison {
   averageScore: number;
   averageCompletionTime: number;
+}
+
+interface QuizPerformanceData {
+  quizId: string;
+  quizTitle: string;
+  averageScore: number;
+  totalAttempts: number;
+  attempts: Array<{
+    attemptId: string;
+    score: number;
+    totalQuestions: number;
+    completedAt: string;
+    hasIncorrectAnswers: boolean;
+  }>;
 }
 
 interface EnhancedStaffData {
@@ -156,6 +187,7 @@ const CATEGORY_CONFIG = {
     color: "#10B981", // Green
     bgColor: "bg-green-50",
     textColor: "text-green-700",
+    borderColor: "border-green-200",
   },
   beverageKnowledge: {
     icon: BoltIcon,
@@ -163,6 +195,7 @@ const CATEGORY_CONFIG = {
     color: "#3B82F6", // Blue
     bgColor: "bg-blue-50",
     textColor: "text-blue-700",
+    borderColor: "border-blue-200",
   },
   wineKnowledge: {
     icon: GiftIcon,
@@ -170,6 +203,7 @@ const CATEGORY_CONFIG = {
     color: "#8B5CF6", // Purple
     bgColor: "bg-purple-50",
     textColor: "text-purple-700",
+    borderColor: "border-purple-200",
   },
   proceduresKnowledge: {
     icon: ClipboardDocumentListIcon,
@@ -177,6 +211,7 @@ const CATEGORY_CONFIG = {
     color: "#F59E0B", // Orange
     bgColor: "bg-orange-50",
     textColor: "text-orange-700",
+    borderColor: "border-orange-200",
   },
 };
 
@@ -188,176 +223,578 @@ const formatCompletionTime = (seconds: number): string => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
-// Personal Performance Cards Component
-const PersonalPerformanceCards: React.FC<{
-  metrics: PersonalMetrics;
-  comparison: RestaurantComparison;
-}> = ({ metrics, comparison }) => {
-  const cards = [
-    {
-      title: "Overall Average Score",
-      value: `${metrics.overallAverageScore.toFixed(1)}%`,
-      comparison: `Restaurant avg: ${comparison.averageScore.toFixed(1)}%`,
-      icon: TrophyIcon,
-      color: "emerald",
-      trend:
-        metrics.overallAverageScore >= comparison.averageScore ? "up" : "down",
-    },
-    {
-      title: "Quizzes Completed",
-      value: metrics.totalQuizzesCompleted.toString(),
-      comparison: `${metrics.totalQuestionsAnswered} questions answered`,
-      icon: AcademicCapIcon,
-      color: "blue",
-    },
-    {
-      title: "Average Time",
-      value: formatCompletionTime(metrics.averageCompletionTime),
-      comparison: `Restaurant avg: ${formatCompletionTime(
-        comparison.averageCompletionTime
-      )}`,
-      icon: ClockIcon,
-      color: "purple",
-      trend:
-        metrics.averageCompletionTime <= comparison.averageCompletionTime
-          ? "up"
-          : "down",
-    },
-  ];
+// Helper function to get category config from quiz title
+const getCategoryFromQuizTitle = (quizTitle: string) => {
+  const title = quizTitle.toLowerCase();
+  if (title.includes("food")) return CATEGORY_CONFIG.foodKnowledge;
+  if (title.includes("wine")) return CATEGORY_CONFIG.wineKnowledge;
+  if (
+    title.includes("beverage") ||
+    title.includes("cocktail") ||
+    title.includes("spirit")
+  )
+    return CATEGORY_CONFIG.beverageKnowledge;
+  if (
+    title.includes("sop") ||
+    title.includes("procedure") ||
+    title.includes("standard")
+  )
+    return CATEGORY_CONFIG.proceduresKnowledge;
+
+  // Default fallback
+  return {
+    icon: ClipboardDocumentListIcon,
+    label: "General Knowledge",
+    color: "#6B7280", // Gray
+    bgColor: "bg-gray-50",
+    textColor: "text-gray-700",
+    borderColor: "border-gray-200",
+  };
+};
+
+// Performance Score Component
+const PerformanceScore: React.FC<{ score: number; comparison: number }> = ({
+  score,
+  comparison,
+}) => {
+  const isAboveAverage = score >= comparison;
+  const difference = Math.abs(score - comparison);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {cards.map((card, index) => {
-        const IconComponent = card.icon;
-        return (
-          <div
-            key={index}
-            className={`bg-${card.color}-50 rounded-xl p-6 border border-${card.color}-100`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  {card.title}
-                </p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {card.value}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">{card.comparison}</p>
-              </div>
-              <div className={`p-3 bg-${card.color}-100 rounded-lg`}>
-                <IconComponent className={`h-6 w-6 text-${card.color}-600`} />
-              </div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="text-center">
+      <div
+        className={`text-4xl font-bold mb-2 ${
+          score >= 80 ? "text-white" : score >= 60 ? "text-white" : "text-white"
+        }`}
+        style={{
+          textShadow:
+            score < 60
+              ? "0 0 8px rgba(239, 68, 68, 0.8)"
+              : score < 80
+              ? "0 0 8px rgba(245, 158, 11, 0.8)"
+              : "0 0 8px rgba(34, 197, 94, 0.8)",
+        }}
+      >
+        {score.toFixed(1)}%
+      </div>
+      <div className="flex items-center justify-center gap-2 text-sm">
+        {isAboveAverage ? (
+          <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
+        ) : (
+          <ArrowTrendingDownIcon className="h-4 w-4 text-white" />
+        )}
+        <span className="text-white text-opacity-90">
+          {difference.toFixed(1)}% {isAboveAverage ? "above" : "below"} average
+        </span>
+      </div>
     </div>
   );
 };
 
-// Category Breakdown Radial Chart Component
-const CategoryBreakdownChart: React.FC<{ categoryData: CategoryBreakdown }> = ({
-  categoryData,
-}) => {
-  const categories = Object.entries(categoryData);
-  const hasData = categories.some(([_, data]) => data.totalQuestions > 0);
-
-  if (!hasData) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">
-          Knowledge Category Breakdown
+// Metrics Card Component
+const MetricsCard: React.FC<{
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ComponentType<any>;
+  color: string;
+  trend?: "up" | "down" | null;
+}> = ({ title, value, subtitle, icon: Icon, color, trend }) => (
+  <div className={`bg-${color}-50 border border-${color}-200 rounded-xl p-6`}>
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <h3 className={`text-sm font-medium text-${color}-700 mb-1`}>
+          {title}
         </h3>
-        <div className="text-center py-12">
-          <ChartBarIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-500">
-            Complete quizzes to see category breakdown
-          </p>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-gray-900">{value}</span>
+          {trend && (
+            <span
+              className={`text-xs ${
+                trend === "up" ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {trend === "up" ? "↗" : "↘"}
+            </span>
+          )}
+        </div>
+        {subtitle && <p className="text-xs text-gray-600 mt-1">{subtitle}</p>}
+      </div>
+      <div className={`p-3 bg-${color}-100 rounded-lg`}>
+        <Icon className={`h-6 w-6 text-${color}-600`} />
+      </div>
+    </div>
+  </div>
+);
+
+// Consolidated Quiz Performance Component
+const QuizPerformanceSection: React.FC<{
+  enhancedData: EnhancedStaffData | null;
+  staffDetails: any;
+  onViewDetails: (attemptId: string) => void;
+}> = ({ enhancedData, staffDetails, onViewDetails }) => {
+  const [expandedQuizzes, setExpandedQuizzes] = useState<Set<string>>(
+    new Set()
+  );
+  const [exportingQuiz, setExportingQuiz] = useState<string | null>(null);
+
+  // Transform enhanced data into quiz performance format
+  const quizPerformanceData: QuizPerformanceData[] = useMemo(() => {
+    // Combine data from both enhanced data and staff details to ensure we get all quizzes
+    const allQuizSources = [];
+
+    // Add from enhanced data (recent quizzes)
+    if (enhancedData?.recentQuizzes) {
+      allQuizSources.push(...enhancedData.recentQuizzes);
+    }
+
+    // Add from staff details aggregated performance if available
+    if (staffDetails?.aggregatedQuizPerformance) {
+      staffDetails.aggregatedQuizPerformance.forEach((aggQuiz: any) => {
+        if (aggQuiz.attempts && aggQuiz.attempts.length > 0) {
+          // Transform aggregated attempts to match the expected format
+          aggQuiz.attempts.forEach((attempt: any) => {
+            allQuizSources.push({
+              quizId: aggQuiz.quizId,
+              quizTitle: aggQuiz.quizTitle,
+              score: attempt.score || 0,
+              totalQuestions: attempt.totalQuestions || 0,
+              completedAt: attempt.attemptDate || attempt.completedAt,
+              attemptId: attempt._id,
+            });
+          });
+        }
+      });
+    }
+
+    if (allQuizSources.length === 0) return [];
+
+    // Debug logging to understand what data we have
+    console.log("[QuizPerformanceSection] All quiz sources:", allQuizSources);
+    console.log(
+      "[QuizPerformanceSection] Enhanced data recent quizzes:",
+      enhancedData?.recentQuizzes
+    );
+    console.log(
+      "[QuizPerformanceSection] Staff details aggregated performance:",
+      staffDetails?.aggregatedQuizPerformance
+    );
+
+    // Group attempts by quiz
+    const quizMap = new Map<string, QuizPerformanceData>();
+
+    allQuizSources.forEach((quiz) => {
+      if (!quizMap.has(quiz.quizId)) {
+        quizMap.set(quiz.quizId, {
+          quizId: quiz.quizId,
+          quizTitle: quiz.quizTitle,
+          averageScore: 0,
+          totalAttempts: 0,
+          attempts: [],
+        });
+      }
+
+      const quizData = quizMap.get(quiz.quizId)!;
+
+      // Check if this attempt is already added (to avoid duplicates)
+      const existingAttempt = quizData.attempts.find(
+        (a) => a.attemptId === quiz.attemptId
+      );
+      if (!existingAttempt) {
+        quizData.attempts.push({
+          attemptId: quiz.attemptId,
+          score: quiz.score,
+          totalQuestions: quiz.totalQuestions,
+          completedAt: quiz.completedAt,
+          hasIncorrectAnswers: quiz.score < quiz.totalQuestions,
+        });
+        quizData.totalAttempts++;
+      }
+    });
+
+    // Calculate average scores and sort attempts by date
+    return Array.from(quizMap.values()).map((quiz) => {
+      const totalScore = quiz.attempts.reduce(
+        (sum, attempt) => sum + (attempt.score / attempt.totalQuestions) * 100,
+        0
+      );
+      quiz.averageScore = totalScore / quiz.attempts.length;
+
+      // Sort attempts by date (newest first)
+      quiz.attempts.sort(
+        (a, b) =>
+          new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+      );
+
+      return quiz;
+    });
+  }, [enhancedData?.recentQuizzes, staffDetails?.aggregatedQuizPerformance]);
+
+  const toggleQuizExpansion = (quizId: string) => {
+    const newExpanded = new Set(expandedQuizzes);
+    if (newExpanded.has(quizId)) {
+      newExpanded.delete(quizId);
+    } else {
+      newExpanded.add(quizId);
+    }
+    setExpandedQuizzes(newExpanded);
+  };
+
+  const handleExportQuizIncorrect = async (
+    quizId: string,
+    quizTitle: string
+  ) => {
+    const staffId = staffDetails?._id || staffDetails?.id;
+    console.log("[Export Debug] Starting quiz export:", {
+      quizId,
+      quizTitle,
+      staffId,
+      staffDetails,
+    });
+
+    if (!staffId) {
+      console.error("[Export Debug] No staff ID available");
+      alert("Staff ID not available. Please refresh the page.");
+      return;
+    }
+
+    setExportingQuiz(quizId);
+    try {
+      console.log("[Export Debug] Calling API with:", staffId, quizId);
+      const data = await getAllIncorrectAnswersForStaff(staffId, quizId);
+
+      console.log("[Export Debug] API response:", data);
+
+      if (
+        data &&
+        data.incorrectQuestions &&
+        data.incorrectQuestions.length > 0
+      ) {
+        console.log(
+          "[Export Debug] Processing",
+          data.incorrectQuestions.length,
+          "incorrect questions"
+        );
+
+        // Generate CSV content
+        const csvHeaders = [
+          "Question",
+          "Your Answer",
+          "Correct Answer",
+          "Explanation",
+          "Attempt Date",
+          "Times Incorrect",
+        ];
+
+        const csvRows = data.incorrectQuestions.map((q: any) => [
+          `"${q.questionText.replace(/"/g, '""')}"`,
+          `"${q.userAnswer.replace(/"/g, '""')}"`,
+          `"${q.correctAnswer.replace(/"/g, '""')}"`,
+          `"${(q.explanation || "N/A").replace(/"/g, '""')}"`,
+          new Date(q.attemptDate).toLocaleDateString(),
+          q.timesIncorrect.toString(),
+        ]);
+
+        const csvContent = [
+          csvHeaders.join(","),
+          ...csvRows.map((row: string[]) => row.join(",")),
+        ].join("\n");
+
+        console.log(
+          "[Export Debug] CSV content generated, length:",
+          csvContent.length
+        );
+
+        // Download CSV
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${
+          staffDetails?.name || "staff"
+        }_${quizTitle}_incorrect_answers.csv`;
+        console.log("[Export Debug] Triggering download:", link.download);
+        link.click();
+        URL.revokeObjectURL(link.href);
+        console.log("[Export Debug] Download triggered successfully");
+      } else {
+        console.warn("[Export Debug] No incorrect answers found");
+        alert("No incorrect answers found for this quiz.");
+      }
+    } catch (error) {
+      console.error(
+        "[Export Debug] Error exporting quiz incorrect answers:",
+        error
+      );
+      alert("Failed to export incorrect answers. Please try again.");
+    } finally {
+      setExportingQuiz(null);
+    }
+  };
+
+  const handleExportAllIncorrect = async () => {
+    const staffId = staffDetails?._id || staffDetails?.id;
+    console.log("[Export Debug] Starting all export, staffId:", staffId);
+
+    if (!staffId) {
+      console.error("[Export Debug] No staff ID available for all export");
+      alert("Staff ID not available. Please refresh the page.");
+      return;
+    }
+
+    setExportingQuiz("all");
+    try {
+      console.log("[Export Debug] Calling API for all incorrect answers");
+      const data = await getAllIncorrectAnswersForStaff(staffId);
+
+      console.log("[Export Debug] All export API response:", data);
+
+      if (
+        data &&
+        data.incorrectQuestions &&
+        data.incorrectQuestions.length > 0
+      ) {
+        console.log(
+          "[Export Debug] Processing",
+          data.incorrectQuestions.length,
+          "total incorrect questions"
+        );
+
+        // Generate CSV content
+        const csvHeaders = [
+          "Quiz Title",
+          "Question",
+          "Your Answer",
+          "Correct Answer",
+          "Explanation",
+          "Attempt Date",
+          "Times Incorrect",
+        ];
+
+        const csvRows = data.incorrectQuestions.map((q: any) => [
+          `"${q.quizTitle.replace(/"/g, '""')}"`,
+          `"${q.questionText.replace(/"/g, '""')}"`,
+          `"${q.userAnswer.replace(/"/g, '""')}"`,
+          `"${q.correctAnswer.replace(/"/g, '""')}"`,
+          `"${(q.explanation || "N/A").replace(/"/g, '""')}"`,
+          new Date(q.attemptDate).toLocaleDateString(),
+          q.timesIncorrect.toString(),
+        ]);
+
+        const csvContent = [
+          csvHeaders.join(","),
+          ...csvRows.map((row: string[]) => row.join(",")),
+        ].join("\n");
+
+        console.log(
+          "[Export Debug] All export CSV content generated, length:",
+          csvContent.length
+        );
+
+        // Download CSV
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${
+          staffDetails?.name || "staff"
+        }_all_incorrect_answers.csv`;
+        console.log(
+          "[Export Debug] All export triggering download:",
+          link.download
+        );
+        link.click();
+        URL.revokeObjectURL(link.href);
+        console.log(
+          "[Export Debug] All export download triggered successfully"
+        );
+      } else {
+        console.warn(
+          "[Export Debug] No incorrect answers found for all export"
+        );
+        alert("No incorrect answers found.");
+      }
+    } catch (error) {
+      console.error(
+        "[Export Debug] Error exporting all incorrect answers:",
+        error
+      );
+      alert("Failed to export incorrect answers. Please try again.");
+    } finally {
+      setExportingQuiz(null);
+    }
+  };
+
+  if (!enhancedData || quizPerformanceData.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <TrophyIcon className="h-5 w-5 text-yellow-500" />
+            Quiz Performance
+          </h3>
+        </div>
+        <div className="text-center py-8 text-gray-500">
+          <ChartBarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <p>No quiz attempts found</p>
         </div>
       </div>
     );
   }
 
-  const chartData = {
-    labels: categories.map(
-      ([key, _]) => CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG].label
-    ),
-    datasets: [
-      {
-        data: categories.map(([_, data]) => data.averageScore),
-        backgroundColor: categories.map(
-          ([key, _]) =>
-            CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG].color
-        ),
-        borderWidth: 2,
-        borderColor: "#ffffff",
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: "bottom" as const,
-        labels: {
-          padding: 20,
-          usePointStyle: true,
-        },
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            const categoryKey = Object.keys(categoryData)[context.dataIndex];
-            const data = categoryData[categoryKey as keyof CategoryBreakdown];
-            return [
-              `Average Score: ${data.averageScore.toFixed(1)}%`,
-              `Questions: ${data.totalQuestions}`,
-              `Avg Time: ${formatCompletionTime(data.averageCompletionTime)}`,
-            ];
-          },
-        },
-      },
-    },
-  };
-
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">
-        Knowledge Category Breakdown
-      </h3>
-      <div style={{ height: "400px" }}>
-        <Doughnut data={chartData} options={chartOptions} />
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <TrophyIcon className="h-5 w-5 text-yellow-500" />
+          Quiz Performance
+        </h3>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportAllIncorrect}
+            disabled={exportingQuiz === "all"}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {exportingQuiz === "all" ? (
+              <>
+                <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                Export All Incorrect
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Category Details */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {categories.map(([key, data]) => {
-          const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG];
-          const IconComponent = config.icon;
-
-          if (data.totalQuestions === 0) return null;
-
+      <div className="space-y-4">
+        {quizPerformanceData.map((quiz) => {
+          const categoryConfig = getCategoryFromQuizTitle(quiz.quizTitle);
           return (
-            <div key={key} className={`${config.bgColor} rounded-lg p-4`}>
-              <div className="flex items-center gap-3">
-                <IconComponent className={`h-5 w-5 ${config.textColor}`} />
-                <div className="flex-1">
-                  <h4 className={`font-medium ${config.textColor}`}>
-                    {config.label}
-                  </h4>
-                  <div className="text-sm text-gray-600 mt-1">
-                    <span className="font-medium">
-                      {data.averageScore.toFixed(1)}%
-                    </span>{" "}
-                    avg score • <span>{data.totalQuestions} questions</span> •{" "}
-                    <span>
-                      {formatCompletionTime(data.averageCompletionTime)} avg
-                    </span>
+            <div
+              key={quiz.quizId}
+              className="border rounded-lg overflow-hidden"
+            >
+              {/* Quiz Header - Clickable */}
+              <div
+                className={`${categoryConfig.bgColor} p-4 cursor-pointer hover:opacity-90 transition-all duration-200`}
+                style={{ borderLeft: `4px solid ${categoryConfig.color}` }}
+                onClick={() => toggleQuizExpansion(quiz.quizId)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {expandedQuizzes.has(quiz.quizId) ? (
+                      <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRightIcon className="h-5 w-5 text-gray-500" />
+                    )}
+                    <categoryConfig.icon
+                      className={`h-5 w-5 ${categoryConfig.textColor}`}
+                    />
+                    <div>
+                      <h4 className={`font-medium ${categoryConfig.textColor}`}>
+                        {quiz.quizTitle}
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {quiz.totalAttempts} attempt
+                        {quiz.totalAttempts !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-gray-900">
+                        {quiz.averageScore.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-gray-500">Average Score</div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportQuizIncorrect(quiz.quizId, quiz.quizTitle);
+                      }}
+                      disabled={exportingQuiz === quiz.quizId}
+                      className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      {exportingQuiz === quiz.quizId ? (
+                        <ArrowPathIcon className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ArrowDownTrayIcon className="h-3 w-3" />
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
+
+              {/* Expanded Attempts List */}
+              {expandedQuizzes.has(quiz.quizId) && (
+                <div className="border-t bg-white">
+                  <div className="p-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-3">
+                      All Attempts ({quiz.totalAttempts})
+                    </h5>
+                    <div className="space-y-2">
+                      {quiz.attempts.map((attempt, index) => (
+                        <div
+                          key={attempt.attemptId}
+                          className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-sm font-medium text-gray-900">
+                              Attempt #{quiz.totalAttempts - index}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(
+                                attempt.completedAt
+                              ).toLocaleDateString()}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {attempt.score}/{attempt.totalQuestions}
+                              </span>
+                              <span
+                                className={`text-sm font-medium ${
+                                  attempt.score / attempt.totalQuestions >= 0.8
+                                    ? "text-green-600"
+                                    : attempt.score / attempt.totalQuestions >=
+                                      0.6
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                (
+                                {(
+                                  (attempt.score / attempt.totalQuestions) *
+                                  100
+                                ).toFixed(1)}
+                                %)
+                              </span>
+                            </div>
+
+                            {attempt.hasIncorrectAnswers && (
+                              <button
+                                onClick={() => onViewDetails(attempt.attemptId)}
+                                className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              >
+                                <EyeIcon className="h-3 w-3 mr-1" />
+                                Details
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -366,70 +803,143 @@ const CategoryBreakdownChart: React.FC<{ categoryData: CategoryBreakdown }> = ({
   );
 };
 
-// Recent Quiz History Component
-const RecentQuizHistory: React.FC<{
-  recentQuizzes: RecentQuiz[];
-  onViewDetails: (quizId: string) => void;
-}> = ({ recentQuizzes, onViewDetails }) => {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900">
-          Recent Quiz History
+// Simplified Category Chart Component
+const CategoryInsightsChart: React.FC<{ categoryData: CategoryBreakdown }> = ({
+  categoryData,
+}) => {
+  const categories = Object.entries(categoryData);
+  const hasData = categories.some(([_, data]) => data.totalQuestions > 0);
+
+  if (!hasData) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-xl font-semibold text-gray-900 mb-6">
+          Knowledge Areas
         </h3>
+        <div className="text-center py-12">
+          <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">
+            Complete quizzes to see knowledge area breakdown
+          </p>
+        </div>
       </div>
-      <div className="p-6">
-        {recentQuizzes.length > 0 ? (
-          <div className="space-y-4">
-            {recentQuizzes.map((quiz, index) => (
-              <div
-                key={quiz.quizId}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
-              >
-                <div className="flex-1">
-                  <h4 className="font-medium text-slate-900">
-                    {quiz.quizTitle}
-                  </h4>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
-                    <span>Score: {quiz.averageScore}%</span>
-                    <span>
-                      Time: {formatCompletionTime(quiz.completionTime)}
-                    </span>
-                    <span>{formatDate(quiz.completedAt)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      parseFloat(quiz.averageScore) >= 70
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {parseFloat(quiz.averageScore) >= 70 ? "Passed" : "Failed"}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => onViewDetails(quiz.quizId)}
-                    className="text-xs px-3 py-1"
-                  >
-                    View Details
-                  </Button>
-                </div>
+    );
+  }
+
+  const validCategories = categories.filter(
+    ([_, data]) => data.totalQuestions > 0
+  );
+  const bestCategory = validCategories.reduce(
+    (best, [key, data]) =>
+      data.averageScore > best.score ? { key, score: data.averageScore } : best,
+    { key: "", score: -1 }
+  );
+  const worstCategory = validCategories.reduce(
+    (worst, [key, data]) =>
+      data.averageScore < worst.score
+        ? { key, score: data.averageScore }
+        : worst,
+    { key: "", score: 101 }
+  );
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <h3 className="text-xl font-semibold text-gray-900 mb-6">
+        Knowledge Areas
+      </h3>
+
+      <div className="space-y-4 mb-6">
+        {bestCategory.score > -1 && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <TrophyIcon className="h-5 w-5 text-emerald-600" />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <h4 className="text-lg font-medium text-slate-900 mb-2">
-              No recent quizzes
-            </h4>
-            <p className="text-slate-500">
-              Quiz history will appear here once completed.
-            </p>
+              <div>
+                <h4 className="font-semibold text-emerald-900">
+                  Strongest Area
+                </h4>
+                <p className="text-sm text-emerald-700">
+                  {
+                    CATEGORY_CONFIG[
+                      bestCategory.key as keyof typeof CATEGORY_CONFIG
+                    ]?.label
+                  }{" "}
+                  - {bestCategory.score.toFixed(1)}%
+                </p>
+              </div>
+            </div>
           </div>
         )}
+
+        {worstCategory.score < 101 && validCategories.length > 1 && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <ArrowTrendingDownIcon className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-amber-900">
+                  Needs Improvement
+                </h4>
+                <p className="text-sm text-amber-700">
+                  {
+                    CATEGORY_CONFIG[
+                      worstCategory.key as keyof typeof CATEGORY_CONFIG
+                    ]?.label
+                  }{" "}
+                  - {worstCategory.score.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-4">
+        {validCategories.map(([key, data]) => {
+          const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG];
+          const IconComponent = config.icon;
+          const percentage = data.averageScore;
+
+          return (
+            <div
+              key={key}
+              className={`${config.bgColor} ${config.borderColor} border rounded-xl p-4`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <IconComponent className={`h-5 w-5 ${config.textColor}`} />
+                  <h4 className={`font-semibold ${config.textColor}`}>
+                    {config.label}
+                  </h4>
+                </div>
+                <span className={`text-lg font-bold ${config.textColor}`}>
+                  {percentage.toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="mb-3">
+                <div className="w-full bg-white rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(percentage, 100)}%`,
+                      backgroundColor: config.color,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>{data.totalQuestions} questions</span>
+                <span>
+                  {formatCompletionTime(data.averageCompletionTime)} avg time
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -459,20 +969,7 @@ const StaffDetails: React.FC = () => {
   const loading = basicLoading || enhancedLoading;
   const error = basicError || enhancedError;
 
-  // Debug logging
-  console.log("StaffDetails Debug:", {
-    staffId,
-    basicLoading,
-    enhancedLoading,
-    basicError,
-    enhancedError,
-    staffDetails: staffDetails ? "loaded" : "null",
-    enhancedData: enhancedData ? "loaded" : "null",
-    loading,
-    error,
-  });
-
-  // State for modals and notifications (unchanged)
+  // State for modals and notifications
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
     useState<ClientQuizAttemptDetails | null>(null);
@@ -480,16 +977,23 @@ const StaffDetails: React.FC = () => {
   const [modalError, setModalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Handlers (unchanged)
+  // Handlers
   const handleOpenAttemptModal = useCallback(async (attemptId: string) => {
+    console.log("Opening attempt modal for attemptId:", attemptId);
     setLoadingModalDetails(true);
     setModalError(null);
     setModalDataForIncorrectAnswers(null);
 
     try {
       const attemptDetailsData = await getQuizAttemptDetails(attemptId);
+      console.log("Received attempt details:", attemptDetailsData);
+
       if (attemptDetailsData) {
         setModalDataForIncorrectAnswers(attemptDetailsData);
+        console.log(
+          "Incorrect questions count:",
+          attemptDetailsData.incorrectQuestions?.length || 0
+        );
       } else {
         setModalError("Could not load attempt details.");
       }
@@ -516,7 +1020,7 @@ const StaffDetails: React.FC = () => {
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-center min-h-96">
+              <div className="flex items-center justify-center min-h-[60vh]">
                 <LoadingSpinner message="Loading staff details..." />
               </div>
             </div>
@@ -534,16 +1038,12 @@ const StaffDetails: React.FC = () => {
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-                  <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <UserIcon className="h-8 w-8 text-red-600" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-red-600 mb-4">
-                    Error Loading Staff Details
-                  </h1>
-                  <ErrorMessage message={error} />
-                </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
+                <UserIcon className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                <h1 className="text-2xl font-bold text-red-600 mb-4">
+                  Error Loading Staff Details
+                </h1>
+                <ErrorMessage message={error} />
               </div>
             </div>
           </div>
@@ -552,35 +1052,7 @@ const StaffDetails: React.FC = () => {
     );
   }
 
-  // No data state
-  if (!staffDetails && !enhancedData) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-                  <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <UserIcon className="h-8 w-8 text-slate-600" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-slate-700 mb-4">
-                    Staff Member Not Found
-                  </h1>
-                  <p className="text-slate-600">
-                    The requested staff member could not be found.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Use enhanced data if available, fallback to basic data with proper null safety
+  // Use enhanced data if available, fallback to basic data
   const displayData = enhancedData || {
     staffInfo: {
       id: staffDetails?._id || "",
@@ -622,38 +1094,21 @@ const StaffDetails: React.FC = () => {
     restaurantComparison: { averageScore: 0, averageCompletionTime: 0 },
   };
 
-  // Additional detailed debugging
-  console.log("Enhanced Data Full Structure:", enhancedData);
-  console.log("Display Data:", displayData);
-  console.log("Display Data staffInfo:", displayData?.staffInfo);
-
-  // Additional null safety check to ensure displayData has the required structure
-  if (!displayData || !displayData.staffInfo) {
-    console.log("ISSUE: displayData or staffInfo is missing!", {
-      displayData: !!displayData,
-      staffInfo: !!displayData?.staffInfo,
-      enhancedData: !!enhancedData,
-      staffDetails: !!staffDetails,
-    });
-
+  if (!displayData?.staffInfo) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-                  <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <UserIcon className="h-8 w-8 text-slate-600" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-slate-700 mb-4">
-                    Loading Staff Data...
-                  </h1>
-                  <p className="text-slate-600">
-                    Please wait while we load the staff information.
-                  </p>
-                </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+                <UserIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h1 className="text-2xl font-bold text-gray-700 mb-4">
+                  Staff Member Not Found
+                </h1>
+                <p className="text-gray-600">
+                  The requested staff member could not be found.
+                </p>
               </div>
             </div>
           </div>
@@ -667,180 +1122,143 @@ const StaffDetails: React.FC = () => {
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="space-y-8">
-              {/* Header Section - Enhanced */}
-              <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
-                <div className="flex items-center space-x-6">
-                  <div className="p-4 bg-emerald-600 rounded-xl shadow-lg">
-                    <UserIcon className="h-10 w-10 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-3">
-                      {displayData?.staffInfo?.name || "Unknown Staff"}
-                    </h1>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4 text-slate-600">
-                        <span className="font-medium">Email:</span>
-                        <span>
-                          {displayData?.staffInfo?.email || "No email"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-slate-600">
-                        <span className="font-medium">Professional Role:</span>
-                        <span>
-                          {displayData?.staffInfo?.assignedRoleName || "Staff"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-slate-600">
-                        <span className="font-medium">Date Joined:</span>
-                        <span>
-                          {displayData?.staffInfo?.dateJoined
-                            ? formatDate(
-                                displayData.staffInfo.dateJoined.toString()
-                              )
-                            : "Unknown"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-emerald-600">
-                      {(
-                        displayData?.personalMetrics?.overallAverageScore || 0
-                      ).toFixed(1)}
-                      %
-                    </div>
-                    <div className="text-sm text-slate-600 font-medium">
-                      Overall Average Score
-                    </div>
-                  </div>
-                </div>
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* Navigation */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="secondary"
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="text-sm text-gray-500">
+                Team Management → Staff Details
               </div>
-
-              {/* Personal Performance Cards */}
-              {displayData?.personalMetrics &&
-                displayData?.restaurantComparison && (
-                  <PersonalPerformanceCards
-                    metrics={displayData.personalMetrics}
-                    comparison={displayData.restaurantComparison}
-                  />
-                )}
-
-              {/* Category Breakdown Chart */}
-              {displayData?.categoryBreakdown && (
-                <CategoryBreakdownChart
-                  categoryData={displayData.categoryBreakdown}
-                />
-              )}
-
-              {/* Recent Quiz History */}
-              {displayData?.recentQuizzes && (
-                <RecentQuizHistory
-                  recentQuizzes={displayData.recentQuizzes}
-                  onViewDetails={handleOpenAttemptModal}
-                />
-              )}
-
-              {/* Original Quiz Results Section (kept for compatibility) */}
-              {staffDetails && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Detailed Quiz Results
-                    </h2>
-                  </div>
-                  <div className="p-6">
-                    {staffDetails.aggregatedQuizPerformance.length > 0 ? (
-                      <div className="space-y-4">
-                        {staffDetails.aggregatedQuizPerformance.map(
-                          (quizAgg) => (
-                            <div
-                              key={quizAgg.quizId}
-                              className="p-4 bg-slate-50 rounded-lg border border-slate-200"
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="flex-1">
-                                  <h3 className="font-medium text-slate-900">
-                                    {quizAgg.quizTitle}
-                                  </h3>
-                                  <p className="text-sm text-slate-600">
-                                    Score:{" "}
-                                    {quizAgg.averageScorePercent?.toFixed(1) ??
-                                      "N/A"}
-                                    %
-                                  </p>
-                                  <p className="text-sm text-slate-500">
-                                    {quizAgg.lastCompletedAt
-                                      ? formatDate(quizAgg.lastCompletedAt)
-                                      : "N/A"}
-                                  </p>
-                                </div>
-                                <div className="flex items-center space-x-3">
-                                  <span
-                                    className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                                      (quizAgg.averageScorePercent ?? 0) >= 70
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                                    }`}
-                                  >
-                                    {quizAgg.averageScorePercent !== null
-                                      ? (quizAgg.averageScorePercent >= 70
-                                          ? "Passed"
-                                          : "Failed") +
-                                        ` (${quizAgg.averageScorePercent.toFixed(
-                                          1
-                                        )}%)`
-                                      : "N/A"}
-                                  </span>
-                                  {quizAgg.attempts.length > 0 && (
-                                    <Button
-                                      variant="secondary"
-                                      onClick={() =>
-                                        handleOpenAttemptModal(
-                                          quizAgg.attempts[
-                                            quizAgg.attempts.length - 1
-                                          ]._id
-                                        )
-                                      }
-                                      className="text-xs px-3 py-1"
-                                    >
-                                      View Details
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12">
-                        <UserIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900 mb-2">
-                          No detailed quiz results yet
-                        </h3>
-                        <p className="text-slate-500">
-                          Detailed quiz results will appear here.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Modal (unchanged) */}
-            {isModalOpen && modalDataForIncorrectAnswers && (
-              <ViewIncorrectAnswersModal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                attemptDetails={modalDataForIncorrectAnswers}
+            {/* Header Section */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl p-8 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="p-4 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <UserIcon className="h-12 w-12 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2">
+                      {displayData.staffInfo.name}
+                    </h1>
+                    <div className="space-y-1 text-emerald-100">
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">Email:</span>
+                        {displayData.staffInfo.email}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">Role:</span>
+                        {displayData.staffInfo.assignedRoleName}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        <span>
+                          Joined{" "}
+                          {formatDate(
+                            displayData.staffInfo.dateJoined?.toString() || ""
+                          )}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <PerformanceScore
+                    score={displayData.personalMetrics.overallAverageScore}
+                    comparison={displayData.restaurantComparison.averageScore}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <MetricsCard
+                title="Quizzes Completed"
+                value={displayData.personalMetrics.totalQuizzesCompleted}
+                subtitle={`${displayData.personalMetrics.totalQuestionsAnswered} questions answered`}
+                icon={AcademicCapIcon}
+                color="blue"
               />
-            )}
+              <MetricsCard
+                title="Average Time"
+                value={formatCompletionTime(
+                  displayData.personalMetrics.averageCompletionTime
+                )}
+                subtitle={`Restaurant avg: ${formatCompletionTime(
+                  displayData.restaurantComparison.averageCompletionTime
+                )}`}
+                icon={ClockIcon}
+                color="purple"
+                trend={
+                  displayData.personalMetrics.averageCompletionTime <=
+                  displayData.restaurantComparison.averageCompletionTime
+                    ? "up"
+                    : "down"
+                }
+              />
+              <MetricsCard
+                title="Performance"
+                value={
+                  displayData.personalMetrics.overallAverageScore >=
+                  displayData.restaurantComparison.averageScore
+                    ? "Above Average"
+                    : "Below Average"
+                }
+                subtitle={`${Math.abs(
+                  displayData.personalMetrics.overallAverageScore -
+                    displayData.restaurantComparison.averageScore
+                ).toFixed(1)}% difference`}
+                icon={TrophyIcon}
+                color="emerald"
+                trend={
+                  displayData.personalMetrics.overallAverageScore >=
+                  displayData.restaurantComparison.averageScore
+                    ? "up"
+                    : "down"
+                }
+              />
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Quiz Performance - Takes 2 columns */}
+              <div className="lg:col-span-2">
+                <QuizPerformanceSection
+                  enhancedData={enhancedData}
+                  staffDetails={staffDetails}
+                  onViewDetails={handleOpenAttemptModal}
+                />
+              </div>
+
+              {/* Knowledge Areas - Takes 1 column */}
+              <div className="lg:col-span-1">
+                <CategoryInsightsChart
+                  categoryData={displayData.categoryBreakdown}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </main>
+
+      {/* Modal */}
+      {isModalOpen && modalDataForIncorrectAnswers && (
+        <ViewIncorrectAnswersModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          attemptDetails={modalDataForIncorrectAnswers}
+        />
+      )}
     </div>
   );
 };

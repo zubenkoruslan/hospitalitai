@@ -36,8 +36,9 @@ const StaffResultsFilter: React.FC<StaffResultsFilterProps> = ({
   const uniqueRoles = React.useMemo(() => {
     const roles = new Set<string>();
     staffData.forEach((staff) => {
-      if (staff.professionalRole) {
-        roles.add(staff.professionalRole);
+      const roleName = staff.assignedRoleName || staff.professionalRole;
+      if (roleName) {
+        roles.add(roleName);
       }
     });
     return Array.from(roles).sort();

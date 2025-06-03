@@ -140,14 +140,9 @@ const Navbar: React.FC<NavbarProps> = ({
       icon: UsersIcon,
     },
     {
-      name: "Quiz Results",
+      name: "Staff Analytics",
       path: "/staff-results",
       icon: ChartBarIcon,
-    },
-    {
-      name: "Knowledge Analytics",
-      path: "/knowledge-analytics",
-      icon: ChartPieIcon,
     },
   ];
 

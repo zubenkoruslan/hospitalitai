@@ -37,10 +37,13 @@ export const getIndividualStaffAnalytics = async (
       return;
     }
 
-    // Get staff user details
-    const staffUser = await UserModel.findById(staffId).select(
-      "name email assignedRoleId"
-    );
+    // Get staff user details with populated role
+    const staffUser = await UserModel.findById(staffId)
+      .select("name email assignedRoleId createdAt")
+      .populate({
+        path: "assignedRoleId",
+        select: "name",
+      });
 
     if (!staffUser) {
       res.status(404).json({
@@ -49,6 +52,11 @@ export const getIndividualStaffAnalytics = async (
       });
       return;
     }
+
+    // Get role name if available
+    const assignedRoleName = staffUser.assignedRoleId
+      ? (staffUser.assignedRoleId as any).name
+      : "Staff";
 
     // Get real analytics using the same working service as other endpoints
     const authUser = req.user!;
@@ -61,7 +69,7 @@ export const getIndividualStaffAnalytics = async (
     // Get ALL quiz attempts for this staff member to calculate category breakdown
     const allAttempts = await QuizAttemptModel.find({
       staffUserId: staffId,
-      restaurantId: authUser.restaurantId,
+      restaurantId: new Types.ObjectId(authUser.restaurantId!),
     })
       .populate({
         path: "quizId",
@@ -96,6 +104,7 @@ export const getIndividualStaffAnalytics = async (
         completedAt: attempt.completedAt
           ? attempt.completedAt.toISOString()
           : new Date().toISOString(),
+        attemptId: attempt._id.toString(), // Add the actual attempt ID for viewing details
       };
 
       // Debug logging
@@ -105,6 +114,7 @@ export const getIndividualStaffAnalytics = async (
         totalQuestions: quizData.totalQuestions,
         averageScore: quizData.averageScore,
         percentage: percentage,
+        attemptId: quizData.attemptId,
       });
 
       return quizData;
@@ -190,7 +200,8 @@ export const getIndividualStaffAnalytics = async (
         id: staffId,
         name: staffUser.name,
         email: staffUser.email,
-        assignedRoleName: staffUser.assignedRoleId || "Staff",
+        assignedRoleName: assignedRoleName,
+        dateJoined: staffUser.createdAt,
       },
       personalMetrics: {
         totalQuizzesCompleted: quizzesTaken,
@@ -496,7 +507,7 @@ export const getEnhancedRestaurantAnalytics = async (
     for (const categoryKey of categoryKeys) {
       // Get average score for this category
       const categoryScoreResult = await QuizAttemptModel.aggregate([
-        { $match: { restaurantId } },
+        { $match: { restaurantId: new Types.ObjectId(restaurantId) } },
         { $unwind: "$questionsPresented" },
         {
           $lookup: {
@@ -560,7 +571,7 @@ export const getEnhancedRestaurantAnalytics = async (
 
       // Calculate average completion time for category
       const categoryTimeResult = await QuizAttemptModel.aggregate([
-        { $match: { restaurantId } },
+        { $match: { restaurantId: new Types.ObjectId(restaurantId) } },
         { $match: { durationInSeconds: { $exists: true, $gt: 0 } } },
         { $unwind: "$questionsPresented" },
         {
@@ -581,6 +592,11 @@ export const getEnhancedRestaurantAnalytics = async (
         },
       ]);
 
+      console.log(
+        `Debug: categoryTimeResult for ${categoryKey}:`,
+        categoryTimeResult
+      );
+
       const timeKey = categoryKey.replace("-knowledge", "Knowledge");
       categoryCompletionTimes[timeKey] =
         categoryTimeResult.length > 0
@@ -590,7 +606,7 @@ export const getEnhancedRestaurantAnalytics = async (
 
     // Calculate completion time stats using real-time QuizAttempt data
     const completionTimeStatsResult = await QuizAttemptModel.aggregate([
-      { $match: { restaurantId } },
+      { $match: { restaurantId: new Types.ObjectId(restaurantId) } },
       { $match: { durationInSeconds: { $exists: true, $gt: 0 } } },
       {
         $group: {
@@ -627,7 +643,7 @@ export const getEnhancedRestaurantAnalytics = async (
 
     // Calculate performance distribution using real-time data
     const performanceDistributionResult = await QuizAttemptModel.aggregate([
-      { $match: { restaurantId } },
+      { $match: { restaurantId: new Types.ObjectId(restaurantId) } },
       {
         $match: {
           score: { $exists: true, $gte: 0 },

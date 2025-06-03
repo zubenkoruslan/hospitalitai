@@ -1,6 +1,18 @@
 import React from "react";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { ClientIQuiz } from "../../types/quizTypes";
+import {
+  PencilIcon,
+  PlayIcon,
+  PauseIcon,
+  ChartBarIcon,
+  TrashIcon,
+  EyeIcon,
+  CalendarIcon,
+  QuestionMarkCircleIcon,
+  UserGroupIcon,
+  ClockIcon,
+} from "@heroicons/react/24/outline";
 
 // --- Component Props ---
 interface QuizListProps {
@@ -38,7 +50,7 @@ const QuizList: React.FC<QuizListProps> = ({
   }
 
   return (
-    <ul className="divide-y divide-gray-200" aria-labelledby="quiz-list-title">
+    <div className="space-y-4">
       {quizzes.map((quiz) => {
         console.log(
           "Rendering quiz in QuizList, ID:",
@@ -47,103 +59,154 @@ const QuizList: React.FC<QuizListProps> = ({
           quiz
         );
         return (
-          <li key={quiz._id} className="px-4 py-4 sm:px-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1 mb-3 sm:mb-0">
-                <p className="text-lg font-medium text-blue-600 truncate">
-                  {quiz.title}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Description: {quiz.description || "N/A"}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Questions Per Attempt: {quiz.numberOfQuestionsPerAttempt}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Total Unique Questions in Source:{" "}
-                  {quiz.totalUniqueQuestionsInSourceSnapshot ?? "N/A"}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Target Roles:{" "}
-                  {quiz.targetRoles && quiz.targetRoles.length > 0
-                    ? quiz.targetRoles.map((role) => role.name).join(", ")
-                    : "All Roles"}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Created:{" "}
-                  {quiz.createdAt
-                    ? new Date(quiz.createdAt).toLocaleDateString()
-                    : "N/A"}
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-0 flex-shrink-0 w-full sm:w-auto">
-                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap self-start sm:self-center ${
-                      quiz.isAvailable
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {quiz.isAvailable ? "Active" : "Draft"}
-                  </span>
-                  <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                    <button
-                      onClick={() => onPreview(quiz)}
-                      className="w-full sm:w-auto text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors duration-150"
-                      disabled={isDeletingQuizId === quiz._id}
-                      aria-label={`Edit quiz ${quiz.title}`}
-                    >
-                      Edit / Preview
-                    </button>
-                    {quiz.isAvailable === true && (
-                      <button
-                        onClick={() => onDeactivate(quiz._id!)}
-                        className="w-full sm:w-auto text-sm font-medium text-yellow-600 hover:text-yellow-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-yellow-50 transition-colors duration-150"
-                        disabled={isDeletingQuizId === quiz._id}
-                        aria-label={`Deactivate quiz ${quiz.title}`}
-                      >
-                        Deactivate
-                      </button>
+          <div
+            key={quiz._id}
+            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg hover:border-gray-300 transition-all duration-300 overflow-hidden"
+          >
+            {/* Header Section with Status */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    {quiz.isAvailable ? (
+                      <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-xl border-2 border-green-200">
+                        <PlayIcon className="h-6 w-6 text-green-600" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl border-2 border-gray-200">
+                        <PauseIcon className="h-6 w-6 text-gray-500" />
+                      </div>
                     )}
-                    {quiz.isAvailable === false && (
-                      <button
-                        onClick={() => onActivate(quiz._id!)}
-                        className="w-full sm:w-auto text-sm font-medium text-green-600 hover:text-green-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-green-50 transition-colors duration-150"
-                        disabled={isDeletingQuizId === quiz._id}
-                        aria-label={`Activate quiz ${quiz.title}`}
-                      >
-                        Activate
-                      </button>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xl font-semibold text-gray-900 truncate">
+                      {quiz.title}
+                    </h3>
+                    <div className="flex items-center space-x-6 mt-2">
+                      <span className="text-sm text-gray-500 flex items-center">
+                        <CalendarIcon className="h-4 w-4 mr-1.5" />
+                        {quiz.createdAt
+                          ? new Date(quiz.createdAt).toLocaleDateString()
+                          : "N/A"}
+                      </span>
+                      <span className="text-sm text-gray-500 flex items-center">
+                        <QuestionMarkCircleIcon className="h-4 w-4 mr-1.5" />
+                        {quiz.numberOfQuestionsPerAttempt} questions per attempt
+                      </span>
+                      <span className="text-sm text-gray-500 flex items-center">
+                        <UserGroupIcon className="h-4 w-4 mr-1.5" />
+                        {quiz.targetRoles && quiz.targetRoles.length > 0
+                          ? quiz.targetRoles.map((role) => role.name).join(", ")
+                          : "All Roles"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-600">
+                      Total Questions
+                    </div>
+                    <div className="text-lg font-bold text-gray-900">
+                      {quiz.totalUniqueQuestionsInSourceSnapshot ?? "N/A"}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {quiz.isAvailable ? (
+                      <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-800 border border-green-200">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                        Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                        Draft
+                      </span>
                     )}
-                    <button
-                      onClick={() => onViewProgress(quiz._id)}
-                      className="w-full sm:w-auto text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md hover:bg-indigo-50 transition-colors duration-150"
-                      disabled={isDeletingQuizId === quiz._id}
-                      aria-label={`View progress for quiz ${quiz.title}`}
-                    >
-                      View Progress
-                    </button>
-                    <button
-                      onClick={() => onDelete(quiz)}
-                      disabled={isDeletingQuizId === quiz._id}
-                      className={`w-full sm:w-auto text-sm font-medium ${
-                        isDeletingQuizId === quiz._id
-                          ? "text-gray-400 cursor-not-allowed"
-                          : "text-red-600 hover:text-red-800 hover:bg-red-50"
-                      } disabled:opacity-50 text-left sm:text-center px-3 py-1.5 rounded-md transition-colors duration-150`}
-                      aria-label={`Delete quiz ${quiz.title}`}
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          </li>
+
+            {/* Content Section */}
+            <div className="px-6 py-5">
+              {quiz.description && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {quiz.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => onPreview(quiz)}
+                  className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isDeletingQuizId === quiz._id}
+                  aria-label={`Edit quiz ${quiz.title}`}
+                >
+                  <PencilIcon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  Edit / Preview
+                </button>
+
+                {quiz.isAvailable === true ? (
+                  <button
+                    onClick={() => onDeactivate(quiz._id!)}
+                    className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 hover:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isDeletingQuizId === quiz._id}
+                    aria-label={`Deactivate quiz ${quiz.title}`}
+                  >
+                    <PauseIcon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                    Deactivate
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onActivate(quiz._id!)}
+                    className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 hover:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isDeletingQuizId === quiz._id}
+                    aria-label={`Activate quiz ${quiz.title}`}
+                  >
+                    <PlayIcon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                    Activate
+                  </button>
+                )}
+
+                <button
+                  onClick={() => onViewProgress(quiz._id)}
+                  className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isDeletingQuizId === quiz._id}
+                  aria-label={`View progress for quiz ${quiz.title}`}
+                >
+                  <ChartBarIcon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  View Progress
+                </button>
+
+                <button
+                  onClick={() => onDelete(quiz)}
+                  disabled={isDeletingQuizId === quiz._id}
+                  className={`inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all duration-200 group ${
+                    isDeletingQuizId === quiz._id
+                      ? "text-gray-400 bg-gray-50 border border-gray-200 cursor-not-allowed"
+                      : "text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 hover:border-red-300 focus:ring-red-500"
+                  }`}
+                  aria-label={`Delete quiz ${quiz.title}`}
+                >
+                  <TrashIcon
+                    className={`h-4 w-4 mr-2 transition-transform duration-200 ${
+                      isDeletingQuizId !== quiz._id
+                        ? "group-hover:scale-110"
+                        : ""
+                    }`}
+                  />
+                  {isDeletingQuizId === quiz._id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
         );
       })}
-    </ul>
+    </div>
   );
 };
 

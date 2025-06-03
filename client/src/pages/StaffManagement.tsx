@@ -38,6 +38,13 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   UserIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ChevronDownIcon,
+  UserGroupIcon,
+  AcademicCapIcon,
+  ClockIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to format percentages
@@ -45,12 +52,16 @@ const formatPercentage = (value: number | null) =>
   value === null ? "N/A" : `${value.toFixed(1)}%`;
 
 // Helper function to calculate staff completion rate (restored)
+// Updated to calculate based on quiz participation rather than seeing all questions
 const calculateStaffCompletionRate = (staff: StaffMemberWithData): number => {
   if (staff.quizProgressSummaries && staff.quizProgressSummaries.length > 0) {
-    const completedCount = staff.quizProgressSummaries.filter(
-      (qps) => qps.isCompletedOverall
+    // Count quizzes where staff has made at least one attempt (has an average score)
+    const participatedCount = staff.quizProgressSummaries.filter(
+      (qps) =>
+        qps.averageScoreForQuiz !== null &&
+        qps.averageScoreForQuiz !== undefined
     ).length;
-    return (completedCount / staff.quizProgressSummaries.length) * 100;
+    return (participatedCount / staff.quizProgressSummaries.length) * 100;
   }
   return 0;
 };
@@ -71,6 +82,16 @@ const StaffManagement: React.FC = () => {
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
   const [currentRole, setCurrentRole] = useState<IRole | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState<"staff" | "roles" | "invitations">(
+    "staff"
+  );
+
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("name");
@@ -301,6 +322,21 @@ const StaffManagement: React.FC = () => {
   const filteredAndSortedStaffList = useMemo(() => {
     let list = [...staffList];
 
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      list = list.filter(
+        (staff) =>
+          staff.name?.toLowerCase().includes(searchLower) ||
+          staff.email?.toLowerCase().includes(searchLower) ||
+          rolesList
+            .find((role) => role._id === staff.assignedRoleId)
+            ?.name.toLowerCase()
+            .includes(searchLower)
+      );
+    }
+
+    // Apply role filter
     if (selectedRoleId) {
       list = list.filter((staff) => staff.assignedRoleId === selectedRoleId);
     }
@@ -345,17 +381,55 @@ const StaffManagement: React.FC = () => {
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [staffList, sortField, sortDirection, selectedRoleId]);
+  }, [
+    staffList,
+    sortField,
+    sortDirection,
+    selectedRoleId,
+    searchTerm,
+    rolesList,
+  ]);
+
+  // Staff statistics
+  const staffStats = useMemo(() => {
+    const totalStaff = staffList.length;
+    const activeStaff = staffList.filter((s) => s.averageScore !== null).length;
+    const avgScore =
+      staffList.length > 0
+        ? staffList.reduce((sum, s) => sum + (s.averageScore || 0), 0) /
+          staffList.length
+        : 0;
+    const avgCompletion =
+      staffList.length > 0
+        ? staffList.reduce(
+            (sum, s) => sum + calculateStaffCompletionRate(s),
+            0
+          ) / staffList.length
+        : 0;
+
+    return { totalStaff, activeStaff, avgScore, avgCompletion };
+  }, [staffList]);
 
   const tableHeaders: { label: string; field: SortField | null }[] = [
-    { label: "Name", field: "name" },
+    { label: "Staff Member", field: "name" },
     { label: "Email", field: "email" },
+    { label: "Role", field: null },
     { label: "Avg. Score", field: "averageScore" },
-    { label: "Completion %", field: "completionRate" },
-    { label: "Date Joined", field: "createdAt" },
-    { label: "Assign Role", field: null },
+    { label: "Completion", field: "completionRate" },
+    { label: "Joined", field: "createdAt" },
     { label: "Actions", field: null },
   ];
+
+  const tabs = [
+    {
+      id: "staff",
+      name: "Staff Members",
+      icon: UsersIcon,
+      count: staffList.length,
+    },
+    { id: "roles", name: "Roles", icon: CogIcon, count: rolesList.length },
+    { id: "invitations", name: "Invitations", icon: EnvelopeIcon, count: 0 },
+  ] as const;
 
   if (loading || rolesLoading) {
     return (
@@ -363,7 +437,11 @@ const StaffManagement: React.FC = () => {
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
-            <LoadingSpinner message="Loading staff and roles..." />
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <LoadingSpinner message="Loading staff and roles..." />
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -375,46 +453,114 @@ const StaffManagement: React.FC = () => {
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Staff & Role Management
+                  <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <UserGroupIcon className="h-8 w-8 text-emerald-600" />
+                    Team Management
                   </h1>
-                  <p className="text-gray-600 mt-2">
-                    Manage your team members and their access levels.
+                  <p className="text-gray-600 mt-1">
+                    Manage your team members, roles, and invitations in one
+                    place.
                   </p>
                 </div>
-                <Button
-                  variant="primary"
-                  onClick={() => setShowInviteModal(true)}
-                >
-                  <PlusIcon className="h-5 w-5 mr-2" />
-                  Invite Staff
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setActiveTab("invitations")}
+                    className="flex items-center gap-2"
+                  >
+                    <EnvelopeIcon className="h-4 w-4" />
+                    Invitations
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <UserPlusIcon className="h-4 w-4" />
+                    Invite Staff
+                  </Button>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-600 rounded-lg">
+                      <UsersIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700">
+                        Total Staff
+                      </p>
+                      <p className="text-2xl font-bold text-emerald-900">
+                        {staffStats.totalStaff}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <AcademicCapIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">
+                        Active Learners
+                      </p>
+                      <p className="text-2xl font-bold text-blue-900">
+                        {staffStats.activeStaff}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-600 rounded-lg">
+                      <StarIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">
+                        Avg. Score
+                      </p>
+                      <p className="text-2xl font-bold text-purple-900">
+                        {formatPercentage(staffStats.avgScore)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-600 rounded-lg">
+                      <ClockIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-orange-700">
+                        Avg. Completion
+                      </p>
+                      <p className="text-2xl font-bold text-orange-900">
+                        {formatPercentage(staffStats.avgCompletion)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Messages */}
             {message && (
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-6 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="p-1 bg-green-100 rounded-full mr-3">
-                    <svg
-                      className="w-5 h-5 text-green-600"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <span className="text-green-700">{message}</span>
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                  <span className="text-green-700 font-medium">{message}</span>
                 </div>
                 <button
                   type="button"
@@ -422,346 +568,495 @@ const StaffManagement: React.FC = () => {
                   onClick={() => setMessage(null)}
                   aria-label="Dismiss"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <XCircleIcon className="h-5 w-5" />
                 </button>
               </div>
             )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            {(error || rolesError) && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
                 <ErrorMessage
-                  message={error}
-                  onDismiss={() => setError(null)}
+                  message={error || rolesError || ""}
+                  onDismiss={() => {
+                    setError(null);
+                    setRolesError(null);
+                  }}
                 />
               </div>
             )}
 
-            {rolesError && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-                <ErrorMessage
-                  message={rolesError}
-                  onDismiss={() => setRolesError(null)}
-                />
-              </div>
-            )}
-
-            {/* Role Filter Section */}
-            {!rolesLoading && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <CogIcon className="h-5 w-5 text-slate-600" />
-                  <h3 className="text-lg font-medium text-slate-900">
-                    Filter by Role
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => setSelectedRoleId(null)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      selectedRoleId === null
-                        ? "bg-emerald-600 text-white shadow-lg"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    All Roles ({staffList.length})
-                  </button>
-                  {rolesList.map((role) => (
-                    <button
-                      key={role._id}
-                      onClick={() => setSelectedRoleId(role._id)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        selectedRoleId === role._id
-                          ? "bg-emerald-600 text-white shadow-lg"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      {role.name} ({roleCounts[role._id] || 0})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="lg:col-span-2">
-              <Card>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                  <h3 className="text-xl font-semibold text-slate-700 mb-3 sm:mb-0">
-                    Staff Members ({filteredAndSortedStaffList.length})
-                  </h3>
-                  {!rolesLoading && rolesList.length > 0 && (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-sm text-slate-600">
-                        Filter by role:
-                      </span>
-                      <select
-                        value={selectedRoleId || ""}
-                        onChange={(e) =>
-                          setSelectedRoleId(e.target.value || null)
-                        }
-                        className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-sm"
+            {/* Navigation Tabs */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+              <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                  {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`${
+                          activeTab === tab.id
+                            ? "border-emerald-500 text-emerald-600 bg-emerald-50"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        } flex items-center gap-2 whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg`}
                       >
-                        <option value="">All Roles ({staffList.length})</option>
-                        {rolesList.map((role) => (
-                          <option key={role._id} value={role._id}>
-                            {role.name} ({roleCounts[role._id] || 0})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {loading &&
-                filteredAndSortedStaffList.length === 0 &&
-                !error ? (
-                  <div className="text-center py-10">
-                    <LoadingSpinner message="Loading staff data..." />
-                  </div>
-                ) : filteredAndSortedStaffList.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          {tableHeaders.map((col) => (
-                            <th
-                              key={col.label}
-                              scope="col"
-                              className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider ${
-                                col.field
-                                  ? "cursor-pointer hover:bg-slate-100 transition-colors"
-                                  : ""
-                              }`}
-                              onClick={() =>
-                                col.field && handleSortRequest(col.field)
-                              }
-                            >
-                              {col.label}
-                              {sortField === col.field && col.field && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "▲" : "▼"}
-                                </span>
-                              )}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-slate-200">
-                        {filteredAndSortedStaffList.map((staff) => (
-                          <tr
-                            key={staff._id}
-                            className="hover:bg-slate-50 transition-colors group"
+                        <Icon className="h-5 w-5" />
+                        {tab.name}
+                        {tab.count > 0 && (
+                          <span
+                            className={`${
+                              activeTab === tab.id
+                                ? "bg-emerald-600 text-white"
+                                : "bg-gray-100 text-gray-600"
+                            } inline-flex items-center justify-center px-2 py-1 rounded-full text-xs font-medium min-w-[20px] h-5`}
                           >
-                            {tableHeaders.map((col) => (
-                              <td
-                                key={`${staff._id}-${col.label}`}
-                                className="px-4 py-3 whitespace-nowrap text-sm text-slate-600"
-                              >
-                                {col.field === "name" && (
-                                  <Link
-                                    to={`/staff/${staff._id}`}
-                                    className="font-medium text-emerald-600 hover:text-emerald-800 group-hover:underline"
-                                  >
-                                    {staff.name}
-                                  </Link>
-                                )}
-                                {col.field === "email" && staff.email}
-                                {col.field === "averageScore" &&
-                                  formatPercentage(staff.averageScore)}
-                                {col.field === "completionRate" &&
-                                  formatPercentage(
-                                    calculateStaffCompletionRate(staff)
-                                  )}
-                                {col.field === "createdAt" &&
-                                  formatDate(staff.createdAt)}
-
-                                {col.label === "Assign Role" &&
-                                  (rolesLoading ? (
-                                    <span className="text-xs text-slate-400">
-                                      Loading...
-                                    </span>
-                                  ) : assignRoleLoading === staff._id ? (
-                                    <LoadingSpinner />
-                                  ) : rolesList.length > 0 ? (
-                                    <select
-                                      value={staff.assignedRoleId || ""}
-                                      onChange={(e) =>
-                                        handleAssignRoleChange(
-                                          staff._id,
-                                          e.target.value || null
-                                        )
-                                      }
-                                      disabled={
-                                        assignRoleLoading === staff._id ||
-                                        rolesLoading
-                                      }
-                                      className="block w-full max-w-[150px] pl-3 pr-8 py-1 border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-xs"
-                                      aria-label={`Assign role to ${staff.name}`}
-                                    >
-                                      <option value="">Unassigned</option>
-                                      {rolesList.map((role) => (
-                                        <option key={role._id} value={role._id}>
-                                          {role.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <span className="text-xs text-slate-400">
-                                      No roles
-                                    </span>
-                                  ))}
-
-                                {col.label === "Actions" && (
-                                  <div className="flex items-center justify-end space-x-2">
-                                    <Link
-                                      to={`/staff/${staff._id}`}
-                                      className="text-emerald-600 hover:text-emerald-800 transition-colors text-xs font-medium py-1 px-2 rounded-md hover:bg-emerald-50"
-                                      title="View Details"
-                                    >
-                                      View
-                                    </Link>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={() =>
-                                        handleDeleteStaff(staff._id, staff.name)
-                                      }
-                                      title="Remove Staff"
-                                      disabled={assignRoleLoading === staff._id}
-                                      className="text-xs !px-2 !py-1"
-                                    >
-                                      Remove
-                                    </Button>
-                                  </div>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-center text-slate-500 py-10">
-                    {loading
-                      ? "Loading staff..."
-                      : error
-                      ? "Could not load staff data."
-                      : selectedRoleId
-                      ? `No staff members found with the role '${
-                          rolesList.find((r) => r._id === selectedRoleId)
-                            ?.name || "selected role"
-                        }'`
-                      : "No staff members currently in the system. Invite one to get started!"}
-                  </p>
-                )}
-              </Card>
-            </div>
-
-            {/* Staff Invitation Management Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <StaffInvitationForm
-                onSuccess={(message) => {
-                  setMessage(message);
-                  // Clear the message after 5 seconds
-                  setTimeout(() => setMessage(null), 5000);
-                }}
-                onError={(error) => {
-                  setError(error);
-                  // Clear the error after 5 seconds
-                  setTimeout(() => setError(null), 5000);
-                }}
-              />
-              <PendingInvitationsTable
-                onInvitationCancelled={() => {
-                  setMessage("Invitation cancelled successfully");
-                  setTimeout(() => setMessage(null), 3000);
-                }}
-              />
-            </div>
-
-            <Card className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800">
-                  Manage Roles
-                </h2>
-                <Button
-                  variant="primary"
-                  onClick={handleOpenCreateRoleModal}
-                  disabled={roleSubmitLoading || !!assignRoleLoading}
-                >
-                  Create New Role
-                </Button>
+                            {tab.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
               </div>
-              {rolesLoading && rolesList.length === 0 && !rolesError ? (
-                <div className="text-center py-10">
-                  <LoadingSpinner message="Loading roles..." />
-                </div>
-              ) : rolesList.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {rolesList.map((role) => (
-                    <div
-                      key={role._id}
-                      className="bg-gray-50 rounded-lg shadow p-5 flex flex-col justify-between ring-1 ring-gray-200"
-                    >
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {role.name}
+
+              {/* Tab Content */}
+              <div className="p-6">
+                {activeTab === "staff" && (
+                  <div className="space-y-6">
+                    {/* Search and Filter Bar */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <div className="flex-1 max-w-md">
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Search staff by name, email, or role..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowFilters(!showFilters)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                            showFilters || selectedRoleId
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          <FunnelIcon className="h-4 w-4" />
+                          Filters
+                          {selectedRoleId && (
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-medium px-2 py-1 rounded-full">
+                              1
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter Panel */}
+                    {showFilters && (
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex flex-wrap gap-3 items-center">
+                          <span className="text-sm font-medium text-gray-700">
+                            Filter by role:
+                          </span>
+                          <button
+                            onClick={() => setSelectedRoleId(null)}
+                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                              selectedRoleId === null
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
+                            }`}
+                          >
+                            All ({staffList.length})
+                          </button>
+                          {rolesList.map((role) => (
+                            <button
+                              key={role._id}
+                              onClick={() => setSelectedRoleId(role._id)}
+                              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                selectedRoleId === role._id
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
+                              }`}
+                            >
+                              {role.name} ({roleCounts[role._id] || 0})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Staff Table */}
+                    {filteredAndSortedStaffList.length > 0 ? (
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {tableHeaders.map((col) => (
+                                  <th
+                                    key={col.label}
+                                    scope="col"
+                                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                                      col.field
+                                        ? "cursor-pointer hover:bg-gray-100 transition-colors"
+                                        : ""
+                                    }`}
+                                    onClick={() =>
+                                      col.field && handleSortRequest(col.field)
+                                    }
+                                  >
+                                    <div className="flex items-center space-x-1">
+                                      <span>{col.label}</span>
+                                      {sortField === col.field && col.field && (
+                                        <ChevronDownIcon
+                                          className={`h-4 w-4 transform transition-transform ${
+                                            sortDirection === "asc"
+                                              ? "rotate-180"
+                                              : ""
+                                          }`}
+                                        />
+                                      )}
+                                    </div>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {filteredAndSortedStaffList.map(
+                                (staff, index) => (
+                                  <tr
+                                    key={staff._id}
+                                    className={`hover:bg-gray-50 transition-colors ${
+                                      index % 2 === 0
+                                        ? "bg-white"
+                                        : "bg-gray-50/30"
+                                    }`}
+                                  >
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center">
+                                        <div className="h-10 w-10 flex-shrink-0">
+                                          <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                            <span className="text-sm font-medium text-emerald-700">
+                                              {staff.name
+                                                ?.charAt(0)
+                                                ?.toUpperCase() || "?"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="ml-4">
+                                          <Link
+                                            to={`/staff/${staff._id}`}
+                                            className="text-sm font-medium text-gray-900 hover:text-emerald-600 transition-colors"
+                                          >
+                                            {staff.name}
+                                          </Link>
+                                          <p className="text-sm text-gray-500">
+                                            Member since{" "}
+                                            {formatDate(staff.createdAt)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                      {staff.email}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <select
+                                        value={staff.assignedRoleId || ""}
+                                        onChange={(e) =>
+                                          handleAssignRoleChange(
+                                            staff._id,
+                                            e.target.value || null
+                                          )
+                                        }
+                                        disabled={
+                                          assignRoleLoading === staff._id
+                                        }
+                                        className="text-sm border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+                                      >
+                                        <option value="">Unassigned</option>
+                                        {rolesList.map((role) => (
+                                          <option
+                                            key={role._id}
+                                            value={role._id}
+                                          >
+                                            {role.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center">
+                                        <span
+                                          className={`text-sm font-medium ${
+                                            (staff.averageScore || 0) >= 70
+                                              ? "text-green-600"
+                                              : (staff.averageScore || 0) >= 50
+                                              ? "text-orange-600"
+                                              : "text-red-600"
+                                          }`}
+                                        >
+                                          {formatPercentage(staff.averageScore)}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center">
+                                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                          <div
+                                            className="bg-emerald-600 h-2 rounded-full"
+                                            style={{
+                                              width: `${calculateStaffCompletionRate(
+                                                staff
+                                              )}%`,
+                                            }}
+                                          ></div>
+                                        </div>
+                                        <span className="text-sm text-gray-600">
+                                          {formatPercentage(
+                                            calculateStaffCompletionRate(staff)
+                                          )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                      {formatDate(staff.createdAt)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                      <div className="flex items-center justify-end space-x-2">
+                                        <Link
+                                          to={`/staff/${staff._id}`}
+                                          className="text-emerald-600 hover:text-emerald-900 transition-colors"
+                                        >
+                                          <EyeIcon className="h-4 w-4" />
+                                        </Link>
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteStaff(
+                                              staff._id,
+                                              staff.name
+                                            )
+                                          }
+                                          className="text-red-600 hover:text-red-900 transition-colors"
+                                          disabled={
+                                            assignRoleLoading === staff._id
+                                          }
+                                        >
+                                          <TrashIcon className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
+                        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-4 text-lg font-medium text-gray-900">
+                          {searchTerm || selectedRoleId
+                            ? "No staff found"
+                            : "No staff members yet"}
                         </h3>
-                        <p className="text-sm text-gray-600 mt-1 min-h-[40px] line-clamp-2">
-                          {role.description || "No description provided."}
+                        <p className="mt-2 text-gray-600">
+                          {searchTerm || selectedRoleId
+                            ? "Try adjusting your search or filter criteria"
+                            : "Get started by inviting your first team member"}
+                        </p>
+                        {!searchTerm && !selectedRoleId && (
+                          <Button
+                            variant="primary"
+                            onClick={() => setShowInviteModal(true)}
+                            className="mt-4"
+                          >
+                            <UserPlusIcon className="h-4 w-4 mr-2" />
+                            Invite Staff
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "roles" && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Role Management
+                        </h3>
+                        <p className="text-gray-600">
+                          Create and manage roles for your team members
                         </p>
                       </div>
-                      <div className="mt-6 flex items-center justify-end space-x-3">
+                      <Button
+                        variant="primary"
+                        onClick={handleOpenCreateRoleModal}
+                        disabled={roleSubmitLoading}
+                        className="flex items-center gap-2"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Create Role
+                      </Button>
+                    </div>
+
+                    {rolesList.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {rolesList.map((role) => (
+                          <div
+                            key={role._id}
+                            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                  {role.name}
+                                </h4>
+                                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                                  {role.description ||
+                                    "No description provided"}
+                                </p>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <UsersIcon className="h-4 w-4 mr-1" />
+                                  {roleCounts[role._id] || 0} staff members
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-end space-x-2 mt-4 pt-4 border-t border-gray-100">
+                              <Button
+                                variant="secondary"
+                                onClick={() => handleOpenEditRoleModal(role)}
+                                disabled={roleSubmitLoading}
+                                className="text-xs px-3 py-1.5"
+                              >
+                                <PencilIcon className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={() =>
+                                  handleDeleteRole(role._id, role.name)
+                                }
+                                disabled={roleSubmitLoading}
+                                className="text-xs px-3 py-1.5"
+                              >
+                                <TrashIcon className="h-3 w-3 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
+                        <CogIcon className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-4 text-lg font-medium text-gray-900">
+                          No roles yet
+                        </h3>
+                        <p className="mt-2 text-gray-600">
+                          Create your first role to organize your team
+                        </p>
                         <Button
-                          variant="secondary"
-                          className="text-xs px-3 py-1.5"
-                          onClick={() => handleOpenEditRoleModal(role)}
-                          disabled={roleSubmitLoading || !!assignRoleLoading}
+                          variant="primary"
+                          onClick={handleOpenCreateRoleModal}
+                          className="mt-4"
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          className="text-xs px-3 py-1.5"
-                          onClick={() => handleDeleteRole(role._id, role.name)}
-                          disabled={roleSubmitLoading || !!assignRoleLoading}
-                        >
-                          Delete
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Create Role
                         </Button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-gray-500 py-10">
-                  {rolesError && !error
-                    ? "Could not load roles."
-                    : "No roles found. Create one to get started!"}
-                </p>
-              )}
-            </Card>
+                    )}
+                  </div>
+                )}
 
-            {isRoleModalOpen && (
-              <RoleFormModal
-                isOpen={isRoleModalOpen}
-                onClose={handleCloseRoleModal}
-                onSubmit={handleRoleFormSubmit}
-                currentRole={currentRole}
-                isLoading={roleSubmitLoading}
-              />
-            )}
+                {activeTab === "invitations" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Staff Invitations
+                      </h3>
+                      <p className="text-gray-600">
+                        Send invitations and manage pending invites
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <StaffInvitationForm
+                        onSuccess={(message) => {
+                          setMessage(message);
+                          setTimeout(() => setMessage(null), 5000);
+                        }}
+                        onError={(error) => {
+                          setError(error);
+                          setTimeout(() => setError(null), 5000);
+                        }}
+                      />
+                      <PendingInvitationsTable
+                        onInvitationCancelled={() => {
+                          setMessage("Invitation cancelled successfully");
+                          setTimeout(() => setMessage(null), 3000);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>
+
+      {/* Role Modal */}
+      {isRoleModalOpen && (
+        <RoleFormModal
+          isOpen={isRoleModalOpen}
+          onClose={handleCloseRoleModal}
+          onSubmit={handleRoleFormSubmit}
+          currentRole={currentRole}
+          isLoading={roleSubmitLoading}
+        />
+      )}
+
+      {/* Staff Invitation Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Invite Staff Member
+              </h3>
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircleIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <StaffInvitationForm
+              onSuccess={(message) => {
+                setMessage(message);
+                setShowInviteModal(false);
+                setTimeout(() => setMessage(null), 5000);
+              }}
+              onError={(error) => {
+                setError(error);
+                setTimeout(() => setError(null), 5000);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

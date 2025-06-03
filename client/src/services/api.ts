@@ -486,6 +486,73 @@ export const getQuizAttemptDetails = async (
 };
 
 /**
+ * Fetches all incorrect answers across all quiz attempts for a specific staff member.
+ * @param staffId - The ID of the staff member.
+ * @param quizId - Optional: Filter by specific quiz ID.
+ */
+export const getAllIncorrectAnswersForStaff = async (
+  staffId: string,
+  quizId?: string
+): Promise<{
+  staffInfo: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  incorrectQuestions: Array<{
+    questionText: string;
+    userAnswer: string;
+    correctAnswer: string;
+    explanation?: string;
+    quizTitle: string;
+    attemptDate: Date;
+    attemptId: string;
+    timesIncorrect: number;
+  }>;
+  summary: {
+    totalAttempts: number;
+    totalIncorrectQuestions: number;
+    uniqueIncorrectQuestions: number;
+    mostMissedQuestion?: {
+      questionText: string;
+      timesIncorrect: number;
+    };
+  };
+}> => {
+  const params = quizId ? { quizId } : {};
+  const response = await api.get<{
+    status: string;
+    data: {
+      staffInfo: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      incorrectQuestions: Array<{
+        questionText: string;
+        userAnswer: string;
+        correctAnswer: string;
+        explanation?: string;
+        quizTitle: string;
+        attemptDate: Date;
+        attemptId: string;
+        timesIncorrect: number;
+      }>;
+      summary: {
+        totalAttempts: number;
+        totalIncorrectQuestions: number;
+        uniqueIncorrectQuestions: number;
+        mostMissedQuestion?: {
+          questionText: string;
+          timesIncorrect: number;
+        };
+      };
+    };
+  }>(`/quizzes/staff/${staffId}/all-incorrect-answers`, { params });
+  return response.data.data;
+};
+
+/**
  * Fetches the progress for the current staff member on a specific quiz, including all attempt summaries.
  * MODIFIED to reflect new backend response structure.
  */

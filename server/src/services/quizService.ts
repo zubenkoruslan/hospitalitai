@@ -821,7 +821,7 @@ export class QuizService {
       sourceType: finalSourceType,
       totalUniqueQuestionsInSourceSnapshot: sourceSnapshotCount,
       numberOfQuestionsPerAttempt,
-      isAvailable: true, // Default to available
+      isAvailable: false, // Default to draft (inactive)
       targetRoles: targetRoles || [], // Ensure targetRoles is an array
       retakeCooldownHours: retakeCooldownHours || 0, // Added field, default to 0
     });
@@ -1577,6 +1577,325 @@ export class QuizService {
       totalQuestions: attempt.questionsPresented.length,
       attemptDate: attempt.attemptDate,
       incorrectQuestions: incorrectQuestionDetails,
+    };
+  }
+
+  /**
+   * Gets all incorrect answers across all quiz attempts for a specific staff member
+   *
+   * @param staffUserId - The ID of the staff member
+   * @param requestingUserIdString - The ID of the requesting user (for authorization)
+   * @param quizId - Optional: If provided, only get incorrect answers for this specific quiz
+   * @returns A promise resolving to aggregated incorrect question details
+   * @throws {AppError} If user is not authorized or other errors occur
+   */
+  static async getAllIncorrectAnswersForStaff(
+    staffUserId: Types.ObjectId,
+    requestingUserIdString: string,
+    quizId?: Types.ObjectId
+  ): Promise<{
+    staffInfo: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    incorrectQuestions: Array<
+      IncorrectQuestionDetailForAttempt & {
+        quizTitle: string;
+        attemptDate: Date;
+        attemptId: string;
+        timesIncorrect: number; // How many times this question was answered incorrectly
+      }
+    >;
+    summary: {
+      totalAttempts: number;
+      totalIncorrectQuestions: number;
+      uniqueIncorrectQuestions: number;
+      mostMissedQuestion?: {
+        questionText: string;
+        timesIncorrect: number;
+      };
+    };
+  } | null> {
+    if (!Types.ObjectId.isValid(staffUserId)) {
+      throw new AppError("Invalid staff user ID", 400);
+    }
+
+    if (!Types.ObjectId.isValid(requestingUserIdString)) {
+      throw new AppError("Invalid requesting user ID", 400);
+    }
+
+    const requestingUserId = new Types.ObjectId(requestingUserIdString);
+
+    // Get staff user details
+    const staffUser = await User.findById(staffUserId)
+      .select("name email restaurantId")
+      .lean<Pick<IUser, "_id" | "name" | "email" | "restaurantId">>();
+
+    if (!staffUser) {
+      throw new AppError("Staff member not found", 404);
+    }
+
+    // Populate the role for the requesting user
+    const requestingUser = await User.findById(requestingUserId)
+      .populate<{ assignedRoleId: IRole }>("assignedRoleId")
+      .select("role restaurantId assignedRoleId")
+      .lean<
+        Pick<IUser, "_id" | "role" | "restaurantId" | "assignedRoleId"> & {
+          assignedRoleId?: IRole;
+        }
+      >();
+
+    if (!requestingUser) {
+      throw new AppError("Requesting user not found", 404);
+    }
+
+    // Authorization check
+    let isAuthorized = false;
+    if (requestingUserId.toString() === staffUserId.toString()) {
+      isAuthorized = true;
+    }
+
+    const specificRoleName = requestingUser.assignedRoleId?.name;
+
+    if (
+      requestingUser.role === "restaurant" ||
+      specificRoleName === "restaurantAdmin" ||
+      specificRoleName === "manager"
+    ) {
+      if (
+        requestingUser.restaurantId &&
+        staffUser.restaurantId &&
+        requestingUser.restaurantId.equals(staffUser.restaurantId)
+      ) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new AppError(
+        "You are not authorized to view this staff member's quiz data.",
+        403
+      );
+    }
+
+    // Build the query for attempts
+    const attemptQuery: any = {
+      staffUserId: staffUserId,
+      restaurantId: staffUser.restaurantId,
+    };
+
+    if (quizId) {
+      attemptQuery.quizId = quizId;
+    }
+
+    // Get all quiz attempts for this staff member
+    const attempts = await QuizAttempt.find(attemptQuery)
+      .populate<{ quizId: Pick<IQuiz, "_id" | "title" | "isAvailable"> }>({
+        path: "quizId",
+        select: "_id title isAvailable",
+      })
+      .select("quizId questionsPresented attemptDate score")
+      .sort({ attemptDate: -1 })
+      .lean<
+        Array<
+          IQuizAttempt & {
+            quizId: Pick<IQuiz, "_id" | "title" | "isAvailable">;
+          }
+        >
+      >();
+
+    // Filter to only include attempts from available quizzes
+    const activeAttempts = attempts.filter(
+      (attempt) => attempt.quizId && attempt.quizId.isAvailable === true
+    );
+
+    const allIncorrectQuestions: Array<
+      IncorrectQuestionDetailForAttempt & {
+        quizTitle: string;
+        attemptDate: Date;
+        attemptId: string;
+        timesIncorrect: number;
+      }
+    > = [];
+
+    // Track question frequency for summary
+    const questionFrequency = new Map<
+      string,
+      {
+        count: number;
+        questionText: string;
+      }
+    >();
+
+    // Process each attempt
+    for (const attempt of activeAttempts) {
+      if (
+        !attempt.questionsPresented ||
+        attempt.questionsPresented.length === 0
+      ) {
+        continue;
+      }
+
+      for (const presentedQ of attempt.questionsPresented) {
+        if (!presentedQ.isCorrect) {
+          const questionDoc = await QuestionModel.findById(
+            presentedQ.questionId
+          ).lean<QuestionDocument>();
+
+          let questionText: string;
+          let userAnswerText: string;
+          let correctAnswerText: string;
+          let explanation: string | undefined = undefined;
+
+          if (questionDoc) {
+            questionText = questionDoc.questionText;
+            explanation = questionDoc.explanation;
+
+            if (questionDoc.questionType === "true-false") {
+              const userAnswerGivenStr = String(presentedQ.answerGiven);
+              const answeredOption = questionDoc.options.find(
+                (opt) => opt._id.toString() === userAnswerGivenStr
+              );
+              userAnswerText = answeredOption?.text || "Not answered";
+              const correctOpt = questionDoc.options.find(
+                (opt) => opt.isCorrect
+              );
+              correctAnswerText = correctOpt?.text || "Error: Correct N/A";
+            } else if (
+              questionDoc.questionType === "multiple-choice-single" ||
+              questionDoc.questionType === "multiple-choice-multiple"
+            ) {
+              const getOptionTextById = (optionIdToFind: any) => {
+                const optionIdStr = String(optionIdToFind);
+                const opt = questionDoc.options.find(
+                  (o) => o._id.toString() === optionIdStr
+                );
+                return opt?.text;
+              };
+
+              if (Array.isArray(presentedQ.answerGiven)) {
+                userAnswerText = presentedQ.answerGiven
+                  .map((id) => getOptionTextById(id))
+                  .filter(Boolean)
+                  .join(", ");
+                if (!userAnswerText && presentedQ.answerGiven.length > 0) {
+                  userAnswerText = "Invalid Option(s) ID";
+                } else if (!userAnswerText) {
+                  userAnswerText = "No selection";
+                }
+              } else if (
+                presentedQ.answerGiven !== null &&
+                presentedQ.answerGiven !== undefined
+              ) {
+                userAnswerText =
+                  getOptionTextById(presentedQ.answerGiven) ||
+                  "Invalid Option ID";
+              } else {
+                userAnswerText = "Not answered";
+              }
+
+              correctAnswerText = questionDoc.options
+                .filter((opt) => opt.isCorrect)
+                .map((opt) => opt.text)
+                .join(", ");
+            } else {
+              userAnswerText =
+                "Answered (format not recognized for this question type)";
+              correctAnswerText =
+                "Correct answer (format not recognized for this question type)";
+            }
+          } else {
+            questionText =
+              "Question data unavailable (it may have been deleted or is invalid).";
+            if (
+              presentedQ.answerGiven !== null &&
+              presentedQ.answerGiven !== undefined
+            ) {
+              userAnswerText =
+                "User's answer (details unavailable as original question data is missing).";
+            } else {
+              userAnswerText =
+                "Not answered (original question data is missing).";
+            }
+            correctAnswerText =
+              "Correct answer (details unavailable as original question data is missing).";
+          }
+
+          // Track question frequency
+          const questionKey = presentedQ.questionId.toString();
+          const existing = questionFrequency.get(questionKey);
+          if (existing) {
+            existing.count++;
+          } else {
+            questionFrequency.set(questionKey, {
+              count: 1,
+              questionText: questionText,
+            });
+          }
+
+          allIncorrectQuestions.push({
+            questionText: questionText,
+            userAnswer: userAnswerText,
+            correctAnswer: correctAnswerText,
+            explanation: explanation,
+            quizTitle: attempt.quizId.title || "Quiz Title Not Found",
+            attemptDate: attempt.attemptDate,
+            attemptId: attempt._id.toString(),
+            timesIncorrect: questionFrequency.get(questionKey)?.count || 1,
+          });
+        }
+      }
+    }
+
+    // Calculate summary statistics
+    const totalAttempts = activeAttempts.length;
+    const totalIncorrectQuestions = allIncorrectQuestions.length;
+    const uniqueIncorrectQuestions = questionFrequency.size;
+
+    // Find most missed question
+    let mostMissedQuestion:
+      | {
+          questionText: string;
+          timesIncorrect: number;
+        }
+      | undefined;
+
+    let maxCount = 0;
+    for (const [, { count, questionText }] of questionFrequency) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostMissedQuestion = {
+          questionText,
+          timesIncorrect: count,
+        };
+      }
+    }
+
+    // Update timesIncorrect for each question based on frequency map
+    allIncorrectQuestions.forEach((question) => {
+      // Find the question ID from the original attempt that matches this question
+      const matchingEntry = Array.from(questionFrequency.entries()).find(
+        ([, { questionText }]) => questionText === question.questionText
+      );
+      if (matchingEntry) {
+        question.timesIncorrect = matchingEntry[1].count;
+      }
+    });
+
+    return {
+      staffInfo: {
+        id: staffUser._id.toString(),
+        name: staffUser.name,
+        email: staffUser.email,
+      },
+      incorrectQuestions: allIncorrectQuestions,
+      summary: {
+        totalAttempts,
+        totalIncorrectQuestions,
+        uniqueIncorrectQuestions,
+        mostMissedQuestion,
+      },
     };
   }
 

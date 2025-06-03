@@ -504,3 +504,59 @@ export const updateQuizController = async (
     next(error);
   }
 };
+
+export const getAllIncorrectAnswersForStaffController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { staffId } = req.params;
+    const { quizId } = req.query; // Optional query parameter to filter by specific quiz
+
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated.", 401));
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(staffId)) {
+      return next(new AppError("Invalid staff ID.", 400));
+    }
+
+    const requestingUserId = req.user.userId.toString();
+    const staffObjectId = new mongoose.Types.ObjectId(staffId);
+    let quizObjectId: mongoose.Types.ObjectId | undefined;
+
+    // Validate quiz ID if provided
+    if (quizId) {
+      if (!mongoose.Types.ObjectId.isValid(quizId as string)) {
+        return next(new AppError("Invalid quiz ID.", 400));
+      }
+      quizObjectId = new mongoose.Types.ObjectId(quizId as string);
+    }
+
+    const result = await QuizService.getAllIncorrectAnswersForStaff(
+      staffObjectId,
+      requestingUserId,
+      quizObjectId
+    );
+
+    if (!result) {
+      return next(
+        new AppError("No data found for the specified staff member.", 404)
+      );
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    if (!(error instanceof AppError)) {
+      console.error(
+        "Unexpected error in getAllIncorrectAnswersForStaffController:",
+        error
+      );
+    }
+    next(error);
+  }
+};

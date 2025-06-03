@@ -59,7 +59,7 @@ const QuizSchema: Schema<IQuiz> = new Schema(
     },
     isAvailable: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     targetRoles: [
       {

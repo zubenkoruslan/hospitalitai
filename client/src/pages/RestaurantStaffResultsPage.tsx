@@ -1,24 +1,23 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// import api from "../services/api"; // Removed unused direct API import
 import { useAuth } from "../context/AuthContext";
-import { useStaffSummary } from "../hooks/useStaffSummary"; // Import the new hook
-import { useQuizCount } from "../hooks/useQuizCount"; // Import the quiz count hook
+import { useStaffSummary } from "../hooks/useStaffSummary";
+import { useQuizCount } from "../hooks/useQuizCount";
 import Navbar from "../components/Navbar";
-import LoadingSpinner from "../components/common/LoadingSpinner"; // Import common LoadingSpinner
-import ErrorMessage from "../components/common/ErrorMessage"; // Import common ErrorMessage
-import ScoreDistributionChart from "../components/charts/ScoreDistributionChart"; // Import the chart
-import StaffResultsFilter from "../components/staff/StaffResultsFilter"; // Import the filter component
-import StaffResultsTable from "../components/staff/StaffResultsTable"; // Import the table component
-import Card from "../components/common/Card"; // Import Card
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import ErrorMessage from "../components/common/ErrorMessage";
+import ScoreDistributionChart from "../components/charts/ScoreDistributionChart";
+import StaffResultsFilter from "../components/staff/StaffResultsFilter";
+import StaffResultsTable from "../components/staff/StaffResultsTable";
+import Card from "../components/common/Card";
+
 // Import shared types
 import { Filters, StaffMemberWithData } from "../types/staffTypes";
-// Import utility functions
-// import { formatDate } from "../utils/helpers"; // Removed formatDate
+import { KnowledgeCategory } from "../types/questionBankTypes";
 
-import KPICard from "../components/settings/KPICard"; // Added KPICard import
-import BarChart from "../components/charts/BarChart"; // Added BarChart import
-import { ChartData } from "chart.js"; // Added ChartData import
+import KPICard from "../components/settings/KPICard";
+import BarChart from "../components/charts/BarChart";
+import { ChartData } from "chart.js";
 import {
   ChartBarIcon,
   UsersIcon,
@@ -31,9 +30,14 @@ import {
   ClipboardDocumentListIcon,
   FireIcon,
   SparklesIcon,
-} from "@heroicons/react/24/outline"; // Added new icons
+  PresentationChartLineIcon,
+  UserGroupIcon,
+  ChartPieIcon,
+  ExclamationTriangleIcon,
+  HomeIcon,
+} from "@heroicons/react/24/outline";
 
-// Enhanced interfaces for Phase 5 leaderboard features
+// Enhanced interfaces for comprehensive analytics
 interface LeaderboardEntry {
   rank: number;
   userId: string;
@@ -43,6 +47,63 @@ interface LeaderboardEntry {
   totalQuestions: number;
   completionTime?: number;
   totalQuizzes?: number;
+}
+
+interface ParticipationMetrics {
+  totalStaff: number;
+  activeStaff: number;
+  participationRate: number;
+}
+
+interface CompletionTimeStats {
+  averageCompletionTime: number;
+  fastestCompletionTime: number;
+  slowestCompletionTime: number;
+  totalQuizzesCompleted: number;
+}
+
+interface CategoryCompletionTimes {
+  foodKnowledge: number;
+  beverageKnowledge: number;
+  wineKnowledge: number;
+  proceduresKnowledge: number;
+}
+
+interface EnhancedRestaurantAnalytics {
+  totalStaff: number;
+  totalQuestionsAnswered: number;
+  overallAverageScore: number;
+  participationMetrics: ParticipationMetrics;
+  categoryPerformance: {
+    [key in KnowledgeCategory]: {
+      totalQuestions: number;
+      averageScore: number;
+      staffParticipation: number;
+      improvementTrend: number;
+    };
+  };
+  categoryCompletionTimes: CategoryCompletionTimes;
+  completionTimeStats: CompletionTimeStats;
+  topPerformers: Array<{
+    userId: string | { _id: string; toString(): string };
+    userName: string;
+    overallAverageScore: number;
+    strongestCategory: KnowledgeCategory;
+  }>;
+  staffNeedingSupport: Array<{
+    userId: string | { _id: string; toString(): string };
+    userName: string;
+    overallAverageScore: number;
+    weakestCategory: KnowledgeCategory;
+  }>;
+  questionDistribution: {
+    [key in KnowledgeCategory]: {
+      totalQuestions: number;
+      aiGenerated: number;
+      manuallyCreated: number;
+    };
+  };
+  lastUpdated: string;
 }
 
 interface CategoryChampion {
@@ -108,12 +169,88 @@ const useLeaderboardData = (timePeriod: string = "all") => {
   return { leaderboardData, loading, error };
 };
 
+// Enhanced hook for comprehensive analytics data
+const useEnhancedAnalytics = (selectedTimeframe: string = "30d") => {
+  const [analytics, setAnalytics] =
+    useState<EnhancedRestaurantAnalytics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchEnhancedAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/analytics/restaurant/enhanced", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch enhanced analytics data");
+        }
+
+        const data = await response.json();
+        setAnalytics(data.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnhancedAnalytics();
+  }, [selectedTimeframe]);
+
+  return { analytics, loading, error };
+};
+
 // Category configuration for visual consistency
 const CATEGORY_CONFIG = {
+  [KnowledgeCategory.FOOD_KNOWLEDGE]: {
+    icon: CakeIcon,
+    label: "Food Knowledge",
+    color: "bg-green-500",
+    lightColor: "bg-green-50",
+    textColor: "text-green-700",
+    borderColor: "border-green-200",
+    timeKey: "foodKnowledge" as keyof CategoryCompletionTimes,
+  },
+  [KnowledgeCategory.BEVERAGE_KNOWLEDGE]: {
+    icon: BoltIcon,
+    label: "Beverage Knowledge",
+    color: "bg-blue-500",
+    lightColor: "bg-blue-50",
+    textColor: "text-blue-700",
+    borderColor: "border-blue-200",
+    timeKey: "beverageKnowledge" as keyof CategoryCompletionTimes,
+  },
+  [KnowledgeCategory.WINE_KNOWLEDGE]: {
+    icon: GiftIcon,
+    label: "Wine Knowledge",
+    color: "bg-purple-500",
+    lightColor: "bg-purple-50",
+    textColor: "text-purple-700",
+    borderColor: "border-purple-200",
+    timeKey: "wineKnowledge" as keyof CategoryCompletionTimes,
+  },
+  [KnowledgeCategory.PROCEDURES_KNOWLEDGE]: {
+    icon: ClipboardDocumentListIcon,
+    label: "Procedures Knowledge",
+    color: "bg-orange-500",
+    lightColor: "bg-orange-50",
+    textColor: "text-orange-700",
+    borderColor: "border-orange-200",
+    timeKey: "proceduresKnowledge" as keyof CategoryCompletionTimes,
+  },
+  // Legacy keys for leaderboard compatibility
   foodKnowledge: {
     icon: CakeIcon,
     label: "Food Knowledge",
-    color: "#10B981", // Green
+    color: "#10B981",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
     textColor: "text-green-700",
@@ -122,7 +259,7 @@ const CATEGORY_CONFIG = {
   beverageKnowledge: {
     icon: BoltIcon,
     label: "Beverage Knowledge",
-    color: "#3B82F6", // Blue
+    color: "#3B82F6",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
     textColor: "text-blue-700",
@@ -131,7 +268,7 @@ const CATEGORY_CONFIG = {
   wineKnowledge: {
     icon: GiftIcon,
     label: "Wine Knowledge",
-    color: "#8B5CF6", // Purple
+    color: "#8B5CF6",
     bgColor: "bg-purple-50",
     borderColor: "border-purple-200",
     textColor: "text-purple-700",
@@ -140,7 +277,7 @@ const CATEGORY_CONFIG = {
   proceduresKnowledge: {
     icon: ClipboardDocumentListIcon,
     label: "Procedures Knowledge",
-    color: "#F59E0B", // Orange
+    color: "#F59E0B",
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
     textColor: "text-orange-700",
@@ -151,10 +288,19 @@ const CATEGORY_CONFIG = {
 // Helper function to format completion time
 const formatCompletionTime = (seconds?: number): string => {
   if (!seconds) return "N/A";
+  if (seconds === 0) return "N/A";
   if (seconds < 60) return `${Math.round(seconds)}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.round(seconds % 60);
   return `${minutes}m ${remainingSeconds}s`;
+};
+
+// Helper function to format completion time (for enhanced analytics)
+const formatCompletionTimeDetailed = (seconds?: number): string => {
+  if (!seconds || seconds === 0) return "N/A";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 };
 
 // Helper function to format percentages (moved from StaffManagement.tsx)
@@ -254,17 +400,23 @@ const CategoryChampions: React.FC<{
           CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
         const IconComponent = config.icon;
 
+        // Use type-safe property access
+        const bgColorClass =
+          "bgColor" in config ? config.bgColor : config.lightColor;
+        const iconColorClass =
+          "iconColor" in config ? config.iconColor : config.textColor;
+
         return (
           <div
             key={categoryKey}
-            className={`${config.bgColor} ${
+            className={`${bgColorClass} ${
               config.borderColor
             } rounded-xl p-6 border ${
               champion ? "hover:shadow-md transition-shadow" : ""
             }`}
           >
             <div className="flex items-center space-x-3 mb-4">
-              <IconComponent className={`h-6 w-6 ${config.iconColor}`} />
+              <IconComponent className={`h-6 w-6 ${iconColorClass}`} />
               <h3 className={`font-semibold ${config.textColor}`}>
                 {config.label}
               </h3>
@@ -326,8 +478,11 @@ const CategoryChampions: React.FC<{
 };
 
 const RestaurantStaffResultsPage: React.FC = () => {
-  // Phase 5: Enhanced state for leaderboards
+  // Enhanced state for comprehensive analytics
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("all");
+  const [selectedTimeframe, setSelectedTimeframe] = useState<
+    "7d" | "30d" | "90d"
+  >("30d");
 
   // Use custom hooks for data
   const {
@@ -341,16 +496,30 @@ const RestaurantStaffResultsPage: React.FC = () => {
     error: quizCountError,
   } = useQuizCount();
 
-  // Phase 5: Enhanced leaderboard data hook
+  // Enhanced analytics hooks
   const {
     leaderboardData,
     loading: leaderboardLoading,
     error: leaderboardError,
   } = useLeaderboardData(selectedTimePeriod);
 
+  const {
+    analytics,
+    loading: analyticsLoading,
+    error: analyticsError,
+  } = useEnhancedAnalytics(selectedTimeframe);
+
+  // Debug logging for data issues
+  React.useEffect(() => {
+    console.log("Debug - Analytics data:", analytics);
+    console.log("Debug - Staff data sample:", staffData.slice(0, 2));
+  }, [analytics, staffData]);
+
   // Combine loading and error states
-  const loading = staffLoading || quizCountLoading || leaderboardLoading;
-  const error = staffError || quizCountError || leaderboardError;
+  const loading =
+    staffLoading || quizCountLoading || leaderboardLoading || analyticsLoading;
+  const error =
+    staffError || quizCountError || leaderboardError || analyticsError;
 
   // Keep other state specific to this page
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
@@ -412,11 +581,10 @@ const RestaurantStaffResultsPage: React.FC = () => {
     }
 
     if (filters.role) {
-      result = result.filter((staff) =>
-        staff.professionalRole
-          ?.toLowerCase()
-          .includes(filters.role.toLowerCase())
-      );
+      result = result.filter((staff) => {
+        const roleName = staff.assignedRoleName || staff.professionalRole;
+        return roleName?.toLowerCase().includes(filters.role.toLowerCase());
+      });
     }
 
     // Apply selected category filter
@@ -524,35 +692,68 @@ const RestaurantStaffResultsPage: React.FC = () => {
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Header Section */}
-              <div className="bg-emerald-50 rounded-2xl p-8 border border-emerald-100 shadow-sm">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
-                    <ChartBarIcon className="h-8 w-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-slate-900">
-                      Staff Results & Performance Analytics
+              {/* Enhanced Header with Analytics Overview */}
+              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 rounded-2xl p-8 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2">
+                      Comprehensive Staff Analytics
                     </h1>
-                    <p className="text-slate-600 mt-2">
-                      Track staff quiz performance, leaderboards, and training
-                      progress
+                    <p className="text-blue-100 mb-4">
+                      Track staff performance, leaderboards, knowledge
+                      analytics, and training progress
                     </p>
+                    <div className="flex items-center gap-6 text-sm">
+                      {analytics && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <UserGroupIcon className="h-4 w-4" />
+                            <span>
+                              {analytics.participationMetrics.activeStaff} of{" "}
+                              {analytics.participationMetrics.totalStaff} staff
+                              active
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <ClockIcon className="h-4 w-4" />
+                            <span>
+                              Avg completion:{" "}
+                              {formatCompletionTimeDetailed(
+                                analytics.completionTimeStats
+                                  .averageCompletionTime
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  {/* Phase 5: Time Period Filter */}
-                  <div className="flex flex-col space-y-2">
-                    <label className="text-sm font-medium text-slate-700">
-                      Time Period:
-                    </label>
+                  <div className="flex items-center gap-4">
+                    <select
+                      value={selectedTimeframe}
+                      onChange={(e) =>
+                        setSelectedTimeframe(
+                          e.target.value as "7d" | "30d" | "90d"
+                        )
+                      }
+                      className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    >
+                      <option value="7d">Last 7 days</option>
+                      <option value="30d">Last 30 days</option>
+                      <option value="90d">Last 90 days</option>
+                    </select>
                     <select
                       value={selectedTimePeriod}
                       onChange={(e) => setSelectedTimePeriod(e.target.value)}
-                      className="px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
                     >
                       <option value="all">All Time</option>
                       <option value="month">Last Month</option>
                       <option value="week">Last Week</option>
                     </select>
+                    <div className="p-3 bg-white/20 rounded-xl">
+                      <PresentationChartLineIcon className="h-8 w-8" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -574,139 +775,252 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
               {!loading && !error && (
                 <>
-                  {/* Phase 5: Enhanced KPIs with Leaderboard Metrics */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h2 className="text-xl font-semibold text-slate-900 mb-6">
-                      Key Performance Indicators
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <UsersIcon className="h-6 w-6 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-700">
-                              Total Staff
-                            </h3>
-                            <p className="text-2xl font-bold text-slate-900">
-                              {totalStaff === null
-                                ? "N/A"
-                                : totalStaff.toString()}
-                            </p>
-                          </div>
+                  {/* Enhanced Key Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-100 rounded-xl">
+                          <UsersIcon className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Total Staff
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {analytics?.totalStaff || totalStaff || 0}
+                          </p>
                         </div>
                       </div>
-                      <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-emerald-100 rounded-lg">
-                            <TrophyIcon className="h-6 w-6 text-emerald-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-700">
-                              Avg. Quiz Score
-                            </h3>
-                            <p className="text-2xl font-bold text-slate-900">
-                              {formatPercentage(avgQuizScore)}
-                            </p>
-                          </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-green-100 rounded-xl">
+                          <AcademicCapIcon className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Questions Answered
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {analytics?.totalQuestionsAnswered || 0}
+                          </p>
                         </div>
                       </div>
-                      <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-100">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-yellow-100 rounded-lg">
-                            <FireIcon className="h-6 w-6 text-yellow-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-700">
-                              Top Performer
-                            </h3>
-                            <p className="text-lg font-bold text-slate-900">
-                              {leaderboardData?.topPerformers?.[0]?.name ||
-                                "N/A"}
-                            </p>
-                            {leaderboardData?.topPerformers?.[0] && (
-                              <p className="text-sm text-slate-600">
-                                {Math.round(
-                                  leaderboardData.topPerformers[0]
-                                    .overallAverageScore
-                                )}
-                                % average score
-                              </p>
-                            )}
-                          </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-purple-100 rounded-xl">
+                          <TrophyIcon className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Overall Average Score
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {analytics?.overallAverageScore?.toFixed(1) ||
+                              avgQuizScore?.toFixed(1) ||
+                              0}
+                            %
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-100 rounded-xl">
+                          <ChartPieIcon className="h-6 w-6 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Participation Rate
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {analytics
+                              ? Math.round(
+                                  analytics.participationMetrics
+                                    .participationRate
+                                )
+                              : 0}
+                            %
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-orange-100 rounded-xl">
+                          <ExclamationTriangleIcon className="h-6 w-6 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Need Support
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {analytics?.staffNeedingSupport?.length || 0}
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Phase 5: Leaderboards Section */}
-                  <div className="grid grid-cols-1 gap-8">
-                    {/* Top Performers Leaderboard */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-6 py-4 border-b border-slate-200">
-                        <div className="flex items-center space-x-3">
-                          <TrophyIcon className="h-6 w-6 text-yellow-600" />
-                          <h2 className="text-xl font-semibold text-slate-900">
+                  {/* Enhanced Staff Insights from Analytics */}
+                  {analytics && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Top Performers from Analytics */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-green-50 px-6 py-4 border-b border-green-200">
+                          <h3 className="text-lg font-semibold text-green-900 flex items-center gap-2">
+                            <TrophyIcon className="h-5 w-5" />
                             Top Performers
-                          </h2>
+                          </h3>
                         </div>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Highest overall quiz average scores (
-                          {selectedTimePeriod})
-                        </p>
-                      </div>
-                      <div className="p-6">
-                        {leaderboardData?.topPerformers?.length ? (
-                          <TopPerformersLeaderboard
-                            topPerformers={leaderboardData.topPerformers}
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <TrophyIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                            <p className="text-slate-500">
+                        <div className="p-6">
+                          {analytics.topPerformers.length > 0 ? (
+                            <div className="space-y-4">
+                              {analytics.topPerformers.map(
+                                (performer, index) => {
+                                  const categoryConfig =
+                                    CATEGORY_CONFIG[
+                                      performer.strongestCategory
+                                    ];
+                                  const IconComponent = categoryConfig.icon;
+
+                                  const userIdString =
+                                    typeof performer.userId === "object"
+                                      ? (performer.userId as any)._id ||
+                                        (performer.userId as any).toString()
+                                      : performer.userId;
+
+                                  return (
+                                    <div
+                                      key={userIdString}
+                                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                      onClick={() => {
+                                        console.log(
+                                          "Navigating to staff ID:",
+                                          userIdString,
+                                          "Type:",
+                                          typeof userIdString
+                                        );
+                                        window.open(
+                                          `/staff/${userIdString}`,
+                                          "_blank"
+                                        );
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full text-green-600 font-bold text-sm">
+                                        {index + 1}
+                                      </div>
+                                      <div className="flex-1">
+                                        <p className="font-medium text-gray-900">
+                                          {performer.userName}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                          <IconComponent className="h-4 w-4" />
+                                          <span>
+                                            Strongest: {categoryConfig.label}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-lg font-bold text-green-600">
+                                          {(
+                                            performer.overallAverageScore || 0
+                                          ).toFixed(1)}
+                                          %
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-center py-8">
                               No performance data available
                             </p>
-                            <p className="text-slate-400 text-sm">
-                              Complete quizzes to see rankings
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Phase 5: Category Champions */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
-                      <div className="flex items-center space-x-3">
-                        <AcademicCapIcon className="h-6 w-6 text-green-600" />
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          Category Champions
-                        </h2>
-                      </div>
-                      <p className="text-sm text-slate-600 mt-1">
-                        Best performers in each knowledge category
-                      </p>
-                    </div>
-                    <div className="p-6">
-                      {leaderboardData?.categoryChampions ? (
-                        <CategoryChampions
-                          categoryChampions={leaderboardData.categoryChampions}
-                        />
-                      ) : (
-                        <div className="text-center py-8">
-                          <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                          <p className="text-slate-500">
-                            No category data available
-                          </p>
-                          <p className="text-slate-400 text-sm">
-                            Complete category-specific quizzes to see champions
-                          </p>
+                          )}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Staff Needing Support */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-orange-50 px-6 py-4 border-b border-orange-200">
+                          <h3 className="text-lg font-semibold text-orange-900 flex items-center gap-2">
+                            <ExclamationTriangleIcon className="h-5 w-5" />
+                            Staff Needing Support
+                          </h3>
+                        </div>
+                        <div className="p-6">
+                          {analytics.staffNeedingSupport.length > 0 ? (
+                            <div className="space-y-4">
+                              {analytics.staffNeedingSupport.map(
+                                (staff, index) => {
+                                  const categoryConfig =
+                                    CATEGORY_CONFIG[staff.weakestCategory];
+                                  const IconComponent = categoryConfig.icon;
+
+                                  const userIdString =
+                                    typeof staff.userId === "object"
+                                      ? (staff.userId as any)._id ||
+                                        (staff.userId as any).toString()
+                                      : staff.userId;
+
+                                  return (
+                                    <div
+                                      key={userIdString}
+                                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                      onClick={() => {
+                                        console.log(
+                                          "Navigating to staff ID:",
+                                          userIdString,
+                                          "Type:",
+                                          typeof userIdString
+                                        );
+                                        window.open(
+                                          `/staff/${userIdString}`,
+                                          "_blank"
+                                        );
+                                      }}
+                                    >
+                                      <div className="flex-1">
+                                        <p className="font-medium text-gray-900">
+                                          {staff.userName}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                          <IconComponent className="h-4 w-4" />
+                                          <span>
+                                            Needs help: {categoryConfig.label}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-lg font-bold text-orange-600">
+                                          {(
+                                            staff.overallAverageScore || 0
+                                          ).toFixed(1)}
+                                          %
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-center py-8 flex flex-col items-center gap-2">
+                              <TrophyIcon className="h-8 w-8 text-green-500" />
+                              <span>All staff performing well!</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Score Distribution Chart */}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -763,6 +1077,290 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Category Champions */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center space-x-3">
+                        <AcademicCapIcon className="h-6 w-6 text-green-600" />
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Category Champions
+                        </h2>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Best performers in each knowledge category
+                      </p>
+                    </div>
+                    <div className="p-6">
+                      {leaderboardData?.categoryChampions ? (
+                        <CategoryChampions
+                          categoryChampions={leaderboardData.categoryChampions}
+                        />
+                      ) : (
+                        <div className="text-center py-8">
+                          <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <p className="text-slate-500">
+                            No category data available
+                          </p>
+                          <p className="text-slate-400 text-sm">
+                            Complete category-specific quizzes to see champions
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Enhanced Question Distribution */}
+                  {analytics && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Question Distribution by Category
+                        </h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                          {Object.entries(analytics.questionDistribution).map(
+                            ([category, distribution]) => {
+                              const config =
+                                CATEGORY_CONFIG[category as KnowledgeCategory];
+                              const IconComponent = config.icon;
+
+                              // Use type-safe property access
+                              const lightColorClass =
+                                "lightColor" in config
+                                  ? config.lightColor
+                                  : "bg-gray-50";
+
+                              return (
+                                <div
+                                  key={category}
+                                  className={`${lightColorClass} rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow`}
+                                >
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div
+                                      className={`p-2 ${config.color} rounded-lg`}
+                                    >
+                                      <IconComponent className="h-5 w-5 text-white" />
+                                    </div>
+                                    <h4
+                                      className={`font-medium ${config.textColor}`}
+                                    >
+                                      {config.label}
+                                    </h4>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">
+                                        Total:
+                                      </span>
+                                      <span className="font-medium">
+                                        {distribution.totalQuestions}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">
+                                        AI Generated:
+                                      </span>
+                                      <span className="font-medium">
+                                        {distribution.aiGenerated}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">
+                                        Manual:
+                                      </span>
+                                      <span className="font-medium">
+                                        {distribution.manuallyCreated}
+                                      </span>
+                                    </div>
+                                    <div className="mt-3 pt-2 border-t border-gray-200">
+                                      <div className="text-xs text-gray-500 text-center">
+                                        {Math.round(
+                                          (distribution.aiGenerated /
+                                            distribution.totalQuestions) *
+                                            100
+                                        )}
+                                        % AI Generated
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completion Time Analytics */}
+                  {analytics && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Overall Completion Time Stats */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 text-white">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <ClockIcon className="h-5 w-5" />
+                            Completion Time Analytics
+                          </h3>
+                        </div>
+                        <div className="p-6">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="text-center p-4 bg-indigo-50 rounded-lg">
+                              <p className="text-sm text-indigo-600 mb-1">
+                                Average Time
+                              </p>
+                              <p className="text-xl font-bold text-indigo-900">
+                                {analytics.completionTimeStats
+                                  ?.averageCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .averageCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-4 bg-green-50 rounded-lg">
+                              <p className="text-sm text-green-600 mb-1">
+                                Fastest Time
+                              </p>
+                              <p className="text-xl font-bold text-green-900">
+                                {analytics.completionTimeStats
+                                  ?.fastestCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .fastestCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-4 bg-orange-50 rounded-lg">
+                              <p className="text-sm text-orange-600 mb-1">
+                                Slowest Time
+                              </p>
+                              <p className="text-xl font-bold text-orange-900">
+                                {analytics.completionTimeStats
+                                  ?.slowestCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .slowestCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-4 bg-blue-50 rounded-lg">
+                              <p className="text-sm text-blue-600 mb-1">
+                                Total Quizzes
+                              </p>
+                              <p className="text-xl font-bold text-blue-900">
+                                {analytics.completionTimeStats
+                                  ?.totalQuizzesCompleted || 0}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Category Completion Times */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4 text-white">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <FireIcon className="h-5 w-5" />
+                            Average Completion Time by Category
+                          </h3>
+                        </div>
+                        <div className="p-6">
+                          {analytics.categoryCompletionTimes ? (
+                            <div className="grid grid-cols-1 gap-4">
+                              {Object.entries(
+                                analytics.categoryCompletionTimes
+                              ).map(([categoryKey, time]) => {
+                                // Find the matching category configuration
+                                const categoryConfig = Object.values(
+                                  CATEGORY_CONFIG
+                                ).find(
+                                  (config) =>
+                                    "timeKey" in config &&
+                                    config.timeKey === categoryKey
+                                );
+
+                                if (!categoryConfig) return null;
+
+                                const IconComponent = categoryConfig.icon;
+
+                                // Use type-safe property access for completion times
+                                const lightColorClass =
+                                  "lightColor" in categoryConfig
+                                    ? categoryConfig.lightColor
+                                    : "bg-gray-50";
+                                const borderColorClass =
+                                  "borderColor" in categoryConfig
+                                    ? categoryConfig.borderColor
+                                    : "border-gray-200";
+                                const colorClass =
+                                  "color" in categoryConfig
+                                    ? categoryConfig.color
+                                    : "bg-gray-500";
+
+                                return (
+                                  <div
+                                    key={categoryKey}
+                                    className={`${lightColorClass} ${borderColorClass} rounded-lg p-4 border-2 hover:shadow-md transition-shadow`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <div
+                                          className={`p-2 ${colorClass} rounded-lg`}
+                                        >
+                                          <IconComponent className="h-5 w-5 text-white" />
+                                        </div>
+                                        <h4
+                                          className={`font-medium ${categoryConfig.textColor} text-sm`}
+                                        >
+                                          {categoryConfig.label}
+                                        </h4>
+                                      </div>
+                                      <div className="text-right">
+                                        <p
+                                          className={`text-xl font-bold ${categoryConfig.textColor}`}
+                                        >
+                                          {formatCompletionTimeDetailed(time)}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          avg time
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <ClockIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                              <p className="text-gray-500">
+                                No category completion time data available
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Last Updated */}
+                  {analytics && (
+                    <div className="text-center text-sm text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <ClockIcon className="h-4 w-4" />
+                        <span>
+                          Analytics last updated:{" "}
+                          {new Date(analytics.lastUpdated).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

@@ -26,6 +26,16 @@ import {
   InformationCircleIcon,
   EyeIcon,
   ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ArchiveBoxIcon,
+  ChartBarIcon,
+  ListBulletIcon,
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  BookOpenIcon,
+  DocumentMagnifyingGlassIcon,
 } from "@heroicons/react/24/outline"; // Example icons for future edit/delete functionality
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
@@ -47,6 +57,16 @@ const SopDocumentDetailPage: React.FC = () => {
   // State for description editing
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [newDescription, setNewDescription] = useState("");
+
+  // State for content search and display
+  const [contentSearchTerm, setContentSearchTerm] = useState<string>("");
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({});
+  const [expandedSubCategories, setExpandedSubCategories] = useState<
+    Record<string, boolean>
+  >({});
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // State for category modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -370,33 +390,39 @@ const SopDocumentDetailPage: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-              <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-                {/* Document Header Section */}
-                <div className="p-6 md:p-8 border-b border-slate-200">
-                  <div className="flex items-start justify-between mb-3">
-                    {isEditingTitle ? (
-                      <div className="flex-grow mr-4">
-                        <input
-                          type="text"
-                          value={newTitle}
-                          onChange={handleTitleChange}
-                          onBlur={handleSaveTitle} // Save on blur
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && handleSaveTitle()
-                          } // Save on Enter
-                          autoFocus
-                          className="text-3xl font-bold text-slate-800 w-full border-b-2 border-indigo-500 focus:outline-none py-1.5"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                          Press Enter to save or click away.
-                        </p>
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                      <DocumentTextIcon className="h-8 w-8 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <button
+                          onClick={() => navigate("/sop-management")}
+                          className="flex items-center text-slate-300 hover:text-white transition-colors duration-200 text-sm"
+                        >
+                          <ArrowLeftIcon className="h-4 w-4 mr-1" />
+                          Back to SOP Management
+                        </button>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-300 text-sm">
+                          Document Details
+                        </span>
                       </div>
-                    ) : (
-                      <h1 className="text-3xl font-bold text-slate-800 flex-grow break-words mr-2">
+                      <h1 className="text-3xl font-bold text-white">
                         {document.title}
                       </h1>
-                    )}
+                      {document.description && (
+                        <p className="text-slate-300 mt-2 font-medium">
+                          {document.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
                     <button
                       onClick={() => {
                         if (isEditingTitle) {
@@ -406,108 +432,142 @@ const SopDocumentDetailPage: React.FC = () => {
                           setIsEditingTitle(true);
                         }
                       }}
-                      className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 shadow-lg px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                       title={isEditingTitle ? "Save Title" : "Edit Title"}
                     >
-                      <PencilIcon className="h-5 w-5" />
+                      <PencilIcon className="h-4 w-4" />
+                      Edit Details
                     </button>
-                  </div>
-
-                  {/* Display Description */}
-                  <div className="mb-4">
-                    {isEditingDescription ? (
-                      <div className="mt-2">
-                        <textarea
-                          value={newDescription}
-                          onChange={handleDescriptionChange}
-                          onBlur={handleSaveDescription}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" &&
-                            !e.shiftKey &&
-                            handleSaveDescription()
-                          } // Save on Enter (not Shift+Enter)
-                          autoFocus
-                          rows={4}
-                          className="text-md text-slate-700 w-full border-2 border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm p-2 resize-y"
-                          placeholder="Enter document description..."
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                          Press Enter (without Shift) to save or click away.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex items-start justify-between group">
-                        <p className="text-md text-slate-600 whitespace-pre-wrap flex-grow">
-                          {document.description || (
-                            <span className="italic text-slate-400">
-                              No description provided. Click the pencil to add
-                              one.
-                            </span>
-                          )}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setNewDescription(document.description || "");
-                            setIsEditingDescription(true);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors duration-150 ease-in-out ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-                          title="Edit Description"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                {/* Document Details Grid */}
-                <div className="p-6 md:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 border-b border-slate-200">
-                  {[
-                    {
-                      label: "Status",
-                      value:
-                        document.status.charAt(0).toUpperCase() +
-                        document.status.slice(1),
-                      colorClass:
-                        document.status === "processed"
-                          ? "text-green-600"
-                          : document.status === "processing_error"
-                          ? "text-red-600"
-                          : "text-yellow-600",
-                    },
-                    {
-                      label: "File Type",
-                      value: (document.fileType || "N/A").toUpperCase(),
-                    },
-                    {
-                      label: "Uploaded At",
-                      value: document.uploadedAt
-                        ? format(new Date(document.uploadedAt), "MMM yyyy")
-                        : "N/A",
-                    },
-                    {
-                      label: "Last Updated",
-                      value: document.updatedAt
-                        ? format(new Date(document.updatedAt), "dd MMM yyyy, p")
-                        : "N/A",
-                    },
-                  ].map((detail) => (
-                    <div
-                      key={detail.label}
-                      className="bg-slate-50 p-4 rounded-lg shadow-sm border border-slate-200"
-                    >
-                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        {detail.label}
-                      </h3>
-                      <p
-                        className={`text-md font-medium ${
-                          detail.colorClass || "text-slate-800"
-                        }`}
-                      >
-                        {detail.value}
+                {/* Status and Statistics Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Status
+                        </p>
+                        <p className="text-lg font-bold text-white capitalize">
+                          {document.status.replace("_", " ")}
+                        </p>
+                      </div>
+                      {document.status === "processed" ? (
+                        <CheckCircleIcon className="h-8 w-8 text-green-400" />
+                      ) : document.status === "processing_error" ? (
+                        <ExclamationTriangleIcon className="h-8 w-8 text-red-400" />
+                      ) : document.status === "archived" ? (
+                        <ArchiveBoxIcon className="h-8 w-8 text-gray-400" />
+                      ) : (
+                        <ClockIcon className="h-8 w-8 text-amber-400" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Categories
+                        </p>
+                        <p className="text-lg font-bold text-white">
+                          {document.categories?.length || 0}
+                        </p>
+                      </div>
+                      <ListBulletIcon className="h-8 w-8 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          File Type
+                        </p>
+                        <p className="text-lg font-bold text-white">
+                          {(document.fileType || "PDF").toUpperCase()}
+                        </p>
+                      </div>
+                      <DocumentTextIcon className="h-8 w-8 text-purple-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Uploaded
+                        </p>
+                        <p className="text-lg font-bold text-white">
+                          {document.uploadedAt
+                            ? format(new Date(document.uploadedAt), "MMM yyyy")
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <ClockIcon className="h-8 w-8 text-emerald-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-slate-200">
+                {/* Edit Forms Section */}
+                <div className="p-6 md:p-8 border-b border-slate-200">
+                  {isEditingTitle && (
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Document Title
+                      </label>
+                      <input
+                        type="text"
+                        value={newTitle}
+                        onChange={handleTitleChange}
+                        onBlur={handleSaveTitle}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleSaveTitle()
+                        }
+                        autoFocus
+                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold"
+                        placeholder="Enter document title..."
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Press Enter to save or click away
                       </p>
                     </div>
-                  ))}
+                  )}
+
+                  {isEditingDescription && (
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Document Description
+                      </label>
+                      <textarea
+                        value={newDescription}
+                        onChange={handleDescriptionChange}
+                        onBlur={handleSaveDescription}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" &&
+                          !e.shiftKey &&
+                          handleSaveDescription()
+                        }
+                        autoFocus
+                        rows={4}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                        placeholder="Enter document description..."
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Press Enter (without Shift) to save or click away
+                      </p>
+                    </div>
+                  )}
+
+                  {!isEditingTitle && !isEditingDescription && (
+                    <div className="text-center py-4">
+                      <p className="text-slate-600 mb-4">
+                        Use the "Edit Details" button in the header to modify
+                        the document title and description.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {document.errorMessage &&
@@ -520,61 +580,488 @@ const SopDocumentDetailPage: React.FC = () => {
                     </div>
                   )}
 
-                {/* Categories Section */}
+                {/* Enhanced Content Display Section */}
                 <div className="p-6 md:p-8">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-semibold text-slate-700">
-                      Document Content & Categories
-                    </h2>
+                  {/* Header with Search and Actions */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <BookOpenIcon className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-slate-900">
+                          Document Content
+                        </h2>
+                        <p className="text-slate-600 mt-1">
+                          {document.categories?.length || 0} categories found •
+                          Extracted and organized content
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="flex items-center space-x-3">
-                      {" "}
-                      {/* Container for buttons */}
+                      {document.categories &&
+                        document.categories.length > 0 && (
+                          <div className="relative">
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Search content..."
+                              value={contentSearchTerm}
+                              onChange={(e) =>
+                                setContentSearchTerm(e.target.value)
+                              }
+                              className="pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+                            />
+                          </div>
+                        )}
                       <button
                         onClick={handleAddTopLevelCategory}
-                        className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                        className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors border border-blue-200"
                       >
-                        <PlusIcon className="h-5 w-5 mr-1.5" />
+                        <PlusIcon className="h-4 w-4 mr-2" />
                         Add Category
                       </button>
                     </div>
                   </div>
 
                   {document.categories && document.categories.length > 0 ? (
-                    <RecursiveCategoryList
-                      categories={document.categories}
-                      {...categoryModalTriggers}
-                    />
+                    <div className="space-y-6">
+                      {/* Content Overview */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <DocumentMagnifyingGlassIcon className="h-8 w-8 text-blue-600" />
+                            <div>
+                              <h3 className="text-lg font-semibold text-slate-900">
+                                Content Structure
+                              </h3>
+                              <p className="text-slate-600">
+                                AI-extracted and categorized content from your
+                                document
+                              </p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                            <div className="bg-white rounded-lg p-3 shadow-sm">
+                              <div className="text-2xl font-bold text-blue-600">
+                                {document.categories.length}
+                              </div>
+                              <div className="text-xs text-slate-600">
+                                Categories
+                              </div>
+                            </div>
+                            <div className="bg-white rounded-lg p-3 shadow-sm">
+                              <div className="text-2xl font-bold text-green-600">
+                                {document.categories.reduce((total, cat) => {
+                                  const countSubcategories = (
+                                    category: any
+                                  ): number => {
+                                    return (
+                                      1 +
+                                      (category.subcategories || []).reduce(
+                                        (sum: number, sub: any) =>
+                                          sum + countSubcategories(sub),
+                                        0
+                                      )
+                                    );
+                                  };
+                                  return total + countSubcategories(cat);
+                                }, 0)}
+                              </div>
+                              <div className="text-xs text-slate-600">
+                                Total Items
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Category Display */}
+                      <div className="space-y-4">
+                        {document.categories.map((category, index) => (
+                          <div
+                            key={category._id || index}
+                            className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+                          >
+                            {/* Category Header */}
+                            <div
+                              className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 cursor-pointer hover:from-slate-100 hover:to-slate-200 transition-all duration-200"
+                              onClick={() => {
+                                const categoryKey =
+                                  category._id || `category-${index}`;
+                                setExpandedCategories((prev) => ({
+                                  ...prev,
+                                  [categoryKey]: !prev[categoryKey],
+                                }));
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="p-2 bg-blue-100 rounded-lg">
+                                    {expandedCategories[
+                                      category._id || `category-${index}`
+                                    ] ? (
+                                      <ChevronDownIcon className="h-5 w-5 text-blue-600" />
+                                    ) : (
+                                      <ChevronRightIcon className="h-5 w-5 text-blue-600" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <h3 className="text-lg font-semibold text-slate-900">
+                                      {category.name}
+                                    </h3>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-slate-500 bg-slate-200 px-2 py-1 rounded">
+                                    {(category.subCategories || []).length + 1}{" "}
+                                    items
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTriggerEditCategory(category);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                  >
+                                    <PencilIcon className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteCategory(category);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Category Content */}
+                            {expandedCategories[
+                              category._id || `category-${index}`
+                            ] && (
+                              <div className="p-6 bg-white">
+                                {/* Main Content */}
+                                {category.content && (
+                                  <div className="mb-6">
+                                    <div className="flex items-center space-x-2 mb-3">
+                                      <DocumentTextIcon className="h-5 w-5 text-slate-500" />
+                                      <h4 className="font-medium text-slate-900">
+                                        Content
+                                      </h4>
+                                    </div>
+                                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                      <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed">
+                                        {category.content.split("\n").map(
+                                          (paragraph: string, pIndex: number) =>
+                                            paragraph.trim() && (
+                                              <p
+                                                key={pIndex}
+                                                className="mb-3 last:mb-0"
+                                              >
+                                                {contentSearchTerm &&
+                                                paragraph
+                                                  .toLowerCase()
+                                                  .includes(
+                                                    contentSearchTerm.toLowerCase()
+                                                  ) ? (
+                                                  <span
+                                                    dangerouslySetInnerHTML={{
+                                                      __html: paragraph.replace(
+                                                        new RegExp(
+                                                          `(${contentSearchTerm})`,
+                                                          "gi"
+                                                        ),
+                                                        '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
+                                                      ),
+                                                    }}
+                                                  />
+                                                ) : (
+                                                  paragraph
+                                                )}
+                                              </p>
+                                            )
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Subcategories */}
+                                {category.subCategories &&
+                                  category.subCategories.length > 0 && (
+                                    <div>
+                                      <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-2">
+                                          <ListBulletIcon className="h-5 w-5 text-slate-500" />
+                                          <h4 className="font-medium text-slate-900">
+                                            Subcategories (
+                                            {category.subCategories?.length ||
+                                              0}
+                                            )
+                                          </h4>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                          <button
+                                            onClick={() => {
+                                              const allSubcatKeys =
+                                                category.subCategories?.map(
+                                                  (subcat, subIndex) =>
+                                                    subcat._id ||
+                                                    `subcat-${category._id}-${subIndex}`
+                                                ) || [];
+                                              const allExpanded =
+                                                allSubcatKeys.every(
+                                                  (key) =>
+                                                    expandedSubCategories[key]
+                                                );
+                                              const newState: Record<
+                                                string,
+                                                boolean
+                                              > = {};
+                                              allSubcatKeys.forEach((key) => {
+                                                newState[key] = !allExpanded;
+                                              });
+                                              setExpandedSubCategories(
+                                                (prev) => ({
+                                                  ...prev,
+                                                  ...newState,
+                                                })
+                                              );
+                                            }}
+                                            className="text-xs text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors"
+                                          >
+                                            {category.subCategories?.every(
+                                              (subcat, subIndex) =>
+                                                expandedSubCategories[
+                                                  subcat._id ||
+                                                    `subcat-${category._id}-${subIndex}`
+                                                ]
+                                            )
+                                              ? "Collapse All"
+                                              : "Expand All"}
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleTriggerAddSubCategory(
+                                                category
+                                              )
+                                            }
+                                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                                          >
+                                            <PlusIcon className="h-4 w-4" />
+                                            <span>Add Subcategory</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-3">
+                                        {category.subCategories.map(
+                                          (
+                                            subcat: ISopCategory,
+                                            subIndex: number
+                                          ) => {
+                                            const subcatKey =
+                                              subcat._id ||
+                                              `subcat-${category._id}-${subIndex}`;
+                                            const isSubcatExpanded =
+                                              expandedSubCategories[subcatKey];
+
+                                            return (
+                                              <div
+                                                key={subcat._id || subIndex}
+                                                className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm"
+                                              >
+                                                {/* Subcategory Header */}
+                                                <div
+                                                  className="p-3 bg-gradient-to-r from-slate-25 to-slate-50 border-b border-slate-150 cursor-pointer hover:from-slate-50 hover:to-slate-100 transition-all duration-200"
+                                                  onClick={() => {
+                                                    setExpandedSubCategories(
+                                                      (prev) => ({
+                                                        ...prev,
+                                                        [subcatKey]:
+                                                          !prev[subcatKey],
+                                                      })
+                                                    );
+                                                  }}
+                                                >
+                                                  <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-2">
+                                                      <div className="p-1 bg-slate-200 rounded">
+                                                        {isSubcatExpanded ? (
+                                                          <ChevronDownIcon className="h-3 w-3 text-slate-600" />
+                                                        ) : (
+                                                          <ChevronRightIcon className="h-3 w-3 text-slate-600" />
+                                                        )}
+                                                      </div>
+                                                      <h5 className="font-medium text-slate-800 text-sm">
+                                                        {subcat.name}
+                                                      </h5>
+                                                      {subcat.content && (
+                                                        <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
+                                                          {
+                                                            subcat.content
+                                                              .split("\n")
+                                                              .filter((p) =>
+                                                                p.trim()
+                                                              ).length
+                                                          }{" "}
+                                                          paragraphs
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <div className="flex items-center space-x-1">
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleTriggerEditCategory(
+                                                            subcat
+                                                          );
+                                                        }}
+                                                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                        title="Edit subcategory"
+                                                      >
+                                                        <PencilIcon className="h-3 w-3" />
+                                                      </button>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleDeleteCategory(
+                                                            subcat
+                                                          );
+                                                        }}
+                                                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        title="Delete subcategory"
+                                                      >
+                                                        <TrashIcon className="h-3 w-3" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+
+                                                {/* Subcategory Content */}
+                                                {isSubcatExpanded &&
+                                                  subcat.content && (
+                                                    <div className="p-4 bg-white">
+                                                      <div className="text-sm text-slate-700 leading-relaxed">
+                                                        {subcat.content
+                                                          .split("\n")
+                                                          .map(
+                                                            (
+                                                              paragraph: string,
+                                                              pIndex: number
+                                                            ) =>
+                                                              paragraph.trim() && (
+                                                                <p
+                                                                  key={pIndex}
+                                                                  className="mb-3 last:mb-0"
+                                                                >
+                                                                  {contentSearchTerm &&
+                                                                  paragraph
+                                                                    .toLowerCase()
+                                                                    .includes(
+                                                                      contentSearchTerm.toLowerCase()
+                                                                    ) ? (
+                                                                    <span
+                                                                      dangerouslySetInnerHTML={{
+                                                                        __html:
+                                                                          paragraph.replace(
+                                                                            new RegExp(
+                                                                              `(${contentSearchTerm})`,
+                                                                              "gi"
+                                                                            ),
+                                                                            '<mark class="bg-yellow-200 px-1 rounded">$1</mark>'
+                                                                          ),
+                                                                      }}
+                                                                    />
+                                                                  ) : (
+                                                                    paragraph
+                                                                  )}
+                                                                </p>
+                                                              )
+                                                          )}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                {/* Empty content state */}
+                                                {isSubcatExpanded &&
+                                                  !subcat.content && (
+                                                    <div className="p-4 bg-slate-25 text-center">
+                                                      <p className="text-sm text-slate-500 italic">
+                                                        No content available for
+                                                        this subcategory
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                              </div>
+                                            );
+                                          }
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Action Buttons */}
+                                <div className="mt-6 pt-4 border-t border-slate-200 flex items-center space-x-3">
+                                  <button
+                                    onClick={() =>
+                                      handleTriggerAddSubCategory(category)
+                                    }
+                                    className="flex items-center text-sm text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-md transition-colors"
+                                  >
+                                    <PlusIcon className="h-4 w-4 mr-1" />
+                                    Add Subcategory
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleTriggerEditCategory(category)
+                                    }
+                                    className="flex items-center text-sm text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-md transition-colors"
+                                  >
+                                    <PencilIcon className="h-4 w-4 mr-1" />
+                                    Edit Category
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
-                    <div className="text-center py-10 px-6 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
-                      <svg
-                        className="mx-auto h-12 w-12 text-slate-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path
-                          vectorEffect="non-scaling-stroke"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                        />
-                      </svg>
-                      <h3 className="mt-2 text-sm font-medium text-slate-900">
-                        No categories found.
+                    <div className="text-center py-16 px-8">
+                      <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-slate-100 mb-6">
+                        <BookOpenIcon className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                        No content extracted yet
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        This document may not have been processed yet, or it has
-                        no structured content.
+                      <p className="text-slate-600 mb-8 max-w-md mx-auto">
+                        {document.status === "processed"
+                          ? "This document has been processed but no structured content was found. You can manually add categories to organize the content."
+                          : "This document is being processed. Once complete, the extracted content and categories will appear here."}
                       </p>
                       {(document.status === "pending_upload" ||
                         document.status === "pending_processing" ||
                         document.status === "processing") && (
-                        <p className="mt-2 text-sm text-blue-600">
-                          Processing is currently in progress.
-                        </p>
+                        <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
+                          <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                          <span className="text-sm font-medium">
+                            Processing in progress...
+                          </span>
+                        </div>
                       )}
+                      <button
+                        onClick={handleAddTopLevelCategory}
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors border border-blue-200"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add First Category
+                      </button>
                     </div>
                   )}
                 </div>
@@ -613,7 +1100,7 @@ const SopDocumentDetailPage: React.FC = () => {
                     </div>
                   )}
               </div>
-            </main>
+            </div>
           </div>
         </div>
       </main>

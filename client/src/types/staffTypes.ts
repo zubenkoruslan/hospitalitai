@@ -71,6 +71,7 @@ export interface StaffMemberWithData {
   createdAt: string;
   professionalRole?: string;
   assignedRoleId?: string;
+  assignedRoleName?: string; // ADDED: Role name for display
   quizProgressSummaries: ClientQuizProgressSummary[];
   averageScore: number | null;
   quizzesTaken: number;

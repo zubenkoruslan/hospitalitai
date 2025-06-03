@@ -20,6 +20,12 @@ import {
   DocumentTextIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  MagnifyingGlassIcon,
+  ArrowLeftIcon,
+  ClipboardDocumentListIcon,
+  ChartBarIcon,
+  CubeIcon,
+  CalendarIcon,
 } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
@@ -141,41 +147,86 @@ const MenuItemsPage: React.FC = () => {
     "food"
   );
 
+  // Search functionality
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
+
+  // Filtered items based on search term
+  const filteredItems = useMemo(() => {
+    if (!items || !searchTerm.trim()) return items;
+
+    const search = searchTerm.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search) ||
+        item.category?.toLowerCase().includes(search) ||
+        item.ingredients?.some((ingredient) =>
+          ingredient.toLowerCase().includes(search)
+        )
+    );
+  }, [items, searchTerm]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const currentItems = filteredItems || [];
+    const foodItems = currentItems.filter((item) => item.itemType === "food");
+    const beverageItems = currentItems.filter(
+      (item) => item.itemType === "beverage"
+    );
+    const wineItems = currentItems.filter((item) => item.itemType === "wine");
+
+    const currentTabItems =
+      activeTab === "food"
+        ? foodItems
+        : activeTab === "beverage"
+        ? beverageItems
+        : wineItems;
+
+    return {
+      totalItems: currentItems.length,
+      foodCount: foodItems.length,
+      beverageCount: beverageItems.length,
+      wineCount: wineItems.length,
+      currentTabCount: currentTabItems.length,
+      hasSearchResults: searchTerm.trim() !== "",
+    };
+  }, [filteredItems, activeTab, searchTerm]);
 
   // New: Memoize unique food, beverage, and wine categories separately
   const uniqueFoodCategories = useMemo(() => {
-    if (!items) return [];
+    if (!filteredItems) return [];
     return [
       ...new Set(
-        items
+        filteredItems
           .filter((item) => item.itemType === "food" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [items]);
+  }, [filteredItems]);
 
   const uniqueBeverageCategories = useMemo(() => {
-    if (!items) return [];
+    if (!filteredItems) return [];
     return [
       ...new Set(
-        items
+        filteredItems
           .filter((item) => item.itemType === "beverage" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [items]);
+  }, [filteredItems]);
 
   const uniqueWineCategories = useMemo(() => {
-    if (!items) return [];
+    if (!filteredItems) return [];
     return [
       ...new Set(
-        items
+        filteredItems
           .filter((item) => item.itemType === "wine" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [items]);
+  }, [filteredItems]);
 
   // Effect to initialize editing fields when menuDetails load or change
   useEffect(() => {
@@ -337,11 +388,11 @@ const MenuItemsPage: React.FC = () => {
   // --- Data Grouping for Display ---
   // Memoize grouped items to avoid recalculation on every render
   const groupedItemsByTypeAndCategory = useMemo(() => {
-    if (!items || items.length === 0) {
+    if (!filteredItems || filteredItems.length === 0) {
       return { food: {}, beverage: {}, wine: {} }; // Ensure structure exists
     }
 
-    return items.reduce(
+    return filteredItems.reduce(
       (acc, item) => {
         const typeKey = item.itemType; // "food", "beverage", or "wine"
         const categoryKey = toTitleCase(item.category || "Uncategorized");
@@ -362,7 +413,7 @@ const MenuItemsPage: React.FC = () => {
         Record<string, MenuItem[]> // Categories within that type
       >
     );
-  }, [items]);
+  }, [filteredItems]);
 
   // --- Toggle Category Expansion ---
   const toggleCategory = useCallback((categoryName: string) => {
@@ -427,45 +478,99 @@ const MenuItemsPage: React.FC = () => {
 
   // --- Tab Navigation UI ---
   const renderTabs = () => (
-    <div className="mb-6 border-b border-gray-200 bg-white shadow-sm rounded-t-lg px-4 sm:px-6">
-      <nav className="-mb-px flex space-x-6 sm:space-x-8" aria-label="Tabs">
-        <button
-          type="button"
-          onClick={() => setActiveTab("food")}
-          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
-            activeTab === "food"
-              ? "border-indigo-600 text-indigo-700"
-              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
-          }`}
-          aria-current={activeTab === "food" ? "page" : undefined}
-        >
-          Food Items
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("beverage")}
-          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
-            activeTab === "beverage"
-              ? "border-indigo-600 text-indigo-700"
-              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
-          }`}
-          aria-current={activeTab === "beverage" ? "page" : undefined}
-        >
-          Beverage Items
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("wine")}
-          className={`whitespace-nowrap py-3 px-3 sm:py-4 sm:px-4 border-b-2 font-semibold text-sm transition-colors duration-150 focus:outline-none ${
-            activeTab === "wine"
-              ? "border-indigo-600 text-indigo-700"
-              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-400"
-          }`}
-          aria-current={activeTab === "wine" ? "page" : undefined}
-        >
-          Wine Items
-        </button>
-      </nav>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Tab Header with Search */}
+      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <h3 className="text-lg font-semibold text-slate-900">Menu Items</h3>
+            <span className="text-sm text-slate-600">
+              {stats.hasSearchResults
+                ? `${stats.currentTabCount} found`
+                : `${stats.currentTabCount} total`}
+            </span>
+          </div>
+          <div className="relative max-w-md flex-1">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 bg-white px-6">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("food")}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
+              activeTab === "food"
+                ? "border-amber-600 text-amber-700 bg-amber-50/50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            <CubeIcon className="h-4 w-4" />
+            <span>Food</span>
+            <span
+              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
+                activeTab === "food"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {stats.foodCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("beverage")}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
+              activeTab === "beverage"
+                ? "border-amber-600 text-amber-700 bg-amber-50/50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            <ChartBarIcon className="h-4 w-4" />
+            <span>Beverages</span>
+            <span
+              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
+                activeTab === "beverage"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {stats.beverageCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("wine")}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
+              activeTab === "wine"
+                ? "border-amber-600 text-amber-700 bg-amber-50/50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            <CalendarIcon className="h-4 w-4" />
+            <span>Wines</span>
+            <span
+              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
+                activeTab === "wine"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {stats.wineCount}
+            </span>
+          </button>
+        </nav>
+      </div>
     </div>
   );
 
@@ -490,33 +595,47 @@ const MenuItemsPage: React.FC = () => {
       Object.keys(itemsToDisplay).some((cat) => itemsToDisplay[cat].length > 0);
 
     if (!hasItemsInTab) {
+      const isEmptyDueToSearch = stats.hasSearchResults && searchTerm.trim();
+
       return (
-        <Card className="bg-white shadow-sm rounded-b-lg p-6 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              vectorEffect="non-scaling-stroke"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0l-3-3m-10 3l-3-3m10 0l-4 4m-2 0l-4-4"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            No {activeTab} items in this menu yet.
+        <div className="bg-white rounded-b-2xl p-12 text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
+            {isEmptyDueToSearch ? (
+              <MagnifyingGlassIcon className="h-8 w-8 text-slate-400" />
+            ) : (
+              <CubeIcon className="h-8 w-8 text-slate-400" />
+            )}
+          </div>
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">
+            {isEmptyDueToSearch
+              ? `No ${activeTab} items found`
+              : `No ${activeTab} items yet`}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Add a new item or switch tabs to view other items.
+          <p className="text-slate-600 mb-8 max-w-md mx-auto">
+            {isEmptyDueToSearch
+              ? `Try adjusting your search criteria or add new ${activeTab} items to this menu.`
+              : `Get started by adding your first ${activeTab} item to this menu.`}
           </p>
-          <Button variant="primary" onClick={openAddModal} className="mt-6">
-            Add Menu Item
-          </Button>
-        </Card>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+            {isEmptyDueToSearch && (
+              <Button
+                variant="secondary"
+                onClick={() => setSearchTerm("")}
+                className="flex items-center gap-2"
+              >
+                Clear Search
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              onClick={openAddModal}
+              className="flex items-center gap-2"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Item
+            </Button>
+          </div>
+        </div>
       );
     }
 
@@ -537,7 +656,7 @@ const MenuItemsPage: React.FC = () => {
     }
 
     return (
-      <div className="bg-white shadow-sm rounded-b-lg p-4 sm:p-6">
+      <div className="bg-white rounded-b-2xl p-6">
         {displayCategoriesOrder.map((category) => {
           const itemsInCategory = itemsToDisplay[category];
           if (!itemsInCategory || itemsInCategory.length === 0) return null;
@@ -556,52 +675,72 @@ const MenuItemsPage: React.FC = () => {
 
           return (
             <div key={uniqueCategoryKey} className="mb-6 last:mb-0">
-              <div
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100 transition-colors duration-150 border border-gray-200 shadow-sm"
-                onClick={() => toggleCategory(uniqueCategoryKey)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ")
-                    toggleCategory(uniqueCategoryKey);
-                }}
-                aria-expanded={!!expandedCategories[uniqueCategoryKey]}
-                aria-controls={`category-items-${uniqueCategoryKey}`}
-              >
-                <h3 className="text-lg font-medium text-gray-700 flex items-center">
-                  {toTitleCase(category)}
-                  {expandedCategories[uniqueCategoryKey] ? (
-                    <ChevronUpIcon className="h-5 w-5 ml-2 text-gray-500" />
-                  ) : (
-                    <ChevronDownIcon className="h-5 w-5 ml-2 text-gray-500" />
-                  )}
-                </h3>
-                {category !== "Uncategorized" && (
-                  <Button
-                    variant="destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDeleteCategoryModal(category);
-                    }}
-                    className="text-xs z-10 relative px-2 py-1"
-                    aria-label={`Delete ${category} category`}
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
+                <div
+                  className="flex justify-between items-center p-4 bg-gradient-to-r from-slate-50 to-slate-100 cursor-pointer hover:from-slate-100 hover:to-slate-200 transition-all duration-200"
+                  onClick={() => toggleCategory(uniqueCategoryKey)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      toggleCategory(uniqueCategoryKey);
+                  }}
+                  aria-expanded={!!expandedCategories[uniqueCategoryKey]}
+                  aria-controls={`category-items-${uniqueCategoryKey}`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <ClipboardDocumentListIcon className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {toTitleCase(category)}
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        {itemsInCategory.length} item
+                        {itemsInCategory.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {category !== "Uncategorized" && (
+                      <Button
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteCategoryModal(category);
+                        }}
+                        className="text-xs px-3 py-1 shadow-sm"
+                        aria-label={`Delete ${category} category`}
+                      >
+                        <TrashIcon className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
+                    )}
+                    <div className="p-1">
+                      {expandedCategories[uniqueCategoryKey] ? (
+                        <ChevronUpIcon className="h-5 w-5 text-slate-400" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {expandedCategories[uniqueCategoryKey] && (
+                  <div
+                    id={`category-items-${uniqueCategoryKey}`}
+                    className="p-4 bg-white border-t border-slate-200"
                   >
-                    <TrashIcon className="h-4 w-4 mr-1 inline-block" /> Delete
-                  </Button>
+                    <MenuItemList
+                      items={itemsInCategory}
+                      onEdit={openEditModal}
+                      onDelete={openDeleteModal}
+                    />
+                  </div>
                 )}
               </div>
-              {expandedCategories[uniqueCategoryKey] && (
-                <div
-                  id={`category-items-${uniqueCategoryKey}`}
-                  className="mt-1 p-3 border border-gray-200 border-t-0 rounded-b-md bg-white shadow-inner"
-                >
-                  <MenuItemList
-                    items={itemsInCategory}
-                    onEdit={openEditModal}
-                    onDelete={openDeleteModal}
-                  />
-                </div>
-              )}
             </div>
           );
         })}
@@ -697,46 +836,109 @@ const MenuItemsPage: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
               {/* Header Section */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                  {/* Title and Description Section */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
                       <DocumentTextIcon className="h-8 w-8 text-white" />
                     </div>
-                    <div className="space-y-1">
-                      <h1 className="text-3xl font-bold text-slate-900">
+                    <div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <button
+                          onClick={() => navigate("/menu")}
+                          className="flex items-center text-slate-300 hover:text-white transition-colors duration-200 text-sm"
+                        >
+                          <ArrowLeftIcon className="h-4 w-4 mr-1" />
+                          Back to Menus
+                        </button>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-300 text-sm">
+                          Menu Items
+                        </span>
+                      </div>
+                      <h1 className="text-3xl font-bold text-white">
                         {menuDetails.name}
                       </h1>
                       {menuDetails.description && (
-                        <p className="text-slate-600 text-lg">
+                        <p className="text-slate-300 mt-2 font-medium">
                           {menuDetails.description}
                         </p>
                       )}
-                      <p className="text-sm text-slate-500">
-                        Manage menu items and categories
-                      </p>
                     </div>
                   </div>
-
-                  {/* Action Buttons Section */}
-                  <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                  <div className="flex items-center space-x-3">
                     <Button
                       variant="secondary"
                       onClick={openMenuDetailsModal}
-                      className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
                     >
-                      <PencilIcon className="h-4 w-4" />
-                      <span>Edit Menu Details</span>
+                      <PencilIcon className="h-5 w-5 mr-2" />
+                      Edit Menu
                     </Button>
                     <Button
                       variant="primary"
                       onClick={openAddModal}
-                      className="flex items-center justify-center space-x-2 flex-1 sm:flex-none"
+                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-lg"
                     >
-                      <PlusIcon className="h-4 w-4" />
-                      <span>Add New Item</span>
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Add Item
                     </Button>
+                  </div>
+                </div>
+
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Total Items
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.totalItems}
+                        </p>
+                      </div>
+                      <ClipboardDocumentListIcon className="h-8 w-8 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Food Items
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.foodCount}
+                        </p>
+                      </div>
+                      <CubeIcon className="h-8 w-8 text-green-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Beverages
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.beverageCount}
+                        </p>
+                      </div>
+                      <ChartBarIcon className="h-8 w-8 text-purple-400" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Wines
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {stats.wineCount}
+                        </p>
+                      </div>
+                      <CalendarIcon className="h-8 w-8 text-amber-400" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -767,11 +969,13 @@ const MenuItemsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Render tabs */}
-              {renderTabs()}
-
-              {/* Render categorized items or placeholder */}
-              {!loading && renderCategorizedItems()}
+              {/* Render tabs and categorized items */}
+              {!loading && (
+                <>
+                  {renderTabs()}
+                  <div className="mt-6">{renderCategorizedItems()}</div>
+                </>
+              )}
             </div>
 
             {/* Modals */}

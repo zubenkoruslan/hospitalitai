@@ -1009,11 +1009,11 @@ const RestaurantDashboard: React.FC = () => {
                       {/* Link to enhanced analytics */}
                       <div className="mt-4">
                         <Link
-                          to="/knowledge-analytics"
+                          to="/staff-results"
                           className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                         >
                           <ChartBarIcon className="h-4 w-4 mr-2" />
-                          View Detailed Analytics
+                          View Comprehensive Analytics
                         </Link>
                       </div>
                     </div>

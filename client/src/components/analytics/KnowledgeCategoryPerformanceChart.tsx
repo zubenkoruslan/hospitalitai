@@ -31,7 +31,7 @@ ChartJS.register(
 // Interface for category performance data
 export interface CategoryPerformanceData {
   category: KnowledgeCategory;
-  averageAccuracy: number;
+  averageScore: number;
   staffParticipation: number;
   totalQuestions: number;
   improvementTrend: number;
@@ -91,8 +91,8 @@ const KnowledgeCategoryPerformanceChart: React.FC<
     labels: data.map((item) => CATEGORY_CONFIG[item.category].label),
     datasets: [
       {
-        label: "Average Accuracy (%)",
-        data: data.map((item) => Math.round(item.averageAccuracy * 10) / 10),
+        label: "Average Score (%)",
+        data: data.map((item) => Math.round(item.averageScore * 10) / 10),
         backgroundColor: data.map(
           (item) => CATEGORY_CONFIG[item.category].color
         ),
@@ -241,7 +241,7 @@ const KnowledgeCategoryPerformanceChart: React.FC<
                     {config.label}
                   </p>
                   <p className="text-lg font-bold text-gray-900">
-                    {Math.round(categoryData.averageAccuracy)}%
+                    {Math.round(categoryData.averageScore)}%
                   </p>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>{categoryData.totalQuestions} questions</span>
@@ -274,7 +274,7 @@ const KnowledgeCategoryPerformanceChart: React.FC<
       <div className="mt-4 space-y-2">
         {data.map((categoryData) => {
           const config = CATEGORY_CONFIG[categoryData.category];
-          const performance = categoryData.averageAccuracy;
+          const performance = categoryData.averageScore;
 
           let insight = "";
           let insightColor = "";
@@ -300,7 +300,7 @@ const KnowledgeCategoryPerformanceChart: React.FC<
             >
               <span className="text-sm font-medium">{config.label}</span>
               <span className="text-sm">
-                {insight} ({Math.round(categoryData.averageAccuracy)}%)
+                {insight} ({Math.round(categoryData.averageScore)}%)
               </span>
             </div>
           );

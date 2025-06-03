@@ -22,6 +22,7 @@ import {
   getRestaurantQuizStaffProgressController,
   resetQuizProgressController,
   updateQuizController,
+  getAllIncorrectAnswersForStaffController,
 } from "../controllers/quizController";
 
 const router: Router = express.Router();
@@ -277,6 +278,20 @@ router.post(
   validateQuizIdParam,
   handleValidationErrors,
   resetQuizProgressController
+);
+
+/**
+ * @route   GET /api/quiz/staff/:staffId/all-incorrect-answers
+ * @desc    Get all incorrect answers across all quiz attempts for a specific staff member
+ * @access  Private (Staff member themselves, or Restaurant managers)
+ * @query   quizId - Optional: Filter incorrect answers for a specific quiz
+ */
+router.get(
+  "/staff/:staffId/all-incorrect-answers",
+  restrictTo("restaurantAdmin", "manager", "staff", "restaurant"),
+  validateObjectId("staffId"),
+  handleValidationErrors,
+  getAllIncorrectAnswersForStaffController
 );
 
 export default router;

@@ -90,7 +90,9 @@ const StaffResultsTable: React.FC<StaffResultsTableProps> = ({
                     </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {staffMember.professionalRole || "N/A"}
+                    {staffMember.assignedRoleName ||
+                      staffMember.professionalRole ||
+                      "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                     {staffMember.quizzesTaken}

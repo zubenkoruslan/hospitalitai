@@ -22,6 +22,10 @@ import {
   ClipboardDocumentListIcon,
   DocumentIcon,
   InformationCircleIcon,
+  MagnifyingGlassIcon,
+  ListBulletIcon,
+  ChartBarIcon,
+  BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
 import { useMenus } from "../hooks/useMenus";
@@ -71,6 +75,7 @@ const MenusPage: React.FC = () => {
   // Local state for page-specific success messages, modals, form data, etc.
   const [pageError, setPageError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Modal state
   const [isAddMenuModalOpen, setIsAddMenuModalOpen] = useState<boolean>(false);
@@ -89,6 +94,27 @@ const MenusPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
+
+  // Filtered menus based on search
+  const filteredMenus = useMemo(() => {
+    if (!searchTerm.trim()) return menus;
+
+    const search = searchTerm.toLowerCase();
+    return menus.filter(
+      (menu) =>
+        menu.name.toLowerCase().includes(search) ||
+        menu.description?.toLowerCase().includes(search)
+    );
+  }, [menus, searchTerm]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    return {
+      totalMenus: menus.length,
+      totalFiltered: filteredMenus.length,
+      hasSearchResults: searchTerm.trim() !== "",
+    };
+  }, [menus, filteredMenus, searchTerm]);
 
   // Effect to refetch menus if navigated with newMenuImported state
   useEffect(() => {
@@ -229,23 +255,84 @@ const MenusPage: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
+            {/* Header Section */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg mb-8">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Menu Management
-                  </h1>
-                  <p className="text-gray-600 mt-2">
-                    Manage your restaurant's menus and menu items.
-                  </p>
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                    <BuildingStorefrontIcon className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-white">
+                      Menu Management
+                    </h1>
+                    <p className="text-slate-300 mt-2 font-medium">
+                      Manage your restaurant's menus and menu items
+                    </p>
+                  </div>
                 </div>
-                <Link to="/menu-upload-path">
-                  <Button variant="primary">
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Add New Menu
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="secondary"
+                    onClick={openPdfUploadModal}
+                    className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
+                  >
+                    <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+                    Upload PDF
                   </Button>
-                </Link>
+                  <Link to="/menu-upload-path">
+                    <Button
+                      variant="primary"
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Create Menu
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-300 text-sm font-medium">
+                        Total Menus
+                      </p>
+                      <p className="text-2xl font-bold text-white">
+                        {stats.totalMenus}
+                      </p>
+                    </div>
+                    <DocumentTextIcon className="h-8 w-8 text-blue-400" />
+                  </div>
+                </div>
+                <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-300 text-sm font-medium">
+                        {stats.hasSearchResults ? "Filtered" : "Showing"}
+                      </p>
+                      <p className="text-2xl font-bold text-white">
+                        {stats.totalFiltered}
+                      </p>
+                    </div>
+                    <ListBulletIcon className="h-8 w-8 text-emerald-400" />
+                  </div>
+                </div>
+                <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-300 text-sm font-medium">
+                        Restaurant
+                      </p>
+                      <p className="text-lg font-bold text-white truncate">
+                        {user?.restaurantName || "My Restaurant"}
+                      </p>
+                    </div>
+                    <ChartBarIcon className="h-8 w-8 text-purple-400" />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -274,86 +361,149 @@ const MenusPage: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="bg-white shadow-sm rounded-2xl border border-slate-200 overflow-hidden">
+              {/* Search and Actions Bar */}
+              {menus.length > 0 && (
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="relative max-w-md flex-1">
+                      <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search menus..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="secondary"
+                        onClick={openAddModal}
+                        className="flex items-center gap-2"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        <span className="hidden sm:inline">Create Menu</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={openPdfUploadModal}
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowUpTrayIcon className="h-4 w-4" />
+                        <span className="hidden sm:inline">Upload PDF</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
               {isLoading && menus.length === 0 && (
                 <div className="flex justify-center items-center py-20">
                   <LoadingSpinner message="Loading menus..." />
                 </div>
               )}
 
+              {/* Empty State */}
               {!isLoading && menus.length === 0 && !menusError && (
                 <div className="text-center py-20 px-8">
-                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
-                    <DocumentTextIcon className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                    No menus found
+                  <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No menus yet
                   </h3>
-                  <p className="text-slate-600 mb-8 max-w-md mx-auto">
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">
                     Get started by creating your first menu or uploading a PDF
-                    menu to automatically extract items.
+                    menu to automatically extract items
                   </p>
-                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <Button
-                      variant="primary"
-                      onClick={openAddModal}
-                      className="w-full sm:w-auto"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-2" /> Create First Menu
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+                    <Button variant="primary" onClick={openAddModal}>
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create First Menu
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={openPdfUploadModal}
-                      className="w-full sm:w-auto"
-                    >
-                      <ArrowUpTrayIcon className="h-5 w-5 mr-2" /> Upload PDF
-                      Menu
+                    <Button variant="secondary" onClick={openPdfUploadModal}>
+                      <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
+                      Upload PDF Menu
                     </Button>
                   </div>
                 </div>
               )}
 
-              {menus.length > 0 && (
-                <div className="p-8">
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {menus.map((menu) => (
+              {/* No Search Results */}
+              {!isLoading &&
+                menus.length > 0 &&
+                filteredMenus.length === 0 &&
+                searchTerm.trim() && (
+                  <div className="text-center py-16 px-8">
+                    <MagnifyingGlassIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No menus found
+                    </h3>
+                    <p className="text-gray-500 mb-6">
+                      Try adjusting your search criteria or create a new menu
+                    </p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      Clear Search
+                    </Button>
+                  </div>
+                )}
+
+              {/* Menu Grid */}
+              {filteredMenus.length > 0 && (
+                <div className="p-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {filteredMenus.map((menu) => (
                       <div
                         key={menu._id}
-                        className="bg-slate-50 border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-slate-300 transition-all duration-200 group"
+                        className="bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden group"
                       >
-                        <div className="flex flex-col h-full">
-                          <div className="flex-1">
-                            <Link
-                              to={`/menu/${menu._id}`}
-                              className="block hover:no-underline"
-                            >
-                              <h3 className="text-lg font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors mb-2">
-                                {menu.name}
-                              </h3>
-                            </Link>
-                            <p className="text-sm text-slate-600 line-clamp-2 min-h-[2.5rem]">
-                              {menu.description || (
-                                <span className="italic text-slate-400">
-                                  No description provided
-                                </span>
-                              )}
-                            </p>
+                        <div className="p-6">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1 min-w-0">
+                              <Link
+                                to={`/menu/${menu._id}`}
+                                className="block hover:no-underline"
+                              >
+                                <h3 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                                  {menu.name}
+                                </h3>
+                              </Link>
+                            </div>
+                            <div className="ml-2 flex-shrink-0">
+                              <DocumentTextIcon className="h-5 w-5 text-gray-400" />
+                            </div>
                           </div>
 
-                          <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
+                          <p className="text-sm text-gray-600 line-clamp-2 mb-4 min-h-[2.5rem]">
+                            {menu.description || (
+                              <span className="italic text-gray-400">
+                                No description provided
+                              </span>
+                            )}
+                          </p>
+
+                          <div className="flex items-center text-xs text-gray-500 mb-4">
+                            <span>
+                              Created{" "}
+                              {new Date(menu.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                             <Link to={`/menu/${menu._id}`}>
                               <Button
                                 variant="secondary"
-                                aria-label={`View items in ${menu.name}`}
-                                className="text-sm px-4 py-2"
+                                className="text-sm px-3 py-2"
                               >
-                                <EyeIcon className="h-4 w-4 mr-1" />
+                                <EyeIcon className="h-4 w-4 mr-1.5" />
                                 View Items
                               </Button>
                             </Link>
                             <Button
                               variant="destructive"
                               onClick={() => openDeleteModal(menu)}
-                              aria-label={`Delete ${menu.name}`}
                               className="text-sm p-2"
                             >
                               <TrashIcon className="h-4 w-4" />
