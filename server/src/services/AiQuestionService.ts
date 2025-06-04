@@ -27,6 +27,15 @@ import {
   QuestionTaggingService,
   TaggingContext,
 } from "./questionTaggingService";
+import {
+  IMPROVED_SYSTEM_INSTRUCTIONS,
+  QUESTION_GENERATION_CONFIG,
+} from "../utils/questionGenerationConstants";
+import {
+  validateGeneratedQuestions,
+  ValidationResult,
+  RawAiGeneratedQuestion as ValidationRawQuestion,
+} from "../utils/questionValidation";
 
 // Define the schema for the function call for Gemini to generate questions
 const questionGenerationFunctionSchema: FunctionDeclaration = {
@@ -148,122 +157,13 @@ if (GEMINI_API_KEY) {
   );
 }
 
-// System instruction for the AI - REVISED with Knowledge Category Integration
-const _systemInstructionForQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for hospitality staff training with knowledge category awareness. Your goal is to generate clear, accurate, and relevant questions based *strictly* on the provided menu item information and the additional context of other items/ingredients from the same menu.
+// NEW: Improved System instruction - dramatically simplified and focused on answer leakage prevention
+const _systemInstructionForQuestionGeneration =
+  IMPROVED_SYSTEM_INSTRUCTIONS.MENU;
 
-**KNOWLEDGE CATEGORIES**: Focus on these four knowledge categories when creating questions:
-1. **Food Knowledge**: Ingredients, allergens, nutrition, preparation methods, menu items, dietary restrictions, cooking methods, food safety
-2. **Beverage Knowledge**: Coffee, tea, soft drinks, juices, cocktails, mixed drinks, preparation techniques, equipment, temperature requirements
-3. **Wine Knowledge**: Varieties, regions, vintages, pairings, service, storage, tasting notes, production, grape types, wine styles, serving temperature
-4. **Procedures Knowledge**: Safety protocols, hygiene standards, service procedures, opening/closing procedures, emergency protocols, customer service
-
-**IMPORTANT - CATEGORY-SPECIFIC QUESTION FOCUS**:
-- **For WINE menu categories** (e.g., "Wine List", "Wines", "Red Wines", "White Wines", etc.): Focus on Wine Knowledge aspects like grape varieties, wine regions, vintages, wine pairings, serving temperature, wine styles, producers, tasting notes
-- **For BEVERAGE menu categories** (e.g., "Cocktails", "Drinks", "Beverages"): Focus on Beverage Knowledge aspects like drink preparation, ingredients, mixing techniques, garnishes
-- **For FOOD menu categories** (e.g., "Starters", "Mains", "Desserts"): Focus on Food Knowledge aspects like ingredients, allergens, preparation methods, dietary restrictions
-
-**CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
-
-You will be provided with the following for each question generation request:
-- 'itemsInCategory': An array of objects, where each object contains details of a menu item within the target category (e.g., name, description, ingredients list, allergens).
-- 'categoryName': The menu category these items belong to.
-- 'questionFocusAreas': A list of general themes or aspects to generate questions about (e.g., ["Ingredients", "Allergens"]).
-- 'questionTypes': The types of questions to generate (e.g., ["multiple-choice-single", "true-false"]).
-- 'contextualItemNames' (for MCQ distractors): An array of other item names from the menu (potentially from other categories).
-- 'contextualIngredients' (for MCQ distractors): An array of ingredients found across other items on the menu.
-- 'targetQuestionCount': The total number of questions to generate for this entire batch of items in the category.
-
-All generated questions should be of 'medium' difficulty. The 'difficulty' field should NOT be included in your output data structure.
-
-General Instructions for Question Generation:
-1.  **Adherence**: Base questions on the 'itemsInCategory'. Distribute questions among the items in the category.
-2.  **Correctness**: The CORRECT ANSWER must always be based *only* on the information provided for the specific item a question refers to.
-3.  **Clarity**: Ensure questions are grammatically correct, clear, and unambiguous.
-4.  **Explanation**: ALWAYS provide a brief 'explanation' for the correct answer, referencing the relevant item\'s details.
-5.  **Focus Field**: In your output for each question, populate the 'focus' field with the primary theme of that question (e.g., "Ingredients", "Allergens", "Dietary Information"). This should align with the input 'questionFocusAreas'.
-6.  **Category Field**: The 'category' field in your output MUST match the 'categoryName' provided in the input, or if a question is very specific to an item, that item\'s original category if it differs (though typically items in the batch share the categoryName).
-7.  **Question Distribution**: Attempt to generate a balanced set of questions covering different items within the 'itemsInCategory' and different 'questionFocusAreas', up to the 'targetQuestionCount'.
-
-Multiple Choice Questions (MCQ - 'multiple-choice-single'):
-- Provide one correct answer and three plausible but incorrect distractor options (total 4 options).
-- Distractors MUST be clearly wrong for the item the question is about.
-- **Item-Specific MCQs** (e.g., focusing on one item from 'itemsInCategory'):
-    - For ingredients: "Which of the following are key ingredients in [Item Name from batch]?"
-    - For allergens: "Regarding dietary information for [Item Name from batch], which statement is correct?"
-- **Category-Wide MCQs** (e.g., comparing items in 'itemsInCategory'):
-    - "Which of these [categoryName] items is listed as vegan?"
-    - "Which item in the [categoryName] category contains [specific ingredient]?"
-
-True/False Questions ('true-false'):
-- Create a clear statement about a specific item from 'itemsInCategory' that is definitively true or false.
-- Provide two options: {"text": "True", "isCorrect": ...} and {"text": "False", "isCorrect": ...}.
-- Example: "[Item Name from batch] is described as spicy." (True/False based on its description)
-
-Output Format (ensure your function call adheres to this for EACH question - OMIT the 'difficulty' field):
-{
-  "questionText": "...",
-  "questionType": "multiple-choice-single", // or "true-false"
-  "options": [ // For T/F: [{text: "True", isCorrect: true/false}, {text: "False", isCorrect: true/false}]
-    {"text": "Option A", "isCorrect": false},
-    {"text": "Option B", "isCorrect": true}
-    // ... up to 4 options for MCQ
-  ],
-  "category": "match input categoryName, or specific item\'s category if distinct and relevant",
-  "explanation": "Brief explanation of why the answer is correct, based on item details.",
-  "focus": "derived focus of the question (e.g., 'Ingredients', 'Allergens')"
-}
-
-Generate 'targetQuestionCount' questions based on these instructions, distributing them across the provided 'itemsInCategory'.
-`;
-
-// ADDED: System instruction for SOP/Policy Question Generation with Knowledge Category Integration
-const _systemInstructionForSopQuestionGeneration = `System: You are an AI assistant specialized in creating quiz questions for employee training based on Standard Operating Procedures (SOPs), policies, and instructional documents with knowledge category awareness.
-
-**KNOWLEDGE CATEGORIES**: When creating questions, consider these four knowledge categories:
-1. **Food Knowledge**: Food safety protocols, ingredient handling, nutrition guidelines, allergen management, preparation standards
-2. **Beverage Knowledge**: Beverage preparation protocols, equipment operation, temperature standards, ingredient handling
-3. **Wine Knowledge**: Wine service protocols, storage procedures, pairing guidelines, temperature requirements
-4. **Procedures Knowledge**: Safety protocols, hygiene standards, service procedures, opening/closing procedures, emergency protocols, customer service standards
-
-**CRITICAL INSTRUCTION: You MUST use the 'extract_generated_questions' function to provide your response. Do NOT provide a text-based response or explanation. Your ONLY output should be the function call with the generated question data. Adhere strictly to the schema provided for the 'extract_generated_questions' function.**
-
-You will be provided with the following for each question generation request:
-- 'sopCategoryName': The name of the category/section from the SOP document.
-- 'sopCategoryText': The full text content of that SOP category/section.
-- 'questionTypes': The types of questions to generate (e.g., ["multiple-choice-single", "true-false"]). If multiple types are provided, please try to alternate between them or provide a balanced mix for the 'targetQuestionCount'.
-- 'targetQuestionCount': The total number of questions to generate from this SOP category text.
-
-All generated questions should be of 'medium' difficulty. The 'difficulty' field should NOT be included in your output data structure.
-
-General Instructions for Question Generation:
-1.  **Adherence**: Base questions strictly on the provided 'sopCategoryText'.
-2.  **Correctness**: The CORRECT ANSWER must always be verifiable from the 'sopCategoryText'.
-3.  **Clarity**: Ensure questions are grammatically correct, clear, and unambiguous.
-4.  **Explanation**: ALWAYS provide a brief 'explanation' for the correct answer, referencing the relevant part of the 'sopCategoryText' if possible.
-5.  **Focus Field**: In your output for each question, populate the 'focus' field with a concise keyword or phrase describing the main topic of the question derived from the SOP (e.g., "Fire Extinguisher Types", "Hand Washing Steps", "Data Privacy Clause").
-6.  **Category Field**: The 'category' field in your output MUST match the 'sopCategoryName' provided in the input.
-7.  **Question Distribution**: If the 'sopCategoryText' is long, attempt to generate questions covering different aspects of it, up to the 'targetQuestionCount'.
-
-Multiple Choice Questions (MCQ - 'multiple-choice-single'):
-- Provide one correct answer and three plausible but incorrect distractor options (total 4 options).
-- Distractors should be relevant to the SOP context but clearly incorrect according to the 'sopCategoryText'.
-
-True/False Questions ('true-false'):
-- Create a clear statement based on the 'sopCategoryText' that is definitively true or false according to that text.
-- Provide two options: {"text": "True", "isCorrect": ...} and {"text": "False", "isCorrect": ...}.
-
-Output Format (ensure your function call adheres to this for EACH question, using the existing 'extract_generated_questions' schema - OMIT the 'difficulty' field):
-{
-  "questionText": "...",
-  "questionType": "multiple-choice-single", // or "true-false"
-  "options": [ /* ...options... */ ],
-  "category": "match input sopCategoryName",
-  "explanation": "Brief explanation of why the answer is correct, based on sopCategoryText.",
-  "focus": "derived focus of the question (e.g., \"Emergency Exits\")"
-}
-
-Generate 'targetQuestionCount' questions based on these instructions from the provided 'sopCategoryText'.
-`;
+// NEW: Improved SOP System instruction - simplified and focused on answer leakage prevention
+const _systemInstructionForSopQuestionGeneration =
+  IMPROVED_SYSTEM_INSTRUCTIONS.SOP;
 
 // Refactored LLM API call function using Gemini SDK
 async function _callGeminiApiForQuestionGeneration(
@@ -652,7 +552,77 @@ class AiQuestionService {
               // We can add fallbacks or overrides here if necessary.
               q.category = q.category || task.categoryName; // Fallback to task's category if AI omits
             });
-            return generatedQuestionsFromAI;
+
+            // NEW: Apply validation to each batch of generated questions
+            console.log(
+              `[AiQuestionService] Validating ${generatedQuestionsFromAI.length} questions for category: ${task.categoryName}`
+            );
+
+            const validationResult = await this.validateAndImproveQuestions(
+              generatedQuestionsFromAI,
+              task.itemsInCategory,
+              task.categoryName
+            );
+
+            // Log validation results
+            if (validationResult.rejectedQuestions.length > 0) {
+              console.warn(
+                `[AiQuestionService] Rejected ${validationResult.rejectedQuestions.length} questions due to quality issues for category: ${task.categoryName}`
+              );
+            }
+
+            // ENFORCE MINIMUM QUALITY THRESHOLD - Reject entire batch if too low
+            if (
+              validationResult.report.score <
+              QUESTION_GENERATION_CONFIG.MIN_QUALITY_SCORE
+            ) {
+              console.warn(
+                `[AiQuestionService] REJECTING ENTIRE BATCH due to low quality score (${validationResult.report.score}) for category: ${task.categoryName}. Minimum required: ${QUESTION_GENERATION_CONFIG.MIN_QUALITY_SCORE}`
+              );
+
+              // Log specific issues for debugging
+              console.warn(
+                `[AiQuestionService] Quality Issues in rejected batch:`
+              );
+              validationResult.report.issues.forEach((issue, idx) => {
+                console.warn(`  ${idx + 1}. ${issue}`);
+              });
+
+              // Log sample questions for debugging
+              console.warn(
+                `[AiQuestionService] Sample questions from rejected batch:`
+              );
+              generatedQuestionsFromAI.slice(0, 2).forEach((q, idx) => {
+                console.warn(
+                  `  Q${idx + 1}: "${q.questionText.substring(0, 100)}..."`
+                );
+                console.warn(`  Options: ${q.options.length} total`);
+              });
+
+              return []; // Return no questions from this batch
+            }
+
+            // ENFORCE MINIMUM VALID QUESTION COUNT - Need at least 50% valid questions
+            const validQuestionRatio =
+              validationResult.validQuestions.length /
+              generatedQuestionsFromAI.length;
+            if (validQuestionRatio < 0.5) {
+              console.warn(
+                `[AiQuestionService] REJECTING ENTIRE BATCH due to low valid question ratio (${(
+                  validQuestionRatio * 100
+                ).toFixed(1)}%) for category: ${
+                  task.categoryName
+                }. Need at least 50% valid questions.`
+              );
+              return []; // Return no questions from this batch
+            }
+
+            console.log(
+              `[AiQuestionService] BATCH ACCEPTED for category: ${task.categoryName}. Quality score: ${validationResult.report.score}, Valid questions: ${validationResult.validQuestions.length}/${generatedQuestionsFromAI.length}`
+            );
+
+            // Return only valid questions
+            return validationResult.validQuestions;
           } catch (error: any) {
             // Added type any to error for generic handling
             console.error(
@@ -826,6 +796,171 @@ class AiQuestionService {
       }
     }
     return savedQuestions;
+  }
+
+  /**
+   * NEW: Validate and improve generated questions using our validation system
+   * This implements the quality validation from our refactor plan
+   */
+  public static async validateAndImproveQuestions(
+    questions: RawAiGeneratedQuestion[],
+    originalItems: IMenuItem[],
+    categoryName: string
+  ): Promise<{
+    validQuestions: RawAiGeneratedQuestion[];
+    report: ValidationResult;
+    rejectedQuestions: RawAiGeneratedQuestion[];
+  }> {
+    console.log(
+      `[AiQuestionService - validateAndImproveQuestions] Validating ${questions.length} questions for category: ${categoryName}`
+    );
+
+    // Convert IMenuItem[] to SimplifiedMenuItem[] for validation
+    const simplifiedItems = originalItems.map((item) => ({
+      name: item.name,
+      description: item.description || "",
+      keyIngredients: getIngredientNamesForPrompt(item.ingredients),
+      allergens: item.allergens || [],
+      category: item.category || categoryName,
+      wineDetails:
+        item.category && /wine/i.test(item.category)
+          ? {
+              wineStyle: (item as any).wineStyle,
+              grapeVariety: (item as any).grapeVariety,
+              region: (item as any).region,
+              producer: (item as any).producer,
+              vintage: (item as any).vintage,
+            }
+          : undefined,
+    }));
+
+    const context = {
+      categoryName,
+      items: simplifiedItems,
+      targetCount: questions.length,
+    };
+
+    // Convert RawAiGeneratedQuestion[] to ValidationRawQuestion[] for validation
+    const validationQuestions: ValidationRawQuestion[] = questions.map((q) => ({
+      ...q,
+      focus: q.focus || "general",
+      category: q.category || categoryName,
+    }));
+
+    const validation = validateGeneratedQuestions(
+      validationQuestions,
+      simplifiedItems,
+      context
+    );
+
+    // Filter questions based on validation results - STRICTER ENFORCEMENT
+    const validQuestions: RawAiGeneratedQuestion[] = [];
+    const rejectedQuestions: RawAiGeneratedQuestion[] = [];
+
+    questions.forEach((q, index) => {
+      // Check if this specific question has validation issues
+      const questionHasLeakage = validation.issues.some(
+        (issue) =>
+          issue.includes(`Question ${index + 1}:`) &&
+          (issue.includes("answer leaked") ||
+            issue.includes("visible in question"))
+      );
+
+      const questionHasVagueReference = validation.issues.some(
+        (issue) =>
+          issue.includes(`Question ${index + 1}:`) &&
+          issue.includes("vague reference")
+      );
+
+      const questionHasCriticalIssues = validation.issues.some(
+        (issue) =>
+          issue.includes(`Question ${index + 1}:`) &&
+          (issue.includes("No clear menu item reference") ||
+            issue.includes("Must have exactly") ||
+            issue.includes("duplicate options"))
+      );
+
+      const questionHasMinorIssues = validation.issues.some(
+        (issue) =>
+          issue.includes(`Question ${index + 1}:`) &&
+          !questionHasLeakage &&
+          !questionHasVagueReference &&
+          !questionHasCriticalIssues
+      );
+
+      // REJECT: Questions with answer leakage (critical issue)
+      if (questionHasLeakage) {
+        console.warn(
+          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to answer leakage: "${q.questionText.substring(
+            0,
+            100
+          )}..."`
+        );
+        rejectedQuestions.push(q);
+      }
+      // REJECT: Questions with vague references (quality issue)
+      else if (questionHasVagueReference) {
+        console.warn(
+          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to vague reference: "${q.questionText.substring(
+            0,
+            100
+          )}..."`
+        );
+        rejectedQuestions.push(q);
+      }
+      // REJECT: Questions with critical structural issues
+      else if (questionHasCriticalIssues) {
+        console.warn(
+          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to critical issues: "${q.questionText.substring(
+            0,
+            100
+          )}..."`
+        );
+        rejectedQuestions.push(q);
+      }
+      // ACCEPT: Only questions with minor issues or no issues
+      else if (questionHasMinorIssues) {
+        console.warn(
+          `[AiQuestionService - validateAndImproveQuestions] Accepting question with minor issues: "${q.questionText.substring(
+            0,
+            100
+          )}..."`
+        );
+        validQuestions.push(q);
+      }
+      // ACCEPT: Questions with no issues
+      else {
+        validQuestions.push(q);
+      }
+    });
+
+    console.log(
+      `[AiQuestionService - validateAndImproveQuestions] Results: ${validQuestions.length} valid, ${rejectedQuestions.length} rejected. Quality Score: ${validation.score}`
+    );
+
+    // Log specific issues for debugging
+    if (validation.issues.length > 0) {
+      console.warn(
+        `[AiQuestionService - validateAndImproveQuestions] Validation Issues:\n${validation.issues.join(
+          "\n"
+        )}`
+      );
+    }
+
+    // Log recommendations
+    if (validation.recommendations.length > 0) {
+      console.log(
+        `[AiQuestionService - validateAndImproveQuestions] Recommendations:\n${validation.recommendations.join(
+          "\n"
+        )}`
+      );
+    }
+
+    return {
+      validQuestions,
+      report: validation,
+      rejectedQuestions,
+    };
   }
 
   // Helper to get menu item details

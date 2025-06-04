@@ -113,7 +113,7 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       type: String,
       required: [true, "Menu item name is required"],
       trim: true,
-      maxlength: [100, "Item name cannot exceed 100 characters"],
+      maxlength: [200, "Item name cannot exceed 200 characters"],
     },
     description: {
       type: String,

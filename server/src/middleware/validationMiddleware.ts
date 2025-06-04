@@ -721,8 +721,8 @@ export const validateCreateItemBody: ValidationChain[] = [
   body("name", "Item name is required and must be a string")
     .isString()
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage("Item name must be between 2 and 100 characters"),
+    .isLength({ min: 2, max: 200 })
+    .withMessage("Item name must be between 2 and 200 characters"),
   body("menuId", "Menu ID is required and must be a valid MongoID").isMongoId(),
   body("itemType", "Item type is required").isString().trim().notEmpty(), // Could add .isIn(ITEM_TYPES) if ITEM_TYPES is accessible here
   body("category", "Category is required and must be a non-empty string")
@@ -764,8 +764,8 @@ export const validateUpdateItemBody: ValidationChain[] = [
     .optional()
     .isString()
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage("Item name must be between 2 and 100 characters"),
+    .isLength({ min: 2, max: 200 })
+    .withMessage("Item name must be between 2 and 200 characters"),
   body("menuId", "Menu ID must be a valid MongoID") // Usually not updated this way, but if allowed
     .optional()
     .isMongoId(),
@@ -1155,8 +1155,8 @@ export const validateProcessConflictResolutionData: ValidationChain[] = [
     .isString()
     .notEmpty()
     .withMessage("Each item name.value must be a non-empty string.")
-    .isLength({ min: 1, max: 100 }) // Assuming item names can be up to 100, align with MenuItem model if different
-    .withMessage("Item name.value must be between 1 and 100 characters."),
+    .isLength({ min: 1, max: 200 }) // Increased to 200 to accommodate longer menu item descriptions
+    .withMessage("Item name.value must be between 1 and 200 characters."),
 
   // Add validation for required fields that might be missing
   body("itemsToProcess.*.fields.itemType")
