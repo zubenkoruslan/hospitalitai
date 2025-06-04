@@ -7,6 +7,9 @@ import QuestionModel, {
 } from "../models/QuestionModel";
 import QuestionBankModel from "../models/QuestionBankModel";
 import { AppError } from "../utils/errorHandler";
+import MenuItemModel, { IMenuItem } from "../models/MenuItemModel";
+import MenuModel, { IMenu } from "../models/MenuModel";
+import AiQuestionService, { RawAiGeneratedQuestion } from "./AiQuestionService";
 
 // Interface for the data needed to create a new question
 export interface NewQuestionData {
@@ -378,6 +381,14 @@ interface IMenuDocument extends mongoose.Document {
 export const generateAiQuestionsService = async (
   params: AiGenerationParams
 ): Promise<IQuestion[]> => {
+  console.log("[AI Question Generation] Starting with params:", {
+    restaurantId: params.restaurantId,
+    menuId: params.menuId,
+    bankId: params.bankId,
+    categoriesToFocus: params.categoriesToFocus,
+    numQuestionsPerItem: params.numQuestionsPerItem,
+  });
+
   try {
     const {
       restaurantId,
@@ -385,7 +396,7 @@ export const generateAiQuestionsService = async (
       bankId,
       itemIds,
       categoriesToFocus,
-      numQuestionsPerItem = 1, // Default to 1 question per item if not specified
+      numQuestionsPerItem = 2, // Default to 2 questions per item
     } = params;
 
     // 1. Fetch the Question Bank to get its categories
@@ -400,33 +411,16 @@ export const generateAiQuestionsService = async (
       );
     }
     const bankCategories = questionBank.categories || [];
+    console.log(
+      "[AI Question Generation] Question bank found with categories:",
+      bankCategories
+    );
 
-    // 2. Fetch the Menu and its items
-    // TODO: Replace with actual MenuModel and populate items if necessary
-    // const menu = await MenuModel.findOne({ _id: menuId, restaurantId }).populate('items');
-    // For now, using a placeholder for menu and items.
-    // Ensure MenuModel is imported and IMenuDocument/IMenuItemSubDocument match your models.
-
-    // Example: Using a placeholder for menu items for now.
-    // You'll need to replace this with actual database fetching and type for MenuModel
-    const MenuModel = mongoose.model<IMenuDocument>(
-      "Menu",
-      new mongoose.Schema({
-        name: String,
-        restaurantId: mongoose.Schema.Types.ObjectId,
-        items: [
-          new mongoose.Schema({
-            name: String,
-            description: String,
-            category: String,
-          }),
-        ],
-      })
-    ); // Define a placeholder MenuModel if not imported
-
-    const menu = await MenuModel.findOne({ _id: menuId, restaurantId })
-      // .populate<{ items: IMenuItemSubDocument[] }>("items") // Example of typed populate
-      .exec();
+    // 2. Fetch the Menu and verify it exists
+    const menu = await MenuModel.findOne({
+      _id: menuId,
+      restaurantId,
+    });
 
     if (!menu) {
       throw new AppError(
@@ -434,120 +428,126 @@ export const generateAiQuestionsService = async (
         404
       );
     }
+    console.log("[AI Question Generation] Menu found:", menu.name);
 
-    let menuItemsToProcess: IMenuItemSubDocument[] = [];
-    if (menu.items && menu.items.length > 0) {
-      // Ensure items are populated if they are ObjectIds
-      // This check handles if 'items' are already populated objects or need population.
-      // This is a simplified check; robust population check might be needed.
-      if (menu.items[0] instanceof mongoose.Types.ObjectId) {
-        // If items are ObjectIds, you'd need to populate them.
-        // This example assumes they are either populated or the schema structure is simpler.
-        // For a real scenario: await menu.populate('items');
-        // menuItemsToProcess = menu.items as IMenuItemSubDocument[]; // after population
-        throw new AppError(
-          "Menu items are not populated. Implement population for MenuModel.",
-          500
-        );
-      } else {
-        menuItemsToProcess = menu.items as IMenuItemSubDocument[];
-      }
-    }
+    // 3. Fetch menu items based on criteria
+    let menuItemsToProcess: IMenuItem[] = [];
 
-    // Filter items if itemIds or categoriesToFocus are provided
     if (itemIds && itemIds.length > 0) {
-      const selectedItemIds = new Set(itemIds);
-      menuItemsToProcess = menuItemsToProcess.filter((item) =>
-        selectedItemIds.has(item._id.toString())
+      // Use specific item IDs
+      menuItemsToProcess = await MenuItemModel.find({
+        _id: { $in: itemIds },
+        restaurantId,
+        isActive: true,
+      });
+      console.log(
+        `[AI Question Generation] Found ${menuItemsToProcess.length} specific items`
       );
     } else if (categoriesToFocus && categoriesToFocus.length > 0) {
-      const selectedMenuCategories = new Set(categoriesToFocus);
-      menuItemsToProcess = menuItemsToProcess.filter(
-        (item) => item.category && selectedMenuCategories.has(item.category)
+      // Use category filtering
+      menuItemsToProcess = await MenuItemModel.find({
+        menuId: menuId,
+        restaurantId,
+        category: { $in: categoriesToFocus },
+        isActive: true,
+      });
+      console.log(
+        `[AI Question Generation] Found ${menuItemsToProcess.length} items in categories:`,
+        categoriesToFocus
+      );
+    } else {
+      // Use all items from the menu
+      menuItemsToProcess = await MenuItemModel.find({
+        menuId: menuId,
+        restaurantId,
+        isActive: true,
+      });
+      console.log(
+        `[AI Question Generation] Found ${menuItemsToProcess.length} total items`
       );
     }
 
     if (menuItemsToProcess.length === 0) {
-      // No items to process, maybe return empty or throw error
-      // For now, returning empty array as no questions can be generated
+      console.log("[AI Question Generation] No items found matching criteria");
       return [];
-      // Or: throw new AppError("No menu items found matching the criteria for AI generation.", 404);
     }
 
-    const allGeneratedQuestionsData: NewQuestionData[] = [];
+    // 4. Prepare parameters for the real AI service
+    const aiServiceParams = {
+      menuId: menuId,
+      itemIds: itemIds,
+      categoriesToFocus: categoriesToFocus || bankCategories,
+      questionFocusAreas: [
+        "ingredients",
+        "allergens",
+        "preparation",
+        "description",
+      ], // Smart focus areas
+      targetQuestionCountPerItemFocus: numQuestionsPerItem,
+      questionTypes: ["multiple-choice-single", "true-false"], // Standard question types
+      additionalContext: `Restaurant menu analysis for hospitality training. Focus on practical knowledge needed for restaurant staff.`,
+      restaurantId: restaurantId.toString(),
+    };
 
-    // 3. Iterate through selected menu items and generate questions
-    for (const menuItem of menuItemsToProcess) {
-      // Prepare context for AI based on menuItem
-      // let _aiContext = `Menu Item: ${menuItem.name}. Description: ${ // Removed unused variable declaration
-      //   menuItem.description || "N/A"
-      // }. Category: ${menuItem.category || "N/A"}.`;
-
-      // Simulate AI Call - Placeholder for actual Gemini API call
-      // TODO: Replace this section with your actual AI question generation logic
-      // The AI should ideally return: questionText, questionType, options, and its derived category (menuItem.category)
-      // For each item, generate 'numQuestionsPerItem' questions
-      for (let i = 0; i < numQuestionsPerItem; i++) {
-        // --- Placeholder AI Generation Start ---
-        const aiGeneratedContent: AiGeneratedQuestionContent = {
-          questionText: `What is special about ${menuItem.name}? (Variation ${
-            i + 1
-          })`,
-          questionType: "multiple-choice-single", // Example
-          options: [
-            { text: "Option A for " + menuItem.name, isCorrect: true },
-            { text: "Option B for " + menuItem.name, isCorrect: false },
-            { text: "Option C for " + menuItem.name, isCorrect: false },
-          ],
-          category: menuItem.category || "General", // AI should determine this from context or be told
-          difficulty: "medium",
-        };
-        // --- Placeholder AI Generation End ---
-
-        // Merge categories: menuItem's category + bank's categories
-        const combinedCategories = new Set<string>();
-        if (menuItem.category) {
-          combinedCategories.add(menuItem.category);
-        }
-        bankCategories.forEach((cat) => combinedCategories.add(cat));
-
-        const questionData: NewQuestionData = {
-          questionText: aiGeneratedContent.questionText,
-          questionType: aiGeneratedContent.questionType,
-          options: aiGeneratedContent.options.map((opt) => ({
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-          })), // Ensure options have _id removed if it's part of AiGeneratedQuestionContent
-          categories: Array.from(combinedCategories),
-          restaurantId: restaurantId,
-          createdBy: "ai",
-          difficulty: aiGeneratedContent.difficulty || "medium",
-          questionBankId: questionBank._id,
-        };
-        allGeneratedQuestionsData.push(questionData);
-      }
-    }
-
-    // 4. Bulk create questions
-    if (allGeneratedQuestionsData.length === 0) {
-      return []; // Or throw error if no questions could be formed
-    }
-
-    const createdQuestions = await QuestionModel.insertMany(
-      allGeneratedQuestionsData
+    console.log(
+      "[AI Question Generation] Calling AiQuestionService with params:",
+      aiServiceParams
     );
-    return createdQuestions as unknown as IQuestion[]; // Asserting the type via unknown
+
+    // 5. Call the real AI service to generate questions
+    const rawGeneratedQuestions: RawAiGeneratedQuestion[] =
+      await AiQuestionService.generateRawQuestionsFromMenuContent(
+        aiServiceParams
+      );
+
+    console.log(
+      `[AI Question Generation] AI service returned ${rawGeneratedQuestions.length} raw questions`
+    );
+
+    if (rawGeneratedQuestions.length === 0) {
+      console.log(
+        "[AI Question Generation] No questions generated by AI service"
+      );
+      return [];
+    }
+
+    // 6. Save questions as pending review using the AI service
+    const savedQuestions: IQuestion[] =
+      await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
+        rawGeneratedQuestions,
+        restaurantId.toString(),
+        bankId,
+        {
+          menuCategories: categoriesToFocus || bankCategories,
+          existingCategories: bankCategories,
+        }
+      );
+
+    console.log(
+      `[AI Question Generation] Successfully saved ${savedQuestions.length} questions as pending review`
+    );
+
+    // 7. Return the generated questions
+    return savedQuestions;
   } catch (error) {
     console.error("Error in generateAiQuestionsService:", error);
     if (error instanceof AppError) {
       throw error;
     }
-    // Check for Mongoose validation error specifically for insertMany, if applicable
+    // Check for Mongoose validation error specifically
     if (error instanceof mongoose.Error.ValidationError) {
       throw new AppError(
         `Validation Error during question creation: ${error.message}`,
         400
       );
+    }
+    // Log additional details about the error
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
     }
     throw new AppError("Failed to generate AI questions.", 500);
   }

@@ -33,9 +33,10 @@ import {
   XCircleIcon,
   CheckIcon,
   XMarkIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
-// Simple component to display a single question - to be expanded
+// Enhanced component to display a single question with modern styling
 const QuestionListItem: React.FC<{
   question: IQuestion;
   onRemove: (questionId: string) => void;
@@ -52,54 +53,153 @@ const QuestionListItem: React.FC<{
       .join(" ");
   };
 
+  // Get question type color
+  const getQuestionTypeColor = (type: string) => {
+    switch (type) {
+      case "multiple-choice":
+        return "bg-blue-100 text-blue-700 border-blue-200";
+      case "true-false":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "short-answer":
+        return "bg-purple-100 text-purple-700 border-purple-200";
+      case "fill-in-the-blank":
+        return "bg-orange-100 text-orange-700 border-orange-200";
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+  };
+
   return (
-    <Card className="relative bg-gray-50 shadow-lg rounded-xl p-4 hover:shadow-xl hover:scale-[1.01] transition-all duration-300 flex items-center space-x-3">
-      {/* Checkbox on the left */}
-      <div className="flex-shrink-0">
-        <input
-          type="checkbox"
-          className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-          checked={isSelected}
-          onChange={() => onToggleSelect(question._id)}
-          aria-label={`Select question: ${question.questionText}`}
-        />
-      </div>
-      {/* Main content area (text only) to the right of checkbox */}
-      <div className="flex-grow flex flex-col pb-10">
-        {/* Question Text */}
-        <p className="text-lg font-semibold text-gray-900 mb-1">
-          {question.questionText}
-        </p>
-        {/* Metadata (Type, Difficulty, Category) */}
-        <div className="text-xs text-gray-500">
-          {`Type: ${formatQuestionType(question.questionType)} | `}
-          {/* `Difficulty: ${question.difficulty || "N/A"} | ` REMOVED */}
-          {`Category: ${question.categories.join(", ")}`}
+    <Card
+      variant="default"
+      hover={true}
+      className={`relative transition-all duration-200 border-l-4 ${
+        isSelected
+          ? "border-l-sky-500 bg-sky-50/50 ring-2 ring-sky-200"
+          : "border-l-slate-200 hover:border-l-sky-300"
+      }`}
+    >
+      <div className="flex items-start space-x-4">
+        {/* Enhanced Checkbox */}
+        <div className="flex-shrink-0 pt-1">
+          <label className="inline-flex items-center cursor-pointer group">
+            <input
+              type="checkbox"
+              className="h-5 w-5 text-sky-600 border-slate-300 rounded-md focus:ring-sky-500 focus:ring-2 transition-colors duration-200"
+              checked={isSelected}
+              onChange={() => onToggleSelect(question._id)}
+              aria-label={`Select question: ${question.questionText}`}
+            />
+            <span className="sr-only">Select question</span>
+          </label>
         </div>
-        {/* Explanation */}
-        {question.explanation && (
-          <p className="text-sm text-gray-700">
-            <span className="font-medium text-gray-800">Explanation:</span>{" "}
-            {question.explanation}
-          </p>
-        )}
-      </div>
-      {/* Buttons container - absolutely positioned */}
-      <div className="absolute bottom-4 right-4 flex space-x-2">
-        <Button
-          variant="secondary"
-          onClick={() => onEdit(question)}
-          className="text-xs px-3 py-1"
-        >
-          Edit
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={() => onRemove(question._id)}
-          className="text-xs px-3 py-1"
-        >
-          Remove
-        </Button>
+
+        {/* Main content area */}
+        <div className="flex-grow space-y-3 pr-32">
+          {/* Question Text with better typography */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 leading-relaxed">
+              {question.questionText}
+            </h3>
+          </div>
+
+          {/* Enhanced Metadata badges */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getQuestionTypeColor(
+                question.questionType
+              )}`}
+            >
+              {formatQuestionType(question.questionType)}
+            </span>
+
+            {question.categories && question.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {question.categories.slice(0, 2).map((category, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200"
+                  >
+                    {category}
+                  </span>
+                ))}
+                {question.categories.length > 2 && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-500 border border-slate-200">
+                    +{question.categories.length - 2} more
+                  </span>
+                )}
+              </div>
+            )}
+
+            {question.knowledgeCategory && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                {question.knowledgeCategory}
+              </span>
+            )}
+          </div>
+
+          {/* Explanation with better styling */}
+          {question.explanation && (
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <p className="text-sm text-slate-700">
+                <span className="font-medium text-slate-800">Explanation:</span>{" "}
+                {question.explanation}
+              </p>
+            </div>
+          )}
+
+          {/* Show options for multiple choice questions */}
+          {question.options && question.options.length > 0 && (
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <p className="text-xs font-medium text-blue-800 mb-2">Options:</p>
+              <div className="space-y-1">
+                {question.options.slice(0, 2).map((option, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        option.isCorrect ? "bg-green-500" : "bg-slate-300"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm ${
+                        option.isCorrect
+                          ? "text-green-700 font-medium"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      {option.text}
+                    </span>
+                  </div>
+                ))}
+                {question.options.length > 2 && (
+                  <p className="text-xs text-blue-600 font-medium">
+                    +{question.options.length - 2} more options
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Enhanced action buttons */}
+        <div className="absolute top-4 right-4 flex items-center space-x-2">
+          <Button
+            variant="secondary"
+            onClick={() => onEdit(question)}
+            className="text-sm px-3 py-1.5 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition-colors duration-200"
+          >
+            <PencilIcon className="h-3 w-3 mr-1" />
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => onRemove(question._id)}
+            className="text-sm px-3 py-1.5"
+          >
+            <TrashIcon className="h-3 w-3 mr-1" />
+            Remove
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -901,121 +1001,170 @@ const QuestionBankDetailPage: React.FC = () => {
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Header Section */}
-              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                      <BookOpenIcon className="h-8 w-8 text-white" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-bold text-slate-900">
-                        {currentQuestionBank.name}
-                      </h1>
-                      <p className="text-slate-600 mt-2">
-                        Manage questions in this question bank
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    onClick={handleOpenEditBankModal}
-                    className="flex items-center space-x-2"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                    <span>Edit Details</span>
-                  </Button>
-                </div>
+              {/* Enhanced Header Section */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-8 border border-slate-200 shadow-sm">
+                {/* Background decoration */}
+                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-gradient-to-br from-blue-100/50 to-indigo-100/50 rounded-full blur-3xl"></div>
 
-                {/* Bank Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-                    <h3 className="text-sm font-medium text-slate-700 mb-1">
-                      Active Questions
-                    </h3>
-                    <p className="text-2xl font-bold text-slate-900">
-                      {getActiveQuestionsAsObjects().length}
-                    </p>
-                  </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-                    <h3 className="text-sm font-medium text-slate-700 mb-1">
-                      Source Type
-                    </h3>
-                    <div className="flex items-center space-x-2">
-                      {currentQuestionBank.sourceType === "MENU" && (
-                        <>
-                          <span className="inline-flex px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
-                            Menu
-                          </span>
-                          {currentQuestionBank.sourceMenuName && (
-                            <span className="text-sm text-slate-600">
-                              {currentQuestionBank.sourceMenuName}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {currentQuestionBank.sourceType === "SOP" && (
-                        <>
-                          <span className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                            SOP
-                          </span>
-                          {currentQuestionBank.sourceSopDocumentTitle && (
-                            <span className="text-sm text-slate-600">
-                              {currentQuestionBank.sourceSopDocumentTitle}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {currentQuestionBank.sourceType === "MANUAL" && (
-                        <span className="inline-flex px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
-                          Manual
-                        </span>
-                      )}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg">
+                        <BookOpenIcon className="h-8 w-8 text-white" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold text-slate-900 mb-1">
+                          {currentQuestionBank.name}
+                        </h1>
+                        <p className="text-slate-600 text-lg">
+                          Manage questions in this question bank
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleOpenEditBankModal}
+                      className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-200"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                      <span>Edit Details</span>
+                    </Button>
                   </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4">
-                    <h3 className="text-sm font-medium text-slate-700 mb-1">
-                      Categories
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {currentQuestionBank.categories &&
-                      currentQuestionBank.categories.length > 0 ? (
-                        currentQuestionBank.categories
-                          .slice(0, 2)
-                          .map((cat) => (
-                            <span
-                              key={cat}
-                              className="inline-flex px-2 py-1 text-xs bg-sky-100 text-sky-700 rounded-full"
-                            >
-                              {cat}
-                            </span>
-                          ))
-                      ) : (
-                        <span className="text-sm text-slate-500 italic">
-                          None
-                        </span>
-                      )}
-                      {currentQuestionBank.categories &&
-                        currentQuestionBank.categories.length > 2 && (
-                          <span className="text-xs text-slate-500">
-                            +{currentQuestionBank.categories.length - 2} more
-                          </span>
-                        )}
-                    </div>
-                  </div>
-                </div>
 
-                {/* Description */}
-                {currentQuestionBank.description && (
-                  <div className="mt-6 p-4 bg-white/50 backdrop-blur-sm rounded-xl">
-                    <h3 className="text-sm font-medium text-slate-700 mb-2">
-                      Description
-                    </h3>
-                    <p className="text-slate-600">
-                      {currentQuestionBank.description}
-                    </p>
+                  {/* Enhanced Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <Card
+                      variant="elevated"
+                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="p-3 bg-green-100 rounded-xl">
+                          <CheckIcon className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-700 mb-1">
+                            Active Questions
+                          </h3>
+                          <p className="text-3xl font-bold text-slate-900">
+                            {getActiveQuestionsAsObjects().length}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card
+                      variant="elevated"
+                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="p-3 bg-blue-100 rounded-xl">
+                          <DocumentTextIcon className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="flex-grow">
+                          <h3 className="text-sm font-medium text-slate-700 mb-1">
+                            Source Type
+                          </h3>
+                          <div className="flex items-center space-x-2">
+                            {currentQuestionBank.sourceType === "MENU" && (
+                              <>
+                                <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200">
+                                  Menu
+                                </span>
+                                {currentQuestionBank.sourceMenuName && (
+                                  <span className="text-sm text-slate-600 truncate">
+                                    {currentQuestionBank.sourceMenuName}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {currentQuestionBank.sourceType === "SOP" && (
+                              <>
+                                <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-100 text-blue-700 rounded-full border border-blue-200">
+                                  SOP
+                                </span>
+                                {currentQuestionBank.sourceSopDocumentTitle && (
+                                  <span className="text-sm text-slate-600 truncate">
+                                    {currentQuestionBank.sourceSopDocumentTitle}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {currentQuestionBank.sourceType === "MANUAL" && (
+                              <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                                Manual
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card
+                      variant="elevated"
+                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="p-3 bg-purple-100 rounded-xl">
+                          <ChartPieIcon className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-700 mb-1">
+                            Categories
+                          </h3>
+                          <div className="flex flex-wrap gap-1">
+                            {currentQuestionBank.categories &&
+                            currentQuestionBank.categories.length > 0 ? (
+                              <>
+                                {currentQuestionBank.categories
+                                  .slice(0, 2)
+                                  .map((cat) => (
+                                    <span
+                                      key={cat}
+                                      className="inline-flex items-center px-2 py-1 text-xs font-medium bg-sky-100 text-sky-700 rounded-full border border-sky-200"
+                                    >
+                                      {cat}
+                                    </span>
+                                  ))}
+                                {currentQuestionBank.categories.length > 2 && (
+                                  <span className="text-xs text-slate-500 font-medium">
+                                    +{currentQuestionBank.categories.length - 2}{" "}
+                                    more
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-slate-500 italic">
+                                None
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
-                )}
+
+                  {/* Enhanced Description */}
+                  {currentQuestionBank.description && (
+                    <Card
+                      variant="outlined"
+                      className="bg-white/60 backdrop-blur-sm border-slate-200"
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="p-2 bg-slate-100 rounded-lg flex-shrink-0">
+                          <DocumentTextIcon className="h-5 w-5 text-slate-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-800 mb-2">
+                            Description
+                          </h3>
+                          <p className="text-slate-600 leading-relaxed">
+                            {currentQuestionBank.description}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </div>
               </div>
 
               {/* Error Messages */}
@@ -1035,63 +1184,113 @@ const QuestionBankDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Manage Questions Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-xl font-semibold text-slate-900 mb-6">
-                  Manage Questions
-                </h2>
+              {/* Enhanced Manage Questions Section */}
+              <Card variant="elevated" size="lg" className="border-0 shadow-lg">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                    <PlusIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Manage Questions
+                    </h2>
+                    <p className="text-slate-600">
+                      Add questions manually or generate with AI
+                    </p>
+                  </div>
+                </div>
+
                 <div
                   className={`grid grid-cols-1 gap-4 ${
                     currentQuestionBank.sourceType === "MANUAL"
-                      ? "md:grid-cols-1"
-                      : "md:grid-cols-2"
+                      ? "lg:grid-cols-1"
+                      : "lg:grid-cols-2"
                   }`}
                 >
-                  <Button
-                    variant="primary"
+                  <Card
+                    variant="outlined"
+                    clickable={true}
                     onClick={() => setShowAddManualQuestionModal(true)}
-                    className="flex items-center justify-center space-x-2"
+                    className="border-emerald-200 hover:border-emerald-300 hover:bg-emerald-50/50 cursor-pointer group"
                   >
-                    <PlusIcon className="h-5 w-5" />
-                    <span>Add Manual Question</span>
-                  </Button>
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-emerald-100 group-hover:bg-emerald-200 rounded-xl transition-colors duration-200">
+                        <PlusIcon className="h-6 w-6 text-emerald-600" />
+                      </div>
+                      <div className="flex-grow">
+                        <h3 className="font-semibold text-slate-900 mb-1">
+                          Add Manual Question
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          Create custom questions with full control over content
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
 
                   {/* Show Generate from Menu button only for MENU source type */}
                   {currentQuestionBank.sourceType === "MENU" && (
-                    <Button
-                      variant="secondary"
+                    <Card
+                      variant="outlined"
+                      clickable={true}
                       onClick={handleOpenGenerateAiQuestions}
-                      className="flex items-center justify-center space-x-2"
+                      className="border-blue-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer group"
                     >
-                      <SparklesIcon className="h-5 w-5" />
-                      <span>Generate from Menu</span>
-                    </Button>
+                      <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-blue-100 group-hover:bg-blue-200 rounded-xl transition-colors duration-200">
+                          <SparklesIcon className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="flex-grow">
+                          <h3 className="font-semibold text-slate-900 mb-1">
+                            Generate from Menu
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            AI-powered questions based on your menu items
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
                   )}
 
                   {/* Show Generate from SOP button only for SOP source type */}
                   {currentQuestionBank.sourceType === "SOP" && (
-                    <Button
-                      variant="secondary"
+                    <Card
+                      variant="outlined"
+                      clickable={true}
                       onClick={() => setShowGenerateSopAiModal(true)}
-                      className="flex items-center justify-center space-x-2"
+                      className="border-purple-200 hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer group"
                     >
-                      <DocumentTextIcon className="h-5 w-5" />
-                      <span>Generate from SOP</span>
-                    </Button>
+                      <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-purple-100 group-hover:bg-purple-200 rounded-xl transition-colors duration-200">
+                          <DocumentTextIcon className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div className="flex-grow">
+                          <h3 className="font-semibold text-slate-900 mb-1">
+                            Generate from SOP
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            AI-powered questions based on your SOP document
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
                   )}
                 </div>
-              </div>
+              </Card>
 
-              {/* Bulk Actions */}
+              {/* Enhanced Bulk Actions */}
               {selectedQuestionIds.length > 0 && (
-                <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
+                <Card
+                  variant="outlined"
+                  className="border-red-200 bg-red-50/50 backdrop-blur-sm"
+                >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-red-100 rounded-lg">
-                        <TrashIcon className="h-5 w-5 text-red-600" />
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-red-100 rounded-xl">
+                        <TrashIcon className="h-6 w-6 text-red-600" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-slate-900">
+                        <h3 className="text-lg font-semibold text-slate-900">
                           {selectedQuestionIds.length} question
                           {selectedQuestionIds.length > 1 ? "s" : ""} selected
                         </h3>
@@ -1104,20 +1303,21 @@ const QuestionBankDetailPage: React.FC = () => {
                       <Button
                         variant="secondary"
                         onClick={() => setSelectedQuestionIds([])}
-                        className="text-sm"
+                        className="bg-white hover:bg-slate-50 border-slate-300"
                       >
                         Clear Selection
                       </Button>
                       <Button
                         variant="destructive"
                         onClick={() => setIsConfirmBulkDeleteModalOpen(true)}
-                        className="text-sm"
+                        className="shadow-lg"
                       >
+                        <TrashIcon className="h-4 w-4 mr-2" />
                         Delete Selected
                       </Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               )}
 
               {/* Questions List */}
@@ -1182,23 +1382,50 @@ const QuestionBankDetailPage: React.FC = () => {
                   {activeQuestionsTab === "active" && (
                     <>
                       {getActiveQuestionsAsObjects().length === 0 ? (
-                        <div className="text-center py-12">
-                          <BookOpenIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-medium text-slate-900 mb-2">
+                        <div className="text-center py-16">
+                          <div className="relative">
+                            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                              <BookOpenIcon className="h-12 w-12 text-slate-500" />
+                            </div>
+                            <div className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg transform translate-x-8 -translate-y-2">
+                              <PlusIcon className="h-3 w-3 text-white" />
+                            </div>
+                          </div>
+                          <h3 className="text-xl font-semibold text-slate-900 mb-3">
                             No active questions yet
                           </h3>
-                          <p className="text-slate-500 mb-6">
-                            Add questions to this bank to get started with quiz
-                            creation.
+                          <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+                            Get started by adding your first question to this
+                            bank. You can create questions manually or generate
+                            them with AI.
                           </p>
-                          <Button
-                            variant="primary"
-                            onClick={() => setShowAddManualQuestionModal(true)}
-                            className="flex items-center space-x-2 mx-auto"
-                          >
-                            <PlusIcon className="h-4 w-4" />
-                            <span>Add First Question</span>
-                          </Button>
+                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <Button
+                              variant="primary"
+                              onClick={() =>
+                                setShowAddManualQuestionModal(true)
+                              }
+                              className="flex items-center space-x-2 shadow-lg"
+                            >
+                              <PlusIcon className="h-4 w-4" />
+                              <span>Add First Question</span>
+                            </Button>
+                            {(currentQuestionBank.sourceType === "MENU" ||
+                              currentQuestionBank.sourceType === "SOP") && (
+                              <Button
+                                variant="secondary"
+                                onClick={
+                                  currentQuestionBank.sourceType === "MENU"
+                                    ? handleOpenGenerateAiQuestions
+                                    : () => setShowGenerateSopAiModal(true)
+                                }
+                                className="flex items-center space-x-2"
+                              >
+                                <SparklesIcon className="h-4 w-4" />
+                                <span>Generate with AI</span>
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-4">

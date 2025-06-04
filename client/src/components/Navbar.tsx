@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   HomeIcon,
@@ -13,7 +13,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   BellIcon,
-  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
 // Define props interface
@@ -32,17 +31,13 @@ const Navbar: React.FC<NavbarProps> = ({
     return true;
   });
   const [isHovered, setIsHovered] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     return typeof window !== "undefined" && window.innerWidth < 1024;
   });
   const [showContent, setShowContent] = useState(false); // For smooth content transitions
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const dropdownButtonRef = useRef<HTMLButtonElement>(null);
-  const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
-  const location = useLocation();
 
   // Handle window resize and mobile detection
   useEffect(() => {
@@ -88,26 +83,6 @@ const Navbar: React.FC<NavbarProps> = ({
     };
   }, [isMobile, isCollapsed, isHovered]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isDropdownOpen &&
-        dropdownButtonRef.current &&
-        dropdownMenuRef.current &&
-        !dropdownButtonRef.current.contains(event.target as Node) &&
-        !dropdownMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDropdownOpen]);
-
   // Base navigation items with icons
   const baseNavItems = [
     {
@@ -146,10 +121,25 @@ const Navbar: React.FC<NavbarProps> = ({
     },
   ];
 
+  // Common navigation items for all roles
+  const commonNavItems = [
+    {
+      name: "Notifications",
+      path: "/notifications",
+      icon: BellIcon,
+    },
+    {
+      name: "Settings",
+      path: "/settings",
+      icon: CogIcon,
+    },
+  ];
+
   // Combine navigation items based on role
   const navItems = [
     ...baseNavItems,
     ...(user?.role === "restaurant" ? restaurantNavItems : []),
+    ...commonNavItems,
   ];
 
   // Navigation Handler with improved accessibility
@@ -161,7 +151,6 @@ const Navbar: React.FC<NavbarProps> = ({
         return;
       }
     }
-    setIsDropdownOpen(false);
 
     // Auto-collapse on mobile after navigation
     if (isMobile) {
@@ -177,17 +166,12 @@ const Navbar: React.FC<NavbarProps> = ({
       }
     }
     logout();
-    setIsDropdownOpen(false);
   };
 
   const toggleCollapse = () => {
     // Only allow manual toggle on mobile/tablet
     if (isMobile) {
       setIsCollapsed(!isCollapsed);
-      // Close dropdown when collapsing
-      if (!isCollapsed) {
-        setIsDropdownOpen(false);
-      }
     }
   };
 
@@ -213,8 +197,6 @@ const Navbar: React.FC<NavbarProps> = ({
       }
 
       setIsHovered(false);
-      // Close dropdown when leaving navbar
-      setIsDropdownOpen(false);
     }
   };
 
@@ -224,7 +206,7 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav
       ref={navRef}
-      className={`bg-white shadow-lg fixed left-0 top-0 h-full z-30 transition-all duration-200 ease-out ${
+      className={`bg-white shadow-lg fixed left-0 top-0 h-full z-40 transition-all duration-200 ease-out ${
         isExpanded ? "w-64" : "w-16"
       }`}
       role="navigation"
@@ -233,9 +215,8 @@ const Navbar: React.FC<NavbarProps> = ({
       onMouseLeave={handleMouseLeave}
     >
       <div className="flex flex-col h-full">
-        {/* Header section with logo, collapse button, notifications, and user - Fixed total height */}
-        <div className="border-b border-slate-200 h-36">
-          {/* Top row: Logo and collapse button - Fixed height to prevent vertical shifts */}
+        {/* Header section with logo and collapse button */}
+        <div className="border-b border-slate-200 h-16">
           <div className="flex items-center justify-between relative h-16 px-4">
             {/* Logo with smooth fade - absolute positioned to not affect layout */}
             <div
@@ -274,207 +255,6 @@ const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             </button>
-          </div>
-
-          {/* Bottom row: Notifications and user profile - Fixed height container */}
-          <div className="px-2 h-20 flex items-center">
-            {!isExpanded ? (
-              /* Collapsed: Just user profile centered in fixed height container */
-              <div className="flex items-center justify-center h-full">
-                {/* User profile dropdown */}
-                <div className="relative">
-                  <button
-                    ref={dropdownButtonRef}
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="flex items-center justify-center rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors duration-150 ease-in-out w-11 h-11"
-                    title={`${
-                      user?.name || "User Menu"
-                    } - Settings and sign out`}
-                    aria-label={`User menu for ${
-                      user?.name || "user"
-                    } - Settings and sign out`}
-                    aria-expanded={isDropdownOpen}
-                    aria-haspopup="menu"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-sm shadow-sm">
-                      {user?.name?.charAt(0).toUpperCase() || "U"}
-                    </div>
-                  </button>
-
-                  {/* Dropdown menu */}
-                  {isDropdownOpen && (
-                    <div
-                      ref={dropdownMenuRef}
-                      className="absolute left-full ml-2 top-0 w-56 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none py-2 z-50 animate-fade-in"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="user-menu-button"
-                    >
-                      <div className="px-1 py-1">
-                        {/* User info in collapsed state */}
-                        <div className="px-4 py-3" role="none">
-                          <p className="text-sm font-medium text-slate-800 truncate">
-                            {user?.name || "User Name"}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate capitalize">
-                            {user?.role || "Role"}
-                          </p>
-                        </div>
-                        <div
-                          className="border-t border-slate-100 my-1"
-                          role="none"
-                        ></div>
-
-                        {/* Notifications */}
-                        <NavLink
-                          to="/notifications"
-                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                          onClick={(e) => {
-                            handleNavigationClick(e, "/notifications");
-                            setIsDropdownOpen(false);
-                          }}
-                          role="menuitem"
-                          title="Notifications"
-                        >
-                          <BellIcon className="h-4 w-4 mr-3" />
-                          Notifications
-                        </NavLink>
-
-                        {/* Settings */}
-                        <NavLink
-                          to="/settings"
-                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                          onClick={(e) => {
-                            handleNavigationClick(e, "/settings");
-                            setIsDropdownOpen(false);
-                          }}
-                          role="menuitem"
-                          title="User settings"
-                        >
-                          <CogIcon className="h-4 w-4 mr-3" />
-                          Settings
-                        </NavLink>
-
-                        <div
-                          className="border-t border-slate-100 my-1"
-                          role="none"
-                        ></div>
-
-                        {/* Sign Out */}
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
-                          role="menuitem"
-                        >
-                          <ArrowRightOnRectangleIcon className="h-4 w-4 mr-3" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Expanded: Stacked layout with user on top, notifications below - centered in fixed height container */
-              <div
-                className={`flex flex-col space-y-2 justify-center h-full transition-all duration-200 ease-out ${
-                  showContent
-                    ? "opacity-100 translate-x-0"
-                    : "opacity-0 translate-x-4"
-                }`}
-              >
-                {/* User profile dropdown - Top */}
-                <div className="relative">
-                  <button
-                    ref={dropdownButtonRef}
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="flex items-center w-full rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors duration-150 ease-in-out h-12"
-                    title="User menu"
-                    aria-label={`User menu for ${
-                      user?.name || "user"
-                    } - Settings and sign out`}
-                    aria-expanded={isDropdownOpen}
-                    aria-haspopup="menu"
-                  >
-                    {/* Fixed icon position to match navigation icons */}
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                      <div className="w-5 h-5 flex items-center justify-center">
-                        <div className="h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs shadow-sm">
-                          {user?.name?.charAt(0).toUpperCase() || "U"}
-                        </div>
-                      </div>
-                    </div>
-                    {/* Text positioned to align with navigation text */}
-                    <div className="ml-11 flex-1 text-left">
-                      <p className="text-sm font-medium text-slate-800 truncate">
-                        {user?.name || "User Name"}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate capitalize">
-                        {user?.role || "Role"}
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Dropdown menu */}
-                  {isDropdownOpen && (
-                    <div
-                      ref={dropdownMenuRef}
-                      className="absolute right-0 top-0 w-56 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none py-2 z-50 animate-fade-in"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="user-menu-button"
-                    >
-                      <div className="px-1 py-1">
-                        {/* Notifications */}
-                        <NavLink
-                          to="/notifications"
-                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                          onClick={(e) => {
-                            handleNavigationClick(e, "/notifications");
-                            setIsDropdownOpen(false);
-                          }}
-                          role="menuitem"
-                          title="Notifications"
-                        >
-                          <BellIcon className="h-4 w-4 mr-3" />
-                          Notifications
-                        </NavLink>
-
-                        {/* Settings */}
-                        <NavLink
-                          to="/settings"
-                          className="group flex items-center w-full px-4 py-2.5 text-sm text-slate-700 rounded-lg hover:bg-sky-50 hover:text-sky-700 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                          onClick={(e) => {
-                            handleNavigationClick(e, "/settings");
-                            setIsDropdownOpen(false);
-                          }}
-                          role="menuitem"
-                          title="User settings"
-                        >
-                          <CogIcon className="h-4 w-4 mr-3" />
-                          Settings
-                        </NavLink>
-
-                        <div
-                          className="border-t border-slate-100 my-1"
-                          role="none"
-                        ></div>
-
-                        {/* Sign Out */}
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
-                          role="menuitem"
-                        >
-                          <ArrowRightOnRectangleIcon className="h-4 w-4 mr-3" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -535,6 +315,74 @@ const Navbar: React.FC<NavbarProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* User info and Sign Out at bottom */}
+        <div className="border-t border-slate-200 p-2">
+          {/* User info */}
+          <div className="mb-2">
+            <div className="flex items-center rounded-lg p-2">
+              {/* Fixed icon position to match navigation icons */}
+              <div className="absolute left-3">
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <div className="h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs shadow-sm">
+                    {user?.name?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                </div>
+              </div>
+              {/* Text positioned to align with navigation text */}
+              <div
+                className={`ml-11 overflow-hidden transition-all duration-200 ease-out ${
+                  showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
+                }`}
+                style={{
+                  transform: showContent ? "translateX(0)" : "translateX(-8px)",
+                }}
+              >
+                <p className="text-sm font-medium text-slate-800 truncate">
+                  {user?.name || "User Name"}
+                </p>
+                <p className="text-xs text-slate-500 truncate capitalize">
+                  {user?.role || "Role"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sign Out Button */}
+          <button
+            onClick={handleLogout}
+            className="group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-150 ease-in-out min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
+            aria-label="Sign out"
+            title={!isExpanded ? "Sign out" : ""}
+          >
+            {/* Fixed icon position - never moves */}
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <div className="w-5 h-5 flex items-center justify-center">
+                <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
+              </div>
+            </div>
+
+            {/* Invisible spacer to maintain click area in collapsed state */}
+            <div className="w-full h-full absolute inset-0"></div>
+
+            {/* Text container - slides out from icon position */}
+            <div
+              className={`ml-11 overflow-hidden transition-all duration-200 ease-out ${
+                showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
+              }`}
+              style={{
+                transform: showContent ? "translateX(0)" : "translateX(-8px)",
+              }}
+            >
+              <span className="truncate whitespace-nowrap block py-3 pr-3">
+                Sign Out
+              </span>
+            </div>
+
+            {/* Screen reader text for collapsed state */}
+            {!isExpanded && <span className="sr-only">Sign Out</span>}
+          </button>
         </div>
       </div>
 

@@ -45,6 +45,10 @@ import {
   ExclamationTriangleIcon,
   BellIcon,
   ArrowRightIcon,
+  CakeIcon,
+  BeakerIcon,
+  GlobeAltIcon,
+  Cog6ToothIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to check if a quiz is completed regardless of capitalization
@@ -89,7 +93,6 @@ const RestaurantDashboard: React.FC = () => {
     useState<ChartData<"doughnut"> | null>(null);
 
   // Keep other state
-  const [copied, setCopied] = useState(false);
 
   // State for menu upload modal
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
@@ -109,21 +112,6 @@ const RestaurantDashboard: React.FC = () => {
     const overallAverage = sumOfAverages / staffWithScores.length;
     return overallAverage.toFixed(1); // Display raw average score
   }, [staffData]);
-
-  // useCallback for copy handler
-  const handleCopyId = useCallback(() => {
-    if (user?.restaurantId) {
-      navigator.clipboard
-        .writeText(user.restaurantId)
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-        .catch((err) => {
-          console.error("Failed to copy ID: ", err);
-        });
-    }
-  }, [user?.restaurantId]); // Dependency: user.restaurantId
 
   const openPdfUploadModal = () => {
     setUploadMessage(null); // Clear previous messages
@@ -453,62 +441,6 @@ const RestaurantDashboard: React.FC = () => {
                     </span>
                     ! Here's your comprehensive overview.
                   </p>
-                  {user?.restaurantId && (
-                    <div className="flex items-center space-x-3 bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50">
-                      <span className="text-sm font-medium text-slate-600">
-                        Restaurant ID:
-                      </span>
-                      <code className="text-sm text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-mono">
-                        {user.restaurantId}
-                      </code>
-                      <button
-                        onClick={handleCopyId}
-                        className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 transform hover:scale-105 ${
-                          copied
-                            ? "bg-green-600 text-white shadow-lg"
-                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg"
-                        }`}
-                        aria-label="Copy Restaurant ID"
-                      >
-                        {copied ? (
-                          <span className="flex items-center space-x-1">
-                            <CheckCircleIcon className="h-3 w-3" />
-                            <span>Copied!</span>
-                          </span>
-                        ) : (
-                          "Copy ID"
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick stats summary */}
-                <div className="hidden lg:flex items-center space-x-6 text-right">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {staffData.length}
-                    </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">
-                      Staff
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {totalQuizzes}
-                    </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">
-                      Quizzes
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {overallAveragePerformance}%
-                    </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">
-                      Avg Score
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -598,44 +530,31 @@ const RestaurantDashboard: React.FC = () => {
               </Link>
 
               {/* Enhanced Average Performance Card */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+              <Link to="/staff-results" className="block group">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
-                <div className="relative z-10">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                      <ChartBarIcon className="h-6 w-6 text-white" />
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ChartBarIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                          Avg. Performance
+                        </p>
+                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {overallAveragePerformance}%
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
-                        Avg. Performance
-                      </p>
-                      <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
-                        {overallAveragePerformance}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-slate-500">Progress</span>
-                      <span className="text-xs font-medium text-purple-600">
-                        {overallAveragePerformance}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-1000 ease-out shadow-sm"
-                        style={{
-                          width: `${Math.min(
-                            parseFloat(overallAveragePerformance),
-                            100
-                          )}%`,
-                        }}
-                      ></div>
+                    <div className="mt-4 flex items-center text-purple-600 text-sm font-medium group-hover:text-purple-700">
+                      <span>View Analytics</span>
+                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
 
             {/* Enhanced Action Cards */}
@@ -877,146 +796,210 @@ const RestaurantDashboard: React.FC = () => {
               categoriesData.length > 0 ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
                 <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-1.5 bg-purple-600 rounded-lg">
-                        <ChartBarIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          Knowledge Categories Performance
-                        </h2>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Average scores across the four knowledge areas
-                        </p>
-                      </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-purple-600 rounded-lg">
+                      <ChartBarIcon className="h-4 w-4 text-white" />
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-purple-600">
-                        {overallAveragePerformance}%
-                      </div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wide">
-                        Overall
-                      </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">
+                        Knowledge Categories Performance
+                      </h2>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Average scores across the four knowledge areas
+                      </p>
                     </div>
                   </div>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                    {/* Enhanced Doughnut Chart */}
-                    <div className="flex justify-center">
-                      <div className="w-80 h-80 relative">
-                        <Doughnut
-                          data={categoriesChartData}
-                          options={chartOptions}
-                        />
-                        {/* Center text overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-slate-900">
-                              {overallAveragePerformance}%
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              Overall
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Four Horizontal Circular Charts */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {categoriesData.map((cat, index) => {
+                      const categoryConfig = {
+                        "food-knowledge": {
+                          label: "Food Knowledge",
+                          color: "rgba(34, 197, 94, 0.8)",
+                          bgColor: "bg-green-50",
+                          borderColor: "border-green-200",
+                          icon: CakeIcon,
+                          iconColor: "text-green-600",
+                        },
+                        "beverage-knowledge": {
+                          label: "Beverage Knowledge",
+                          color: "rgba(59, 130, 246, 0.8)",
+                          bgColor: "bg-blue-50",
+                          borderColor: "border-blue-200",
+                          icon: BeakerIcon,
+                          iconColor: "text-blue-600",
+                        },
+                        "wine-knowledge": {
+                          label: "Wine Knowledge",
+                          color: "rgba(147, 51, 234, 0.8)",
+                          bgColor: "bg-purple-50",
+                          borderColor: "border-purple-200",
+                          icon: GlobeAltIcon,
+                          iconColor: "text-purple-600",
+                        },
+                        "procedures-knowledge": {
+                          label: "Procedures Knowledge",
+                          color: "rgba(249, 115, 22, 0.8)",
+                          bgColor: "bg-orange-50",
+                          borderColor: "border-orange-200",
+                          icon: Cog6ToothIcon,
+                          iconColor: "text-orange-600",
+                        },
+                      };
 
-                    {/* Enhanced Custom Legend and Stats */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                        Performance Breakdown
-                      </h3>
+                      const config = categoryConfig[
+                        cat.category as keyof typeof categoryConfig
+                      ] || {
+                        label: cat.category,
+                        color: "rgba(75, 192, 192, 0.8)",
+                        bgColor: "bg-gray-50",
+                        borderColor: "border-gray-200",
+                        icon: ChartBarIcon,
+                        iconColor: "text-gray-600",
+                      };
 
-                      {categoriesData.map((cat, index) => {
-                        const categoryLabels = {
-                          "food-knowledge": "Food Knowledge",
-                          "beverage-knowledge": "Beverage Knowledge",
-                          "wine-knowledge": "Wine Knowledge",
-                          "procedures-knowledge": "Procedures Knowledge",
+                      const score = Math.round(cat.averageAccuracy * 10) / 10;
+                      const IconComponent = config.icon;
+
+                      // Performance status
+                      const getPerformanceStatus = (score: number) => {
+                        if (score >= 85)
+                          return {
+                            label: "Excellent",
+                            color: "text-green-600",
+                            bgColor: "bg-green-100",
+                          };
+                        if (score >= 70)
+                          return {
+                            label: "Good",
+                            color: "text-blue-600",
+                            bgColor: "bg-blue-100",
+                          };
+                        if (score >= 50)
+                          return {
+                            label: "Fair",
+                            color: "text-yellow-600",
+                            bgColor: "bg-yellow-100",
+                          };
+                        return {
+                          label: "Needs Improvement",
+                          color: "text-red-600",
+                          bgColor: "bg-red-100",
                         };
+                      };
 
-                        const categoryColors = {
-                          "food-knowledge": "bg-green-500",
-                          "beverage-knowledge": "bg-blue-500",
-                          "wine-knowledge": "bg-purple-500",
-                          "procedures-knowledge": "bg-orange-500",
-                        };
+                      const status = getPerformanceStatus(score);
 
-                        const label =
-                          categoryLabels[
-                            cat.category as keyof typeof categoryLabels
-                          ] || cat.category;
-                        const colorClass =
-                          categoryColors[
-                            cat.category as keyof typeof categoryColors
-                          ] || "bg-gray-500";
+                      const chartData = {
+                        labels: [config.label, "Remaining"],
+                        datasets: [
+                          {
+                            data: [score, 100 - score],
+                            backgroundColor: [
+                              config.color,
+                              "rgba(226, 232, 240, 0.3)",
+                            ],
+                            borderColor: [
+                              config.color.replace("0.8", "1"),
+                              "rgba(226, 232, 240, 0.5)",
+                            ],
+                            borderWidth: 3,
+                            cutout: "75%",
+                            borderRadius: 4,
+                          },
+                        ],
+                      };
 
-                        return (
-                          <div
-                            key={cat.category}
-                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div
-                                className={`w-4 h-4 rounded-full ${colorClass} shadow-sm`}
-                              ></div>
-                              <span className="font-medium text-slate-700">
-                                {label}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold text-slate-900">
-                                {Math.round(cat.averageAccuracy * 10) / 10}%
-                              </div>
-                              <div className="text-xs text-slate-500">
-                                {cat.totalQuestions} questions
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      const singleChartOptions: ChartOptions<"doughnut"> = {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        devicePixelRatio: window.devicePixelRatio || 2,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: { enabled: false },
+                        },
+                        animation: {
+                          animateRotate: true,
+                          duration: 1200,
+                          easing: "easeOutQuart",
+                        },
+                        elements: {
+                          arc: {
+                            borderWidth: 3,
+                            hoverBorderWidth: 4,
+                            borderAlign: "inner",
+                          },
+                        },
+                        layout: {
+                          padding: 0,
+                        },
+                      };
 
-                      {/* Enhanced Overall Stats */}
-                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-                        <h4 className="font-semibold text-slate-900 mb-2">
-                          Overall Performance
-                        </h4>
-                        <div className="text-sm text-slate-600 space-y-1">
-                          <div>
-                            Total Staff:{" "}
-                            <span className="font-medium text-slate-900">
-                              {staffData.length}
-                            </span>
-                          </div>
-                          <div>
-                            Categories Tracked:{" "}
-                            <span className="font-medium text-slate-900">
-                              {categoriesData.length}
-                            </span>
-                          </div>
-                          <div>
-                            Average Score:{" "}
-                            <span className="font-medium text-slate-900">
-                              {overallAveragePerformance}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Link to enhanced analytics */}
-                      <div className="mt-4">
+                      return (
                         <Link
                           to="/staff-results"
-                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors duration-200"
+                          key={cat.category}
+                          className="group block"
                         >
-                          <ChartBarIcon className="h-4 w-4 mr-2" />
-                          View Comprehensive Analytics
+                          <div
+                            className={`${config.bgColor} ${config.borderColor} border-2 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:-translate-y-1 cursor-pointer`}
+                          >
+                            {/* Icon and Status */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div
+                                className={`p-2 bg-white rounded-lg border ${config.borderColor} shadow-sm`}
+                              >
+                                <IconComponent
+                                  className={`h-5 w-5 ${config.iconColor}`}
+                                />
+                              </div>
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}
+                              >
+                                {status.label}
+                              </span>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="w-32 h-32 mx-auto relative mb-4">
+                              <Doughnut
+                                data={chartData}
+                                options={singleChartOptions}
+                              />
+                              {/* Center text overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-slate-900 group-hover:scale-110 transition-transform duration-300">
+                                    {score}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Category Info */}
+                            <div className="text-center">
+                              <h4 className="font-semibold text-slate-900 text-sm mb-2 group-hover:text-slate-700 transition-colors">
+                                {config.label}
+                              </h4>
+                              <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
+                                <span className="flex items-center">
+                                  <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                                  {cat.totalQuestions} questions
+                                </span>
+                              </div>
+
+                              {/* View Details Indicator */}
+                              <div className="mt-3 flex items-center justify-center text-xs text-slate-400 group-hover:text-blue-600 transition-colors">
+                                <span>View Details</span>
+                                <ArrowRightIcon className="ml-1 h-3 w-3 transform group-hover:translate-x-1 transition-transform" />
+                              </div>
+                            </div>
+                          </div>
                         </Link>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

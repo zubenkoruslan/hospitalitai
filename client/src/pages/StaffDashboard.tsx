@@ -120,129 +120,184 @@ const QuizItem: React.FC<QuizItemProps> = ({
   return (
     <Card
       data-testid={`quiz-item-${quizId}`}
-      className="flex flex-col justify-between h-full shadow-sm hover:shadow-lg transition-shadow duration-200 border border-gray-200"
+      variant="default"
+      hover={true}
+      className={`flex flex-col justify-between h-full transition-all duration-200 ${
+        isCompletedOverall
+          ? "border-green-200 bg-green-50/30"
+          : isQuizOnCooldown
+          ? "border-amber-200 bg-amber-50/30"
+          : "border-slate-200 hover:border-blue-300"
+      }`}
     >
-      <div className="flex-grow p-4">
-        <h3
-          className="text-md font-semibold text-gray-800 mb-1 truncate"
-          title={title}
-        >
-          {title}
-        </h3>
-        {description && (
-          <p className="text-xs text-gray-600 mt-1 mb-2 line-clamp-2">
-            {description}
-          </p>
-        )}
-        <div className="mt-2 mb-3">
-          <div className="flex justify-between mb-1">
-            <span className="text-xs font-medium text-blue-700">
-              Overall Progress
-            </span>
-            <span className="text-xs font-medium text-blue-700">
+      <div className="flex-grow space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex-grow min-w-0">
+            <h3
+              className="text-base sm:text-lg font-semibold text-slate-900 mb-1 line-clamp-2"
+              title={title}
+            >
+              {title}
+            </h3>
+            {description && (
+              <p className="text-sm text-slate-600 line-clamp-2">
+                {description}
+              </p>
+            )}
+          </div>
+          <div className="flex-shrink-0 ml-3">
+            {isCompletedOverall ? (
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircleIcon className="h-5 w-5 text-green-600" />
+              </div>
+            ) : isQuizOnCooldown ? (
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <ClockIcon className="h-5 w-5 text-amber-600" />
+              </div>
+            ) : (
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <PlayIcon className="h-5 w-5 text-blue-600" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-slate-700">Progress</span>
+            <span className="text-sm font-semibold text-slate-900">
               {overallProgressPercentage}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-slate-200 rounded-full h-2.5">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+              className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
+                isCompletedOverall
+                  ? "bg-gradient-to-r from-green-500 to-emerald-500"
+                  : "bg-gradient-to-r from-blue-500 to-indigo-500"
+              }`}
               style={{ width: `${overallProgressPercentage}%` }}
             ></div>
           </div>
         </div>
 
+        {/* Average Score */}
         {progress?.averageScore !== null &&
           progress?.averageScore !== undefined && (
-            <p className="text-xs text-gray-500 mt-1 mb-2">
-              Your Average Score:{" "}
-              <span
-                className={`font-semibold ${
-                  progress.averageScore >= 70
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {progress.averageScore.toFixed(1)}%
-              </span>
-            </p>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">
+                  Your Average
+                </span>
+                <span
+                  className={`text-lg font-bold ${
+                    progress.averageScore >= 80
+                      ? "text-green-600"
+                      : progress.averageScore >= 70
+                      ? "text-blue-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {progress.averageScore.toFixed(1)}%
+                </span>
+              </div>
+            </div>
           )}
 
+        {/* All Attempts - Expandable for mobile */}
         {progress && progress.attempts && progress.attempts.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <h4 className="text-xs font-medium text-gray-600 mb-2">
-              Your Attempts:
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-slate-700">
+              All Attempts ({progress.attempts.length})
             </h4>
-            <ul className="space-y-2 max-h-32 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto">
               {progress.attempts.map((attempt, index) => (
-                <li
+                <div
                   key={attempt._id}
-                  className="text-xs p-2 bg-gray-50 hover:bg-gray-100 rounded-md flex justify-between items-center"
+                  className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors duration-150"
                 >
-                  <div>
-                    <span className="font-medium text-gray-700">
-                      Attempt {progress.attempts.length - index}
-                    </span>
-                    <span className="text-gray-500 ml-2">
-                      ({new Date(attempt.attemptDate).toLocaleDateString()})
-                    </span>
+                  <div className="flex-grow min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-slate-800">
+                        #{progress.attempts.length - index}
+                      </span>
+                      <span className="text-xs text-slate-500 truncate">
+                        {new Date(attempt.attemptDate).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center space-x-2 flex-shrink-0">
                     <span
-                      className={`font-semibold mr-2 ${
+                      className={`text-sm font-semibold ${
                         attempt.score >= attempt.totalQuestions * 0.7
                           ? "text-green-600"
                           : "text-red-600"
                       }`}
                     >
-                      {attempt.score}/{attempt.totalQuestions} pts
+                      {attempt.score}/{attempt.totalQuestions}
                     </span>
                     {attempt.hasIncorrectAnswers &&
                       progress.staffUserId?._id && (
                         <Button
                           variant="secondary"
-                          className="text-blue-600 hover:text-blue-700 hover:underline text-xs p-0 m-0 leading-none bg-transparent border-none shadow-none focus:outline-none focus:ring-0"
+                          className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 bg-transparent border-blue-200 hover:border-blue-300"
                           onClick={() =>
                             onViewAttemptIncorrectAnswers(attempt._id)
                           }
                         >
-                          View Incorrect
+                          Review
                         </Button>
                       )}
                   </div>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="flex-shrink-0 mt-auto p-4 border-t border-gray-100">
+      {/* Action Button */}
+      <div className="flex-shrink-0 mt-4 pt-4 border-t border-slate-200">
         {isQuizOnCooldown ? (
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <Button
-              variant="primary"
-              className="w-full text-sm py-1.5 opacity-70 cursor-not-allowed bg-slate-400 hover:bg-slate-400 focus:bg-slate-400"
+              variant="secondary"
+              className="w-full bg-amber-50 text-amber-700 border-amber-200 cursor-not-allowed"
               disabled
             >
-              You've completed your quiz for today.
+              <ClockIcon className="h-4 w-4 mr-2" />
+              Quiz completed today
             </Button>
+            <p className="text-xs text-amber-600">
+              {formatAvailability(nextAvailableAt)}
+            </p>
           </div>
         ) : !isCompletedOverall ? (
           <Button
             variant="primary"
-            className="w-full text-sm py-1.5"
+            className="w-full shadow-lg"
             onClick={() => navigate(`/staff/quiz/${quizId}/take`)}
           >
-            Take Quiz
+            <PlayIcon className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Take Quiz</span>
+            <span className="sm:hidden">Start</span>
           </Button>
         ) : progress && progress.attempts.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-1.5">
-            Quiz completed. No attempts logged.
-          </p>
+          <div className="text-center">
+            <div className="inline-flex items-center px-3 py-2 rounded-lg bg-slate-100 text-slate-600">
+              <CheckCircleIcon className="h-4 w-4 mr-2" />
+              <span className="text-sm">Quiz completed</span>
+            </div>
+          </div>
         ) : (
-          <p className="text-xs text-green-600 text-center py-1.5">
-            You have completed this quiz.
-          </p>
+          <div className="text-center">
+            <div className="inline-flex items-center px-3 py-2 rounded-lg bg-green-100 text-green-700">
+              <CheckCircleIcon className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Completed!</span>
+            </div>
+          </div>
         )}
       </div>
     </Card>
@@ -468,115 +523,268 @@ const StaffDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Staff Dashboard
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Welcome back, {user?.name}! Here's your training overview.
-              </p>
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8 border border-slate-200 shadow-sm">
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-blue-100/50 to-indigo-100/50 rounded-full blur-3xl"></div>
+
+              <div className="relative">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center space-x-3 sm:space-x-4 mb-4 sm:mb-0">
+                    <div className="p-3 sm:p-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg flex-shrink-0">
+                      <UserIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">
+                        Staff Dashboard
+                      </h1>
+                      <p className="text-slate-600 text-sm sm:text-base mt-1">
+                        Welcome back, {user?.name}!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick action button for mobile */}
+                  <div className="flex-shrink-0">
+                    {pendingQuizzes.length > 0 && (
+                      <Button
+                        variant="primary"
+                        onClick={() =>
+                          navigate(`/staff/quiz/${pendingQuizzes[0]._id}/take`)
+                        }
+                        className="w-full sm:w-auto bg-white/80 backdrop-blur-sm hover:bg-white/90 text-blue-600 border-blue-200 hover:border-blue-300"
+                      >
+                        <PlayIcon className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">
+                          Continue Learning
+                        </span>
+                        <span className="sm:hidden">Start Quiz</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Training progress overview */}
+                <div className="mt-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                    <div className="flex items-center space-x-2">
+                      <BookOpenIcon className="h-5 w-5 text-slate-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-slate-800">
+                        Training Progress
+                      </span>
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {completedQuizzes.length} of {quizzes.length} quizzes
+                      completed
+                      {quizzes.length > 0 && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          {Math.round(
+                            (completedQuizzes.length / quizzes.length) * 100
+                          )}
+                          %
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Enhanced Stats Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
               {/* Quizzes Completed */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">
-                      Quizzes Completed
-                    </p>
-                    <p className="text-2xl font-bold text-slate-900">
-                      {completedQuizzes.length}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+              <Card variant="elevated" className="border-0 shadow-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg flex-shrink-0">
                     <CheckCircleIcon className="h-6 w-6 text-white" />
                   </div>
-                </div>
-              </div>
-
-              {/* Certificates Earned */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">
-                      Certificates Earned
+                  <div className="flex-grow min-w-0">
+                    <p className="text-sm font-medium text-slate-600 mb-1">
+                      Quizzes Completed
                     </p>
-                    <p className="text-2xl font-bold text-slate-900">
+                    <p className="text-3xl font-bold text-slate-900 truncate">
                       {completedQuizzes.length}
                     </p>
-                  </div>
-                  <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                    <TrophyIcon className="h-6 w-6 text-white" />
+                    <p className="text-xs text-slate-500 mt-1">
+                      {pendingQuizzes.length > 0
+                        ? `${pendingQuizzes.length} pending`
+                        : "All caught up!"}
+                    </p>
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* Average Score */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">
+              <Card variant="elevated" className="border-0 shadow-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg flex-shrink-0">
+                    <ChartBarIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-grow min-w-0">
+                    <p className="text-sm font-medium text-slate-600 mb-1">
                       Average Score
                     </p>
-                    <p className="text-2xl font-bold text-slate-900">
+                    <p className="text-3xl font-bold text-slate-900 truncate">
                       {rankingData?.myAverageScore !== null &&
                       rankingData?.myAverageScore !== undefined
                         ? `${rankingData.myAverageScore.toFixed(1)}%`
                         : "N/A"}
                     </p>
-                  </div>
-                  <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
-                    <ChartBarIcon className="h-6 w-6 text-white" />
+                    <p className="text-xs text-slate-500 mt-1">
+                      {rankingData?.myAverageScore !== null &&
+                      rankingData?.myAverageScore !== undefined
+                        ? rankingData.myAverageScore >= 80
+                          ? "Excellent performance!"
+                          : rankingData.myAverageScore >= 70
+                          ? "Good progress"
+                          : "Keep improving"
+                        : "Take a quiz to see your score"}
+                    </p>
                   </div>
                 </div>
-              </div>
+              </Card>
             </div>
 
             {/* Error Message */}
-            {quizError && rankingError && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-                <ErrorMessage message={quizError} />
-              </div>
+            {(quizError || rankingError) && (
+              <Card
+                variant="outlined"
+                className="border-red-200 bg-red-50/50 mb-6"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-800 mb-1">
+                      Unable to load data
+                    </h3>
+                    <ErrorMessage
+                      message={quizError || rankingError || "An error occurred"}
+                    />
+                  </div>
+                </div>
+              </Card>
             )}
 
-            {/* Quizzes Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                <h2 className="text-xl font-semibold text-slate-900">
-                  Available Quizzes
-                </h2>
+            {/* Enhanced Quizzes Section */}
+            <Card
+              variant="elevated"
+              className="border-0 shadow-lg overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-4 sm:px-6 py-4 border-b border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-lg">
+                      <AcademicCapIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+                        Available Quizzes
+                      </h2>
+                      <p className="text-sm text-slate-600">
+                        {quizzes.length} quiz{quizzes.length !== 1 ? "es" : ""}{" "}
+                        available
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Filter/Sort options - could be added later */}
+                  {pendingQuizzes.length > 0 && completedQuizzes.length > 0 && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {pendingQuizzes.length} pending
+                      </span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                        {completedQuizzes.length} completed
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="p-6">
+
+              <div className="p-4 sm:p-6">
                 {quizzes.length === 0 ? (
-                  <div className="text-center py-12">
-                    <AcademicCapIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  <div className="text-center py-12 sm:py-16">
+                    <div className="relative">
+                      <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                        <AcademicCapIcon className="h-10 w-10 sm:h-12 sm:w-12 text-slate-500" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-3">
                       No quizzes available
                     </h3>
-                    <p className="text-slate-500">
-                      Check back later for new training materials.
+                    <p className="text-slate-600 max-w-md mx-auto leading-relaxed">
+                      Check back later for new training materials. Your manager
+                      may be preparing new content for you.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {quizzes.map((quizDisplayItem) => (
-                      <QuizItem
-                        key={quizDisplayItem._id}
-                        quizDisplayItem={quizDisplayItem}
-                        onViewAttemptIncorrectAnswers={
-                          handleOpenAttemptIncorrectAnswersModal
-                        }
-                      />
-                    ))}
+                  <div className="space-y-6">
+                    {/* Pending Quizzes */}
+                    {pendingQuizzes.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-1.5 bg-blue-100 rounded-lg">
+                            <PlayIcon className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            Continue Learning
+                          </h3>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                            {pendingQuizzes.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {pendingQuizzes.map((quizDisplayItem) => (
+                            <QuizItem
+                              key={quizDisplayItem._id}
+                              quizDisplayItem={quizDisplayItem}
+                              onViewAttemptIncorrectAnswers={
+                                handleOpenAttemptIncorrectAnswersModal
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Completed Quizzes */}
+                    {completedQuizzes.length > 0 && (
+                      <div className="space-y-4">
+                        {pendingQuizzes.length > 0 && (
+                          <div className="border-t border-slate-200 pt-6"></div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <div className="p-1.5 bg-green-100 rounded-lg">
+                            <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            Completed Quizzes
+                          </h3>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                            {completedQuizzes.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {completedQuizzes.map((quizDisplayItem) => (
+                            <QuizItem
+                              key={quizDisplayItem._id}
+                              quizDisplayItem={quizDisplayItem}
+                              onViewAttemptIncorrectAnswers={
+                                handleOpenAttemptIncorrectAnswersModal
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       </main>

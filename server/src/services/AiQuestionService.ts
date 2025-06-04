@@ -30,6 +30,12 @@ import {
 import {
   IMPROVED_SYSTEM_INSTRUCTIONS,
   QUESTION_GENERATION_CONFIG,
+  buildEnhancedPromptContext,
+  QuestionGenerationContext,
+  applySmartContextProcessing,
+  SimplifiedMenuItem,
+  calculateAdvancedQuestionDistribution,
+  AdvancedQuestionPlan,
 } from "../utils/questionGenerationConstants";
 import {
   validateGeneratedQuestions,
@@ -412,7 +418,6 @@ class AiQuestionService {
     const menu = await MenuModel.findOne({
       _id: new mongoose.Types.ObjectId(menuId),
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
-      isActive: true,
     }).lean<IMenu>();
 
     if (!menu) {
@@ -440,7 +445,6 @@ class AiQuestionService {
           menuId: new mongoose.Types.ObjectId(menuId),
           restaurantId: new mongoose.Types.ObjectId(restaurantId),
           category: categoryName,
-          isActive: true,
         }).lean<IMenuItem[]>();
 
         if (itemsInCategory && itemsInCategory.length > 0) {
@@ -815,30 +819,17 @@ class AiQuestionService {
       `[AiQuestionService - validateAndImproveQuestions] Validating ${questions.length} questions for category: ${categoryName}`
     );
 
-    // Convert IMenuItem[] to SimplifiedMenuItem[] for validation
+    // NEW: Convert IMenuItem[] to SimplifiedMenuItem[] for enhanced validation
     const simplifiedItems = originalItems.map((item) => ({
       name: item.name,
       description: item.description || "",
       keyIngredients: getIngredientNamesForPrompt(item.ingredients),
       allergens: item.allergens || [],
       category: item.category || categoryName,
-      wineDetails:
-        item.category && /wine/i.test(item.category)
-          ? {
-              wineStyle: (item as any).wineStyle,
-              grapeVariety: (item as any).grapeVariety,
-              region: (item as any).region,
-              producer: (item as any).producer,
-              vintage: (item as any).vintage,
-            }
-          : undefined,
+      itemType:
+        item.itemType ||
+        (item.category && /wine/i.test(item.category) ? "wine" : "food"),
     }));
-
-    const context = {
-      categoryName,
-      items: simplifiedItems,
-      targetCount: questions.length,
-    };
 
     // Convert RawAiGeneratedQuestion[] to ValidationRawQuestion[] for validation
     const validationQuestions: ValidationRawQuestion[] = questions.map((q) => ({
@@ -847,61 +838,48 @@ class AiQuestionService {
       category: q.category || categoryName,
     }));
 
+    // NEW: Use our enhanced validation with simplified interface
     const validation = validateGeneratedQuestions(
       validationQuestions,
       simplifiedItems,
-      context
+      categoryName
     );
 
-    // Filter questions based on validation results - STRICTER ENFORCEMENT
+    // Filter questions based on validation results - ENHANCED ENFORCEMENT
     const validQuestions: RawAiGeneratedQuestion[] = [];
     const rejectedQuestions: RawAiGeneratedQuestion[] = [];
 
     questions.forEach((q, index) => {
-      // Check if this specific question has validation issues
-      const questionHasLeakage = validation.issues.some(
-        (issue) =>
-          issue.includes(`Question ${index + 1}:`) &&
-          (issue.includes("answer leaked") ||
-            issue.includes("visible in question"))
-      );
+      const questionNumber = index + 1;
 
-      const questionHasVagueReference = validation.issues.some(
+      // Check if this specific question has validation issues
+      const questionHasAnswerLeakage = validation.issues.some(
         (issue) =>
-          issue.includes(`Question ${index + 1}:`) &&
-          issue.includes("vague reference")
+          issue.includes(`Question ${questionNumber}:`) &&
+          issue.includes("ANSWER LEAKAGE")
       );
 
       const questionHasCriticalIssues = validation.issues.some(
         (issue) =>
-          issue.includes(`Question ${index + 1}:`) &&
+          issue.includes(`Question ${questionNumber}:`) &&
           (issue.includes("No clear menu item reference") ||
             issue.includes("Must have exactly") ||
-            issue.includes("duplicate options"))
+            issue.includes("duplicate options") ||
+            issue.includes("No correct answer marked"))
       );
 
-      const questionHasMinorIssues = validation.issues.some(
+      const questionHasQualityIssues = validation.issues.some(
         (issue) =>
-          issue.includes(`Question ${index + 1}:`) &&
-          !questionHasLeakage &&
-          !questionHasVagueReference &&
-          !questionHasCriticalIssues
+          issue.includes(`Question ${questionNumber}:`) &&
+          (issue.includes("Too short or vague") ||
+            issue.includes("Poor or missing explanation") ||
+            issue.includes("obviously wrong distractors"))
       );
 
-      // REJECT: Questions with answer leakage (critical issue)
-      if (questionHasLeakage) {
+      // REJECT: Questions with answer leakage (CRITICAL)
+      if (questionHasAnswerLeakage) {
         console.warn(
-          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to answer leakage: "${q.questionText.substring(
-            0,
-            100
-          )}..."`
-        );
-        rejectedQuestions.push(q);
-      }
-      // REJECT: Questions with vague references (quality issue)
-      else if (questionHasVagueReference) {
-        console.warn(
-          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to vague reference: "${q.questionText.substring(
+          `[AiQuestionService - validateAndImproveQuestions] REJECTING question due to ANSWER LEAKAGE: "${q.questionText.substring(
             0,
             100
           )}..."`
@@ -918,10 +896,10 @@ class AiQuestionService {
         );
         rejectedQuestions.push(q);
       }
-      // ACCEPT: Only questions with minor issues or no issues
-      else if (questionHasMinorIssues) {
+      // ACCEPT: Questions with only minor quality issues
+      else if (questionHasQualityIssues) {
         console.warn(
-          `[AiQuestionService - validateAndImproveQuestions] Accepting question with minor issues: "${q.questionText.substring(
+          `[AiQuestionService - validateAndImproveQuestions] Accepting question with minor quality issues: "${q.questionText.substring(
             0,
             100
           )}..."`
@@ -1115,7 +1093,7 @@ class AiQuestionService {
     }
   }
 
-  // This is the new helper function to build the prompt for a category batch.
+  // NEW: Phase 2 Smart Context Processing - Enhanced prompt builder
   private static async _buildPromptForCategoryBatch(params: {
     categoryName: string;
     itemsInCategory: IMenuItem[];
@@ -1144,70 +1122,157 @@ class AiQuestionService {
       return null;
     }
 
+    // Step 1: Get contextual data for smart processing
     const contextualData = await this._getContextualData(
       menuId,
       categoryName,
-      itemsInCategory[0]?._id?.toString() || "", // Use first item for general context if available
+      itemsInCategory[0]?._id?.toString() || "",
       restaurantId
     );
 
-    // Prepare items data for the prompt
-    const itemsDataForPrompt = itemsInCategory.map((item) => ({
-      name: item.name,
-      description: item.description,
-      ingredients: getIngredientNamesForPrompt(item.ingredients),
-      allergens: item.allergens?.join(", ") || "None listed",
-      // No need to include item.category here as it's passed as categoryName for the batch
-    }));
+    // Step 2: Convert menu items to simplified format for processing
+    const simplifiedItems: SimplifiedMenuItem[] = itemsInCategory.map(
+      (item) => ({
+        name: item.name,
+        description: item.description?.substring(0, 100) || "",
+        keyIngredients: getIngredientNamesForPrompt(item.ingredients).slice(
+          0,
+          5
+        ),
+        allergens: item.allergens || [],
+        dietary: {
+          isVegan: item.isVegan,
+          isVegetarian: item.isVegetarian,
+          isGlutenFree: item.isGlutenFree,
+          isDairyFree: undefined, // Not available in current MenuItem model
+        },
+        category: categoryName,
+        // Note: wineDetails not available in current MenuItem model
+        // Future enhancement would add wine-specific fields to MenuItem schema
+        wineDetails: undefined,
+      })
+    );
 
-    // Determine if this is a wine-related category
-    const isWineCategory =
-      /wine/i.test(categoryName) ||
-      itemsInCategory.some(
-        (item) =>
-          (item.itemType as string) === "wine" || /wine/i.test(item.name || "")
+    // Step 3: Apply Phase 2 Smart Context Processing
+    const smartProcessingResult = applySmartContextProcessing(
+      simplifiedItems,
+      categoryName,
+      contextualData,
+      questionFocusAreas,
+      targetQuestionCount
+    );
+
+    // Step 3.1: Apply Phase 3 Advanced Question Distribution
+    const advancedDistribution = calculateAdvancedQuestionDistribution(
+      simplifiedItems,
+      categoryName,
+      questionFocusAreas,
+      targetQuestionCount,
+      "priority-weighted" // Default strategy, could be made configurable
+    );
+
+    // Step 4: Build enhanced prompt with Phase 2 & 3 processing insights
+    const promptStructure = {
+      instruction:
+        "Generate quiz questions for hospitality training using Phase 2 Smart Context Processing and Phase 3 Advanced Distribution",
+
+      categoryAnalysis: {
+        name: categoryName,
+        itemCount: simplifiedItems.length,
+        targetQuestions: targetQuestionCount,
+        focusAreas: questionFocusAreas,
+        questionTypes: questionTypes,
+      },
+
+      // Phase 2: Smart Context Processing Results
+      smartProcessingInsights: smartProcessingResult.processingInsights,
+
+      enhancedItems: smartProcessingResult.enhancedItems.map((item) => ({
+        name: item.name,
+        description: item.description,
+        keyIngredients: item.keyIngredients,
+        allergens: item.allergens,
+        selectedFormat: item.selectedFormat,
+        formatReasoning: item.formatReasoning,
+        complexityScore: item.complexityScore,
+        questionPriority: item.questionPriority,
+        wineDetails: item.wineDetails,
+      })),
+
+      smartDistractors: smartProcessingResult.smartDistractors,
+
+      // Phase 3: Advanced Question Distribution Results
+      advancedDistribution: {
+        strategy: advancedDistribution.distributionStrategy,
+        totalQuestions: advancedDistribution.totalQuestions,
+        itemPlans: advancedDistribution.itemQuestionPlans.map((plan) => ({
+          itemName: plan.item.name,
+          allocatedQuestions: plan.allocatedQuestions,
+          rationale: plan.rationale,
+          priority: plan.priority,
+          trainingValue: plan.trainingValue,
+          estimatedDifficulty: plan.estimatedDifficulty,
+          focusAreas: plan.focusAreas,
+        })),
+        focusAreaCoverage: advancedDistribution.focusAreaDistribution,
+        qualityTargets: advancedDistribution.qualityTargets,
+      },
+
+      requirements: {
+        mustReferenceMenuItems: true,
+        useSmartDistractors: true,
+        followSelectedFormats: true,
+        followAdvancedDistribution: true,
+        respectQualityTargets: true,
+        avoidAnswerLeakage: true,
+        useContextAwareDistractors: true,
+      },
+
+      additionalContext: additionalContext || null,
+    };
+
+    // Log smart processing insights for debugging
+    console.log(`🧠 Phase 2 Smart Processing for ${categoryName}:`);
+    console.log(
+      `📊 ${smartProcessingResult.processingInsights.categoryAnalysis}`
+    );
+    console.log(
+      `🎯 Format Distribution:`,
+      smartProcessingResult.processingInsights.formatDistribution
+    );
+    console.log(
+      `🔍 ${smartProcessingResult.processingInsights.complexityAnalysis}`
+    );
+
+    // Log Phase 3 advanced distribution insights
+    console.log(`🎯 Phase 3 Advanced Distribution for ${categoryName}:`);
+    console.log(`📋 Strategy: ${advancedDistribution.distributionStrategy}`);
+    console.log(`📈 Question Allocation:`);
+    advancedDistribution.itemQuestionPlans.forEach((plan, index) => {
+      console.log(
+        `  ${index + 1}. ${plan.item.name}: ${
+          plan.allocatedQuestions
+        } questions (Priority: ${plan.priority}/10, Training Value: ${
+          plan.trainingValue
+        }/10)`
       );
+      console.log(`     📝 ${plan.rationale}`);
+    });
+    console.log(`🎚️ Focus Area Coverage:`);
+    advancedDistribution.focusAreaDistribution.forEach((area) => {
+      console.log(
+        `  ${area.area}: ${area.actualQuestions}/${
+          area.targetQuestions
+        } questions (${area.coverage.toFixed(1)}% coverage, ${
+          area.priority
+        } priority)`
+      );
+    });
+    console.log(
+      `🎯 Quality Targets: Min Score ${advancedDistribution.qualityTargets.minimumScore}, Difficulty: ${advancedDistribution.qualityTargets.expectedDifficulty}`
+    );
 
-    const isBeverageCategory =
-      !isWineCategory &&
-      (/beverage|drink|cocktail|coffee|tea/i.test(categoryName) ||
-        itemsInCategory.some((item) => item.itemType === "beverage"));
-
-    let promptString = `Category: ${categoryName}\n`;
-    promptString += `Target Question Count: ${targetQuestionCount}\n`;
-    promptString += `Question Types: ${questionTypes.join(", ")}\n`;
-
-    // Adjust focus areas based on category type
-    if (isWineCategory) {
-      promptString += `Focus Areas (Wine-Specific): Wine Varieties, Wine Regions, Vintages, Wine Pairings, Wine Service, Wine Styles, Producers, Tasting Notes\n`;
-      promptString += `NOTE: This is a WINE category. Generate questions focused on WINE KNOWLEDGE, not food ingredients.\n`;
-    } else if (isBeverageCategory) {
-      promptString += `Focus Areas (Beverage-Specific): Drink Preparation, Ingredients, Mixing Techniques, Equipment, Temperature, Garnishes\n`;
-      promptString += `NOTE: This is a BEVERAGE category. Generate questions focused on BEVERAGE KNOWLEDGE.\n`;
-    } else {
-      promptString += `Focus Areas: ${questionFocusAreas.join(", ")}\n`;
-    }
-
-    if (additionalContext) {
-      promptString += `Additional Context: ${additionalContext}\n`;
-    }
-    promptString += `\nMenu Items in this Category (itemsInCategory):\n${JSON.stringify(
-      itemsDataForPrompt,
-      null,
-      2
-    )}\n`;
-    promptString += `\nContextual Item Names (for distractor generation):\n${JSON.stringify(
-      contextualData.contextualItemNames.slice(0, 30),
-      null,
-      2
-    )}\n`;
-    promptString += `\nContextual Ingredients (for distractor generation):\n${JSON.stringify(
-      contextualData.contextualIngredients.slice(0, 50),
-      null,
-      2
-    )}\n`;
-
-    return promptString;
+    return JSON.stringify(promptStructure, null, 2);
   }
 
   // Old prompt builder - _buildUserPromptForItemFocus - can be removed or commented out
