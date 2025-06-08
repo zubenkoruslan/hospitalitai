@@ -32,6 +32,71 @@ export interface GeminiProcessedMenuItem {
   wineRegion?: string;
   wineServingOptions?: Array<{ size: string; price: number | null }>;
   winePairings?: string[];
+
+  // Enhancement metadata for debugging and validation
+  _enhancementMetadata?: {
+    confidence: {
+      overall: number;
+      ingredients: number;
+      allergens: number;
+      dietary: number;
+      wine: number;
+    };
+    allergens: Array<{
+      allergen: string;
+      confidence: "definite" | "likely" | "possible";
+      source: string; // which ingredient triggered this
+      reason: string; // why we think this allergen is present
+    }>;
+    enhancedIngredients: Array<{
+      name: string;
+      cleanName: string;
+      category: string;
+      isCore: boolean;
+      allergenRisk: string[];
+      confidence: number;
+    }>;
+    wineIntelligence?: {
+      grapeVarieties: Array<{
+        name: string;
+        confidence: "confirmed" | "inferred" | "likely";
+        source:
+          | "explicit"
+          | "regional"
+          | "producer"
+          | "wine_name"
+          | "web_search";
+      }>;
+      region: {
+        country?: string;
+        region?: string;
+        appellation?: string;
+      };
+      vintage?: number;
+      producer?: string;
+      wineStyle:
+        | "still"
+        | "sparkling"
+        | "champagne"
+        | "dessert"
+        | "fortified"
+        | "other";
+      bodyProfile?: "light" | "medium" | "full";
+      foodPairings: string[];
+    };
+    originalData: {
+      ingredients: string[];
+      dietary: {
+        isVegan: boolean;
+        isVegetarian: boolean;
+        isGlutenFree: boolean;
+      };
+      wine: {
+        grapeVariety?: string[];
+      };
+    };
+  };
+
   // If Gemini can provide originalText or sourceCoordinates per item, add here.
   // e.g., originalItemText?: string;
   // e.g., itemSourceCoordinates?: any;
@@ -162,8 +227,8 @@ export interface ParsedMenuItem {
 export interface MenuUploadPreview {
   previewId: string; // Unique ID for this upload session (e.g., based on temp file path or a UUID)
   filePath: string; // Path to the temporarily stored uploaded file
-  sourceFormat: "pdf"; // Initially supporting PDF, can extend later
-  parsedMenuName?: string; // The menu name as parsed by AI
+  sourceFormat: "pdf" | "excel" | "csv" | "json" | "word"; // Enhanced multi-format support
+  parsedMenuName?: string; // The menu name as parsed by AI or extracted from structured data
   parsedItems: ParsedMenuItem[];
   detectedCategories: string[]; // Unique categories detected from all items
   globalErrors?: string[]; // Errors not specific to one item (e.g., "File too large", "AI parsing failed")
@@ -171,8 +236,8 @@ export interface MenuUploadPreview {
     totalItemsParsed: number;
     itemsWithPotentialErrors: number;
   };
-  rawAIText?: string; // Full raw text extracted from PDF, truncated if very long
-  rawAIOutput?: GeminiAIServiceOutput | null; // Raw output from Gemini AI service for debugging
+  rawAIText?: string; // Full raw text extracted from PDF, truncated if very long (PDF only)
+  rawAIOutput?: GeminiAIServiceOutput | null; // Raw output from Gemini AI service for debugging (PDF only)
 }
 
 // --- Structures for Final Menu Import ---

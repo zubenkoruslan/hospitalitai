@@ -10,11 +10,13 @@ import MenuItem, {
 import { AppError } from "../utils/errorHandler";
 import pdfParse from "pdf-parse";
 import fs from "fs";
+import path from "path";
 import {
   GoogleGenerativeAI,
   FunctionDeclaration,
   FunctionDeclarationSchemaType,
   FunctionDeclarationSchema,
+  FunctionCallingMode,
 } from "@google/generative-ai";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -44,6 +46,23 @@ import {
   ASYNC_IMPORT_THRESHOLD,
   AI_MODEL_NAME,
 } from "../utils/constants";
+// Enhanced Intelligence imports
+import {
+  enhanceIngredients,
+  detectAllergens,
+  detectWineGrapeVarieties,
+  processMenuItem,
+  EnhancedIngredient,
+  AllergenDetection,
+  WineIntelligence,
+  ProcessedMenuItem,
+} from "../utils/ingredientIntelligence";
+// File Parser Service import
+import {
+  FileParserService,
+  ParsedMenuData,
+  RawMenuItem,
+} from "./fileParserService";
 
 interface MenuData {
   name: string;
@@ -72,9 +91,11 @@ const _systemInstruction = `
 You are an AI assistant specialized in parsing restaurant menu data from unstructured text. Your primary goal is to extract detailed information about the menu and its items.
 The user will provide text extracted from a menu document (typically a PDF).
 
-IMPORTANT: You MUST use the 'extract_menu_data' function to structure your response. This is critical for proper processing.
+CRITICAL: You MUST use the 'extract_menu_data' function call to structure your response. Do NOT return plain JSON text. Use the function call format.
 
-If for any reason you cannot use the function call, you must still provide the exact same structured data format as valid JSON in your text response.
+FUNCTION CALL REQUIREMENT: Always call the extract_menu_data function with the extracted data. The system expects a function call, not plain text JSON.
+
+If the function call mechanism is not working, as a fallback you may provide valid JSON, but the preferred method is always the function call.
 
 When you process the menu text, please extract the following:
 
@@ -348,6 +369,12 @@ async function getAIRawExtraction(
     model: AI_MODEL_NAME,
     systemInstruction: _systemInstruction,
     tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
+    toolConfig: {
+      functionCallingConfig: {
+        mode: FunctionCallingMode.ANY, // Force function calling for more reliable results
+        allowedFunctionNames: ["extract_menu_data"],
+      },
+    },
   });
 
   const chat = model.startChat({});
@@ -389,121 +416,140 @@ async function getAIRawExtraction(
         console.log("Response text length:", responseText.length);
         console.log("Response text preview:", responseText.substring(0, 1000));
 
-        // Look for JSON-like content in the response
-        // First try to match JSON wrapped in markdown code blocks (with optional closing block for truncated responses)
-        let jsonMatch = responseText.match(/```json\s*([\s\S]*?)(?:\s*```|$)/);
-        if (!jsonMatch) {
-          console.log("No markdown JSON blocks found, trying raw JSON match");
-          // Fallback to looking for raw JSON (from first { to last })
-          jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        } else {
-          console.log("Found markdown JSON block (potentially truncated)");
-        }
+        // First try to parse the response directly as JSON (since gemini-2.0-flash sometimes returns direct JSON)
+        let parsedData: GeminiAIServiceOutput | null = null;
 
-        if (jsonMatch) {
-          let jsonStr = jsonMatch[1] || jsonMatch[0]; // Use capture group if available, otherwise full match
-          console.log("Extracted JSON string length:", jsonStr.length);
-          console.log("Extracted JSON preview:", jsonStr.substring(0, 500));
+        try {
+          parsedData = JSON.parse(responseText) as GeminiAIServiceOutput;
+          console.log("Successfully parsed direct JSON response");
+        } catch (directParseError) {
+          console.log("Direct JSON parse failed, trying other methods");
 
-          // If the JSON string seems truncated (doesn't end with } or ]), try to fix it
-          jsonStr = jsonStr.trim();
-          if (!jsonStr.endsWith("}") && !jsonStr.endsWith("]")) {
-            console.log("JSON appears truncated, attempting to complete it");
+          // Look for JSON-like content in the response
+          // First try to match JSON wrapped in markdown code blocks (with optional closing block for truncated responses)
+          let jsonMatch = responseText.match(
+            /```json\s*([\s\S]*?)(?:\s*```|$)/
+          );
+          if (!jsonMatch) {
+            console.log("No markdown JSON blocks found, trying raw JSON match");
+            // Fallback to looking for raw JSON (from first { to last })
+            jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          } else {
+            console.log("Found markdown JSON block (potentially truncated)");
+          }
 
-            // Try to find the last complete item in the menuItems array
-            const menuItemsMatch = jsonStr.match(
-              /"menuItems"\s*:\s*\[([\s\S]*)/
-            );
-            if (menuItemsMatch) {
-              const itemsContent = menuItemsMatch[1];
+          if (jsonMatch) {
+            let jsonStr = jsonMatch[1] || jsonMatch[0]; // Use capture group if available, otherwise full match
+            console.log("Extracted JSON string length:", jsonStr.length);
+            console.log("Extracted JSON preview:", jsonStr.substring(0, 500));
 
-              // Find all complete items (those that end with '}' followed by optional comma and whitespace)
-              const completeItems = [];
-              let currentItem = "";
-              let braceCount = 0;
-              let inString = false;
-              let escapeNext = false;
+            // If the JSON string seems truncated (doesn't end with } or ]), try to fix it
+            jsonStr = jsonStr.trim();
+            if (!jsonStr.endsWith("}") && !jsonStr.endsWith("]")) {
+              console.log("JSON appears truncated, attempting to complete it");
 
-              for (let i = 0; i < itemsContent.length; i++) {
-                const char = itemsContent[i];
+              // Try to find the last complete item in the menuItems array
+              const menuItemsMatch = jsonStr.match(
+                /"menuItems"\s*:\s*\[([\s\S]*)/
+              );
+              if (menuItemsMatch) {
+                const itemsContent = menuItemsMatch[1];
 
-                if (escapeNext) {
-                  escapeNext = false;
-                  currentItem += char;
-                  continue;
-                }
+                // Find all complete items (those that end with '}' followed by optional comma and whitespace)
+                const completeItems = [];
+                let currentItem = "";
+                let braceCount = 0;
+                let inString = false;
+                let escapeNext = false;
 
-                if (char === "\\") {
-                  escapeNext = true;
-                  currentItem += char;
-                  continue;
-                }
+                for (let i = 0; i < itemsContent.length; i++) {
+                  const char = itemsContent[i];
 
-                if (char === '"' && !escapeNext) {
-                  inString = !inString;
-                }
-
-                if (!inString) {
-                  if (char === "{") {
-                    if (braceCount === 0) {
-                      // Starting a new item
-                      currentItem = char;
-                    } else {
-                      currentItem += char;
-                    }
-                    braceCount++;
-                  } else if (char === "}") {
+                  if (escapeNext) {
+                    escapeNext = false;
                     currentItem += char;
-                    braceCount--;
-                    if (braceCount === 0) {
-                      // Found a complete item
-                      completeItems.push(currentItem.trim());
-                      currentItem = "";
-                      // Skip past any comma and whitespace
-                      while (
-                        i + 1 < itemsContent.length &&
-                        /[,\s]/.test(itemsContent[i + 1])
-                      ) {
-                        i++;
+                    continue;
+                  }
+
+                  if (char === "\\") {
+                    escapeNext = true;
+                    currentItem += char;
+                    continue;
+                  }
+
+                  if (char === '"' && !escapeNext) {
+                    inString = !inString;
+                  }
+
+                  if (!inString) {
+                    if (char === "{") {
+                      if (braceCount === 0) {
+                        // Starting a new item
+                        currentItem = char;
+                      } else {
+                        currentItem += char;
                       }
+                      braceCount++;
+                    } else if (char === "}") {
+                      currentItem += char;
+                      braceCount--;
+                      if (braceCount === 0) {
+                        // Found a complete item
+                        completeItems.push(currentItem.trim());
+                        currentItem = "";
+                        // Skip past any comma and whitespace
+                        while (
+                          i + 1 < itemsContent.length &&
+                          /[,\s]/.test(itemsContent[i + 1])
+                        ) {
+                          i++;
+                        }
+                      }
+                    } else if (braceCount > 0) {
+                      currentItem += char;
                     }
                   } else if (braceCount > 0) {
                     currentItem += char;
                   }
-                } else if (braceCount > 0) {
-                  currentItem += char;
+                }
+
+                if (completeItems.length > 0) {
+                  // Extract menu name more carefully
+                  const menuNameMatch = jsonStr.match(
+                    /"menuName"\s*:\s*"([^"]*)"/
+                  );
+                  const menuName = menuNameMatch
+                    ? menuNameMatch[1]
+                    : "Wine-menu.pdf";
+
+                  // Reconstruct the JSON with only complete items
+                  const reconstructedJson = {
+                    menuName: menuName,
+                    menuItems: completeItems.map((item) => JSON.parse(item)),
+                  };
+
+                  jsonStr = JSON.stringify(reconstructedJson, null, 2);
+                  console.log(
+                    `Reconstructed JSON with ${completeItems.length} complete items`
+                  );
+                  console.log(
+                    "Reconstructed JSON preview:",
+                    jsonStr.substring(0, 500)
+                  );
                 }
               }
+            }
 
-              if (completeItems.length > 0) {
-                // Extract menu name more carefully
-                const menuNameMatch = jsonStr.match(
-                  /"menuName"\s*:\s*"([^"]*)"/
-                );
-                const menuName = menuNameMatch
-                  ? menuNameMatch[1]
-                  : "Wine-menu.pdf";
-
-                // Reconstruct the JSON with only complete items
-                const reconstructedJson = {
-                  menuName: menuName,
-                  menuItems: completeItems.map((item) => JSON.parse(item)),
-                };
-
-                jsonStr = JSON.stringify(reconstructedJson, null, 2);
-                console.log(
-                  `Reconstructed JSON with ${completeItems.length} complete items`
-                );
-                console.log(
-                  "Reconstructed JSON preview:",
-                  jsonStr.substring(0, 500)
-                );
-              }
+            try {
+              parsedData = JSON.parse(jsonStr) as GeminiAIServiceOutput;
+              console.log("Successfully parsed extracted JSON data");
+            } catch (extractedParseError) {
+              console.log("Failed to parse extracted JSON");
             }
           }
+        }
 
-          let parsedData = JSON.parse(jsonStr) as GeminiAIServiceOutput;
-          console.log("Successfully parsed JSON data");
+        if (parsedData) {
           console.log("Parsed menu name:", parsedData.menuName);
           console.log("Parsed items count:", parsedData.menuItems?.length || 0);
 
@@ -532,7 +578,7 @@ async function getAIRawExtraction(
             });
           }
         } else {
-          console.log("No JSON content found in response");
+          console.log("No valid JSON data could be extracted from response");
         }
       } catch (parseError) {
         console.error("Failed to parse JSON from text response:", parseError);
@@ -1009,6 +1055,244 @@ async function enhanceWineGrapeVarieties(
 }
 
 class MenuService {
+  /**
+   * Enhanced Raw Menu Item Processing
+   * Applies Enhanced Menu Parsing intelligence to structured data sources
+   */
+  private static enhanceRawMenuItem(
+    rawItem: RawMenuItem | GeminiProcessedMenuItem
+  ): GeminiProcessedMenuItem {
+    // Normalize the data structure first
+    let normalizedItem: GeminiProcessedMenuItem;
+
+    if ("itemName" in rawItem) {
+      // Already in GeminiProcessedMenuItem format (from PDF AI)
+      normalizedItem = rawItem as GeminiProcessedMenuItem;
+    } else {
+      // Convert from RawMenuItem (from structured files)
+      const raw = rawItem as RawMenuItem;
+      normalizedItem = {
+        itemName: raw.name || "",
+        itemPrice: raw.price,
+        itemType: raw.itemType || "food",
+        itemIngredients: raw.ingredients || [],
+        itemCategory: raw.category || "Uncategorized",
+        isGlutenFree: raw.isGlutenFree || false,
+        isVegan: raw.isVegan || false,
+        isVegetarian: raw.isVegetarian || false,
+        // Wine fields with correct field names from RawMenuItem
+        wineStyle: raw.wineStyle as WineStyleType,
+        wineProducer: raw.producer,
+        wineGrapeVariety: raw.grapeVariety,
+        wineVintage: raw.vintage,
+        wineRegion: raw.region,
+        wineServingOptions: raw.servingOptions,
+        winePairings: raw.pairings,
+      };
+    }
+
+    // Apply Enhanced Menu Parsing intelligence with structured data enhancement
+    return this.enhanceStructuredMenuItem(normalizedItem);
+  }
+
+  /**
+   * Apply comprehensive Enhanced Menu Parsing intelligence to structured menu items
+   * Phase 4.1: Enhanced Structured Data Enhancement
+   */
+  private static enhanceStructuredMenuItem(
+    item: GeminiProcessedMenuItem
+  ): GeminiProcessedMenuItem {
+    try {
+      const processedMenuItem = processMenuItem({
+        itemName: item.itemName,
+        itemType: item.itemType,
+        itemCategory: item.itemCategory,
+        itemPrice: item.itemPrice,
+        itemIngredients: item.itemIngredients,
+        description: undefined, // Not available in current structure
+        isVegan: item.isVegan,
+        isVegetarian: item.isVegetarian,
+        isGlutenFree: item.isGlutenFree,
+        // Wine fields
+        wineRegion: item.wineRegion,
+        wineProducer: item.wineProducer,
+        wineStyle: item.wineStyle,
+        wineVintage: item.wineVintage,
+        winePairings: item.winePairings,
+      });
+
+      // Apply enhanced ingredient processing
+      const enhancedIngredients = processedMenuItem.enhancedIngredients;
+      const coreIngredients = enhancedIngredients
+        .filter((ing) => ing.isCore)
+        .map((ing) => ing.name);
+
+      // Apply allergen detection with dish name context
+      const allergenDetections = processedMenuItem.detectedAllergens;
+
+      // Apply wine intelligence for wine items
+      const wineIntelligence = processedMenuItem.wineIntelligence;
+
+      // Generate confidence scores for enhancements
+      const enhancementConfidence = this.generateEnhancementConfidence(
+        processedMenuItem,
+        item
+      );
+
+      // Build enhanced item with all intelligence applied
+      const enhancedItem: GeminiProcessedMenuItem = {
+        ...item,
+        // Enhanced dietary flags with confidence
+        isVegan: processedMenuItem.isVegan,
+        isVegetarian: processedMenuItem.isVegetarian,
+        isGlutenFree: processedMenuItem.isGlutenFree,
+        // Enhanced ingredient processing (core ingredients only)
+        itemIngredients:
+          coreIngredients.length > 0 ? coreIngredients : item.itemIngredients,
+        // Enhanced wine intelligence
+        wineGrapeVariety:
+          wineIntelligence?.grapeVarieties.map((g) => g.name) ||
+          item.wineGrapeVariety,
+        // Store enhancement metadata for debugging and validation
+        _enhancementMetadata: {
+          confidence: enhancementConfidence,
+          allergens: allergenDetections,
+          enhancedIngredients: enhancedIngredients,
+          wineIntelligence: wineIntelligence,
+          originalData: {
+            ingredients: item.itemIngredients,
+            dietary: {
+              isVegan: item.isVegan,
+              isVegetarian: item.isVegetarian,
+              isGlutenFree: item.isGlutenFree,
+            },
+            wine: {
+              grapeVariety: item.wineGrapeVariety,
+            },
+          },
+        },
+      };
+
+      console.log(
+        `[MenuService.enhanceStructuredMenuItem] Enhanced "${enhancedItem.itemName}" with:`,
+        {
+          coreIngredients: coreIngredients.length,
+          allergens: allergenDetections.length,
+          wineVarieties: wineIntelligence?.grapeVarieties.length || 0,
+          confidence: enhancementConfidence.overall,
+        }
+      );
+
+      return enhancedItem;
+    } catch (error) {
+      console.error(
+        `[MenuService.enhanceStructuredMenuItem] Error enhancing item "${item.itemName}":`,
+        error
+      );
+      // Return the original item without enhancement if there's an error
+      return item;
+    }
+  }
+
+  /**
+   * Generate confidence scores for enhancement processing
+   * Phase 4.1: Enhancement confidence tracking
+   */
+  private static generateEnhancementConfidence(
+    processedItem: ProcessedMenuItem,
+    originalItem: GeminiProcessedMenuItem
+  ): {
+    overall: number;
+    ingredients: number;
+    allergens: number;
+    dietary: number;
+    wine: number;
+  } {
+    let ingredientConfidence = 0;
+    let allergenConfidence = 0;
+    let dietaryConfidence = 0;
+    let wineConfidence = 0;
+
+    // Ingredient confidence based on enhanced processing results
+    if (processedItem.enhancedIngredients.length > 0) {
+      const coreIngredients = processedItem.enhancedIngredients.filter(
+        (i) => i.isCore
+      );
+      ingredientConfidence = Math.min(
+        (coreIngredients.length /
+          Math.max(processedItem.enhancedIngredients.length, 1)) *
+          100,
+        95
+      );
+    }
+
+    // Allergen confidence based on detection results
+    if (processedItem.detectedAllergens.length > 0) {
+      const definiteAllergens = processedItem.detectedAllergens.filter(
+        (a) => a.confidence === "definite"
+      );
+      const likelyAllergens = processedItem.detectedAllergens.filter(
+        (a) => a.confidence === "likely"
+      );
+      allergenConfidence = Math.min(
+        (definiteAllergens.length * 90 + likelyAllergens.length * 70) /
+          Math.max(processedItem.detectedAllergens.length, 1),
+        95
+      );
+    }
+
+    // Dietary confidence based on changes and ingredient analysis
+    const dietaryChanged =
+      processedItem.isVegan !== originalItem.isVegan ||
+      processedItem.isVegetarian !== originalItem.isVegetarian ||
+      processedItem.isGlutenFree !== originalItem.isGlutenFree;
+
+    dietaryConfidence = dietaryChanged ? 75 : 90; // Lower confidence when changes are made
+
+    // Wine confidence based on grape variety detection
+    if (originalItem.itemType === "wine" && processedItem.wineIntelligence) {
+      const confirmedVarieties =
+        processedItem.wineIntelligence.grapeVarieties.filter(
+          (g) => g.confidence === "confirmed"
+        );
+      const inferredVarieties =
+        processedItem.wineIntelligence.grapeVarieties.filter(
+          (g) => g.confidence === "inferred"
+        );
+
+      if (confirmedVarieties.length > 0 || inferredVarieties.length > 0) {
+        wineConfidence = Math.min(
+          (confirmedVarieties.length * 95 + inferredVarieties.length * 75) /
+            Math.max(processedItem.wineIntelligence.grapeVarieties.length, 1),
+          95
+        );
+      }
+    } else if (originalItem.itemType !== "wine") {
+      wineConfidence = 100; // N/A for non-wine items
+    }
+
+    // Calculate overall confidence as weighted average
+    const weights =
+      originalItem.itemType === "wine"
+        ? { ingredients: 0.3, allergens: 0.3, dietary: 0.2, wine: 0.2 }
+        : { ingredients: 0.4, allergens: 0.35, dietary: 0.25, wine: 0 };
+
+    const overall = Math.round(
+      ingredientConfidence * weights.ingredients +
+        allergenConfidence * weights.allergens +
+        dietaryConfidence * weights.dietary +
+        wineConfidence * weights.wine
+    );
+
+    return {
+      overall: Math.min(overall, 95), // Cap at 95% to indicate AI processing
+      ingredients: Math.round(ingredientConfidence),
+      allergens: Math.round(allergenConfidence),
+      dietary: Math.round(dietaryConfidence),
+      wine: Math.round(wineConfidence),
+    };
+  }
+
   private static _prepareAndValidateNewItemData(
     itemFields: ParsedMenuItem["fields"],
     menuObjectId: Types.ObjectId,
@@ -1672,139 +1956,233 @@ class MenuService {
     restaurantId: Types.ObjectId,
     originalFileName?: string
   ): Promise<MenuUploadPreview> {
-    let rawText = "";
-    let parsedAIOutput: GeminiAIServiceOutput | null = null;
     const previewId = uuidv4();
     const globalErrors: string[] = [];
+    let parsedAIOutput: GeminiAIServiceOutput | null = null;
+    let rawText = "";
+    let sourceFormat: "pdf" | "excel" | "csv" | "json" | "word" = "pdf";
+    let structuredData: ParsedMenuData | null = null;
 
-    try {
-      const dataBuffer = fs.readFileSync(multerFilePath);
-      const pdfData = await pdfParse(dataBuffer);
-      rawText = pdfData.text;
-    } catch (error: any) {
-      console.error("Error reading or parsing PDF for preview:", error);
-      globalErrors.push("Failed to read or parse PDF: " + error.message);
-      return {
-        previewId,
-        filePath: multerFilePath,
-        sourceFormat: "pdf",
-        parsedMenuName:
-          originalFileName?.replace(/\.pdf$/i, "") || "Menu from PDF",
-        parsedItems: [],
-        detectedCategories: [],
-        summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
-        globalErrors,
-        rawAIText: rawText.substring(0, 5000),
-        rawAIOutput: null,
-      };
-    }
+    // 1. DETECT FORMAT based on file extension
+    const fileExtension = path.extname(multerFilePath).toLowerCase();
 
-    if (!rawText.trim()) {
-      globalErrors.push("No text content could be extracted from the PDF.");
-    }
+    console.log(
+      `[MenuService.getMenuUploadPreview] Processing file: ${originalFileName}, extension: ${fileExtension}`
+    );
 
-    try {
-      if (rawText.trim()) {
-        parsedAIOutput = await getAIRawExtraction(rawText, originalFileName);
-      }
-    } catch (error: any) {
-      console.error("Error calling AI for preview:", error);
-      globalErrors.push("AI processing failed: " + error.message);
-      if (error instanceof AppError && error.additionalDetails) {
-        globalErrors.push(
-          "AI Details: " + JSON.stringify(error.additionalDetails)
+    switch (fileExtension) {
+      case ".pdf":
+        sourceFormat = "pdf";
+        break;
+      case ".xlsx":
+      case ".xls":
+        sourceFormat = "excel";
+        break;
+      case ".csv":
+        sourceFormat = "csv";
+        break;
+      case ".json":
+        sourceFormat = "json";
+        break;
+      case ".docx":
+        sourceFormat = "word";
+        break;
+      default:
+        // Fallback to PDF for backwards compatibility
+        sourceFormat = "pdf";
+        console.warn(
+          `[MenuService.getMenuUploadPreview] Unknown file extension ${fileExtension}, defaulting to PDF processing`
         );
+    }
+
+    // 2. ROUTE TO APPROPRIATE PARSER
+    if (sourceFormat === "pdf") {
+      // Original PDF processing with AI
+      try {
+        const dataBuffer = fs.readFileSync(multerFilePath);
+        const pdfData = await pdfParse(dataBuffer);
+        rawText = pdfData.text;
+      } catch (error: any) {
+        console.error("Error reading or parsing PDF for preview:", error);
+        globalErrors.push("Failed to read or parse PDF: " + error.message);
+        return {
+          previewId,
+          filePath: multerFilePath,
+          sourceFormat: "pdf",
+          parsedMenuName:
+            originalFileName?.replace(/\.pdf$/i, "") || "Menu from PDF",
+          parsedItems: [],
+          detectedCategories: [],
+          summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+          globalErrors,
+          rawAIText: rawText.substring(0, 5000),
+          rawAIOutput: null,
+        };
+      }
+
+      if (!rawText.trim()) {
+        globalErrors.push("No text content could be extracted from the PDF.");
+      }
+
+      try {
+        if (rawText.trim()) {
+          parsedAIOutput = await getAIRawExtraction(rawText, originalFileName);
+        }
+      } catch (error: any) {
+        console.error("Error calling AI for preview:", error);
+        globalErrors.push("AI processing failed: " + error.message);
+        if (error instanceof AppError && error.additionalDetails) {
+          globalErrors.push(
+            "AI Details: " + JSON.stringify(error.additionalDetails)
+          );
+        }
+      }
+    } else {
+      // New structured data processing
+      try {
+        console.log(
+          `[MenuService.getMenuUploadPreview] Using FileParserService for ${sourceFormat} file`
+        );
+        structuredData = await FileParserService.parseMenuFile(
+          multerFilePath,
+          originalFileName ||
+            `menu.${sourceFormat === "excel" ? "xlsx" : sourceFormat}`
+        );
+        console.log(
+          `[MenuService.getMenuUploadPreview] Parsed ${structuredData.items.length} items from ${sourceFormat} file`
+        );
+      } catch (error: any) {
+        console.error(`Error parsing ${sourceFormat} file for preview:`, error);
+        globalErrors.push(
+          `Failed to parse ${sourceFormat} file: ` + error.message
+        );
+        return {
+          previewId,
+          filePath: multerFilePath,
+          sourceFormat,
+          parsedMenuName:
+            originalFileName?.replace(/\.[^.]+$/i, "") ||
+            `Menu from ${sourceFormat.toUpperCase()}`,
+          parsedItems: [],
+          detectedCategories: [],
+          summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+          globalErrors,
+        };
       }
     }
 
-    const parsedItems: ParsedMenuItem[] = (parsedAIOutput?.menuItems || []).map(
+    // 3. CONVERT TO PREVIEW FORMAT
+    let rawMenuItems: (GeminiProcessedMenuItem | RawMenuItem)[] = [];
+
+    if (sourceFormat === "pdf" && parsedAIOutput) {
+      rawMenuItems = parsedAIOutput.menuItems;
+    } else if (structuredData) {
+      rawMenuItems = structuredData.items;
+    }
+
+    const parsedItems: ParsedMenuItem[] = rawMenuItems.map(
       (item, index): ParsedMenuItem => {
+        // 4. APPLY ENHANCED MENU PARSING INTELLIGENCE
+        const enhancedItem = MenuService.enhanceRawMenuItem(item);
+
         const isNameValid = !!(
-          item.itemName && item.itemName.trim().length > 0
+          enhancedItem.itemName && enhancedItem.itemName.trim().length > 0
         );
         const isCategoryValid = !!(
-          item.itemCategory && item.itemCategory.trim().length > 0
+          enhancedItem.itemCategory &&
+          enhancedItem.itemCategory.trim().length > 0
         );
 
         // Base fields common to all item types
         const baseFields: ParsedMenuItem["fields"] = {
           name: {
-            value: item.itemName,
-            originalValue: item.itemName,
+            value: enhancedItem.itemName,
+            originalValue: enhancedItem.itemName,
             isValid: isNameValid,
             errorMessage: isNameValid ? undefined : "Name cannot be empty.",
           },
           price: {
-            value: item.itemPrice === undefined ? null : item.itemPrice,
-            originalValue: item.itemPrice === undefined ? null : item.itemPrice,
+            value:
+              enhancedItem.itemPrice === undefined
+                ? null
+                : enhancedItem.itemPrice,
+            originalValue:
+              enhancedItem.itemPrice === undefined
+                ? null
+                : enhancedItem.itemPrice,
             isValid: true, // Placeholder, consider validating non-negative if not null
           },
           category: {
-            value: item.itemCategory,
-            originalValue: item.itemCategory,
+            value: enhancedItem.itemCategory,
+            originalValue: enhancedItem.itemCategory,
             isValid: isCategoryValid,
             errorMessage: isCategoryValid
               ? undefined
               : "Category cannot be empty.",
           },
           itemType: {
-            value: item.itemType,
-            originalValue: item.itemType,
-            isValid: true, // Assuming itemType from AI is always valid
+            value: enhancedItem.itemType || "food",
+            originalValue: enhancedItem.itemType || "food",
+            isValid: true, // Assuming itemType from enhanced processing is always valid
           },
           ingredients: {
-            value: item.itemIngredients || [],
-            originalValue: item.itemIngredients || [],
+            value: enhancedItem.itemIngredients || [],
+            originalValue: enhancedItem.itemIngredients || [],
             isValid: true, // Placeholder
           },
           isGlutenFree: {
-            value: item.isGlutenFree || false,
-            originalValue: item.isGlutenFree || false,
+            value: enhancedItem.isGlutenFree || false,
+            originalValue: enhancedItem.isGlutenFree || false,
             isValid: true,
           },
           isVegan: {
-            value: item.isVegan || false,
-            originalValue: item.isVegan || false,
+            value: enhancedItem.isVegan || false,
+            originalValue: enhancedItem.isVegan || false,
             isValid: true,
           },
           isVegetarian: {
-            value: item.isVegetarian || false,
-            originalValue: item.isVegetarian || false,
+            value: enhancedItem.isVegetarian || false,
+            originalValue: enhancedItem.isVegetarian || false,
             isValid: true,
           },
         };
 
         // Wine-specific field transformations
-        if (item.itemType === "wine") {
+        if (enhancedItem.itemType === "wine") {
           baseFields.wineStyle = {
-            value: item.wineStyle || null,
-            originalValue: item.wineStyle || null,
+            value: enhancedItem.wineStyle || null,
+            originalValue: enhancedItem.wineStyle || null,
             isValid: true, // Assuming valid if provided
           };
           baseFields.wineProducer = {
-            value: item.wineProducer || null,
-            originalValue: item.wineProducer || null,
+            value: enhancedItem.wineProducer || null,
+            originalValue: enhancedItem.wineProducer || null,
             isValid: true,
           };
           baseFields.wineGrapeVariety = {
-            value: item.wineGrapeVariety?.join(", ") || null,
-            originalValue: item.wineGrapeVariety?.join(", ") || null,
+            value: enhancedItem.wineGrapeVariety?.join(", ") || null,
+            originalValue: enhancedItem.wineGrapeVariety?.join(", ") || null,
             isValid: true,
           };
           baseFields.wineVintage = {
-            // AI gives number, UI might treat as string or number. Store as is for now.
-            value: item.wineVintage === undefined ? null : item.wineVintage,
+            // Enhanced processing gives number, UI might treat as string or number. Store as is for now.
+            value:
+              enhancedItem.wineVintage === undefined
+                ? null
+                : enhancedItem.wineVintage,
             originalValue:
-              item.wineVintage === undefined ? null : item.wineVintage,
+              enhancedItem.wineVintage === undefined
+                ? null
+                : enhancedItem.wineVintage,
             isValid: true, // Could add validation e.g. sensible year range
           };
           baseFields.wineRegion = {
-            value: item.wineRegion || null,
-            originalValue: item.wineRegion || null,
+            value: enhancedItem.wineRegion || null,
+            originalValue: enhancedItem.wineRegion || null,
             isValid: true,
           };
           baseFields.wineServingOptions = {
-            value: (item.wineServingOptions || []).map((opt) => ({
+            value: (enhancedItem.wineServingOptions || []).map((opt) => ({
               id: uuidv4(), // Generate unique ID for client-side keying
               size: opt.size,
               price:
@@ -1812,19 +2190,21 @@ class MenuService {
                   ? ""
                   : String(opt.price), // Convert price to string for UI input
             })),
-            originalValue: (item.wineServingOptions || []).map((opt) => ({
-              id: uuidv4(), // Ensure original also has unique IDs if compared/used
-              size: opt.size,
-              price:
-                opt.price === null || opt.price === undefined
-                  ? ""
-                  : String(opt.price),
-            })),
+            originalValue: (enhancedItem.wineServingOptions || []).map(
+              (opt) => ({
+                id: uuidv4(), // Ensure original also has unique IDs if compared/used
+                size: opt.size,
+                price:
+                  opt.price === null || opt.price === undefined
+                    ? ""
+                    : String(opt.price),
+              })
+            ),
             isValid: true, // Placeholder; validation would be more complex, per option
           };
           baseFields.winePairings = {
-            value: item.winePairings?.join(", ") || null,
-            originalValue: item.winePairings?.join(", ") || null,
+            value: enhancedItem.winePairings?.join(", ") || null,
+            originalValue: enhancedItem.winePairings?.join(", ") || null,
             isValid: true,
           };
         }
@@ -1833,7 +2213,7 @@ class MenuService {
           id: uuidv4(),
           internalIndex: index,
           fields: baseFields,
-          originalSourceData: item,
+          originalSourceData: enhancedItem, // Store the enhanced item as source data
           status: "new", // Initial status
           conflictResolution: { status: "no_conflict" }, // Default assumption
           userAction: "keep", // Default action
@@ -1841,6 +2221,7 @@ class MenuService {
       }
     );
 
+    // 5. FINALIZE PREVIEW DATA
     const detectedCategories = new Set<string>();
     let itemsWithPotentialErrors = 0;
 
@@ -1874,14 +2255,33 @@ class MenuService {
       }
     });
 
+    // Determine parsed menu name based on source format
+    let parsedMenuName: string;
+    if (sourceFormat === "pdf") {
+      parsedMenuName =
+        parsedAIOutput?.menuName ||
+        originalFileName?.replace(/\.pdf$/i, "") ||
+        "Menu from PDF";
+    } else if (structuredData) {
+      parsedMenuName =
+        structuredData.menuName ||
+        originalFileName?.replace(/\.[^.]+$/i, "") ||
+        `Menu from ${sourceFormat.toUpperCase()}`;
+    } else {
+      parsedMenuName =
+        originalFileName?.replace(/\.[^.]+$/i, "") ||
+        `Menu from ${sourceFormat.toUpperCase()}`;
+    }
+
+    console.log(
+      `[MenuService.getMenuUploadPreview] Successfully processed ${parsedItems.length} items from ${sourceFormat} file with Enhanced Menu Parsing intelligence`
+    );
+
     return {
       previewId,
       filePath: multerFilePath,
-      sourceFormat: "pdf",
-      parsedMenuName:
-        parsedAIOutput?.menuName ||
-        originalFileName?.replace(/\.pdf$/i, "") ||
-        "Menu from PDF",
+      sourceFormat,
+      parsedMenuName,
       parsedItems,
       detectedCategories: Array.from(detectedCategories),
       summary: {
@@ -1889,8 +2289,10 @@ class MenuService {
         itemsWithPotentialErrors,
       },
       globalErrors,
-      rawAIText: rawText.substring(0, 5000),
-      rawAIOutput: parsedAIOutput,
+      // PDF-specific fields (only for PDF)
+      rawAIText:
+        sourceFormat === "pdf" ? rawText.substring(0, 5000) : undefined,
+      rawAIOutput: sourceFormat === "pdf" ? parsedAIOutput : undefined,
     };
   }
 
