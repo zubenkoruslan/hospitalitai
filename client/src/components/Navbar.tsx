@@ -13,7 +13,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   UserIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
+import { MapPinIcon as MapPinIconSolid } from "@heroicons/react/24/solid";
 
 // Define props interface
 interface NavbarProps {
@@ -31,6 +33,14 @@ const Navbar: React.FC<NavbarProps> = ({
     return true;
   });
   const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(() => {
+    // Initialize from localStorage to persist across page navigation
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("navbar-pinned");
+      return saved === "true";
+    }
+    return false;
+  });
   const [isMobile, setIsMobile] = useState(() => {
     return typeof window !== "undefined" && window.innerWidth < 1024;
   });
@@ -38,6 +48,13 @@ const Navbar: React.FC<NavbarProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navRef = useRef<HTMLElement>(null);
+
+  // Save pinned state to localStorage to persist across page navigation
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("navbar-pinned", isPinned.toString());
+    }
+  }, [isPinned]);
 
   // Handle window resize and mobile detection
   useEffect(() => {
@@ -59,7 +76,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   // Handle content visibility timing
   useEffect(() => {
-    const isExpanded = isMobile ? !isCollapsed : isHovered;
+    const isExpanded = isMobile ? !isCollapsed : isHovered || isPinned;
 
     if (contentTimeoutRef.current) {
       clearTimeout(contentTimeoutRef.current);
@@ -78,7 +95,7 @@ const Navbar: React.FC<NavbarProps> = ({
         clearTimeout(contentTimeoutRef.current);
       }
     };
-  }, [isMobile, isCollapsed, isHovered]);
+  }, [isMobile, isCollapsed, isHovered, isPinned]);
 
   // Base navigation items with icons
   const baseNavItems = [
@@ -160,6 +177,9 @@ const Navbar: React.FC<NavbarProps> = ({
   const toggleCollapse = () => {
     if (isMobile) {
       setIsCollapsed(!isCollapsed);
+    } else {
+      // On desktop, toggle the pinned state
+      setIsPinned(!isPinned);
     }
   };
 
@@ -186,7 +206,7 @@ const Navbar: React.FC<NavbarProps> = ({
   };
 
   // Determine if navbar should be expanded
-  const isExpanded = isMobile ? !isCollapsed : isHovered;
+  const isExpanded = isMobile ? !isCollapsed : isHovered || isPinned;
 
   return (
     <nav
@@ -221,22 +241,52 @@ const Navbar: React.FC<NavbarProps> = ({
               </Link>
             </div>
 
-            {/* Collapse button - centered when collapsed */}
+            {/* Toggle button - pin icon for desktop, chevron for mobile */}
             <button
               onClick={toggleCollapse}
               className={`p-2 rounded-lg bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md border border-slate-200/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200 ease-out min-w-[36px] min-h-[36px] flex items-center justify-center group ${
-                !isExpanded
+                !isExpanded && !isMobile
                   ? "absolute left-1/2 transform -translate-x-1/2"
                   : ""
               }`}
-              aria-label={!isExpanded ? "Expand sidebar" : "Collapse sidebar"}
-              title={!isExpanded ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={
+                isMobile
+                  ? !isExpanded
+                    ? "Expand sidebar"
+                    : "Collapse sidebar"
+                  : !isExpanded
+                  ? "Expand sidebar"
+                  : isPinned
+                  ? "Unpin sidebar"
+                  : "Pin sidebar"
+              }
+              title={
+                isMobile
+                  ? !isExpanded
+                    ? "Expand sidebar"
+                    : "Collapse sidebar"
+                  : !isExpanded
+                  ? "Expand sidebar"
+                  : isPinned
+                  ? "Unpin sidebar"
+                  : "Pin sidebar"
+              }
             >
               <div className="transition-transform duration-200 ease-out group-hover:scale-110">
-                {!isExpanded ? (
+                {isMobile ? (
+                  // Mobile: Show chevron arrows
+                  !isExpanded ? (
+                    <ChevronRightIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
+                  ) : (
+                    <ChevronLeftIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
+                  )
+                ) : // Desktop: Show arrow when collapsed, pin when expanded
+                !isExpanded ? (
                   <ChevronRightIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
+                ) : isPinned ? (
+                  <MapPinIconSolid className="h-4 w-4 text-primary group-hover:text-primary-600" />
                 ) : (
-                  <ChevronLeftIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
+                  <MapPinIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
                 )}
               </div>
             </button>

@@ -35,6 +35,7 @@ import {
   ChartPieIcon,
   ExclamationTriangleIcon,
   HomeIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 
 // Enhanced interfaces for comprehensive analytics
@@ -127,6 +128,22 @@ interface LeaderboardData {
   lastUpdated: string;
 }
 
+// Helper function to map time periods for different APIs
+const mapTimePeriodForLeaderboards = (timePeriod: string): string => {
+  switch (timePeriod) {
+    case "7d":
+      return "week";
+    case "30d":
+      return "month";
+    case "90d":
+      return "all"; // 90 days maps to "all" since no quarterly option
+    case "all":
+      return "all";
+    default:
+      return "all";
+  }
+};
+
 // Enhanced hook for leaderboard data
 const useLeaderboardData = (timePeriod: string = "all") => {
   const [leaderboardData, setLeaderboardData] =
@@ -140,8 +157,11 @@ const useLeaderboardData = (timePeriod: string = "all") => {
         setLoading(true);
         setError(null);
 
+        // Map the time period for leaderboards API
+        const mappedTimePeriod = mapTimePeriodForLeaderboards(timePeriod);
+
         const response = await fetch(
-          `/api/analytics/leaderboards?timePeriod=${timePeriod}&limit=10`,
+          `/api/analytics/leaderboards?timePeriod=${mappedTimePeriod}&limit=10`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("authToken")}`,
@@ -479,13 +499,10 @@ const CategoryChampions: React.FC<{
 };
 
 const RestaurantStaffResultsPage: React.FC = () => {
-  // Enhanced state for comprehensive analytics
-  const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("all");
-  const [selectedTimeframe, setSelectedTimeframe] = useState<
-    "7d" | "30d" | "90d"
-  >("30d");
+  // Enhanced state for comprehensive analytics - consolidate time filters
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("30d");
 
-  // Use custom hooks for data
+  // Use custom hooks for data - use single time filter for both
   const {
     staffData,
     loading: staffLoading,
@@ -497,7 +514,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
     error: quizCountError,
   } = useQuizCount();
 
-  // Enhanced analytics hooks
+  // Enhanced analytics hooks - use consolidated time filter
   const {
     leaderboardData,
     loading: leaderboardLoading,
@@ -508,13 +525,19 @@ const RestaurantStaffResultsPage: React.FC = () => {
     analytics,
     loading: analyticsLoading,
     error: analyticsError,
-  } = useEnhancedAnalytics(selectedTimeframe);
+  } = useEnhancedAnalytics(selectedTimePeriod as "7d" | "30d" | "90d");
 
   // Debug logging for data issues
   React.useEffect(() => {
     console.log("Debug - Analytics data:", analytics);
     console.log("Debug - Staff data sample:", staffData.slice(0, 2));
-  }, [analytics, staffData]);
+    console.log("Debug - Leaderboard data:", leaderboardData);
+    console.log("Debug - Selected time period:", selectedTimePeriod);
+    console.log(
+      "Debug - Mapped time period for leaderboards:",
+      mapTimePeriodForLeaderboards(selectedTimePeriod)
+    );
+  }, [analytics, staffData, leaderboardData, selectedTimePeriod]);
 
   // Combine loading and error states
   const loading =
@@ -694,21 +717,23 @@ const RestaurantStaffResultsPage: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
               {/* Enhanced Header with Analytics Overview */}
-              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 rounded-2xl p-8 text-white">
+              <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 rounded-2xl p-8 text-white shadow-xl">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">
+                    <h1 className="text-3xl font-bold mb-2 text-white">
                       Comprehensive Staff Analytics
                     </h1>
-                    <p className="text-blue-100 mb-4">
+                    <p className="text-slate-200 mb-4">
                       Track staff performance, leaderboards, knowledge
                       analytics, and training progress
                     </p>
-                    <div className="flex items-center gap-6 text-sm">
+                    <div className="flex items-center gap-6 text-sm text-slate-300">
                       {analytics && (
                         <>
                           <div className="flex items-center gap-2">
-                            <UserGroupIcon className="h-4 w-4" />
+                            <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                              <UserGroupIcon className="h-4 w-4 text-blue-300" />
+                            </div>
                             <span>
                               {analytics.participationMetrics.activeStaff} of{" "}
                               {analytics.participationMetrics.totalStaff} staff
@@ -716,7 +741,9 @@ const RestaurantStaffResultsPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <ClockIcon className="h-4 w-4" />
+                            <div className="p-1.5 bg-green-500/20 rounded-lg">
+                              <ClockIcon className="h-4 w-4 text-green-300" />
+                            </div>
                             <span>
                               Avg completion:{" "}
                               {formatCompletionTimeDetailed(
@@ -730,30 +757,32 @@ const RestaurantStaffResultsPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <select
-                      value={selectedTimeframe}
-                      onChange={(e) =>
-                        setSelectedTimeframe(
-                          e.target.value as "7d" | "30d" | "90d"
-                        )
-                      }
-                      className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                    >
-                      <option value="7d">Last 7 days</option>
-                      <option value="30d">Last 30 days</option>
-                      <option value="90d">Last 90 days</option>
-                    </select>
-                    <select
-                      value={selectedTimePeriod}
-                      onChange={(e) => setSelectedTimePeriod(e.target.value)}
-                      className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="month">Last Month</option>
-                      <option value="week">Last Week</option>
-                    </select>
-                    <div className="p-3 bg-white/20 rounded-xl">
-                      <PresentationChartLineIcon className="h-8 w-8" />
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-slate-300">
+                        Time Period:
+                      </span>
+                      <select
+                        value={selectedTimePeriod}
+                        onChange={(e) => setSelectedTimePeriod(e.target.value)}
+                        className="bg-slate-600/50 border border-slate-500/50 rounded-xl px-4 py-2.5 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 hover:bg-slate-600/70"
+                        style={{ color: "white" }}
+                      >
+                        <option value="7d" style={{ color: "black" }}>
+                          Last 7 days
+                        </option>
+                        <option value="30d" style={{ color: "black" }}>
+                          Last 30 days
+                        </option>
+                        <option value="90d" style={{ color: "black" }}>
+                          Last 90 days
+                        </option>
+                        <option value="all" style={{ color: "black" }}>
+                          All Time
+                        </option>
+                      </select>
+                    </div>
+                    <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border border-white/10">
+                      <PresentationChartLineIcon className="h-8 w-8 text-blue-300" />
                     </div>
                   </div>
                 </div>
@@ -1200,19 +1229,36 @@ const RestaurantStaffResultsPage: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Overall Completion Time Stats */}
                       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 text-white">
-                          <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <ClockIcon className="h-5 w-5" />
-                            Completion Time Analytics
-                          </h3>
+                        <div className="bg-slate-800 px-6 py-4 border-b border-slate-700">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold flex items-center gap-2 text-white">
+                              <ClockIcon className="h-5 w-5 text-slate-300" />
+                              Completion Time Analytics
+                            </h3>
+                            {/* Info icon for unusually fast times */}
+                            {analytics.completionTimeStats
+                              ?.averageCompletionTime &&
+                              analytics.completionTimeStats
+                                .averageCompletionTime < 60 && (
+                                <div className="relative group">
+                                  <InformationCircleIcon className="h-5 w-5 text-slate-300 hover:text-white cursor-help transition-colors" />
+                                  <div className="absolute right-0 top-8 w-64 p-3 bg-black/90 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                    <strong>Note:</strong> Average completion
+                                    times appear unusually fast (under 1
+                                    minute). This may indicate test data or
+                                    rapid clicking through quizzes.
+                                  </div>
+                                </div>
+                              )}
+                          </div>
                         </div>
                         <div className="p-6">
                           <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center p-4 bg-indigo-50 rounded-lg">
-                              <p className="text-sm text-indigo-600 mb-1">
+                            <div className="text-center p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                              <p className="text-sm font-medium text-slate-600 mb-2">
                                 Average Time
                               </p>
-                              <p className="text-xl font-bold text-indigo-900">
+                              <p className="text-2xl font-bold text-slate-900">
                                 {analytics.completionTimeStats
                                   ?.averageCompletionTime
                                   ? formatCompletionTimeDetailed(
@@ -1221,12 +1267,23 @@ const RestaurantStaffResultsPage: React.FC = () => {
                                     )
                                   : "N/A"}
                               </p>
+                              {analytics.completionTimeStats
+                                ?.averageCompletionTime && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  ≈{" "}
+                                  {Math.round(
+                                    analytics.completionTimeStats
+                                      .averageCompletionTime / 5
+                                  )}{" "}
+                                  sec/question
+                                </p>
+                              )}
                             </div>
-                            <div className="text-center p-4 bg-green-50 rounded-lg">
-                              <p className="text-sm text-green-600 mb-1">
+                            <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
+                              <p className="text-sm font-medium text-green-700 mb-2">
                                 Fastest Time
                               </p>
-                              <p className="text-xl font-bold text-green-900">
+                              <p className="text-2xl font-bold text-green-900">
                                 {analytics.completionTimeStats
                                   ?.fastestCompletionTime
                                   ? formatCompletionTimeDetailed(
@@ -1235,12 +1292,23 @@ const RestaurantStaffResultsPage: React.FC = () => {
                                     )
                                   : "N/A"}
                               </p>
+                              {analytics.completionTimeStats
+                                ?.fastestCompletionTime && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  ≈{" "}
+                                  {Math.round(
+                                    analytics.completionTimeStats
+                                      .fastestCompletionTime / 5
+                                  )}{" "}
+                                  sec/question
+                                </p>
+                              )}
                             </div>
-                            <div className="text-center p-4 bg-orange-50 rounded-lg">
-                              <p className="text-sm text-orange-600 mb-1">
+                            <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                              <p className="text-sm font-medium text-orange-700 mb-2">
                                 Slowest Time
                               </p>
-                              <p className="text-xl font-bold text-orange-900">
+                              <p className="text-2xl font-bold text-orange-900">
                                 {analytics.completionTimeStats
                                   ?.slowestCompletionTime
                                   ? formatCompletionTimeDetailed(
@@ -1249,14 +1317,28 @@ const RestaurantStaffResultsPage: React.FC = () => {
                                     )
                                   : "N/A"}
                               </p>
+                              {analytics.completionTimeStats
+                                ?.slowestCompletionTime && (
+                                <p className="text-xs text-orange-600 mt-1">
+                                  ≈{" "}
+                                  {Math.round(
+                                    analytics.completionTimeStats
+                                      .slowestCompletionTime / 5
+                                  )}{" "}
+                                  sec/question
+                                </p>
+                              )}
                             </div>
-                            <div className="text-center p-4 bg-blue-50 rounded-lg">
-                              <p className="text-sm text-blue-600 mb-1">
+                            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                              <p className="text-sm font-medium text-blue-700 mb-2">
                                 Total Quizzes
                               </p>
-                              <p className="text-xl font-bold text-blue-900">
+                              <p className="text-2xl font-bold text-blue-900">
                                 {analytics.completionTimeStats
                                   ?.totalQuizzesCompleted || 0}
+                              </p>
+                              <p className="text-xs text-blue-600 mt-1">
+                                completed attempts
                               </p>
                             </div>
                           </div>
