@@ -367,7 +367,9 @@ const Navbar: React.FC<NavbarProps> = ({
                     {user?.name || "User Name"}
                   </p>
                   <p className="text-xs text-muted-gray truncate capitalize">
-                    {user?.role || "Role"}
+                    {user?.role === "staff"
+                      ? user?.professionalRole || "Staff"
+                      : user?.role || "Role"}
                   </p>
                 </div>
               </div>

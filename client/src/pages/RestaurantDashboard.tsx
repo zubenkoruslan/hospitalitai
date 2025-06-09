@@ -445,13 +445,13 @@ const RestaurantDashboard: React.FC = () => {
                       <HomeIcon className="h-6 w-6 text-white" />
                     </div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                      Restaurant Dashboard
+                      {user?.restaurantName || "Restaurant"} Dashboard
                     </h1>
                   </div>
                   <p className="text-muted-gray text-lg mb-4">
                     Welcome back,{" "}
                     <span className="font-semibold text-dark-slate">
-                      {user?.restaurantName}
+                      {user?.name}
                     </span>
                     ! Here's your comprehensive overview.
                   </p>

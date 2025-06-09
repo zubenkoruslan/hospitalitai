@@ -38,6 +38,43 @@ interface RankingData {
   totalRankedStaff: number;
 }
 
+// Interface for Leaderboard Data
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  roleName?: string;
+  overallAverageScore: number;
+  totalQuestions: number;
+}
+
+interface LeaderboardData {
+  topPerformers: LeaderboardEntry[];
+  lastUpdated: string;
+}
+
+// Interface for Per-Quiz Leaderboard
+interface QuizLeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  roleName?: string;
+  score: number;
+  totalQuestions: number;
+  completionTime?: number;
+}
+
+interface QuizLeaderboard {
+  quizId: string;
+  quizTitle: string;
+  topPerformers: QuizLeaderboardEntry[];
+}
+
+interface PerQuizLeaderboardData {
+  quizLeaderboards: QuizLeaderboard[];
+  lastUpdated: string;
+}
+
 // --- Error Formatting Helper ---
 const formatApiError = (err: any, context: string): string => {
   console.error(`Error ${context}:`, err);
@@ -318,6 +355,26 @@ const StaffDashboard: React.FC = () => {
   const [loadingRanking, setLoadingRanking] = useState<boolean>(true);
   const [rankingError, setRankingError] = useState<string | null>(null);
 
+  // State for leaderboard
+  const [leaderboardData, setLeaderboardData] =
+    useState<LeaderboardData | null>(null);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState<boolean>(true);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+
+  // State for per-quiz leaderboard
+  const [perQuizLeaderboardData, setPerQuizLeaderboardData] =
+    useState<PerQuizLeaderboardData | null>(null);
+  const [loadingPerQuizLeaderboard, setLoadingPerQuizLeaderboard] =
+    useState<boolean>(true);
+  const [perQuizLeaderboardError, setPerQuizLeaderboardError] = useState<
+    string | null
+  >(null);
+
+  // State for active tab
+  const [activeLeaderboardTab, setActiveLeaderboardTab] = useState<
+    "overall" | "per-quiz"
+  >("overall");
+
   // State for Incorrect Answers Modal
   const [isIncorrectAnswersModalOpen, setIsIncorrectAnswersModalOpen] =
     useState<boolean>(false);
@@ -327,7 +384,12 @@ const StaffDashboard: React.FC = () => {
   const [_modalLoading, setModalLoading] = useState<boolean>(false);
 
   // Combined loading state
-  const isLoading = authIsLoading || loadingQuizzes || loadingRanking;
+  const isLoading =
+    authIsLoading ||
+    loadingQuizzes ||
+    loadingRanking ||
+    loadingLeaderboard ||
+    loadingPerQuizLeaderboard;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -383,6 +445,37 @@ const StaffDashboard: React.FC = () => {
         setRankingError(formatApiError(err, "fetching ranking data"));
       } finally {
         setLoadingRanking(false);
+      }
+
+      // Fetch Leaderboard Data
+      setLoadingLeaderboard(true);
+      setLeaderboardError(null);
+      try {
+        const leaderboardResponse = await api.get<LeaderboardData>(
+          "/analytics/leaderboards?timePeriod=month&limit=5"
+        );
+        setLeaderboardData(leaderboardResponse.data);
+      } catch (err: any) {
+        setLeaderboardError(formatApiError(err, "fetching leaderboard data"));
+      } finally {
+        setLoadingLeaderboard(false);
+      }
+
+      // Fetch Per-Quiz Leaderboard Data
+      setLoadingPerQuizLeaderboard(true);
+      setPerQuizLeaderboardError(null);
+      try {
+        const perQuizLeaderboardResponse =
+          await api.get<PerQuizLeaderboardData>(
+            "/analytics/quiz-leaderboards?limit=3"
+          );
+        setPerQuizLeaderboardData(perQuizLeaderboardResponse.data);
+      } catch (err: any) {
+        setPerQuizLeaderboardError(
+          formatApiError(err, "fetching per-quiz leaderboard data")
+        );
+      } finally {
+        setLoadingPerQuizLeaderboard(false);
       }
     };
 
@@ -542,10 +635,11 @@ const StaffDashboard: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                       <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">
-                        Staff Dashboard
+                        {user?.name}
                       </h1>
                       <p className="text-slate-600 text-sm sm:text-base mt-1">
-                        Welcome back, {user?.name}!
+                        {user?.professionalRole || "Staff"} at{" "}
+                        {user?.restaurantName}
                       </p>
                     </div>
                   </div>
@@ -651,8 +745,363 @@ const StaffDashboard: React.FC = () => {
               </Card>
             </div>
 
+            {/* Leaderboard Section */}
+            <Card variant="elevated" className="border-0 shadow-lg mb-8">
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-4 sm:px-6 py-4 border-b border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg shadow-lg">
+                      <TrophyIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+                        Leaderboards
+                      </h2>
+                      <p className="text-sm text-slate-600">
+                        See how you rank against your colleagues
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tab Navigation */}
+                  <div className="flex bg-white rounded-lg p-1 border border-slate-200">
+                    <button
+                      onClick={() => setActiveLeaderboardTab("overall")}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                        activeLeaderboardTab === "overall"
+                          ? "bg-yellow-100 text-yellow-800 shadow-sm"
+                          : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                      }`}
+                    >
+                      Overall
+                    </button>
+                    <button
+                      onClick={() => setActiveLeaderboardTab("per-quiz")}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                        activeLeaderboardTab === "per-quiz"
+                          ? "bg-yellow-100 text-yellow-800 shadow-sm"
+                          : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                      }`}
+                    >
+                      Per Quiz
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                {/* Overall Leaderboard Tab */}
+                {activeLeaderboardTab === "overall" && (
+                  <>
+                    {loadingLeaderboard ? (
+                      <div className="flex justify-center items-center py-8">
+                        <LoadingSpinner message="Loading overall leaderboard..." />
+                      </div>
+                    ) : leaderboardError ? (
+                      <div className="text-center py-8">
+                        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                          <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+                        </div>
+                        <h3 className="text-sm font-medium text-slate-900 mb-2">
+                          Unable to load overall leaderboard
+                        </h3>
+                        <p className="text-sm text-red-600">
+                          {leaderboardError}
+                        </p>
+                      </div>
+                    ) : leaderboardData &&
+                      leaderboardData.topPerformers &&
+                      leaderboardData.topPerformers.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="mb-4 text-center">
+                          <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                            Top 5 Overall Average Scores
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            Best performers across all quizzes
+                          </p>
+                        </div>
+                        {leaderboardData.topPerformers.map(
+                          (performer, index) => {
+                            const isCurrentUser =
+                              performer.userId === user?._id;
+                            const getRankBadge = (rank: number) => {
+                              if (rank === 1) return "🥇";
+                              if (rank === 2) return "🥈";
+                              if (rank === 3) return "🥉";
+                              return `#${rank}`;
+                            };
+
+                            const getRankStyle = (rank: number) => {
+                              if (rank === 1)
+                                return "bg-yellow-50 border-yellow-200 text-yellow-800";
+                              if (rank === 2)
+                                return "bg-gray-50 border-gray-200 text-gray-800";
+                              if (rank === 3)
+                                return "bg-orange-50 border-orange-200 text-orange-800";
+                              return "bg-slate-50 border-slate-200 text-slate-800";
+                            };
+
+                            return (
+                              <div
+                                key={performer.userId}
+                                className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                                  isCurrentUser
+                                    ? "border-blue-300 bg-blue-50 shadow-md"
+                                    : getRankStyle(performer.rank)
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="text-2xl font-bold">
+                                      {getRankBadge(performer.rank)}
+                                    </div>
+                                    <div>
+                                      <p
+                                        className={`font-semibold ${
+                                          isCurrentUser
+                                            ? "text-blue-900"
+                                            : "text-slate-900"
+                                        }`}
+                                      >
+                                        {performer.name}
+                                        {isCurrentUser && (
+                                          <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                            You
+                                          </span>
+                                        )}
+                                      </p>
+                                      {performer.roleName && (
+                                        <p
+                                          className={`text-sm ${
+                                            isCurrentUser
+                                              ? "text-blue-600"
+                                              : "text-slate-600"
+                                          }`}
+                                        >
+                                          {performer.roleName}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div
+                                      className={`text-xl font-bold ${
+                                        isCurrentUser
+                                          ? "text-blue-900"
+                                          : "text-slate-900"
+                                      }`}
+                                    >
+                                      {Math.round(
+                                        performer.overallAverageScore
+                                      )}
+                                      %
+                                    </div>
+                                    <div
+                                      className={`text-sm ${
+                                        isCurrentUser
+                                          ? "text-blue-600"
+                                          : "text-slate-600"
+                                      }`}
+                                    >
+                                      {performer.totalQuestions} questions
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+
+                        {leaderboardData.lastUpdated && (
+                          <div className="text-center text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">
+                            Last updated:{" "}
+                            {new Date(
+                              leaderboardData.lastUpdated
+                            ).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                          <TrophyIcon className="h-8 w-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">
+                          No overall leaderboard data yet
+                        </h3>
+                        <p className="text-slate-600 max-w-md mx-auto">
+                          Complete more quizzes to see how you rank against your
+                          colleagues!
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Per-Quiz Leaderboard Tab */}
+                {activeLeaderboardTab === "per-quiz" && (
+                  <>
+                    {loadingPerQuizLeaderboard ? (
+                      <div className="flex justify-center items-center py-8">
+                        <LoadingSpinner message="Loading quiz leaderboards..." />
+                      </div>
+                    ) : perQuizLeaderboardError ? (
+                      <div className="text-center py-8">
+                        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                          <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+                        </div>
+                        <h3 className="text-sm font-medium text-slate-900 mb-2">
+                          Unable to load quiz leaderboards
+                        </h3>
+                        <p className="text-sm text-red-600">
+                          {perQuizLeaderboardError}
+                        </p>
+                      </div>
+                    ) : perQuizLeaderboardData &&
+                      perQuizLeaderboardData.quizLeaderboards &&
+                      perQuizLeaderboardData.quizLeaderboards.length > 0 ? (
+                      <div className="space-y-6">
+                        <div className="text-center mb-6">
+                          <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                            Top Performers by Quiz
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            Best scores for each individual quiz
+                          </p>
+                        </div>
+                        {perQuizLeaderboardData.quizLeaderboards.map(
+                          (quizLeaderboard) => (
+                            <div
+                              key={quizLeaderboard.quizId}
+                              className="bg-slate-50 rounded-xl p-4 border border-slate-200"
+                            >
+                              <h4 className="font-semibold text-slate-900 mb-3 text-center">
+                                {quizLeaderboard.quizTitle}
+                              </h4>
+                              <div className="space-y-2">
+                                {quizLeaderboard.topPerformers.map(
+                                  (performer) => {
+                                    const isCurrentUser =
+                                      performer.userId === user?._id;
+                                    const getRankBadge = (rank: number) => {
+                                      if (rank === 1) return "🥇";
+                                      if (rank === 2) return "🥈";
+                                      if (rank === 3) return "🥉";
+                                      return `#${rank}`;
+                                    };
+
+                                    return (
+                                      <div
+                                        key={performer.userId}
+                                        className={`p-3 rounded-lg border transition-all duration-200 ${
+                                          isCurrentUser
+                                            ? "border-blue-300 bg-blue-50"
+                                            : "border-slate-200 bg-white hover:bg-slate-50"
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-3">
+                                            <span className="text-lg font-bold">
+                                              {getRankBadge(performer.rank)}
+                                            </span>
+                                            <div>
+                                              <p
+                                                className={`font-medium text-sm ${
+                                                  isCurrentUser
+                                                    ? "text-blue-900"
+                                                    : "text-slate-900"
+                                                }`}
+                                              >
+                                                {performer.name}
+                                                {isCurrentUser && (
+                                                  <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                                    You
+                                                  </span>
+                                                )}
+                                              </p>
+                                              {performer.roleName && (
+                                                <p
+                                                  className={`text-xs ${
+                                                    isCurrentUser
+                                                      ? "text-blue-600"
+                                                      : "text-slate-600"
+                                                  }`}
+                                                >
+                                                  {performer.roleName}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div
+                                              className={`text-lg font-bold ${
+                                                isCurrentUser
+                                                  ? "text-blue-900"
+                                                  : "text-slate-900"
+                                              }`}
+                                            >
+                                              {performer.score}/
+                                              {performer.totalQuestions}
+                                            </div>
+                                            <div
+                                              className={`text-xs ${
+                                                isCurrentUser
+                                                  ? "text-blue-600"
+                                                  : "text-slate-600"
+                                              }`}
+                                            >
+                                              {Math.round(
+                                                (performer.score /
+                                                  performer.totalQuestions) *
+                                                  100
+                                              )}
+                                              %
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                )}
+                              </div>
+                            </div>
+                          )
+                        )}
+
+                        {perQuizLeaderboardData.lastUpdated && (
+                          <div className="text-center text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200">
+                            Last updated:{" "}
+                            {new Date(
+                              perQuizLeaderboardData.lastUpdated
+                            ).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                          <AcademicCapIcon className="h-8 w-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">
+                          No quiz leaderboards yet
+                        </h3>
+                        <p className="text-slate-600 max-w-md mx-auto">
+                          Complete some quizzes to see leaderboards for
+                          individual quizzes!
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+
             {/* Error Message */}
-            {(quizError || rankingError) && (
+            {(quizError ||
+              rankingError ||
+              leaderboardError ||
+              perQuizLeaderboardError) && (
               <Card
                 variant="outlined"
                 className="border-red-200 bg-red-50/50 mb-6"
@@ -666,7 +1115,13 @@ const StaffDashboard: React.FC = () => {
                       Unable to load data
                     </h3>
                     <ErrorMessage
-                      message={quizError || rankingError || "An error occurred"}
+                      message={
+                        quizError ||
+                        rankingError ||
+                        leaderboardError ||
+                        perQuizLeaderboardError ||
+                        "An error occurred"
+                      }
                     />
                   </div>
                 </div>

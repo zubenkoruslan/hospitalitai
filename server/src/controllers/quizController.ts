@@ -210,6 +210,7 @@ export const submitQuizAttemptController = async (
           (result.score / result.totalQuestionsAttempted) * 100
         );
 
+        // Create notification for the staff member
         await NotificationService.createNotification({
           type: "completed_training",
           content: `Congratulations! You completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
@@ -227,6 +228,52 @@ export const submitQuizAttemptController = async (
         console.log(
           `Created completion notification for user ${staffUserId} completing quiz ${quiz.title}`
         );
+
+        // Also notify restaurant managers about staff completion
+        try {
+          const staffUser = await User.findById(staffUserId)
+            .select("name")
+            .lean();
+          const restaurantManagers = await User.find({
+            restaurantId: new mongoose.Types.ObjectId(req.user!.restaurantId!),
+            role: { $in: ["restaurant", "restaurantAdmin", "manager"] },
+          })
+            .select("_id")
+            .lean();
+
+          if (restaurantManagers.length > 0 && staffUser) {
+            const managerNotifications = restaurantManagers.map((manager) => ({
+              type: "completed_training" as const,
+              content: `${staffUser.name} completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
+              userId: manager._id,
+              restaurantId: new mongoose.Types.ObjectId(
+                req.user!.restaurantId!
+              ),
+              relatedId: quizObjectId,
+              metadata: {
+                staffId: staffUserId,
+                staffName: staffUser.name,
+                quizId: quizObjectId,
+                score: result.score,
+                totalQuestions: result.totalQuestionsAttempted,
+                percentage: percentage,
+              },
+            }));
+
+            await NotificationService.createBulkNotifications(
+              managerNotifications
+            );
+            console.log(
+              `Created ${managerNotifications.length} manager notifications for ${staffUser.name} completing quiz ${quiz.title}`
+            );
+          }
+        } catch (managerNotificationError) {
+          console.error(
+            "Error creating manager notifications for quiz completion:",
+            managerNotificationError
+          );
+          // Don't fail the submission if manager notifications fail
+        }
       }
     } catch (notificationError) {
       console.error(

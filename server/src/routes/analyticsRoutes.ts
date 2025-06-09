@@ -6,6 +6,7 @@ import { KnowledgeCategory } from "../models/QuestionModel";
 import ReportGenerationService from "../services/reportGenerationService";
 import UserModel from "../models/User";
 import QuizAttemptModel from "../models/QuizAttempt";
+import QuizModel from "../models/QuizModel";
 import UserKnowledgeAnalyticsModel from "../models/UserKnowledgeAnalytics";
 import {
   getEnhancedRestaurantAnalytics,
@@ -681,6 +682,176 @@ router.get(
       res.status(500).json({
         status: "error",
         message: "Failed to fetch leaderboards",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/analytics/quiz-leaderboards
+ * Get per-quiz leaderboard data showing top performers for each quiz
+ * Query params: limit? (default 3, max 10)
+ */
+router.get(
+  "/quiz-leaderboards",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { user } = req as any;
+      const { limit = "3" } = req.query;
+      const restaurantId = new Types.ObjectId(user.restaurantId);
+
+      // Validate limit parameter
+      const limitNum = parseInt(limit as string);
+      if (isNaN(limitNum) || limitNum < 1 || limitNum > 10) {
+        res.status(400).json({
+          status: "error",
+          message: "Limit must be a number between 1 and 10",
+        });
+        return;
+      }
+
+      // Get all quizzes for this restaurant
+      const quizzes = await QuizModel.find({
+        restaurantId,
+        isAvailable: true,
+      }).select("_id title");
+
+      if (!quizzes || quizzes.length === 0) {
+        res.status(200).json({
+          status: "success",
+          data: {
+            quizLeaderboards: [],
+            lastUpdated: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      // Get quiz attempts for all quizzes in this restaurant
+      const quizLeaderboards = await Promise.all(
+        quizzes.map(async (quiz: any) => {
+          try {
+            // Aggregate quiz attempts to get average scores per user for this specific quiz
+            const results = await QuizAttemptModel.aggregate([
+              {
+                $match: {
+                  quizId: quiz._id,
+                  restaurantId: restaurantId,
+                },
+              },
+              {
+                $group: {
+                  _id: "$staffUserId",
+                  totalAttempts: { $sum: 1 },
+                  totalScore: { $sum: "$score" },
+                  totalQuestions: { $sum: { $size: "$questionsPresented" } },
+                  avgCompletionTime: { $avg: "$durationInSeconds" },
+                  lastAttemptDate: { $max: "$attemptDate" },
+                },
+              },
+              {
+                $addFields: {
+                  averageScore: {
+                    $multiply: [
+                      { $divide: ["$totalScore", "$totalQuestions"] },
+                      100,
+                    ],
+                  },
+                },
+              },
+              {
+                $match: {
+                  totalAttempts: { $gte: 1 }, // At least 1 attempt
+                  averageScore: { $gte: 0 }, // Valid score
+                },
+              },
+              {
+                $sort: { averageScore: -1 as const },
+              },
+              {
+                $limit: limitNum,
+              },
+              {
+                $lookup: {
+                  from: "users",
+                  localField: "_id",
+                  foreignField: "_id",
+                  as: "userInfo",
+                },
+              },
+              {
+                $lookup: {
+                  from: "roles",
+                  localField: "userInfo.assignedRoleId",
+                  foreignField: "_id",
+                  as: "roleInfo",
+                },
+              },
+              {
+                $addFields: {
+                  userInfo: { $arrayElemAt: ["$userInfo", 0] },
+                  roleInfo: { $arrayElemAt: ["$roleInfo", 0] },
+                },
+              },
+              {
+                $project: {
+                  userId: "$_id",
+                  name: "$userInfo.name",
+                  roleName: { $ifNull: ["$roleInfo.name", "Staff"] },
+                  score: { $round: ["$averageScore", 1] },
+                  totalQuestions: 1,
+                  completionTime: { $round: ["$avgCompletionTime", 0] },
+                  totalAttempts: 1,
+                  lastAttemptDate: 1,
+                },
+              },
+            ]);
+
+            // Add rank to results
+            const topPerformers = results.map((result: any, index: number) => ({
+              rank: index + 1,
+              userId: result.userId.toString(),
+              name: result.name || "Unknown User",
+              roleName: result.roleName || "Staff",
+              score: result.score,
+              totalQuestions: result.totalQuestions,
+              completionTime: result.completionTime || undefined,
+            }));
+
+            return {
+              quizId: quiz._id.toString(),
+              quizTitle: quiz.title,
+              topPerformers,
+            };
+          } catch (error) {
+            console.error(`Error processing quiz ${quiz._id}:`, error);
+            return {
+              quizId: quiz._id.toString(),
+              quizTitle: quiz.title,
+              topPerformers: [],
+            };
+          }
+        })
+      );
+
+      // Filter out quizzes with no performers
+      const filteredLeaderboards = quizLeaderboards.filter(
+        (leaderboard: any) => leaderboard.topPerformers.length > 0
+      );
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          quizLeaderboards: filteredLeaderboards,
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching quiz leaderboards:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to fetch quiz leaderboards",
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }
