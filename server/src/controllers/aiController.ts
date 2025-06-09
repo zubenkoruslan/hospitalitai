@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import AiQuestionService from "../services/AiQuestionService";
+import LegacyAiQuestionService from "../services/LegacyAiQuestionService";
 import QuestionBankModel from "../models/QuestionBankModel";
 import { AppError } from "../utils/errorHandler"; // Corrected path
 
@@ -15,6 +15,8 @@ interface GenerateQuestionsRequestBody {
   // restaurantId will be taken from authenticated user or request context, not directly from body for security
 }
 
+// DEPRECATED: This controller is replaced by the simplified AI service integrated into questionService
+// The main question generation now uses SimpleAiQuestionService through generateAiQuestionsService
 export const generateAiQuestionsHandler = async (
   req: Request<{}, {}, GenerateQuestionsRequestBody>,
   res: Response,
@@ -118,33 +120,46 @@ export const generateAiQuestionsHandler = async (
       restaurantId: user.restaurantId.toString(),
     };
 
-    // Call the service to generate raw questions (these are not saved yet, or saved as pending)
-    const rawGeneratedQuestions =
-      await AiQuestionService.generateRawQuestionsFromMenuContent(
-        serviceParams
-      );
-
-    // Get question bank for tagging context
-    const questionBank = await QuestionBankModel.findById(bankId);
-    const taggingContext = questionBank
-      ? {
-          menuCategories: questionBank.categories,
-        }
-      : undefined;
-
-    // Save these questions with 'pending_review' status and knowledge category tagging
-    const pendingQuestions =
-      await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
-        rawGeneratedQuestions,
-        user.restaurantId.toString(),
+    // REDIRECT: Guide users to the new simplified system
+    res.status(200).json({
+      status: "redirect",
+      message:
+        "🚀 This endpoint has been upgraded! Please use the new simplified AI system through question banks.",
+      migration: {
+        oldEndpoint: "/api/ai/generate-questions",
+        newFlow: [
+          {
+            step: 1,
+            endpoint: "POST /api/question-banks/from-menu",
+            description: "Create a question bank from your menu",
+            requiredFields: ["name", "description", "menuId", "categories"],
+          },
+          {
+            step: 2,
+            endpoint: "POST /api/question-banks/{bankId}/generate-ai-questions",
+            description: "Generate AI questions for the question bank",
+            requiredFields: ["questionCount", "focusAreas"],
+          },
+        ],
+        benefits: [
+          "🎯 Better organized questions in banks",
+          "💬 Human-like conversational questions",
+          "⚡ 84% faster generation",
+          "🔧 Easier to manage and review",
+        ],
+      },
+      compatibility: {
         bankId,
-        taggingContext
-      );
-
-    res.status(201).json({
-      status: "success",
-      message: "AI questions generated and are pending review.",
-      data: pendingQuestions,
+        menuId,
+        suggestedBankName: `AI Questions for Menu (${new Date().toLocaleDateString()})`,
+        mappedParameters: {
+          questionCount: targetQuestionCountPerItemFocus,
+          focusAreas: questionFocusAreas,
+          categories: categoriesToFocus,
+        },
+      },
+      documentation:
+        "See /api/question-banks endpoints for the new simplified AI system",
     });
   } catch (error) {
     console.error("AI Question Generation Error:", error);

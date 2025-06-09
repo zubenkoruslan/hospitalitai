@@ -3,6 +3,7 @@ import PasswordInput, {
   validatePasswordStrength,
 } from "../common/PasswordInput";
 import ConfirmPasswordInput from "../common/ConfirmPasswordInput";
+import Button from "../common/Button";
 
 // Define basic password data structure
 interface PasswordChangeData {
@@ -113,15 +114,17 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
         autoComplete="new-password"
       />
 
-      <button
+      <Button
         type="submit"
+        variant="primary"
         disabled={
           isLoading || !currentPassword || !newPassword || !confirmPassword
         }
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+        isLoading={isLoading}
+        className="w-full py-3 px-4"
       >
-        {isLoading ? "Updating Password..." : "Change Password"}
-      </button>
+        Change Password
+      </Button>
     </form>
   );
 };

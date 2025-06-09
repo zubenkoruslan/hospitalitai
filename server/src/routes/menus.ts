@@ -14,7 +14,7 @@ import {
   getMenuImportJobStatus,
 } from "../controllers/menuController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import { uploadPdf } from "../middleware/uploadMiddleware";
+import { uploadPdf, uploadMenu } from "../middleware/uploadMiddleware";
 import {
   handleValidationErrors,
   validateCreateMenu,
@@ -93,14 +93,24 @@ router.post(
   uploadMenuPdf
 );
 
-// NEW Route: Upload a menu PDF to get a preview for interactive correction
+// Enhanced Route: Upload a menu file (multiple formats) to get a preview for interactive correction
 router.post(
   "/upload/preview", // No restaurantId in path, will be taken from req.user
   protect, // Ensure user is authenticated
   restrictTo("restaurant"),
-  uploadPdf.single("menuPdf"), // Use the same multer middleware for PDF upload
+  uploadMenu.single("menuFile"), // Enhanced multi-format upload middleware (PDF, Excel, CSV, JSON, Word)
   // No specific body/param validation here as we rely on file upload and auth context
   // handleValidationErrors, // Not strictly needed if no preceding validators that add to req.errors
+  handleMenuUploadPreview
+);
+
+// Backwards Compatibility Route: Upload a menu PDF using the old field name "menuPdf"
+router.post(
+  "/upload/preview/pdf", // Explicit PDF route for backwards compatibility
+  protect, // Ensure user is authenticated
+  restrictTo("restaurant"),
+  uploadPdf.single("menuPdf"), // Original PDF-only middleware with old field name
+  // No specific body/param validation here as we rely on file upload and auth context
   handleMenuUploadPreview
 );
 

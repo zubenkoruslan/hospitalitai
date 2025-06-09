@@ -26,6 +26,7 @@ import RestaurantStaffResultsPage from "./pages/RestaurantStaffResultsPage";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDetails from "./pages/StaffDetails";
 import HomePage from "./pages/HomePage";
+import HowPage from "./pages/HowPage";
 // import QuestionBankListPage from "./pages/QuestionBankListPage"; // Removed import
 import QuestionBankDetailPage from "./pages/QuestionBankDetailPage";
 import QuestionBankEditPage from "./pages/QuestionBankEditPage";
@@ -94,6 +95,7 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
+              <Route path="/how" element={<HowPage />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />

@@ -28,6 +28,8 @@ import {
   BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 import PdfMenuUpload from "../components/menu/PdfMenuUpload";
+import MenuUpload from "../components/menu/MenuUpload";
+import TemplateDownloadSection from "../components/menu/TemplateDownloadSection";
 import { useMenus } from "../hooks/useMenus";
 
 // --- Interfaces ---
@@ -83,6 +85,10 @@ const MenusPage: React.FC = () => {
   const [currentMenu, setCurrentMenu] = useState<IMenuClient | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] =
+    useState<boolean>(false);
+  const [isMenuUploadModalOpen, setIsMenuUploadModalOpen] =
+    useState<boolean>(false);
+  const [isTemplatesSectionExpanded, setIsTemplatesSectionExpanded] =
     useState<boolean>(false);
   const [isTogglingMenuStatus, setIsTogglingMenuStatus] = useState<
     string | null
@@ -141,6 +147,14 @@ const MenusPage: React.FC = () => {
     setIsPdfUploadModalOpen(true);
   };
 
+  const openMenuUploadModal = () => {
+    setIsMenuUploadModalOpen(true);
+  };
+
+  const toggleTemplatesSection = () => {
+    setIsTemplatesSectionExpanded(!isTemplatesSectionExpanded);
+  };
+
   const closeModal = () => {
     setIsAddMenuModalOpen(false);
     setIsDeleteModalOpen(false);
@@ -149,6 +163,7 @@ const MenusPage: React.FC = () => {
     setFormError(null);
     setIsSubmitting(false);
     setIsPdfUploadModalOpen(false);
+    setIsMenuUploadModalOpen(false);
   };
 
   // --- Form Handlers ---
@@ -272,23 +287,34 @@ const MenusPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Button
-                    variant="secondary"
-                    onClick={openPdfUploadModal}
-                    className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
+                  <button
+                    onClick={openMenuUploadModal}
+                    className="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg border border-slate-600 shadow-sm transition-colors duration-200"
                   >
                     <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                    Upload PDF
+                    Upload Menu
+                  </button>
+                  <button
+                    onClick={toggleTemplatesSection}
+                    className={`inline-flex items-center px-4 py-2 font-medium rounded-lg border shadow-sm transition-colors duration-200 ${
+                      isTemplatesSectionExpanded
+                        ? "bg-slate-600 hover:bg-slate-500 text-white border-slate-500"
+                        : "bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                    }`}
+                  >
+                    <DocumentIcon className="h-5 w-5 mr-2" />
+                    {isTemplatesSectionExpanded
+                      ? "Hide Templates"
+                      : "Show Templates"}
+                  </button>
+                  <Button
+                    variant="primary"
+                    onClick={openAddModal}
+                    className="shadow-sm"
+                  >
+                    <PlusIcon className="h-5 w-5 mr-2" />
+                    Create Menu
                   </Button>
-                  <Link to="/menu-upload-path">
-                    <Button
-                      variant="primary"
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-2" />
-                      Create Menu
-                    </Button>
-                  </Link>
                 </div>
               </div>
 
@@ -386,11 +412,11 @@ const MenusPage: React.FC = () => {
                       </Button>
                       <Button
                         variant="secondary"
-                        onClick={openPdfUploadModal}
+                        onClick={openMenuUploadModal}
                         className="flex items-center gap-2"
                       >
                         <ArrowUpTrayIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Upload PDF</span>
+                        <span className="hidden sm:inline">Upload File</span>
                       </Button>
                     </div>
                   </div>
@@ -412,17 +438,24 @@ const MenusPage: React.FC = () => {
                     No menus yet
                   </h3>
                   <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                    Get started by creating your first menu or uploading a PDF
-                    menu to automatically extract items
+                    Get started by creating your first menu or uploading a menu
+                    file to automatically extract items
                   </p>
                   <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
                     <Button variant="primary" onClick={openAddModal}>
                       <PlusIcon className="h-4 w-4 mr-2" />
                       Create First Menu
                     </Button>
-                    <Button variant="secondary" onClick={openPdfUploadModal}>
+                    <Button variant="secondary" onClick={openMenuUploadModal}>
                       <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
-                      Upload PDF Menu
+                      Upload Menu File
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={toggleTemplatesSection}
+                    >
+                      <DocumentIcon className="h-4 w-4 mr-2" />
+                      Download Templates
                     </Button>
                   </div>
                 </div>
@@ -516,6 +549,13 @@ const MenusPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Template Download Section - Below Menus */}
+            {isTemplatesSectionExpanded && (
+              <div className="mt-8">
+                <TemplateDownloadSection />
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -660,6 +700,15 @@ const MenusPage: React.FC = () => {
       {isPdfUploadModalOpen && (
         <PdfMenuUpload
           isOpen={isPdfUploadModalOpen}
+          onClose={closeModal}
+          onFileSelected={handleFileSelectedForUpload}
+        />
+      )}
+
+      {/* Multi-Format Menu Upload Modal */}
+      {isMenuUploadModalOpen && (
+        <MenuUpload
+          isOpen={isMenuUploadModalOpen}
           onClose={closeModal}
           onFileSelected={handleFileSelectedForUpload}
         />

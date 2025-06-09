@@ -305,7 +305,12 @@ export const handleMenuUploadPreview = async (
       );
     }
     if (!req.file) {
-      return next(new AppError("No PDF file uploaded for preview.", 400));
+      return next(
+        new AppError(
+          "No menu file uploaded for preview. Supported formats: PDF, Excel (.xlsx/.xls), CSV, JSON, Word (.docx)",
+          400
+        )
+      );
     }
 
     const restaurantId = new Types.ObjectId(req.user.restaurantId);

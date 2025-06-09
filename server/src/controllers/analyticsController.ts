@@ -767,30 +767,10 @@ export const getEnhancedRestaurantAnalytics = async (
         weakestCategory: "wine-knowledge" as any, // Placeholder
       }));
 
-    // Calculate question distribution (this would need integration with question banks)
-    // For now, using estimated data based on analytics
-    const questionDistribution = {
-      "food-knowledge": {
-        totalQuestions: Math.round(totalQuestionsAnswered * 0.3),
-        aiGenerated: Math.round(totalQuestionsAnswered * 0.2),
-        manuallyCreated: Math.round(totalQuestionsAnswered * 0.1),
-      },
-      "beverage-knowledge": {
-        totalQuestions: Math.round(totalQuestionsAnswered * 0.25),
-        aiGenerated: Math.round(totalQuestionsAnswered * 0.18),
-        manuallyCreated: Math.round(totalQuestionsAnswered * 0.07),
-      },
-      "wine-knowledge": {
-        totalQuestions: Math.round(totalQuestionsAnswered * 0.25),
-        aiGenerated: Math.round(totalQuestionsAnswered * 0.18),
-        manuallyCreated: Math.round(totalQuestionsAnswered * 0.07),
-      },
-      "procedures-knowledge": {
-        totalQuestions: Math.round(totalQuestionsAnswered * 0.2),
-        aiGenerated: Math.round(totalQuestionsAnswered * 0.12),
-        manuallyCreated: Math.round(totalQuestionsAnswered * 0.08),
-      },
-    };
+    // Get real question distribution from the analytics service
+    const realAnalytics =
+      await KnowledgeAnalyticsService.getRestaurantAnalytics(restaurantId);
+    const questionDistribution = realAnalytics.questionDistribution;
 
     const enhancedAnalytics = {
       totalStaff,

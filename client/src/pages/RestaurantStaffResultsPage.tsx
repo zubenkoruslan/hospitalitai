@@ -451,14 +451,15 @@ const CategoryChampions: React.FC<{
                       {champion.totalQuestions}
                     </span>
                   </div>
-                  {champion.averageCompletionTime && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Avg Time:</span>
-                      <span className="font-medium">
-                        {formatCompletionTime(champion.averageCompletionTime)}
-                      </span>
-                    </div>
-                  )}
+                  {champion.averageCompletionTime &&
+                    champion.averageCompletionTime > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Avg Time:</span>
+                        <span className="font-medium">
+                          {formatCompletionTime(champion.averageCompletionTime)}
+                        </span>
+                      </div>
+                    )}
                 </div>
               </div>
             ) : (

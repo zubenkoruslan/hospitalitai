@@ -132,7 +132,7 @@ export interface ParsedMenuItem {
 export interface MenuUploadPreview {
   previewId: string;
   filePath: string;
-  sourceFormat: "pdf";
+  sourceFormat: "pdf" | "excel" | "csv" | "json" | "word";
   parsedMenuName?: string;
   parsedItems: ParsedMenuItem[];
   detectedCategories: string[];
@@ -141,6 +141,8 @@ export interface MenuUploadPreview {
     totalItemsParsed: number;
     itemsWithPotentialErrors: number;
   };
+  rawAIText?: string; // PDF only
+  rawAIOutput?: any; // PDF only
 }
 
 // --- Structures for Final Menu Import ---

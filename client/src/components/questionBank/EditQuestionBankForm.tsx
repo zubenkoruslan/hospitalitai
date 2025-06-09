@@ -199,30 +199,43 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
       } else if (bankToEdit.sourceType === "MENU") {
         const menuId = bankToEdit.sourceMenuId;
         if (typeof menuId === "string") {
-          const menuDoc = await getMenuWithItems(menuId);
-          if (menuDoc && menuDoc.items && menuDoc.items.length > 0) {
-            const uniqueCategoryNames = Array.from(
-              new Set(menuDoc.items.map((item: MenuItem) => item.category))
-            );
-            const menuCategoriesAsNested: NestedSopCategoryItem[] =
-              uniqueCategoryNames.map((name) => ({
-                id: name,
-                name: name,
-                fullName: name,
-                subCategories: [],
-                level: 0,
-              }));
-            setAvailableSourceCategories(menuCategoriesAsNested);
-          } else if (
-            menuDoc &&
-            (!menuDoc.items || menuDoc.items.length === 0)
-          ) {
-            setAvailableSourceCategories([]);
-            // setSourceCategoryError("The linked menu has no items or no categories defined.");
-          } else {
-            setSourceCategoryError(
-              "Could not load categories from the linked Menu (or menu has no items)."
-            );
+          try {
+            const menuDoc = await getMenuWithItems(menuId);
+            if (menuDoc && menuDoc.items && menuDoc.items.length > 0) {
+              const uniqueCategoryNames = Array.from(
+                new Set(menuDoc.items.map((item: MenuItem) => item.category))
+              );
+              const menuCategoriesAsNested: NestedSopCategoryItem[] =
+                uniqueCategoryNames.map((name) => ({
+                  id: name,
+                  name: name,
+                  fullName: name,
+                  subCategories: [],
+                  level: 0,
+                }));
+              setAvailableSourceCategories(menuCategoriesAsNested);
+            } else if (
+              menuDoc &&
+              (!menuDoc.items || menuDoc.items.length === 0)
+            ) {
+              setAvailableSourceCategories([]);
+              // setSourceCategoryError("The linked menu has no items or no categories defined.");
+            } else {
+              setSourceCategoryError(
+                "Could not load categories from the linked Menu (or menu has no items)."
+              );
+            }
+          } catch (error: any) {
+            // Check if it's a 404 error (menu not found)
+            if (error?.response?.status === 404) {
+              setSourceCategoryError(
+                "The linked menu no longer exists. The question bank may need to be updated with a new menu reference."
+              );
+            } else {
+              setSourceCategoryError(
+                "Could not load categories from the linked Menu (or menu has no items)."
+              );
+            }
           }
         } else {
           setSourceCategoryError(

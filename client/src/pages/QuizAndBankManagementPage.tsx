@@ -584,9 +584,9 @@ const QuizAndBankManagementPage: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-3">
                     <Button
-                      variant="secondary"
+                      variant="white"
                       onClick={() => setIsCreateBankModalOpen(true)}
-                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
+                      className="!bg-slate-700 !hover:bg-slate-600 !text-white !border-slate-600 shadow-lg"
                     >
                       <BookOpenIcon className="h-5 w-5 mr-2" />
                       New Question Bank
@@ -594,7 +594,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                     <Button
                       variant="primary"
                       onClick={() => setIsGenerateQuizModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                      className="shadow-lg"
                     >
                       <SparklesIcon className="h-5 w-5 mr-2" />
                       Generate Quiz
@@ -723,7 +723,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                       variant="primary"
                       onClick={() => setIsCreateBankModalOpen(true)}
                       disabled={!restaurantId}
-                      className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 border-emerald-600"
+                      className="flex items-center space-x-2"
                     >
                       <PlusIcon className="h-4 w-4" />
                       <span>Create Question Bank</span>

@@ -305,20 +305,20 @@ const RestaurantDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
               {/* Header skeleton */}
-              <div className="mb-8 bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl p-8 border border-blue-100/50">
+              <div className="mb-8 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-3xl p-8 border border-primary/10 shadow-lg">
                 <div className="animate-pulse">
                   <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-8 h-8 bg-slate-200 rounded-xl"></div>
-                    <div className="h-8 bg-slate-200 rounded w-80"></div>
+                    <div className="w-8 h-8 bg-slate-200/60 rounded-xl"></div>
+                    <div className="h-8 bg-slate-200/60 rounded w-80"></div>
                   </div>
-                  <div className="h-5 bg-slate-200 rounded w-96 mb-4"></div>
-                  <div className="h-12 bg-slate-200 rounded-xl w-80"></div>
+                  <div className="h-5 bg-slate-200/60 rounded w-96 mb-4"></div>
+                  <div className="h-12 bg-slate-200/60 rounded-xl w-80"></div>
                 </div>
               </div>
 
@@ -378,20 +378,27 @@ const RestaurantDashboard: React.FC = () => {
   // Handle access denied specifically if it came from the hook
   if (!isLoading && staffError?.startsWith("Access denied")) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-              <p className="text-gray-600">{staffError}</p>
-              <Button
-                variant="primary"
-                onClick={() => navigate("/login")}
-                className="mt-4"
+              <Card
+                variant="outlined"
+                className="max-w-md mx-auto border-secondary/30"
               >
-                Go to Login
-              </Button>
+                <h1 className="text-2xl font-bold text-secondary mb-4">
+                  Error
+                </h1>
+                <p className="text-muted-gray">{staffError}</p>
+                <Button
+                  variant="primary"
+                  onClick={() => navigate("/login")}
+                  className="mt-4"
+                >
+                  Go to Login
+                </Button>
+              </Card>
             </div>
           </div>
         </main>
@@ -402,13 +409,20 @@ const RestaurantDashboard: React.FC = () => {
   // Handle general errors
   if (displayError) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-              <p className="text-gray-600">{displayError}</p>
+              <Card
+                variant="outlined"
+                className="max-w-md mx-auto border-secondary/30"
+              >
+                <h1 className="text-2xl font-bold text-secondary mb-4">
+                  Error
+                </h1>
+                <p className="text-muted-gray">{displayError}</p>
+              </Card>
             </div>
           </div>
         </main>
@@ -417,26 +431,26 @@ const RestaurantDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             {/* Enhanced Header with gradient background */}
-            <div className="mb-8 bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl p-8 border border-blue-100/50 shadow-sm">
+            <div className="mb-8 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-3xl p-8 border border-primary/10 shadow-lg backdrop-blur-sm">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg">
+                    <div className="p-2 bg-gradient-to-r from-primary to-accent rounded-xl shadow-lg">
                       <HomeIcon className="h-6 w-6 text-white" />
                     </div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                       Restaurant Dashboard
                     </h1>
                   </div>
-                  <p className="text-slate-600 text-lg mb-4">
+                  <p className="text-muted-gray text-lg mb-4">
                     Welcome back,{" "}
-                    <span className="font-semibold text-slate-800">
+                    <span className="font-semibold text-dark-slate">
                       {user?.restaurantName}
                     </span>
                     ! Here's your comprehensive overview.
@@ -1041,13 +1055,15 @@ const RestaurantDashboard: React.FC = () => {
                         Procedures Knowledge
                       </span>
                     </div>
-                    <Link
-                      to="/quiz-management"
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    <Button
+                      variant="primary"
+                      onClick={() =>
+                        (window.location.href = "/quiz-management")
+                      }
                     >
                       <PlusIcon className="h-4 w-4 mr-2" />
                       Create Your First Quiz
-                    </Link>
+                    </Button>
                   </div>
                 </div>
               </div>

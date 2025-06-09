@@ -9,7 +9,9 @@ import QuestionModel, {
   QuestionType,
   IOption,
 } from "../models/QuestionModel";
-import AiQuestionService, { RawAiGeneratedQuestion } from "./AiQuestionService"; // Ensure this path is correct
+import LegacyAiQuestionService, {
+  RawAiGeneratedQuestion,
+} from "./LegacyAiQuestionService";
 import { Types } from "mongoose";
 import { AppError } from "../utils/errorHandler"; // Ensure this path is correct
 
@@ -112,7 +114,7 @@ export class SopQuestionGenerationService {
     for (const selectedCat of allSelectedCategoryObjects) {
       try {
         const categorySpecificQuestions =
-          await AiQuestionService.generateQuestionsFromSopCategoryText(
+          await LegacyAiQuestionService.generateQuestionsFromSopCategoryText(
             selectedCat.name,
             selectedCat.content,
             targetQuestionsPerSelectedCategory,

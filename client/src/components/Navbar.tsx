@@ -12,7 +12,7 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  BellIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 
 // Define props interface
@@ -27,14 +27,14 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Always start collapsed
+    // Always start collapsed on desktop
     return true;
   });
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     return typeof window !== "undefined" && window.innerWidth < 1024;
   });
-  const [showContent, setShowContent] = useState(false); // For smooth content transitions
+  const [showContent, setShowContent] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -45,7 +45,6 @@ const Navbar: React.FC<NavbarProps> = ({
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
 
-      // On mobile, always use collapsed state, ignore hover
       if (mobile) {
         setIsHovered(false);
         setShowContent(!isCollapsed);
@@ -67,13 +66,11 @@ const Navbar: React.FC<NavbarProps> = ({
     }
 
     if (isExpanded) {
-      // Show content immediately when expanding
       setShowContent(true);
     } else {
-      // Delay hiding content to allow width transition to complete
       contentTimeoutRef.current = setTimeout(() => {
         setShowContent(false);
-      }, 100); // Hide content 100ms after collapse starts
+      }, 100);
     }
 
     return () => {
@@ -121,28 +118,21 @@ const Navbar: React.FC<NavbarProps> = ({
     },
   ];
 
-  // Common navigation items for all roles
-  const commonNavItems = [
-    {
-      name: "Notifications",
-      path: "/notifications",
-      icon: BellIcon,
-    },
-    {
-      name: "Settings",
-      path: "/settings",
-      icon: CogIcon,
-    },
-  ];
+  // Settings navigation item
+  const settingsNavItem = {
+    name: "Settings",
+    path: "/settings",
+    icon: CogIcon,
+  };
 
-  // Combine navigation items based on role
-  const navItems = [
+  // Combine main navigation items based on role
+  const mainNavItems = [
     ...baseNavItems,
     ...(user?.role === "restaurant" ? restaurantNavItems : []),
-    ...commonNavItems,
+    settingsNavItem,
   ];
 
-  // Navigation Handler with improved accessibility
+  // Navigation Handler
   const handleNavigationClick = (event: React.MouseEvent, to: string) => {
     if (isBlockingNavigation && onAttemptBlockedNavigation) {
       const proceed = onAttemptBlockedNavigation();
@@ -152,7 +142,6 @@ const Navbar: React.FC<NavbarProps> = ({
       }
     }
 
-    // Auto-collapse on mobile after navigation
     if (isMobile) {
       setIsCollapsed(true);
     }
@@ -169,20 +158,17 @@ const Navbar: React.FC<NavbarProps> = ({
   };
 
   const toggleCollapse = () => {
-    // Only allow manual toggle on mobile/tablet
     if (isMobile) {
       setIsCollapsed(!isCollapsed);
     }
   };
 
   const handleMouseEnter = () => {
-    // Only allow hover expansion on desktop with delay
     if (!isMobile) {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
 
-      // Add slight delay to prevent accidental expansion
       hoverTimeoutRef.current = setTimeout(() => {
         setIsHovered(true);
       }, 150);
@@ -190,7 +176,6 @@ const Navbar: React.FC<NavbarProps> = ({
   };
 
   const handleMouseLeave = () => {
-    // Only allow hover collapse on desktop
     if (!isMobile) {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
@@ -206,7 +191,7 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav
       ref={navRef}
-      className={`bg-white shadow-lg fixed left-0 top-0 h-full z-40 transition-all duration-200 ease-out ${
+      className={`bg-gradient-to-b from-background to-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
         isExpanded ? "w-64" : "w-16"
       }`}
       role="navigation"
@@ -216,11 +201,11 @@ const Navbar: React.FC<NavbarProps> = ({
     >
       <div className="flex flex-col h-full">
         {/* Header section with logo and collapse button */}
-        <div className="border-b border-slate-200 h-16">
-          <div className="flex items-center justify-between relative h-16 px-4">
-            {/* Logo with smooth fade - absolute positioned to not affect layout */}
+        <div className="border-b border-slate-200/50 h-14 bg-gradient-to-r from-primary/5 to-accent/5">
+          <div className="h-14 px-3 flex items-center justify-between">
+            {/* Logo */}
             <div
-              className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-all duration-200 ease-out overflow-hidden ${
+              className={`transition-all duration-300 ease-out overflow-hidden ${
                 showContent
                   ? "opacity-100 translate-x-0"
                   : "opacity-0 -translate-x-4"
@@ -228,7 +213,7 @@ const Navbar: React.FC<NavbarProps> = ({
             >
               <Link
                 to={baseNavItems[0].path}
-                className="text-xl font-bold text-slate-700 hover:text-sky-600 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 rounded-lg px-2 py-1 whitespace-nowrap"
+                className="text-lg font-semibold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hover:from-primary-600 hover:to-accent-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 rounded-lg px-2 py-1 whitespace-nowrap"
                 onClick={(e) => handleNavigationClick(e, baseNavItems[0].path)}
                 aria-label="QuizCrunch - Go to dashboard"
               >
@@ -236,75 +221,67 @@ const Navbar: React.FC<NavbarProps> = ({
               </Link>
             </div>
 
-            {/* Collapse button - always visible, centered when collapsed */}
+            {/* Collapse button - centered when collapsed */}
             <button
               onClick={toggleCollapse}
-              className={`p-2 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all duration-200 ease-out min-w-[44px] min-h-[44px] flex items-center justify-center ${
+              className={`p-2 rounded-lg bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md border border-slate-200/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200 ease-out min-w-[36px] min-h-[36px] flex items-center justify-center group ${
                 !isExpanded
                   ? "absolute left-1/2 transform -translate-x-1/2"
-                  : "ml-auto"
+                  : ""
               }`}
               aria-label={!isExpanded ? "Expand sidebar" : "Collapse sidebar"}
               title={!isExpanded ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <div className="transition-transform duration-200 ease-out">
+              <div className="transition-transform duration-200 ease-out group-hover:scale-110">
                 {!isExpanded ? (
-                  <ChevronRightIcon className="h-5 w-5 text-slate-600" />
+                  <ChevronRightIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
                 ) : (
-                  <ChevronLeftIcon className="h-5 w-5 text-slate-600" />
+                  <ChevronLeftIcon className="h-4 w-4 text-muted-gray group-hover:text-primary" />
                 )}
               </div>
             </button>
           </div>
         </div>
 
-        {/* Navigation Links - Enhanced with better visual hierarchy */}
+        {/* Main Navigation Links */}
         <div className="flex-1 py-4 overflow-y-auto">
           <div className="space-y-1 px-2">
-            {navItems.map((item, index) => {
+            {mainNavItems.map((item, index) => {
               const Icon = item.icon;
               return (
                 <NavLink
                   key={item.name}
                   to={item.path}
                   className={({ isActive }) =>
-                    `group relative flex items-center rounded-lg text-sm font-medium transition-all duration-150 ease-in-out min-h-[44px] ${
+                    `group relative flex items-center rounded-lg text-sm font-medium transition-all duration-200 ease-out min-h-[44px] ${
                       isActive
-                        ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-sm"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-700"
-                    } focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset`
+                        ? "bg-gradient-to-r from-primary/10 to-accent/10 text-primary-700 border border-primary/20 shadow-sm"
+                        : "text-muted-gray hover:bg-slate-50 hover:text-dark-slate hover:shadow-sm"
+                    } focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1`
                   }
                   aria-label={`Navigate to ${item.name}`}
                   onClick={(e) => handleNavigationClick(e, item.path)}
                   title={!isExpanded ? `${item.name}` : ""}
                   style={{
-                    transitionDelay: showContent ? `${index * 50}ms` : "0ms",
+                    transitionDelay: showContent ? `${index * 20}ms` : "0ms",
                   }}
                 >
-                  {/* Fixed icon position - never moves */}
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                    <div className="w-5 h-5 flex items-center justify-center">
+                  {/* Icon - perfectly centered in collapsed state */}
+                  <div className="flex items-center justify-center w-12 h-full flex-shrink-0">
+                    <div className="w-6 h-6 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
                       <Icon className="h-5 w-5 flex-shrink-0" />
                     </div>
                   </div>
 
-                  {/* Invisible spacer to maintain click area in collapsed state */}
-                  <div className="w-full h-full absolute inset-0"></div>
-
-                  {/* Text container - slides out from icon position */}
+                  {/* Text label - slides in smoothly when expanded */}
                   <div
-                    className={`ml-11 overflow-hidden transition-all duration-200 ease-out ${
+                    className={`overflow-hidden transition-all duration-200 ease-out ${
                       showContent
                         ? "opacity-100 max-w-full"
                         : "opacity-0 max-w-0"
                     }`}
-                    style={{
-                      transform: showContent
-                        ? "translateX(0)"
-                        : "translateX(-8px)",
-                    }}
                   >
-                    <span className="truncate whitespace-nowrap block py-3 pr-3">
+                    <span className="truncate whitespace-nowrap block pr-3 font-medium">
                       {item.name}
                     </span>
                   </div>
@@ -317,65 +294,60 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* User info and Sign Out at bottom */}
-        <div className="border-t border-slate-200 p-2">
-          {/* User info */}
+        {/* User Profile and Sign Out at bottom */}
+        <div className="border-t border-slate-200/50 p-2 bg-gradient-to-r from-slate-50/50 to-white">
+          {/* User Profile Info - styled like navigation items */}
           <div className="mb-2">
-            <div className="flex items-center rounded-lg p-2">
-              {/* Fixed icon position to match navigation icons */}
-              <div className="absolute left-3">
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <div className="h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs shadow-sm">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </div>
+            <div className="group relative flex items-center rounded-lg text-sm font-medium transition-all duration-200 ease-out min-h-[44px] text-dark-slate hover:bg-slate-50">
+              {/* User Avatar Icon - aligned with navigation icons */}
+              <div className="flex items-center justify-center w-12 h-full flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
                 </div>
               </div>
-              {/* Text positioned to align with navigation text */}
+
+              {/* Username - shows when expanded */}
               <div
-                className={`ml-11 overflow-hidden transition-all duration-200 ease-out ${
+                className={`overflow-hidden transition-all duration-200 ease-out ${
                   showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
                 }`}
-                style={{
-                  transform: showContent ? "translateX(0)" : "translateX(-8px)",
-                }}
               >
-                <p className="text-sm font-medium text-slate-800 truncate">
-                  {user?.name || "User Name"}
-                </p>
-                <p className="text-xs text-slate-500 truncate capitalize">
-                  {user?.role || "Role"}
-                </p>
+                <div className="pr-3">
+                  <p className="text-sm font-semibold text-dark-slate truncate">
+                    {user?.name || "User Name"}
+                  </p>
+                  <p className="text-xs text-muted-gray truncate capitalize">
+                    {user?.role || "Role"}
+                  </p>
+                </div>
               </div>
+
+              {/* Screen reader text for collapsed state */}
+              {!isExpanded && <span className="sr-only">User Profile</span>}
             </div>
           </div>
 
           {/* Sign Out Button */}
           <button
             onClick={handleLogout}
-            className="group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-150 ease-in-out min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
+            className="group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-200 ease-out min-h-[44px] text-secondary hover:bg-secondary/10 hover:text-secondary-700 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 border border-transparent hover:border-secondary/20"
             aria-label="Sign out"
             title={!isExpanded ? "Sign out" : ""}
           >
-            {/* Fixed icon position - never moves */}
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-              <div className="w-5 h-5 flex items-center justify-center">
+            {/* Icon - perfectly centered in collapsed state */}
+            <div className="flex items-center justify-center w-12 h-full flex-shrink-0">
+              <div className="w-6 h-6 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
                 <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
               </div>
             </div>
 
-            {/* Invisible spacer to maintain click area in collapsed state */}
-            <div className="w-full h-full absolute inset-0"></div>
-
-            {/* Text container - slides out from icon position */}
+            {/* Text label */}
             <div
-              className={`ml-11 overflow-hidden transition-all duration-200 ease-out ${
+              className={`overflow-hidden transition-all duration-200 ease-out ${
                 showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
               }`}
-              style={{
-                transform: showContent ? "translateX(0)" : "translateX(-8px)",
-              }}
             >
-              <span className="truncate whitespace-nowrap block py-3 pr-3">
+              <span className="truncate whitespace-nowrap block pr-3 font-medium">
                 Sign Out
               </span>
             </div>
@@ -388,54 +360,16 @@ const Navbar: React.FC<NavbarProps> = ({
 
       {/* Enhanced animation styles */}
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes slideInRight {
-          from { transform: translateX(-8px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes slideInLeft {
-          from { transform: translateX(8px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        
-        .animate-fade-in {
-          animation: fadeIn 0.15s ease-out forwards;
-        }
-        
-        .animate-slide-in-right {
-          animation: slideInRight 0.2s ease-out forwards;
-        }
-
-        .animate-slide-in-left {
-          animation: slideInLeft 0.2s ease-out forwards;
-        }
-
         /* Smooth hover effect for navbar */
         nav:hover {
-          box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
         }
 
         /* Enhanced focus indicators */
         nav a:focus-visible,
         nav button:focus-visible {
-          outline: 2px solid #0ea5e9;
+          outline: 2px solid rgb(31 111 120 / 0.5);
           outline-offset: 2px;
-        }
-
-        /* Smooth icon transitions */
-        nav .group:hover svg {
-          transform: scale(1.05);
-        }
-
-        /* Text reveal effect */
-        .text-reveal {
-          overflow: hidden;
-          white-space: nowrap;
         }
 
         /* Better touch targets on mobile */

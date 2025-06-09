@@ -9,7 +9,11 @@ import QuestionBankModel from "../models/QuestionBankModel";
 import { AppError } from "../utils/errorHandler";
 import MenuItemModel, { IMenuItem } from "../models/MenuItemModel";
 import MenuModel, { IMenu } from "../models/MenuModel";
-import AiQuestionService, { RawAiGeneratedQuestion } from "./AiQuestionService";
+import LegacyAiQuestionService, {
+  RawAiGeneratedQuestion,
+} from "./LegacyAiQuestionService";
+import { SimpleAiQuestionService } from "./SimpleAiQuestionService";
+import { SimpleMenuItem } from "../types/simpleQuestionTypes";
 
 // Interface for the data needed to create a new question
 export interface NewQuestionData {
@@ -381,7 +385,7 @@ interface IMenuDocument extends mongoose.Document {
 export const generateAiQuestionsService = async (
   params: AiGenerationParams
 ): Promise<IQuestion[]> => {
-  console.log("[AI Question Generation] Starting with params:", {
+  console.log("[SimpleAI] Starting question generation with params:", {
     restaurantId: params.restaurantId,
     menuId: params.menuId,
     bankId: params.bankId,
@@ -396,10 +400,10 @@ export const generateAiQuestionsService = async (
       bankId,
       itemIds,
       categoriesToFocus,
-      numQuestionsPerItem = 2, // Default to 2 questions per item
+      numQuestionsPerItem = 2,
     } = params;
 
-    // 1. Fetch the Question Bank to get its categories
+    // 1. Fetch the Question Bank
     const questionBank = await QuestionBankModel.findOne({
       _id: bankId,
       restaurantId,
@@ -410,138 +414,146 @@ export const generateAiQuestionsService = async (
         404
       );
     }
-    const bankCategories = questionBank.categories || [];
-    console.log(
-      "[AI Question Generation] Question bank found with categories:",
-      bankCategories
-    );
 
-    // 2. Fetch the Menu and verify it exists
+    // 2. Fetch the Menu
     const menu = await MenuModel.findOne({
       _id: menuId,
       restaurantId,
     });
-
     if (!menu) {
       throw new AppError(
         `Menu with ID ${menuId} not found for this restaurant.`,
         404
       );
     }
-    console.log("[AI Question Generation] Menu found:", menu.name);
 
-    // 3. Fetch menu items based on criteria
+    console.log(`[SimpleAI] Using menu: ${menu.name}`);
+
+    // 3. Fetch menu items (simplified)
     let menuItemsToProcess: IMenuItem[] = [];
 
     if (itemIds && itemIds.length > 0) {
-      // Use specific item IDs
       menuItemsToProcess = await MenuItemModel.find({
         _id: { $in: itemIds },
         restaurantId,
         isActive: true,
       });
-      console.log(
-        `[AI Question Generation] Found ${menuItemsToProcess.length} specific items`
-      );
     } else if (categoriesToFocus && categoriesToFocus.length > 0) {
-      // Use category filtering
       menuItemsToProcess = await MenuItemModel.find({
         menuId: menuId,
         restaurantId,
         category: { $in: categoriesToFocus },
         isActive: true,
       });
-      console.log(
-        `[AI Question Generation] Found ${menuItemsToProcess.length} items in categories:`,
-        categoriesToFocus
-      );
     } else {
-      // Use all items from the menu
       menuItemsToProcess = await MenuItemModel.find({
         menuId: menuId,
         restaurantId,
         isActive: true,
       });
-      console.log(
-        `[AI Question Generation] Found ${menuItemsToProcess.length} total items`
-      );
     }
 
     if (menuItemsToProcess.length === 0) {
-      console.log("[AI Question Generation] No items found matching criteria");
+      console.log("[SimpleAI] No items found matching criteria");
       return [];
     }
 
-    // 4. Prepare parameters for the real AI service
-    const aiServiceParams = {
-      menuId: menuId,
-      itemIds: itemIds,
-      categoriesToFocus: categoriesToFocus || bankCategories,
-      questionFocusAreas: [
-        "ingredients",
-        "allergens",
-        "preparation",
-        "description",
-      ], // Smart focus areas
-      targetQuestionCountPerItemFocus: numQuestionsPerItem,
-      questionTypes: ["multiple-choice-single", "true-false"], // Standard question types
-      additionalContext: `Restaurant menu analysis for hospitality training. Focus on practical knowledge needed for restaurant staff.`,
-      restaurantId: restaurantId.toString(),
-    };
-
     console.log(
-      "[AI Question Generation] Calling AiQuestionService with params:",
-      aiServiceParams
+      `[SimpleAI] Processing ${menuItemsToProcess.length} menu items`
     );
 
-    // 5. Call the real AI service to generate questions
-    const rawGeneratedQuestions: RawAiGeneratedQuestion[] =
-      await AiQuestionService.generateRawQuestionsFromMenuContent(
-        aiServiceParams
+    // 4. Convert to simple format (no complex processing)
+    const simpleItems: SimpleMenuItem[] = menuItemsToProcess.map((item) => ({
+      name: item.name,
+      description: item.description || "",
+      ingredients: item.ingredients || [],
+      allergens: item.allergens || [],
+      category: item.category,
+      // Basic wine info extraction from description/name for wine categories
+      grape: item.category.toLowerCase().includes("wine")
+        ? extractWineInfo(item.name + " " + (item.description || ""), "grape")
+        : undefined,
+      region: item.category.toLowerCase().includes("wine")
+        ? extractWineInfo(item.name + " " + (item.description || ""), "region")
+        : undefined,
+      vintage: item.category.toLowerCase().includes("wine")
+        ? extractWineInfo(item.name + " " + (item.description || ""), "vintage")
+        : undefined,
+      producer: item.category.toLowerCase().includes("wine")
+        ? extractWineInfo(
+            item.name + " " + (item.description || ""),
+            "producer"
+          )
+        : undefined,
+    }));
+
+    // 5. Generate questions with simple service (by category)
+    const allGeneratedQuestions: any[] = [];
+    const categoriesToProcess = categoriesToFocus || [
+      ...new Set(simpleItems.map((item) => item.category)),
+    ];
+
+    for (const category of categoriesToProcess) {
+      const categoryItems = simpleItems.filter(
+        (item) => item.category === category
       );
+      if (categoryItems.length === 0) continue;
 
-    console.log(
-      `[AI Question Generation] AI service returned ${rawGeneratedQuestions.length} raw questions`
-    );
+      const focusArea = determineFocusArea(category);
+      const knowledgeCategory = mapToKnowledgeCategory(category);
 
-    if (rawGeneratedQuestions.length === 0) {
       console.log(
-        "[AI Question Generation] No questions generated by AI service"
+        `[SimpleAI] Generating ${
+          categoryItems.length * numQuestionsPerItem
+        } questions for category: ${category} (focus: ${focusArea})`
       );
+
+      const generatedQuestions =
+        await SimpleAiQuestionService.generateMenuQuestions({
+          menuItems: categoryItems,
+          questionCount: categoryItems.length * numQuestionsPerItem,
+          focusArea,
+          knowledgeCategory,
+        });
+
+      allGeneratedQuestions.push(...generatedQuestions);
+    }
+
+    console.log(
+      `[SimpleAI] Generated ${allGeneratedQuestions.length} total questions`
+    );
+
+    if (allGeneratedQuestions.length === 0) {
       return [];
     }
 
-    // 6. Save questions as pending review using the AI service
+    // 6. Save questions to database (reuse existing save logic)
     const savedQuestions: IQuestion[] =
-      await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
-        rawGeneratedQuestions,
+      await LegacyAiQuestionService.saveGeneratedQuestionsAsPendingReview(
+        allGeneratedQuestions,
         restaurantId.toString(),
         bankId,
         {
-          menuCategories: categoriesToFocus || bankCategories,
-          existingCategories: bankCategories,
+          menuCategories: categoriesToProcess,
+          existingCategories: questionBank.categories || [],
         }
       );
 
     console.log(
-      `[AI Question Generation] Successfully saved ${savedQuestions.length} questions as pending review`
+      `[SimpleAI] Successfully saved ${savedQuestions.length} questions as pending review`
     );
-
-    // 7. Return the generated questions
     return savedQuestions;
   } catch (error) {
-    console.error("Error in generateAiQuestionsService:", error);
+    console.error("Error in simplified AI question generation:", error);
     if (error instanceof AppError) {
       throw error;
     }
-    // Check for Mongoose validation error specifically
     if (error instanceof mongoose.Error.ValidationError) {
       throw new AppError(
         `Validation Error during question creation: ${error.message}`,
         400
       );
     }
-    // Log additional details about the error
     if (error instanceof Error) {
       console.error("Error details:", {
         message: error.message,
@@ -549,7 +561,10 @@ export const generateAiQuestionsService = async (
         name: error.name,
       });
     }
-    throw new AppError("Failed to generate AI questions.", 500);
+    throw new AppError(
+      "Failed to generate AI questions with simplified service.",
+      500
+    );
   }
 };
 
@@ -577,3 +592,107 @@ export const getQuestionsByIdsService = async (
     throw new AppError("Failed to fetch questions by IDs.", 500);
   }
 };
+
+// Helper functions for the simplified AI service
+export function determineFocusArea(
+  menuCategory: string
+): "ingredients" | "allergens" | "wine" | "preparation" | "general" {
+  const category = menuCategory.toLowerCase();
+
+  if (category.includes("wine") || category.includes("vino")) {
+    return "wine";
+  }
+
+  if (
+    category.includes("drink") ||
+    category.includes("beverage") ||
+    category.includes("cocktail")
+  ) {
+    return "preparation";
+  }
+
+  // Default to ingredients for food items
+  return "ingredients";
+}
+
+export function mapToKnowledgeCategory(
+  menuCategory: string
+):
+  | "food-knowledge"
+  | "beverage-knowledge"
+  | "wine-knowledge"
+  | "procedures-knowledge" {
+  const category = menuCategory.toLowerCase();
+
+  if (category.includes("wine") || category.includes("vino")) {
+    return "wine-knowledge";
+  }
+
+  if (
+    category.includes("drink") ||
+    category.includes("beverage") ||
+    category.includes("cocktail")
+  ) {
+    return "beverage-knowledge";
+  }
+
+  // Default to food knowledge
+  return "food-knowledge";
+}
+
+// Simple wine info extraction helper
+function extractWineInfo(
+  text: string,
+  type: "grape" | "region" | "vintage" | "producer"
+): string | undefined {
+  if (!text) return undefined;
+
+  const lowerText = text.toLowerCase();
+
+  // Basic patterns for wine info extraction
+  switch (type) {
+    case "vintage":
+      const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+      return yearMatch ? yearMatch[0] : undefined;
+
+    case "grape":
+      const grapes = [
+        "chardonnay",
+        "pinot noir",
+        "cabernet",
+        "merlot",
+        "sauvignon",
+        "riesling",
+        "syrah",
+        "nebbiolo",
+      ];
+      for (const grape of grapes) {
+        if (lowerText.includes(grape)) return grape;
+      }
+      return undefined;
+
+    case "region":
+      const regions = [
+        "napa",
+        "sonoma",
+        "bordeaux",
+        "burgundy",
+        "tuscany",
+        "piedmont",
+        "barolo",
+        "chianti",
+      ];
+      for (const region of regions) {
+        if (lowerText.includes(region)) return region;
+      }
+      return undefined;
+
+    case "producer":
+      // Simple producer extraction - look for capitalized words that might be producers
+      const producerMatch = text.match(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/);
+      return producerMatch ? producerMatch[0] : undefined;
+
+    default:
+      return undefined;
+  }
+}

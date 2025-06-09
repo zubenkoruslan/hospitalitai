@@ -508,11 +508,15 @@ const StaffDashboard: React.FC = () => {
   if (isLoading && !user) {
     // Show main loader if auth is still loading
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
-            <LoadingSpinner message="Loading dashboard..." />
+            <div className="flex justify-center items-center min-h-[60vh]">
+              <Card variant="elevated" className="text-center p-8">
+                <LoadingSpinner message="Loading dashboard..." />
+              </Card>
+            </div>
           </div>
         </main>
       </div>
@@ -520,15 +524,15 @@ const StaffDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Enhanced Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8 border border-slate-200 shadow-sm">
+            <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-accent/5 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8 border border-primary/10 shadow-lg backdrop-blur-sm">
               {/* Background decoration */}
-              <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-blue-100/50 to-indigo-100/50 rounded-full blur-3xl"></div>
+              <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full blur-3xl"></div>
 
               <div className="relative">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">

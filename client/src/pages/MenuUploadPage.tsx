@@ -8,6 +8,7 @@ import api, {
 } from "../services/api";
 import EditableMenuTable from "../components/menu/EditableMenuTable";
 import Spinner from "../components/common/Spinner";
+import Button from "../components/common/Button";
 import Navbar from "../components/Navbar";
 import {
   MenuUploadPreview,
@@ -122,7 +123,9 @@ const MenuUploadPage: React.FC = () => {
     async (file?: File) => {
       const fileToUpload = file || selectedFile;
       if (!fileToUpload) {
-        setError("Please select a PDF file to upload.");
+        setError(
+          "Please select a menu file to upload. Supported formats: PDF, Excel (.xlsx/.xls), CSV, JSON, Word (.docx)"
+        );
         return;
       }
       setIsLoading(true);
@@ -133,7 +136,7 @@ const MenuUploadPage: React.FC = () => {
       setImportJobId(null);
       setJobStatusError(null);
       const formData = new FormData();
-      formData.append("menuPdf", fileToUpload);
+      formData.append("menuFile", fileToUpload);
       try {
         const response = await api.post<MenuUploadPreview>(
           "/menus/upload/preview",
@@ -759,7 +762,7 @@ const MenuUploadPage: React.FC = () => {
                     <div className="relative">
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.xlsx,.xls,.csv,.json,.docx"
                         onChange={handleFileChange}
                         className="hidden"
                         id="menu-file-input"
@@ -774,10 +777,11 @@ const MenuUploadPage: React.FC = () => {
                             <p className="text-lg font-medium text-slate-700 group-hover:text-blue-700">
                               {selectedFile
                                 ? selectedFile.name
-                                : "Click to upload your menu PDF"}
+                                : "Click to upload your menu file"}
                             </p>
                             <p className="text-sm text-slate-500 mt-1">
-                              PDF files only, up to 10MB
+                              Supports PDF, Excel (.xlsx/.xls), CSV, JSON, Word
+                              (.docx) • Up to 10MB
                             </p>
                           </div>
                         </div>
@@ -840,15 +844,16 @@ const MenuUploadPage: React.FC = () => {
 
                     {/* Upload Button */}
                     {selectedFile && !uploadPreview && !isLoading && (
-                      <button
+                      <Button
+                        variant="primary"
                         onClick={() => handleUploadPreview()}
-                        className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-6 py-3"
                       >
                         <div className="flex items-center justify-center space-x-2">
                           <DocumentCheckIcon className="h-5 w-5" />
                           <span>Process Menu with AI</span>
                         </div>
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -1065,17 +1070,15 @@ const MenuUploadPage: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <button
+                            <Button
+                              variant="primary"
                               onClick={handleCheckJobStatus}
                               disabled={isLoadingJobStatus}
-                              className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-400 transition-colors"
+                              isLoading={isLoadingJobStatus}
+                              className="mt-3 px-4 py-2 text-sm"
                             >
-                              {renderButtonContent(
-                                isLoadingJobStatus,
-                                "Check Status",
-                                "Checking..."
-                              )}
-                            </button>
+                              Check Status
+                            </Button>
 
                             {jobStatusError && (
                               <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
@@ -1248,14 +1251,15 @@ const MenuUploadPage: React.FC = () => {
                               4. Edit & Confirm Items
                             </h2>
                           </div>
-                          <button
+                          <Button
+                            variant="primary"
                             onClick={handleAddNewCategory}
-                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                             disabled={!uploadPreview}
+                            className="flex items-center space-x-2 px-4 py-2 text-sm"
                           >
                             <PlusIcon className="h-4 w-4" />
                             <span>Add Category</span>
-                          </button>
+                          </Button>
                         </div>
                       </div>
 

@@ -878,7 +878,7 @@ const MenuItemsPage: React.FC = () => {
                     <Button
                       variant="primary"
                       onClick={openAddModal}
-                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-lg"
+                      className="shadow-lg"
                     >
                       <PlusIcon className="h-5 w-5 mr-2" />
                       Add Item

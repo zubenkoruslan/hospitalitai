@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/solid"; // Icons for expand/collapse
 import { normalizeCategory } from "../../utils/stringUtils"; // Import the shared utility
 import { v4 as uuidv4 } from "uuid"; // Import uuid
+import Button from "../common/Button";
 
 // Explicitly define EditableItem to ensure all fields, including optional wine fields, are recognized.
 interface EditableItem
@@ -1240,14 +1241,14 @@ const EditableMenuTable: React.FC<EditableMenuTableProps> = ({
                             No serving options defined.
                           </p>
                         )}
-                        <button
-                          type="button"
+                        <Button
+                          variant="primary"
                           onClick={() => addServingOption(item.id)}
-                          className="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
                           disabled={item.userAction === "ignore"}
+                          className="mt-2 px-3 py-1.5 text-xs"
                         >
                           Add Serving Option
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

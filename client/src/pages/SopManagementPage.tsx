@@ -231,7 +231,7 @@ const SopManagementPage: React.FC = () => {
                       variant="primary"
                       onClick={() => setIsUploadModalOpen(true)}
                       disabled={isUploading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                      className="shadow-lg"
                     >
                       <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
                       Upload Document

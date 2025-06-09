@@ -55,11 +55,7 @@ router.get(
  */
 router.get("/staff/:staffId", getIndividualStaffAnalytics);
 
-/**
- * GET /api/analytics/leaderboards
- * Get leaderboard data for different metrics
- */
-router.get("/leaderboards", getLeaderboards);
+// Note: /leaderboards endpoint is defined later in this file with proper implementation
 
 /**
  * GET /api/analytics/category/:category
@@ -657,10 +653,12 @@ router.get(
             userId: championAny.userId._id.toString(),
             name: championAny.userId.name,
             roleName: championAny.userDetails?.assignedRoleId?.name || "Staff",
-            accuracy: championAny[category].accuracy,
+            averageScore: championAny[category].accuracy, // Changed from 'accuracy' to 'averageScore'
             totalQuestions: championAny[category].totalQuestions,
             averageCompletionTime:
-              championAny[category].averageCompletionTime || 0,
+              championAny[category].averageCompletionTime > 0
+                ? championAny[category].averageCompletionTime
+                : undefined,
           };
         } else {
           categoryChampions[category] = null;

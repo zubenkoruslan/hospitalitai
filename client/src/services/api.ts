@@ -309,6 +309,23 @@ export const generateAiQuestions = async (
   return response.data.data;
 };
 
+/**
+ * Generates AI questions from menu for a question bank - Simplified approach
+ * @param params - Parameters for menu-based AI question generation
+ */
+export const generateMenuAiQuestions = async (params: {
+  menuId: string;
+  bankId: string;
+  categoriesToFocus: string[];
+  numQuestionsPerItem: number;
+}): Promise<IQuestion[]> => {
+  const response = await api.post<{ data: IQuestion[] }>(
+    "/questions/generate",
+    params
+  );
+  return response.data.data;
+};
+
 // Create a new question bank from a menu
 export const createQuestionBankFromMenu = async (
   data: CreateQuestionBankClientData
@@ -1739,4 +1756,169 @@ export const getCategoriesAnalytics = async (): Promise<
     "/analytics/categories"
   );
   return response.data.data;
+};
+
+// ===== TEMPLATE DOWNLOAD API METHODS =====
+
+/**
+ * Download Excel template for menu data entry
+ */
+export const downloadExcelTemplate = async (): Promise<void> => {
+  try {
+    const response = await api.get("/templates/excel", {
+      responseType: "blob",
+    });
+
+    // Create download link
+    const blob = new Blob([response.data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from headers or use default
+    const contentDisposition = response.headers["content-disposition"];
+    let filename = "QuizCrunch_Menu_Template.xlsx";
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error("Error downloading Excel template:", error);
+    throw new Error("Failed to download Excel template");
+  }
+};
+
+/**
+ * Download CSV template for menu data entry
+ */
+export const downloadCSVTemplate = async (): Promise<void> => {
+  try {
+    const response = await api.get("/templates/csv", {
+      responseType: "blob",
+    });
+
+    const blob = new Blob([response.data], {
+      type: "text/csv",
+    });
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    const contentDisposition = response.headers["content-disposition"];
+    let filename = "QuizCrunch_Menu_Template.csv";
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error("Error downloading CSV template:", error);
+    throw new Error("Failed to download CSV template");
+  }
+};
+
+/**
+ * Download Word template for menu data entry
+ */
+export const downloadWordTemplate = async (): Promise<void> => {
+  try {
+    const response = await api.get("/templates/word", {
+      responseType: "blob",
+    });
+
+    const blob = new Blob([response.data], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    const contentDisposition = response.headers["content-disposition"];
+    let filename = "QuizCrunch_Menu_Template.docx";
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error("Error downloading Word template:", error);
+    throw new Error("Failed to download Word template");
+  }
+};
+
+/**
+ * Download JSON template for menu data entry
+ */
+export const downloadJSONTemplate = async (): Promise<void> => {
+  try {
+    const response = await api.get("/templates/json", {
+      responseType: "blob",
+    });
+
+    const blob = new Blob([response.data], {
+      type: "application/json",
+    });
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    const contentDisposition = response.headers["content-disposition"];
+    let filename = "QuizCrunch_Menu_Template.json";
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error("Error downloading JSON template:", error);
+    throw new Error("Failed to download JSON template");
+  }
+};
+
+/**
+ * Get template information and available formats
+ */
+export const getTemplateInfo = async (): Promise<any> => {
+  try {
+    const response = await api.get("/templates/info");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching template info:", error);
+    throw new Error("Failed to fetch template information");
+  }
 };

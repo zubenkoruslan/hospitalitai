@@ -17,6 +17,7 @@ import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import {
   getMenusByRestaurant as fetchRestaurantMenus,
+  getMenuWithItems,
   getPendingReviewQuestions,
   processReviewedAiQuestions,
 } from "../services/api";
@@ -534,39 +535,51 @@ const QuestionBankDetailPage: React.FC = () => {
     setPageError(null);
 
     if (currentQuestionBank.sourceType === "MENU") {
-      // UPDATED LOGIC: If sourceMenuId exists, use it directly
+      // UPDATED LOGIC: If sourceMenuId exists, try to use it directly, but fall back if it doesn't exist
       if (currentQuestionBank.sourceMenuId) {
-        setSelectedMenuForAi(currentQuestionBank.sourceMenuId);
-        setShowGenerateAiQuestionsModal(true);
-      } else {
-        // Existing logic: Fetch menus if no sourceMenuId is linked
-        setIsLoadingMenusForAi(true);
         try {
-          const menus = await fetchRestaurantMenus(
-            currentQuestionBank.restaurantId
-          );
-          const activeMenus = menus;
-
-          if (activeMenus.length === 0) {
-            setPageError(
-              "No active menus found for your restaurant. AI Question generation for menu-based banks requires an active menu."
-            );
-            setIsLoadingMenusForAi(false);
-            return;
-          }
-          setAvailableMenus(activeMenus);
-          if (activeMenus.length === 1) {
-            setSelectedMenuForAi(activeMenus[0]._id);
-            setShowGenerateAiQuestionsModal(true);
-          } else {
-            setIsMenuSelectionModalOpen(true);
-          }
+          // Try to verify the menu still exists by fetching it
+          await getMenuWithItems(currentQuestionBank.sourceMenuId);
+          // If successful, use the existing menu ID
+          setSelectedMenuForAi(currentQuestionBank.sourceMenuId);
+          setShowGenerateAiQuestionsModal(true);
+          return;
         } catch (err) {
-          console.error("Error fetching menus for AI generation:", err);
-          setPageError(getErrorMessage(err));
-        } finally {
-          setIsLoadingMenusForAi(false);
+          console.warn(
+            "Linked menu no longer exists, falling back to menu selection:",
+            err
+          );
+          // Fall through to the existing logic to fetch available menus
         }
+      }
+
+      // Existing logic: Fetch menus if no sourceMenuId is linked OR if the linked menu doesn't exist
+      setIsLoadingMenusForAi(true);
+      try {
+        const menus = await fetchRestaurantMenus(
+          currentQuestionBank.restaurantId
+        );
+        const activeMenus = menus;
+
+        if (activeMenus.length === 0) {
+          setPageError(
+            "No active menus found for your restaurant. AI Question generation for menu-based banks requires an active menu."
+          );
+          setIsLoadingMenusForAi(false);
+          return;
+        }
+        setAvailableMenus(activeMenus);
+        if (activeMenus.length === 1) {
+          setSelectedMenuForAi(activeMenus[0]._id);
+          setShowGenerateAiQuestionsModal(true);
+        } else {
+          setIsMenuSelectionModalOpen(true);
+        }
+      } catch (err) {
+        console.error("Error fetching menus for AI generation:", err);
+        setPageError(getErrorMessage(err));
+      } finally {
+        setIsLoadingMenusForAi(false);
       }
     } else if (currentQuestionBank.sourceType === "SOP") {
       if (!currentQuestionBank.sourceSopDocumentId) {

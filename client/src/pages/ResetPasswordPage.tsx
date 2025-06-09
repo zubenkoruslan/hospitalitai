@@ -364,12 +364,12 @@ const ResetPasswordPage: React.FC = () => {
 
           <Button
             type="submit"
-            variant="primary"
+            variant="success"
             isLoading={loading}
             disabled={!isPasswordValid || !doPasswordsMatch || loading}
-            className="w-full py-3 text-base font-semibold bg-green-600 hover:bg-green-700 focus:ring-green-500"
+            className="w-full py-3 text-base font-semibold"
           >
-            {loading ? "Resetting Password..." : "Reset Password"}
+            Reset Password
           </Button>
         </form>
 

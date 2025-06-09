@@ -1,11 +1,8 @@
 import React, { useState, FormEvent, useEffect, useCallback } from "react";
-import {
-  IQuestion,
-  NewAiQuestionGenerationParams,
-} from "../../types/questionBankTypes";
+import { IQuestion } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import {
-  triggerAiQuestionGenerationProcess as apiTriggerAiGeneration,
+  generateMenuAiQuestions as apiTriggerAiGeneration,
   getMenuWithItems,
 } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
@@ -166,9 +163,16 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         } else {
           // setErrorMenuCategories("No categories found in the selected menu or menu has no items.");
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching menu categories:", err);
-        setErrorMenuCategories("Failed to load categories from the menu.");
+        // Check if it's a 404 error (menu not found)
+        if (err?.response?.status === 404) {
+          setErrorMenuCategories(
+            "The linked menu no longer exists. Please select a different menu."
+          );
+        } else {
+          setErrorMenuCategories("Failed to load categories from the menu.");
+        }
       } finally {
         setIsLoadingMenuCategories(false);
       }
@@ -273,14 +277,11 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
     }
     setInternalIsLoading(true);
 
-    const payload: NewAiQuestionGenerationParams = {
-      bankId: bankId,
+    const payload = {
       menuId: menuId,
+      bankId: bankId,
       categoriesToFocus: selectedMenuCategories,
-      questionFocusAreas: selectedFocusAreas,
-      targetQuestionCountPerItemFocus,
-      questionTypes: aiQuestionTypes,
-      // difficulty is now optional and removed from here
+      numQuestionsPerItem: targetQuestionCountPerItemFocus,
     };
 
     console.log("AI Generation Payload:", JSON.stringify(payload, null, 2));

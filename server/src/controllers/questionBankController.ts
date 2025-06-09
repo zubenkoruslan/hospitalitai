@@ -10,9 +10,9 @@ import {
 } from "../services/questionBankService";
 import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
 import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel"; // Import QuestionBankModel and IQuestionBank
-import AiQuestionService, {
+import LegacyAiQuestionService, {
   GenerateQuestionsFromSopParams,
-} from "../services/AiQuestionService"; // Import AiQuestionService and relevant types
+} from "../services/LegacyAiQuestionService";
 import asyncHandler from "express-async-handler"; // Assuming you use this for cleaner async routes
 import { validationResult } from "express-validator";
 import { body } from "express-validator";
@@ -1101,7 +1101,7 @@ export const generateAiQuestionsForSopBank = async (
     };
 
     const rawQuestions =
-      await AiQuestionService.generateQuestionsFromSopCategoriesService(
+      await LegacyAiQuestionService.generateQuestionsFromSopCategoriesService(
         sopQuestionParams
       );
 
@@ -1115,7 +1115,7 @@ export const generateAiQuestionsForSopBank = async (
     }
 
     const pendingQuestions =
-      await AiQuestionService.saveGeneratedQuestionsAsPendingReview(
+      await LegacyAiQuestionService.saveGeneratedQuestionsAsPendingReview(
         rawQuestions,
         restaurantIdString,
         bankId,
