@@ -23,9 +23,9 @@ import {
   MagnifyingGlassIcon,
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
-  ChartBarIcon,
-  CubeIcon,
-  CalendarIcon,
+  SparklesIcon, // For wine (elegant/premium feel)
+  CakeIcon, // For food
+  BeakerIcon, // For beverages (glass/liquid container)
 } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
@@ -287,6 +287,19 @@ const MenuItemsPage: React.FC = () => {
     ) => {
       if (!menuId || !restaurantId) return;
 
+      console.log("[MenuItemsPage] Starting menu item submission...");
+      console.log("[MenuItemsPage] User data:", {
+        userId: user?._id,
+        role: user?.role,
+        restaurantId: user?.restaurantId,
+        isAuthenticated: !!user,
+      });
+      console.log("[MenuItemsPage] Submission data:", {
+        currentItemId,
+        isEditMode: currentItemId !== null,
+        formData: submittedFormData,
+      });
+
       setIsSubmittingItem(true);
       setSuccessMessage(null);
 
@@ -304,26 +317,55 @@ const MenuItemsPage: React.FC = () => {
         const isEditMode = currentItemId !== null;
 
         if (isEditMode && currentItemId) {
+          console.log(
+            "[MenuItemsPage] Attempting to update menu item:",
+            currentItemId
+          );
           // Ensure currentItemId is not null for edit mode
           // updateMenuItem expects Partial<MenuItemFormData>
           // transformMenuItemFormData in api.ts handles the conversion
           await updateMenuItem(currentItemId, submittedFormData); // Pass submittedFormData directly
+          console.log("[MenuItemsPage] Menu item updated successfully");
           setSuccessMessage("Menu item updated successfully.");
         } else {
+          console.log("[MenuItemsPage] Attempting to create new menu item");
           // createMenuItem expects MenuItemFormData
           await createMenuItem(submittedFormData); // Pass submittedFormData directly
+          console.log("[MenuItemsPage] Menu item created successfully");
           setSuccessMessage("Menu item added successfully.");
         }
         fetchData();
         closeModal();
       } catch (err: any) {
         console.error("Error submitting item:", err);
-        // TODO: Set a specific submit error state for the modal instead of general page error
+        console.error("Error details:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+        });
+
+        // Display the actual error to the user
+        if (err.response?.status === 403) {
+          setSuccessMessage(
+            "Permission denied. Please ensure you are logged in as a restaurant user."
+          );
+        } else if (err.response?.status === 401) {
+          setSuccessMessage("Authentication required. Please log in again.");
+        } else {
+          setSuccessMessage(
+            `Error: ${
+              err.response?.data?.message ||
+              err.message ||
+              "Unknown error occurred"
+            }`
+          );
+        }
       } finally {
         setIsSubmittingItem(false);
       }
     },
-    [menuId, restaurantId, fetchData, closeModal] // restaurantId might be removed from deps if not used directly
+    [menuId, restaurantId, fetchData, closeModal, user] // Add user to dependencies
   );
 
   // --- Delete Confirmation ---
@@ -515,7 +557,7 @@ const MenuItemsPage: React.FC = () => {
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
             }`}
           >
-            <CubeIcon className="h-4 w-4" />
+            <CakeIcon className="h-4 w-4" />
             <span>Food</span>
             <span
               className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
@@ -536,7 +578,7 @@ const MenuItemsPage: React.FC = () => {
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
             }`}
           >
-            <ChartBarIcon className="h-4 w-4" />
+            <BeakerIcon className="h-4 w-4" />
             <span>Beverages</span>
             <span
               className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
@@ -557,7 +599,7 @@ const MenuItemsPage: React.FC = () => {
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
             }`}
           >
-            <CalendarIcon className="h-4 w-4" />
+            <SparklesIcon className="h-4 w-4" />
             <span>Wines</span>
             <span
               className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
@@ -603,7 +645,7 @@ const MenuItemsPage: React.FC = () => {
             {isEmptyDueToSearch ? (
               <MagnifyingGlassIcon className="h-8 w-8 text-slate-400" />
             ) : (
-              <CubeIcon className="h-8 w-8 text-slate-400" />
+              <CakeIcon className="h-8 w-8 text-slate-400" />
             )}
           </div>
           <h3 className="text-xl font-semibold text-slate-900 mb-2">
@@ -911,7 +953,7 @@ const MenuItemsPage: React.FC = () => {
                           {stats.foodCount}
                         </p>
                       </div>
-                      <CubeIcon className="h-8 w-8 text-green-400" />
+                      <CakeIcon className="h-8 w-8 text-green-400" />
                     </div>
                   </div>
                   <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
@@ -924,7 +966,7 @@ const MenuItemsPage: React.FC = () => {
                           {stats.beverageCount}
                         </p>
                       </div>
-                      <ChartBarIcon className="h-8 w-8 text-purple-400" />
+                      <BeakerIcon className="h-8 w-8 text-purple-400" />
                     </div>
                   </div>
                   <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
@@ -937,7 +979,7 @@ const MenuItemsPage: React.FC = () => {
                           {stats.wineCount}
                         </p>
                       </div>
-                      <CalendarIcon className="h-8 w-8 text-amber-400" />
+                      <SparklesIcon className="h-8 w-8 text-amber-400" />
                     </div>
                   </div>
                 </div>

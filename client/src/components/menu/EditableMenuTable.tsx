@@ -642,199 +642,212 @@ const EditableMenuTable: React.FC<EditableMenuTableProps> = ({
                 item.conflictResolution.status !== "error_processing_conflict";
 
               return (
-                <tr
-                  key={item.id}
-                  draggable={item.userAction === "keep"}
-                  onDragStart={(e) =>
-                    handleDragStartItem(e, item.id, categoryKey)
-                  }
-                  className={`transition-colors ${
-                    item.userAction === "ignore"
-                      ? "bg-gray-200 opacity-70"
-                      : isConflicted
-                      ? "bg-red-50 hover:bg-red-100"
-                      : "hover:bg-gray-50"
-                  }`}
-                >
-                  {/* Action Checkbox */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center justify-center">
+                <>
+                  <tr
+                    key={item.id}
+                    draggable={item.userAction === "keep"}
+                    onDragStart={(e) =>
+                      handleDragStartItem(e, item.id, categoryKey)
+                    }
+                    className={`transition-colors ${
+                      item.userAction === "ignore"
+                        ? "bg-gray-200 opacity-70"
+                        : isConflicted
+                        ? "bg-red-50 hover:bg-red-100"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    {/* Action Checkbox */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={item.userAction === "keep"}
+                          onChange={(e) =>
+                            handleUserActionChange(
+                              item.id,
+                              e.target.checked ? "keep" : "ignore"
+                            )
+                          }
+                          className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                          aria-label={`Mark item ${item.fields.name.value} as ${
+                            item.userAction === "keep" ? "ignore" : "keep"
+                          }`}
+                        />
+                      </div>
+                    </td>
+
+                    {/* Name */}
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <input
-                        type="checkbox"
-                        checked={item.userAction === "keep"}
+                        type="text"
+                        value={String(item.fields.name.value || "")}
                         onChange={(e) =>
-                          handleUserActionChange(
-                            item.id,
-                            e.target.checked ? "keep" : "ignore"
-                          )
+                          handleFieldChange(item.id, "name", e.target.value)
                         }
-                        className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                        aria-label={`Mark item ${item.fields.name.value} as ${
-                          item.userAction === "keep" ? "ignore" : "keep"
+                        className={`${inputBaseClasses} ${
+                          item.fields.name.isValid
+                            ? validInputClasses
+                            : invalidInputClasses
                         }`}
                       />
-                    </div>
-                  </td>
-
-                  {/* Name */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <input
-                      type="text"
-                      value={String(item.fields.name.value || "")}
-                      onChange={(e) =>
-                        handleFieldChange(item.id, "name", e.target.value)
-                      }
-                      className={`${inputBaseClasses} ${
-                        item.fields.name.isValid
-                          ? validInputClasses
-                          : invalidInputClasses
-                      }`}
-                    />
-                    {!item.fields.name.isValid &&
-                      item.fields.name.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {item.fields.name.errorMessage}
-                        </p>
-                      )}
-                  </td>
-
-                  {/* Ingredients */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <input
-                      type="text"
-                      value={String(
-                        (
-                          (item.fields.ingredients.value as string[]) || []
-                        ).join(", ")
-                      )}
-                      onChange={(e) =>
-                        handleFieldChange(
-                          item.id,
-                          "ingredients",
-                          e.target.value
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter((s) => s)
-                        )
-                      }
-                      className={`${inputBaseClasses} ${
-                        item.fields.ingredients.isValid
-                          ? validInputClasses
-                          : invalidInputClasses
-                      }`}
-                    />
-                    {!item.fields.ingredients.isValid &&
-                      item.fields.ingredients.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {item.fields.ingredients.errorMessage}
-                        </p>
-                      )}
-                  </td>
-
-                  {/* Type */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <select
-                      value={String(item.fields.itemType.value || "")}
-                      onChange={(e) =>
-                        handleFieldChange(item.id, "itemType", e.target.value)
-                      }
-                      className={`${inputBaseClasses} ${
-                        item.fields.itemType.isValid
-                          ? validInputClasses
-                          : invalidInputClasses
-                      }`}
-                    >
-                      <option value="">Select...</option>
-                      <option value="food">Food</option>
-                      <option value="beverage">Beverage</option>
-                      <option value="wine">Wine</option>
-                    </select>
-                    {!item.fields.itemType.isValid &&
-                      item.fields.itemType.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {item.fields.itemType.errorMessage}
-                        </p>
-                      )}
-                  </td>
-
-                  {/* Import Action / Conflict */}
-                  <td className="px-4 py-3 whitespace-nowrap text-xs">
-                    {item.conflictResolution && (
-                      <div
-                        className={`p-1 rounded ${
-                          item.conflictResolution.status === "no_conflict"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        <p>
-                          <strong>Status:</strong>{" "}
-                          {item.conflictResolution.status}
-                        </p>
-                        {item.conflictResolution.message && (
-                          <p>{item.conflictResolution.message}</p>
-                        )}
-                        {item.conflictResolution.existingItemId && (
-                          <p>
-                            Existing ID: ...
-                            {item.conflictResolution.existingItemId.slice(-6)}
+                      {!item.fields.name.isValid &&
+                        item.fields.name.errorMessage && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {item.fields.name.errorMessage}
                           </p>
                         )}
-                      </div>
-                    )}
-                    <select
-                      value={item.importAction || ""}
-                      onChange={(e) =>
-                        handleImportActionChange(
-                          item.id,
-                          e.target
-                            .value as MenuUploadTypes.ParsedMenuItem["importAction"]
-                        )
-                      }
-                      className={`${inputBaseClasses} mt-1`}
-                      disabled={item.userAction === "ignore"}
-                    >
-                      <option value="">Select Action...</option>
-                      <option value="create">Create New</option>
-                      <option value="update">Update Existing</option>
-                      <option value="skip">Skip This Item</option>
-                    </select>
-                  </td>
+                    </td>
 
-                  {/* Price */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <input
-                      type="text"
-                      value={String(
-                        item.fields.price.value === null ||
-                          item.fields.price.value === undefined
-                          ? ""
-                          : item.fields.price.value
-                      )}
-                      onChange={(e) =>
-                        handleFieldChange(item.id, "price", e.target.value)
-                      }
-                      className={`${inputBaseClasses} ${
-                        item.fields.price.isValid !== false
-                          ? validInputClasses
-                          : invalidInputClasses
-                      }`}
-                      placeholder="e.g. 12.99"
-                      disabled={item.userAction === "ignore"}
-                    />
-                    {item.fields.price.isValid === false &&
-                      item.fields.price.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {item.fields.price.errorMessage}
-                        </p>
-                      )}
-                  </td>
+                    {/* Ingredients */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="text"
+                        value={String(
+                          // If the field has been converted to an array, join it for display
+                          Array.isArray(item.fields.ingredients.value)
+                            ? item.fields.ingredients.value.join(", ")
+                            : item.fields.ingredients.value || ""
+                        )}
+                        onChange={(e) =>
+                          // Store the raw string value during editing
+                          handleFieldChange(
+                            item.id,
+                            "ingredients",
+                            e.target.value
+                          )
+                        }
+                        onBlur={(e) =>
+                          // Convert to array only when the field loses focus
+                          handleFieldChange(
+                            item.id,
+                            "ingredients",
+                            e.target.value
+                              .split(",")
+                              .map((s) => s.trim())
+                              .filter((s) => s)
+                          )
+                        }
+                        className={`${inputBaseClasses} ${
+                          item.fields.ingredients.isValid
+                            ? validInputClasses
+                            : invalidInputClasses
+                        }`}
+                        placeholder="e.g. Flour, Tomato, Cheese"
+                      />
+                      {!item.fields.ingredients.isValid &&
+                        item.fields.ingredients.errorMessage && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {item.fields.ingredients.errorMessage}
+                          </p>
+                        )}
+                    </td>
 
-                  {/* Status */}
-                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                    {item.status}
-                  </td>
-                </tr>
+                    {/* Type */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <select
+                        value={String(item.fields.itemType.value || "")}
+                        onChange={(e) =>
+                          handleFieldChange(item.id, "itemType", e.target.value)
+                        }
+                        className={`${inputBaseClasses} ${
+                          item.fields.itemType.isValid
+                            ? validInputClasses
+                            : invalidInputClasses
+                        }`}
+                      >
+                        <option value="">Select...</option>
+                        <option value="food">Food</option>
+                        <option value="beverage">Beverage</option>
+                        <option value="wine">Wine</option>
+                      </select>
+                      {!item.fields.itemType.isValid &&
+                        item.fields.itemType.errorMessage && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {item.fields.itemType.errorMessage}
+                          </p>
+                        )}
+                    </td>
+
+                    {/* Import Action / Conflict */}
+                    <td className="px-4 py-3 whitespace-nowrap text-xs">
+                      {item.conflictResolution && (
+                        <div
+                          className={`p-1 rounded ${
+                            item.conflictResolution.status === "no_conflict"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          <p>
+                            <strong>Status:</strong>{" "}
+                            {item.conflictResolution.status}
+                          </p>
+                          {item.conflictResolution.message && (
+                            <p>{item.conflictResolution.message}</p>
+                          )}
+                          {item.conflictResolution.existingItemId && (
+                            <p>
+                              Existing ID: ...
+                              {item.conflictResolution.existingItemId.slice(-6)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <select
+                        value={item.importAction || ""}
+                        onChange={(e) =>
+                          handleImportActionChange(
+                            item.id,
+                            e.target
+                              .value as MenuUploadTypes.ParsedMenuItem["importAction"]
+                          )
+                        }
+                        className={`${inputBaseClasses} mt-1`}
+                        disabled={item.userAction === "ignore"}
+                      >
+                        <option value="">Select Action...</option>
+                        <option value="create">Create New</option>
+                        <option value="update">Update Existing</option>
+                        <option value="skip">Skip This Item</option>
+                      </select>
+                    </td>
+
+                    {/* Price */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="text"
+                        value={String(
+                          item.fields.price.value === null ||
+                            item.fields.price.value === undefined
+                            ? ""
+                            : item.fields.price.value
+                        )}
+                        onChange={(e) =>
+                          handleFieldChange(item.id, "price", e.target.value)
+                        }
+                        className={`${inputBaseClasses} ${
+                          item.fields.price.isValid !== false
+                            ? validInputClasses
+                            : invalidInputClasses
+                        }`}
+                        placeholder="e.g. 12.99"
+                        disabled={item.userAction === "ignore"}
+                      />
+                      {item.fields.price.isValid === false &&
+                        item.fields.price.errorMessage && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {item.fields.price.errorMessage}
+                          </p>
+                        )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                      {item.status}
+                    </td>
+                  </tr>
+                </>
               );
             })}
           </tbody>
@@ -874,8 +887,9 @@ const EditableMenuTable: React.FC<EditableMenuTableProps> = ({
                 item.conflictResolution.status !== "error_processing_conflict";
 
               return (
-                <Fragment key={item.id}>
+                <>
                   <tr
+                    key={item.id}
                     draggable={item.userAction === "keep"}
                     onDragStart={(e) =>
                       handleDragStartItem(e, item.id, categoryKey)
@@ -1252,7 +1266,7 @@ const EditableMenuTable: React.FC<EditableMenuTableProps> = ({
                       </div>
                     </td>
                   </tr>
-                </Fragment>
+                </>
               );
             })}
           </tbody>

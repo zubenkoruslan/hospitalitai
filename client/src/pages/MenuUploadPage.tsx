@@ -541,8 +541,23 @@ const MenuUploadPage: React.FC = () => {
         setImportJobId(response.jobId);
         setImportResult(null);
       } else {
-        setImportResult(response as ImportResult);
+        const result = response as ImportResult;
+        setImportResult(result);
         setImportJobId(null);
+
+        // Auto-navigate to MenuItemsPage after successful import
+        if (
+          (result.overallStatus === "completed" ||
+            result.overallStatus === "partial") &&
+          result.menuId
+        ) {
+          // Add a small delay to show the success message briefly before navigating
+          setTimeout(() => {
+            navigate(`/menu/${result.menuId}/items`, {
+              state: { fromImport: true },
+            });
+          }, 2000); // 2 second delay
+        }
       }
     } catch (err: any) {
       console.error("Error finalizing import:", err);
@@ -595,6 +610,20 @@ const MenuUploadPage: React.FC = () => {
     try {
       const result = await getMenuImportJobStatus(importJobId);
       setImportResult(result);
+
+      // Auto-navigate to MenuItemsPage after successful async import
+      if (
+        (result.overallStatus === "completed" ||
+          result.overallStatus === "partial") &&
+        result.menuId
+      ) {
+        // Add a small delay to show the success message briefly before navigating
+        setTimeout(() => {
+          navigate(`/menu/${result.menuId}/items`, {
+            state: { fromImport: true },
+          });
+        }, 2000); // 2 second delay
+      }
     } catch (err: any) {
       console.error("Error checking job status:", err);
       setJobStatusError(
@@ -605,7 +634,7 @@ const MenuUploadPage: React.FC = () => {
     } finally {
       setIsLoadingJobStatus(false);
     }
-  }, [importJobId]);
+  }, [importJobId, navigate]);
 
   const buttonDisabled =
     isLoading ||
@@ -654,23 +683,25 @@ const MenuUploadPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-white via-primary-50 to-accent-50">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-        <div className="p-6">
+        <div className="p-6 sm:p-8">
           <div className="max-w-7xl mx-auto">
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {/* Header Section */}
-              <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm">
+              <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-lg">
                 <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                  <div className="p-3 bg-gradient-to-r from-primary to-primary-600 rounded-3xl shadow-lg">
                     <ArrowUpTrayIcon className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold text-slate-900">
-                      Upload Menu
+                    <h1 className="text-3xl sm:text-5xl font-light text-slate-900 tracking-tight">
+                      <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        Upload Menu
+                      </span>
                     </h1>
-                    <p className="text-slate-600 mt-2">
+                    <p className="text-lg text-muted-gray font-light mt-2">
                       Upload your menu PDF and let AI extract and organize your
                       items automatically
                     </p>
@@ -679,24 +710,22 @@ const MenuUploadPage: React.FC = () => {
               </div>
 
               {/* Progress Steps */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 rounded-3xl shadow-lg border border-slate-200 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-8">
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`p-2 rounded-full ${
-                          selectedFile ? "bg-green-100" : "bg-blue-100"
+                        className={`p-3 rounded-3xl shadow-lg ${
+                          selectedFile
+                            ? "bg-gradient-to-r from-green-500 to-green-600"
+                            : "bg-gradient-to-r from-primary to-primary-600"
                         }`}
                       >
-                        <DocumentArrowUpIcon
-                          className={`h-5 w-5 ${
-                            selectedFile ? "text-green-600" : "text-blue-600"
-                          }`}
-                        />
+                        <DocumentArrowUpIcon className="h-6 w-6 text-white" />
                       </div>
                       <span
-                        className={`font-medium ${
-                          selectedFile ? "text-green-700" : "text-blue-700"
+                        className={`font-light text-lg ${
+                          selectedFile ? "text-green-700" : "text-primary-700"
                         }`}
                       >
                         1. Upload File
@@ -705,18 +734,16 @@ const MenuUploadPage: React.FC = () => {
 
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`p-2 rounded-full ${
-                          uploadPreview ? "bg-green-100" : "bg-slate-100"
+                        className={`p-3 rounded-3xl shadow-lg ${
+                          uploadPreview
+                            ? "bg-gradient-to-r from-green-500 to-green-600"
+                            : "bg-gradient-to-r from-slate-300 to-slate-400"
                         }`}
                       >
-                        <CogIcon
-                          className={`h-5 w-5 ${
-                            uploadPreview ? "text-green-600" : "text-slate-400"
-                          }`}
-                        />
+                        <CogIcon className="h-6 w-6 text-white" />
                       </div>
                       <span
-                        className={`font-medium ${
+                        className={`font-light text-lg ${
                           uploadPreview ? "text-green-700" : "text-slate-500"
                         }`}
                       >
@@ -726,18 +753,16 @@ const MenuUploadPage: React.FC = () => {
 
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`p-2 rounded-full ${
-                          importResult ? "bg-green-100" : "bg-slate-100"
+                        className={`p-3 rounded-3xl shadow-lg ${
+                          importResult
+                            ? "bg-gradient-to-r from-green-500 to-green-600"
+                            : "bg-gradient-to-r from-slate-300 to-slate-400"
                         }`}
                       >
-                        <CheckCircleIcon
-                          className={`h-5 w-5 ${
-                            importResult ? "text-green-600" : "text-slate-400"
-                          }`}
-                        />
+                        <CheckCircleIcon className="h-6 w-6 text-white" />
                       </div>
                       <span
-                        className={`font-medium ${
+                        className={`font-light text-lg ${
                           importResult ? "text-green-700" : "text-slate-500"
                         }`}
                       >
@@ -749,9 +774,9 @@ const MenuUploadPage: React.FC = () => {
               </div>
 
               {/* File Upload Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-900">
+              <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-50 to-primary-50 px-6 py-4 border-b border-slate-200">
+                  <h2 className="text-2xl font-light text-slate-900 tracking-tight">
                     Upload New Menu
                   </h2>
                 </div>
@@ -769,17 +794,19 @@ const MenuUploadPage: React.FC = () => {
                       />
                       <label
                         htmlFor="menu-file-input"
-                        className="block w-full p-8 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 cursor-pointer group"
+                        className="block w-full p-8 border-2 border-dashed border-primary-300 rounded-3xl hover:border-primary-400 hover:bg-primary-50 transition-all duration-300 ease-out cursor-pointer group transform hover:scale-[1.01]"
                       >
                         <div className="text-center">
-                          <DocumentArrowUpIcon className="mx-auto h-12 w-12 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                          <div className="mt-4">
-                            <p className="text-lg font-medium text-slate-700 group-hover:text-blue-700">
+                          <div className="p-3 bg-gradient-to-r from-primary to-primary-600 rounded-3xl mx-auto w-fit mb-4 shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <DocumentArrowUpIcon className="h-8 w-8 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-light text-slate-700 group-hover:text-primary-700 transition-colors">
                               {selectedFile
                                 ? selectedFile.name
                                 : "Click to upload your menu file"}
                             </p>
-                            <p className="text-sm text-slate-500 mt-1">
+                            <p className="text-sm text-muted-gray mt-2">
                               Supports PDF, Excel (.xlsx/.xls), CSV, JSON, Word
                               (.docx) • Up to 10MB
                             </p>
@@ -790,8 +817,8 @@ const MenuUploadPage: React.FC = () => {
 
                     {/* Menu Selection */}
                     {availableMenus.length > 0 && (
-                      <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                        <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                      <div className="bg-gradient-to-br from-slate-50 to-white rounded-3xl p-6 border border-slate-200 shadow-md">
+                        <h3 className="text-xl font-light text-slate-900 mb-4 tracking-tight">
                           Target Menu
                         </h3>
                         <div className="space-y-4">
@@ -806,7 +833,7 @@ const MenuUploadPage: React.FC = () => {
                                   e.target.value || undefined
                                 )
                               }
-                              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                              className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
                               disabled={isLoadingMenus}
                             >
                               <option value="">Create new menu</option>
@@ -827,7 +854,7 @@ const MenuUploadPage: React.FC = () => {
                                 onChange={(e) =>
                                   setReplaceAllItems(e.target.checked)
                                 }
-                                className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                                className="h-4 w-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
                               />
                               <label
                                 htmlFor="replace-all-items"
@@ -844,16 +871,15 @@ const MenuUploadPage: React.FC = () => {
 
                     {/* Upload Button */}
                     {selectedFile && !uploadPreview && !isLoading && (
-                      <Button
-                        variant="primary"
+                      <button
                         onClick={() => handleUploadPreview()}
-                        className="w-full px-6 py-3"
+                        className="w-full px-6 py-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-medium rounded-3xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 ease-out"
                       >
                         <div className="flex items-center justify-center space-x-2">
-                          <DocumentCheckIcon className="h-5 w-5" />
-                          <span>Process Menu with AI</span>
+                          <DocumentCheckIcon className="h-6 w-6" />
+                          <span className="text-lg">Process Menu with AI</span>
                         </div>
-                      </Button>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -861,14 +887,14 @@ const MenuUploadPage: React.FC = () => {
 
               {/* Loading State */}
               {isLoading && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 rounded-3xl shadow-lg border border-slate-200 p-8">
                   <div className="flex items-center justify-center space-x-4">
                     <Spinner size="lg" />
                     <div className="text-center">
-                      <p className="text-lg font-medium text-slate-700">
+                      <p className="text-xl font-light text-slate-700 tracking-tight">
                         AI is processing your menu...
                       </p>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-sm text-muted-gray mt-1">
                         This may take a few moments
                       </p>
                     </div>
@@ -878,17 +904,19 @@ const MenuUploadPage: React.FC = () => {
 
               {/* Error Display */}
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-3xl p-6 shadow-lg">
                   <div className="flex items-start space-x-3">
-                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
+                    <div className="p-2 bg-red-100 rounded-2xl">
+                      <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0" />
+                    </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-red-800">
+                      <h3 className="text-xl font-light text-red-800 tracking-tight">
                         Upload Error
                       </h3>
                       <p className="text-red-700 mt-1">{error}</p>
                       <button
                         onClick={() => setError(null)}
-                        className="mt-3 text-sm text-red-600 hover:text-red-800 font-medium"
+                        className="mt-3 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
                       >
                         Dismiss
                       </button>
@@ -901,11 +929,13 @@ const MenuUploadPage: React.FC = () => {
               {uploadPreview && (
                 <>
                   {/* Processing Summary */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
+                  <div className="bg-gradient-to-br from-white via-slate-50 to-emerald-50 rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 px-6 py-4 border-b border-slate-200">
                       <div className="flex items-center space-x-3">
-                        <CheckCircleIcon className="h-6 w-6 text-green-600" />
-                        <h2 className="text-xl font-semibold text-slate-900">
+                        <div className="p-2 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl shadow-lg">
+                          <CheckCircleIcon className="h-6 w-6 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-light text-slate-900 tracking-tight">
                           2. AI Processing Complete
                         </h2>
                       </div>
@@ -913,8 +943,8 @@ const MenuUploadPage: React.FC = () => {
 
                     <div className="p-6">
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                          <div className="text-2xl font-bold text-blue-700">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-3xl p-4 border border-blue-200 shadow-md hover:shadow-lg transition-shadow duration-300">
+                          <div className="text-3xl font-light text-blue-700 tracking-tight">
                             {uploadPreview.parsedItems.length}
                           </div>
                           <div className="text-sm text-blue-600 font-medium">
@@ -922,8 +952,8 @@ const MenuUploadPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                          <div className="text-2xl font-bold text-green-700">
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-3xl p-4 border border-green-200 shadow-md hover:shadow-lg transition-shadow duration-300">
+                          <div className="text-3xl font-light text-green-700 tracking-tight">
                             {
                               uploadPreview.parsedItems.filter(
                                 (item) => item.userAction === "keep"
@@ -935,8 +965,8 @@ const MenuUploadPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                          <div className="text-2xl font-bold text-amber-700">
+                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-3xl p-4 border border-amber-200 shadow-md hover:shadow-lg transition-shadow duration-300">
+                          <div className="text-3xl font-light text-amber-700 tracking-tight">
                             {uploadPreview.detectedCategories?.length || 0}
                           </div>
                           <div className="text-sm text-amber-600 font-medium">
@@ -944,15 +974,11 @@ const MenuUploadPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                          <div className="text-2xl font-bold text-purple-700">
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-3xl p-4 border border-purple-200 shadow-md hover:shadow-lg transition-shadow duration-300">
+                          <div className="text-3xl font-light text-purple-700 tracking-tight">
                             {
                               uploadPreview.parsedItems.filter(
-                                (item) =>
-                                  item.fields.category?.value &&
-                                  !["food", "beverage"].includes(
-                                    item.fields.category.value as string
-                                  )
+                                (item) => item.fields.itemType?.value === "wine"
                               ).length
                             }
                           </div>
@@ -965,11 +991,13 @@ const MenuUploadPage: React.FC = () => {
                       {/* Global Errors */}
                       {uploadPreview.globalErrors &&
                         uploadPreview.globalErrors.length > 0 && (
-                          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                          <div className="mt-6 bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-3xl p-4 shadow-md">
                             <div className="flex items-start space-x-3">
-                              <InformationCircleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div className="p-2 bg-amber-100 rounded-2xl">
+                                <InformationCircleIcon className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                              </div>
                               <div>
-                                <h4 className="font-semibold text-amber-800">
+                                <h4 className="font-medium text-amber-800">
                                   Processing Notes:
                                 </h4>
                                 <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
@@ -995,7 +1023,7 @@ const MenuUploadPage: React.FC = () => {
                                 item.userAction !== "ignore"
                             )
                           }
-                          className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-3xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-out border border-blue-800"
                         >
                           {renderButtonContent(
                             isCheckingConflicts,
@@ -1015,7 +1043,7 @@ const MenuUploadPage: React.FC = () => {
                                 item.userAction !== "ignore"
                             )
                           }
-                          className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-3xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-out"
                         >
                           {renderButtonContent(
                             isFinalizingImport,
@@ -1027,11 +1055,13 @@ const MenuUploadPage: React.FC = () => {
 
                       {/* Conflict Error */}
                       {conflictError && (
-                        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                        <div className="mt-4 bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-3xl p-4 shadow-md">
                           <div className="flex items-start space-x-3">
-                            <XMarkIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div className="p-2 bg-red-100 rounded-2xl">
+                              <XMarkIcon className="h-5 w-5 text-red-600 flex-shrink-0" />
+                            </div>
                             <div>
-                              <h4 className="font-semibold text-red-800">
+                              <h4 className="font-medium text-red-800">
                                 Conflict Check Error:
                               </h4>
                               <p className="text-red-700 text-sm mt-1">
@@ -1046,11 +1076,13 @@ const MenuUploadPage: React.FC = () => {
 
                   {/* Import Status */}
                   {(importJobId || importResult) && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
+                    <div className="bg-gradient-to-br from-white via-slate-50 to-emerald-50 rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                      <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center space-x-3">
-                          <InformationCircleIcon className="h-6 w-6 text-green-600" />
-                          <h2 className="text-xl font-semibold text-slate-900">
+                          <div className="p-2 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl shadow-lg">
+                            <InformationCircleIcon className="h-6 w-6 text-white" />
+                          </div>
+                          <h2 className="text-2xl font-light text-slate-900 tracking-tight">
                             3. Import Status
                           </h2>
                         </div>
@@ -1058,7 +1090,7 @@ const MenuUploadPage: React.FC = () => {
 
                       <div className="p-6">
                         {importJobId && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-3xl p-4 mb-4 shadow-md">
                             <div className="flex items-center space-x-3">
                               <CogIcon className="h-5 w-5 text-blue-600 animate-spin" />
                               <div>
@@ -1070,18 +1102,23 @@ const MenuUploadPage: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <Button
-                              variant="primary"
+                            <button
                               onClick={handleCheckJobStatus}
                               disabled={isLoadingJobStatus}
-                              isLoading={isLoadingJobStatus}
-                              className="mt-3 px-4 py-2 text-sm"
+                              className="mt-3 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-medium shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
                             >
-                              Check Status
-                            </Button>
+                              {isLoadingJobStatus ? (
+                                <div className="flex items-center space-x-2">
+                                  <Spinner size="sm" />
+                                  <span>Checking...</span>
+                                </div>
+                              ) : (
+                                "Check Status"
+                              )}
+                            </button>
 
                             {jobStatusError && (
-                              <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
+                              <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-2xl">
                                 <p className="text-sm text-red-700">
                                   <strong>Status Error:</strong>{" "}
                                   {jobStatusError}
@@ -1093,23 +1130,32 @@ const MenuUploadPage: React.FC = () => {
 
                         {importResult && (
                           <div
-                            className={`rounded-xl p-6 border ${
+                            className={`rounded-3xl p-6 border shadow-lg ${
                               importResult.overallStatus === "failed" ||
                               importResult.itemsErrored > 0
-                                ? "bg-red-50 border-red-200"
-                                : "bg-green-50 border-green-200"
+                                ? "bg-gradient-to-br from-red-50 to-red-100 border-red-200"
+                                : "bg-gradient-to-br from-green-50 to-green-100 border-green-200"
                             }`}
                           >
                             <div className="flex items-start space-x-3">
-                              {importResult.overallStatus === "failed" ||
-                              importResult.itemsErrored > 0 ? (
-                                <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
-                              ) : (
-                                <CheckCircleIcon className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
-                              )}
+                              <div
+                                className={`p-2 rounded-2xl ${
+                                  importResult.overallStatus === "failed" ||
+                                  importResult.itemsErrored > 0
+                                    ? "bg-red-100"
+                                    : "bg-green-100"
+                                }`}
+                              >
+                                {importResult.overallStatus === "failed" ||
+                                importResult.itemsErrored > 0 ? (
+                                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0" />
+                                ) : (
+                                  <CheckCircleIcon className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                )}
+                              </div>
                               <div className="flex-1">
                                 <h3
-                                  className={`text-lg font-semibold ${
+                                  className={`text-xl font-light tracking-tight ${
                                     importResult.overallStatus === "failed" ||
                                     importResult.itemsErrored > 0
                                       ? "text-red-800"
@@ -1143,7 +1189,7 @@ const MenuUploadPage: React.FC = () => {
                                   }`}
                                 >
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold">
+                                    <div className="text-2xl font-light tracking-tight">
                                       {importResult.itemsProcessed}
                                     </div>
                                     <div className="text-xs font-medium">
@@ -1151,7 +1197,7 @@ const MenuUploadPage: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold">
+                                    <div className="text-2xl font-light tracking-tight">
                                       {importResult.itemsCreated}
                                     </div>
                                     <div className="text-xs font-medium">
@@ -1159,7 +1205,7 @@ const MenuUploadPage: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold">
+                                    <div className="text-2xl font-light tracking-tight">
                                       {importResult.itemsUpdated}
                                     </div>
                                     <div className="text-xs font-medium">
@@ -1167,7 +1213,7 @@ const MenuUploadPage: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold">
+                                    <div className="text-2xl font-light tracking-tight">
                                       {importResult.itemsSkipped}
                                     </div>
                                     <div className="text-xs font-medium">
@@ -1175,7 +1221,7 @@ const MenuUploadPage: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold">
+                                    <div className="text-2xl font-light tracking-tight">
                                       {importResult.itemsErrored}
                                     </div>
                                     <div className="text-xs font-medium">
@@ -1186,23 +1232,40 @@ const MenuUploadPage: React.FC = () => {
 
                                 {(importResult.overallStatus === "completed" ||
                                   importResult.overallStatus === "partial") && (
-                                  <button
-                                    onClick={() =>
-                                      navigate("/menu", {
-                                        state: { newMenuImported: true },
-                                      })
-                                    }
-                                    className="mt-4 px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors duration-200"
-                                  >
-                                    Back to Menus
-                                  </button>
+                                  <div className="mt-4 flex space-x-3">
+                                    {importResult.menuId && (
+                                      <button
+                                        onClick={() =>
+                                          navigate(
+                                            `/menu/${importResult.menuId}/items`,
+                                            {
+                                              state: { fromImport: true },
+                                            }
+                                          )
+                                        }
+                                        className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-3xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 ease-out"
+                                      >
+                                        View Menu Items
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() =>
+                                        navigate("/menu", {
+                                          state: { newMenuImported: true },
+                                        })
+                                      }
+                                      className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-3xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 ease-out"
+                                    >
+                                      Back to Menus
+                                    </button>
+                                  </div>
                                 )}
 
                                 {/* Error Details */}
                                 {importResult.itemsErrored > 0 &&
                                   importResult.errorDetails && (
-                                    <div className="mt-4 bg-white rounded-lg p-4 border border-red-300">
-                                      <h4 className="font-semibold text-red-800 mb-2">
+                                    <div className="mt-4 bg-white rounded-2xl p-4 border border-red-300 shadow-md">
+                                      <h4 className="font-medium text-red-800 mb-2">
                                         Error Details:
                                       </h4>
                                       <div className="max-h-40 overflow-y-auto">
@@ -1211,7 +1274,7 @@ const MenuUploadPage: React.FC = () => {
                                             (d: ImportResultItemDetail) => (
                                               <li
                                                 key={d.id}
-                                                className="text-sm text-red-700 bg-red-50 rounded p-2"
+                                                className="text-sm text-red-700 bg-red-50 rounded-2xl p-2"
                                               >
                                                 <strong>"{d.name}"</strong> (ID:{" "}
                                                 {d.id.slice(0, 8)}) - {d.status}
@@ -1225,7 +1288,7 @@ const MenuUploadPage: React.FC = () => {
                                       {importResult.errorReport && (
                                         <button
                                           onClick={handleDownloadErrorReport}
-                                          className="mt-3 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+                                          className="mt-3 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-medium rounded-2xl shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200"
                                         >
                                           Download Error Report (.csv)
                                         </button>
@@ -1242,24 +1305,25 @@ const MenuUploadPage: React.FC = () => {
 
                   {/* Items Table */}
                   {uploadPreview.parsedItems.length > 0 && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                    <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                      <div className="bg-gradient-to-r from-slate-50 to-primary-50 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <DocumentCheckIcon className="h-6 w-6 text-blue-600" />
-                            <h2 className="text-xl font-semibold text-slate-900">
+                            <div className="p-2 bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-lg">
+                              <DocumentCheckIcon className="h-6 w-6 text-white" />
+                            </div>
+                            <h2 className="text-2xl font-light text-slate-900 tracking-tight">
                               4. Edit & Confirm Items
                             </h2>
                           </div>
-                          <Button
-                            variant="primary"
+                          <button
                             onClick={handleAddNewCategory}
                             disabled={!uploadPreview}
-                            className="flex items-center space-x-2 px-4 py-2 text-sm"
+                            className="flex items-center space-x-2 px-4 py-2 text-sm bg-gradient-to-r from-accent to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white rounded-2xl font-medium shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
                           >
                             <PlusIcon className="h-4 w-4" />
                             <span>Add Category</span>
-                          </Button>
+                          </button>
                         </div>
                       </div>
 
@@ -1293,9 +1357,11 @@ const MenuUploadPage: React.FC = () => {
 
               {/* No Items Message */}
               {uploadPreview && uploadPreview.parsedItems.length === 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-                  <InformationCircleIcon className="mx-auto h-12 w-12 text-amber-600 mb-4" />
-                  <h3 className="text-lg font-semibold text-amber-800 mb-2">
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-3xl p-8 text-center shadow-lg">
+                  <div className="p-3 bg-amber-100 rounded-3xl mx-auto w-fit mb-4">
+                    <InformationCircleIcon className="h-8 w-8 text-amber-600" />
+                  </div>
+                  <h3 className="text-xl font-light text-amber-800 mb-2 tracking-tight">
                     No Items Found
                   </h3>
                   <p className="text-amber-700">
