@@ -94,3 +94,57 @@ export const restrictTo = (...roles: string[]) => {
     next();
   };
 };
+
+/**
+ * Middleware to ensure only admin users can access the route.
+ */
+export const adminOnly = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    if (req.user.role !== "admin") {
+      res.status(403).json({
+        message: "Admin access required for this resource",
+      });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "Server error in admin authentication" });
+  }
+};
+
+/**
+ * Middleware to allow restaurant owners or admin users.
+ */
+export const restaurantOrAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    if (req.user.role !== "restaurant" && req.user.role !== "admin") {
+      res.status(403).json({
+        message: "Restaurant or admin access required",
+      });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "Server error in authentication" });
+  }
+};

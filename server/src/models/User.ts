@@ -7,7 +7,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: "restaurant" | "staff";
+  role: "restaurant" | "staff" | "admin";
   restaurantId?: mongoose.Types.ObjectId; // Optional here, but conditionally required by schema
   comparePassword(candidatePassword: string): Promise<boolean>; // Method signature
   assignedRoleId?: Types.ObjectId; // CHANGED: Single assigned Role ID
@@ -46,7 +46,7 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
       enum: {
-        values: ["restaurant", "staff"],
+        values: ["restaurant", "staff", "admin"],
         message: "{VALUE} is not a supported role",
       },
       index: true, // Added index for role filtering
@@ -70,6 +70,11 @@ const userSchema = new Schema<IUser>(
 
 // Add compound index for common staff lookups
 userSchema.index({ restaurantId: 1, role: 1 });
+
+// Add compound indexes for admin analytics queries
+userSchema.index({ role: 1, createdAt: 1 });
+userSchema.index({ restaurantId: 1, role: 1 });
+userSchema.index({ createdAt: 1, role: 1 });
 
 // Pre-save hook to hash password
 userSchema.pre<IUser>("save", async function (next) {

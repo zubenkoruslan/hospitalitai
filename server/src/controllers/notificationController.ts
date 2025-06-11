@@ -25,16 +25,30 @@ export const getNotifications = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
     }
 
     const limit = parseInt(req.query.limit as string) || 50;
+
+    // Admin users get platform-wide notifications (or empty array for now)
+    if (req.user.role === "admin") {
+      // For now, admins don't have notifications - return empty array
+      const notifications: any[] = [];
+      return res.status(200).json({
+        status: "success",
+        notifications,
+      });
+    }
+
     const notifications = await NotificationService.getNotificationsForUser(
       req.user.userId,
-      req.user.restaurantId,
+      req.user.restaurantId!,
       limit
     );
 
@@ -57,15 +71,26 @@ export const getUnreadCount = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
+    }
+
+    // Admin users get 0 unread count for now
+    if (req.user.role === "admin") {
+      return res.status(200).json({
+        status: "success",
+        count: 0,
+      });
     }
 
     const count = await NotificationService.getUnreadCount(
       req.user.userId,
-      req.user.restaurantId
+      req.user.restaurantId!
     );
 
     res.status(200).json({
@@ -87,17 +112,28 @@ export const markAsRead = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
+    }
+
+    // Admin users don't have notifications to mark as read
+    if (req.user.role === "admin") {
+      return res.status(404).json({
+        status: "error",
+        message: "Notification not found",
+      });
     }
 
     const notificationId = new Types.ObjectId(req.params.id);
     const notification = await NotificationService.markAsRead(
       notificationId,
       req.user.userId,
-      req.user.restaurantId
+      req.user.restaurantId!
     );
 
     res.status(200).json({
@@ -119,15 +155,27 @@ export const markAllAsRead = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
+    }
+
+    // Admin users don't have notifications to mark as read
+    if (req.user.role === "admin") {
+      return res.status(200).json({
+        status: "success",
+        message: "0 notifications marked as read",
+        modifiedCount: 0,
+      });
     }
 
     const result = await NotificationService.markAllAsRead(
       req.user.userId,
-      req.user.restaurantId
+      req.user.restaurantId!
     );
 
     res.status(200).json({
@@ -150,17 +198,28 @@ export const deleteNotification = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
+    }
+
+    // Admin users don't have notifications to delete
+    if (req.user.role === "admin") {
+      return res.status(404).json({
+        status: "error",
+        message: "Notification not found",
+      });
     }
 
     const notificationId = new Types.ObjectId(req.params.id);
     await NotificationService.deleteNotification(
       notificationId,
       req.user.userId,
-      req.user.restaurantId
+      req.user.restaurantId!
     );
 
     res.status(200).json({
@@ -182,10 +241,13 @@ export const createNotification = async (
   next: NextFunction
 ): Promise<any> => {
   try {
-    if (!req.user || !req.user.userId || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or missing required data", 401)
-      );
+    if (!req.user || !req.user.userId) {
+      return next(new AppError("User not authenticated", 401));
+    }
+
+    // Admin users don't need restaurantId, but other users do
+    if (req.user.role !== "admin" && !req.user.restaurantId) {
+      return next(new AppError("Missing required restaurant data", 401));
     }
 
     const notificationData: CreateNotificationData = {
@@ -198,7 +260,7 @@ export const createNotification = async (
       userId: req.body.userId
         ? new Types.ObjectId(req.body.userId)
         : req.user.userId,
-      restaurantId: req.user.restaurantId,
+      restaurantId: req.user.restaurantId || new Types.ObjectId(), // Admin users can use a placeholder
     };
 
     const notification = await NotificationService.createNotification(

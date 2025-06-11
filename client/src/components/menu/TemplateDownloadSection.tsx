@@ -154,18 +154,18 @@ const TemplateDownloadSection: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-        <div className="flex items-start space-x-3">
+      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
+        <div className="flex items-center space-x-3">
           <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-            <DocumentArrowDownIcon className="h-6 w-6 text-blue-600" />
+            <DocumentArrowDownIcon className="h-5 w-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-slate-900 mb-1">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">
               Download Menu Templates
             </h2>
-            <p className="text-slate-600">
+            <p className="text-slate-600 text-sm">
               Get started quickly with our pre-formatted templates. Choose the
               format that works best for your workflow.
             </p>
@@ -189,8 +189,8 @@ const TemplateDownloadSection: React.FC = () => {
       )}
 
       {/* Templates Grid */}
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {TEMPLATE_FORMATS.map((format) => {
             const IconComponent = format.icon;
             const isDownloadingFormat = isDownloading[format.key];
@@ -198,24 +198,24 @@ const TemplateDownloadSection: React.FC = () => {
             return (
               <div
                 key={format.key}
-                className="border border-slate-200 rounded-xl p-6 hover:border-slate-300 hover:shadow-md transition-all duration-200"
+                className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col"
               >
                 {/* Format Header */}
-                <div className="flex items-start space-x-4 mb-4">
+                <div className="flex items-start space-x-3 mb-3">
                   <div
-                    className={`p-3 ${format.bgColor} rounded-xl flex-shrink-0`}
+                    className={`p-2 ${format.bgColor} rounded-lg flex-shrink-0`}
                   >
-                    <IconComponent className={`h-8 w-8 ${format.color}`} />
+                    <IconComponent className={`h-6 w-6 ${format.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                    <h3 className="text-base font-semibold text-slate-900 mb-1">
                       {format.displayName}
                     </h3>
                     <p className="text-sm text-slate-600 mb-2">
                       {format.description}
                     </p>
-                    <div className="inline-flex items-center px-2 py-1 bg-slate-100 rounded-md">
-                      <code className="text-xs font-mono text-slate-700">
+                    <div className="inline-flex items-center px-2 py-1 bg-slate-100 rounded text-xs">
+                      <code className="font-mono text-slate-700">
                         {format.extension}
                       </code>
                     </div>
@@ -223,22 +223,22 @@ const TemplateDownloadSection: React.FC = () => {
                 </div>
 
                 {/* Use Case */}
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-slate-700 mb-2">
+                <div className="mb-3">
+                  <p className="text-sm font-medium text-slate-700">
                     {format.useCase}
                   </p>
                 </div>
 
-                {/* Features */}
-                <div className="mb-6">
+                {/* Features - Full List */}
+                <div className="mb-4 flex-grow">
                   <h4 className="text-sm font-medium text-slate-700 mb-2">
                     Features:
                   </h4>
                   <ul className="space-y-1">
                     {format.features.map((feature, index) => (
                       <li key={index} className="flex items-start space-x-2">
-                        <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-slate-600">
+                        <CheckCircleIcon className="h-3 w-3 text-green-500 flex-shrink-0 mt-1" />
+                        <span className="text-xs text-slate-600 leading-relaxed">
                           {feature}
                         </span>
                       </li>
@@ -247,36 +247,35 @@ const TemplateDownloadSection: React.FC = () => {
                 </div>
 
                 {/* Download Button */}
-                <button
-                  onClick={() => handleDownload(format)}
-                  disabled={isDownloadingFormat}
-                  className={`w-full flex items-center justify-center space-x-2 px-4 py-3 text-white font-medium rounded-xl transition-all duration-200 ${
-                    isDownloadingFormat
-                      ? "bg-slate-400 cursor-not-allowed"
-                      : `${format.bgColor
-                          .replace("bg-", "bg-")
-                          .replace("-100", "-600")} hover:${format.bgColor
-                          .replace("bg-", "bg-")
-                          .replace(
-                            "-100",
-                            "-700"
-                          )} focus:ring-2 focus:ring-offset-2 focus:${format.bgColor
-                          .replace("bg-", "ring-")
-                          .replace("-100", "-500")}`
-                  }`}
-                >
-                  {isDownloadingFormat ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Downloading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <DocumentArrowDownIcon className="h-5 w-5" />
-                      <span>Download {format.displayName}</span>
-                    </>
-                  )}
-                </button>
+                <div className="mt-auto">
+                  <button
+                    onClick={() => handleDownload(format)}
+                    disabled={isDownloadingFormat}
+                    className={`w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      isDownloadingFormat
+                        ? "bg-slate-400 text-white cursor-not-allowed"
+                        : format.key === "excel"
+                        ? "bg-green-600 hover:bg-green-700 text-white focus:ring-2 focus:ring-green-500"
+                        : format.key === "csv"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white focus:ring-2 focus:ring-blue-500"
+                        : format.key === "word"
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-2 focus:ring-indigo-500"
+                        : "bg-purple-600 hover:bg-purple-700 text-white focus:ring-2 focus:ring-purple-500"
+                    }`}
+                  >
+                    {isDownloadingFormat ? (
+                      <>
+                        <Spinner size="sm" />
+                        <span>Downloading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DocumentArrowDownIcon className="h-4 w-4" />
+                        <span>Download {format.displayName}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -284,23 +283,19 @@ const TemplateDownloadSection: React.FC = () => {
       </div>
 
       {/* Information Footer */}
-      <div className="bg-blue-50 border-t border-blue-200 px-6 py-4">
-        <div className="flex items-start space-x-3">
-          <InformationCircleIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      <div className="bg-blue-50 border-t border-blue-200 px-4 py-3">
+        <div className="flex items-start space-x-2">
+          <InformationCircleIcon className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Template Usage Tips:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
+            <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs leading-relaxed">
               <li>
-                All templates include example menu items with Caesar Salad,
-                Grilled Salmon, and Dom Pérignon
-              </li>
-              <li>
-                Templates are pre-configured for enhanced menu parsing with
-                ingredient intelligence
+                All templates include example menu items and are pre-configured
+                for enhanced parsing
               </li>
               <li>
                 Wine fields include grape varieties, vintage, and region for
-                maximum intelligence extraction
+                maximum intelligence
               </li>
               <li>
                 After filling out your template, upload it using the "Upload

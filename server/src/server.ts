@@ -37,6 +37,7 @@ import invitationRoutes from "./routes/invitation"; // Import invitation routes
 import passwordResetRoutes from "./routes/passwordReset"; // Import password reset routes
 import notificationRoutes from "./routes/notifications"; // Import notification routes
 import analyticsRoutes from "./routes/analyticsRoutes"; // Import analytics routes
+import adminAnalyticsRoutes from "./routes/adminAnalyticsRoutes"; // Import admin analytics routes
 import debugRoutes from "./routes/debugRoutes"; // Import debug routes
 import templateRoutes from "./routes/templates"; // Import template routes
 
@@ -121,6 +122,7 @@ app.use("/api/sop-documents", sopDocumentEditRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/admin/analytics", adminAnalyticsRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/templates", templateRoutes);
 

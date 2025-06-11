@@ -5,6 +5,7 @@ import { IRole } from "./roleTypes";
 export enum UserRole {
   RestaurantOwner = "restaurant",
   Staff = "staff",
+  Admin = "admin",
 }
 
 // You can add other user-related types here later, e.g.:

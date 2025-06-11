@@ -45,6 +45,10 @@ const restaurantSchema = new Schema<IRestaurant>(
   }
 );
 
+// Add indexes for analytics queries
+restaurantSchema.index({ createdAt: 1 });
+restaurantSchema.index({ owner: 1, createdAt: 1 });
+
 // Create and export the Restaurant model
 const Restaurant: Model<IRestaurant> =
   mongoose.models.Restaurant ||

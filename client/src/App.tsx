@@ -1,6 +1,7 @@
 import React from "react";
 // import "./App.css"; // <-- Re-enabled this import - NOW REMOVING
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { UserRole } from "./types/user";
 import {
   BrowserRouter as Router,
   Routes,
@@ -40,6 +41,7 @@ import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import AdminAnalyticsDashboard from "./pages/AdminAnalyticsDashboard";
 
 // import StaffAnalyticsPage from "./pages/StaffAnalyticsPage"; // Removed import
 // import GenerateQuizPage from "./pages/GenerateQuizPage"; // Removed import for GenerateQuizPage
@@ -54,10 +56,12 @@ const AuthRedirect: React.FC = () => {
 
   if (token && user) {
     // User is logged in, redirect based on role
-    if (user.role === "restaurant") {
+    if (user.role === UserRole.RestaurantOwner) {
       return <Navigate to="/dashboard" replace />;
-    } else if (user.role === "staff") {
+    } else if (user.role === UserRole.Staff) {
       return <Navigate to="/staff/dashboard" replace />;
+    } else if (user.role === UserRole.Admin) {
+      return <Navigate to="/admin/analytics" replace />;
     } else {
       // Fallback if role is unknown
       return <Navigate to="/login" replace />;
@@ -276,6 +280,16 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="staff">
                     <QuizTakingPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin Protected Routes */}
+              <Route
+                path="/admin/analytics"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminAnalyticsDashboard />
                   </ProtectedRoute>
                 }
               />

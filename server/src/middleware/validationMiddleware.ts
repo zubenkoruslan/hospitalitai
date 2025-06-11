@@ -22,6 +22,18 @@ export const handleValidationErrors = (
 ): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    // Enhanced logging for debugging validation errors
+    console.error("[Validation Error] Request URL:", req.originalUrl);
+    console.error("[Validation Error] Request Method:", req.method);
+    console.error(
+      "[Validation Error] Request Body:",
+      JSON.stringify(req.body, null, 2)
+    );
+    console.error(
+      "[Validation Error] Validation Errors:",
+      JSON.stringify(errors.array(), null, 2)
+    );
+
     // Send a 400 response with the validation errors
     // You might want to format the errors more specifically depending on frontend needs
     res

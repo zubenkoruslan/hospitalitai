@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import Button from "./common/Button";
 import ErrorMessage from "./common/ErrorMessage";
+import { UserRole } from "../types/user";
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -11,7 +12,7 @@ const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,15 +22,25 @@ const LoginForm: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate("/dashboard");
+      // Don't navigate immediately, wait for user to be set in context
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An error occurred during login"
       );
-    } finally {
       setIsLoading(false);
     }
   };
+
+  // Navigate based on user role after login
+  React.useEffect(() => {
+    if (user && !isLoading) {
+      if (user.role === UserRole.Admin) {
+        navigate("/admin/analytics");
+      } else {
+        navigate("/dashboard");
+      }
+    }
+  }, [user, isLoading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 py-12 px-4 sm:px-6 lg:px-8">

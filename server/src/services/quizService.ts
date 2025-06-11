@@ -26,6 +26,11 @@ import {
 } from "../types/quizTypes"; // Ensured import
 import { ServerQuestionOption } from "../types/questionTypes"; // CHANGED
 import SopDocumentModel, { ISopDocument } from "../models/SopDocumentModel"; // Added SOP Document Model import
+import { AnalyticsArchivalService } from "./analyticsArchivalService"; // ADDED: Analytics archival support
+import {
+  ArchivalReason,
+  ArchivalResult,
+} from "../types/analyticsArchivalTypes"; // ADDED: Archival types
 
 // Define a type for Quiz with populated targetRoles
 export interface IPopulatedQuiz extends Omit<IQuiz, "targetRoles"> {
@@ -377,11 +382,14 @@ export class QuizService {
    */
   static async deleteQuiz(
     quizId: Types.ObjectId,
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId,
+    deletedBy?: Types.ObjectId,
+    notes?: string
   ): Promise<{
     deletedQuizCount: number;
     deletedProgressCount: number;
     deletedAttemptsCount: number;
+    archivalResult?: ArchivalResult;
   }> {
     const quiz = await QuizModel.findOne({ _id: quizId, restaurantId });
     if (!quiz) {
@@ -391,19 +399,69 @@ export class QuizService {
       );
     }
 
-    // Delete all staff quiz progress associated with this quiz
+    let archivalResult: ArchivalResult | undefined;
+
+    // Step 1: Archive analytics data before deletion (if deletedBy is provided)
+    if (deletedBy) {
+      try {
+        console.log(`🗂️ Archiving analytics before deleting quiz ${quizId}...`);
+        archivalResult =
+          await AnalyticsArchivalService.archiveQuizBeforeDeletion(
+            quizId,
+            deletedBy,
+            ArchivalReason.QUIZ_DELETED,
+            notes
+          );
+
+        if (archivalResult.success) {
+          console.log(`✅ Analytics archived successfully:`, {
+            participants: archivalResult.preservedInsights.totalParticipants,
+            attempts: archivalResult.preservedInsights.totalAttempts,
+            snapshots: archivalResult.userSnapshotsCreated,
+          });
+        } else {
+          console.warn(`⚠️ Analytics archival failed:`, archivalResult.errors);
+        }
+      } catch (error) {
+        console.error(`❌ Analytics archival error for quiz ${quizId}:`, error);
+        // Continue with deletion even if archival fails
+        archivalResult = {
+          success: false,
+          userSnapshotsCreated: 0,
+          attemptsArchived: 0,
+          aggregatedDataPoints: 0,
+          errors: [error instanceof Error ? error.message : String(error)],
+          preservedInsights: {
+            totalParticipants: 0,
+            totalAttempts: 0,
+            keyLearningOutcomes: [],
+          },
+        };
+      }
+    }
+
+    // Step 2: Delete all staff quiz progress associated with this quiz
     const progressDeletionResult = await StaffQuizProgress.deleteMany({
       quizId,
       restaurantId,
     });
 
-    // Delete all quiz attempts associated with this quiz
-    const attemptsDeletionResult = await QuizAttempt.deleteMany({
-      quizId,
-      restaurantId,
-    });
+    // Step 3: Delete quiz attempts (if not archived or archival failed)
+    let attemptsDeletionResult;
+    if (!archivalResult?.success || !archivalResult.attemptsArchived) {
+      // Only hard delete attempts if they weren't successfully archived
+      attemptsDeletionResult = await QuizAttempt.deleteMany({
+        quizId,
+        restaurantId,
+      });
+    } else {
+      // Attempts were archived (marked as archived), count them as "deleted" for consistency
+      attemptsDeletionResult = {
+        deletedCount: archivalResult.attemptsArchived,
+      };
+    }
 
-    // Delete the quiz itself
+    // Step 4: Delete the quiz itself
     const quizDeletionResult = await QuizModel.deleteOne({
       _id: quizId,
       restaurantId,
@@ -418,24 +476,30 @@ export class QuizService {
       deletedQuizCount: quizDeletionResult.deletedCount || 0,
       deletedProgressCount: progressDeletionResult.deletedCount || 0,
       deletedAttemptsCount: attemptsDeletionResult.deletedCount || 0,
+      archivalResult,
     };
   }
 
   /**
    * Resets all progress for a specific quiz for all staff members in a restaurant.
-   * This includes clearing seen questions, completion status, and deleting all associated quiz attempts.
+   * This includes clearing seen questions, completion status, and archiving/deleting all associated quiz attempts.
    *
    * @param quizId - The ID of the quiz to reset.
    * @param restaurantId - The ID of the restaurant.
-   * @returns A promise resolving to an object with counts of updated/deleted documents.
+   * @param resetBy - The ID of the user performing the reset (for analytics archival).
+   * @param notes - Optional notes about why the reset is being performed.
+   * @returns A promise resolving to an object with counts of updated/deleted documents and archival results.
    * @throws {AppError} If the quiz is not found (404) or database operations fail (500).
    */
   static async resetQuizProgressForEveryone(
     quizId: Types.ObjectId,
-    restaurantId: Types.ObjectId
+    restaurantId: Types.ObjectId,
+    resetBy?: Types.ObjectId,
+    notes?: string
   ): Promise<{
     updatedProgressCount: number;
     deletedAttemptsCount: number;
+    archivalResult?: ArchivalResult;
   }> {
     // Verify the quiz exists and belongs to the restaurant
     const quiz = await QuizModel.findOne({ _id: quizId, restaurantId }).lean();
@@ -443,7 +507,54 @@ export class QuizService {
       throw new AppError("Quiz not found for this restaurant.", 404);
     }
 
-    // Reset StaffQuizProgress: clear seenQuestionIds, set isCompletedOverall to false
+    let archivalResult: ArchivalResult | undefined;
+
+    // Step 1: Archive analytics data before reset (if resetBy is provided)
+    if (resetBy) {
+      try {
+        console.log(
+          `🗂️ Archiving analytics before resetting quiz ${quizId}...`
+        );
+        archivalResult = await AnalyticsArchivalService.handleQuizReset(
+          quizId,
+          resetBy,
+          notes || "Quiz reset - clearing all progress"
+        );
+
+        if (archivalResult.success) {
+          console.log(`✅ Analytics archived for quiz reset:`, {
+            participants: archivalResult.preservedInsights.totalParticipants,
+            attempts: archivalResult.preservedInsights.totalAttempts,
+            snapshots: archivalResult.userSnapshotsCreated,
+          });
+        } else {
+          console.warn(
+            `⚠️ Analytics archival failed for quiz reset:`,
+            archivalResult.errors
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ Analytics archival error for quiz reset ${quizId}:`,
+          error
+        );
+        // Continue with reset even if archival fails
+        archivalResult = {
+          success: false,
+          userSnapshotsCreated: 0,
+          attemptsArchived: 0,
+          aggregatedDataPoints: 0,
+          errors: [error instanceof Error ? error.message : String(error)],
+          preservedInsights: {
+            totalParticipants: 0,
+            totalAttempts: 0,
+            keyLearningOutcomes: [],
+          },
+        };
+      }
+    }
+
+    // Step 2: Reset StaffQuizProgress: clear seenQuestionIds, set isCompletedOverall to false
     const progressUpdateResult = await StaffQuizProgress.updateMany(
       { quizId, restaurantId },
       {
@@ -456,15 +567,25 @@ export class QuizService {
       }
     );
 
-    // Delete all QuizAttempts for this quiz and restaurant
-    const attemptsDeletionResult = await QuizAttempt.deleteMany({
-      quizId,
-      restaurantId,
-    });
+    // Step 3: Handle quiz attempts based on archival success
+    let attemptsDeletionResult;
+    if (!archivalResult?.success || !archivalResult.attemptsArchived) {
+      // Only hard delete attempts if they weren't successfully archived
+      attemptsDeletionResult = await QuizAttempt.deleteMany({
+        quizId,
+        restaurantId,
+      });
+    } else {
+      // Attempts were archived (marked as archived), count them as "deleted" for consistency
+      attemptsDeletionResult = {
+        deletedCount: archivalResult.attemptsArchived,
+      };
+    }
 
     return {
       updatedProgressCount: progressUpdateResult.modifiedCount || 0,
       deletedAttemptsCount: attemptsDeletionResult.deletedCount || 0,
+      archivalResult,
     };
   }
 

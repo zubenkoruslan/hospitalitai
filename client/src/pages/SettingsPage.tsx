@@ -1,40 +1,35 @@
 import Navbar from "../components/Navbar";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
+import StaffSettings from "../components/settings/StaffSettings";
+import RestaurantSettings from "../components/settings/RestaurantSettings";
 import {
-  CogIcon,
   UserIcon,
   BellIcon,
   ShieldCheckIcon,
-  KeyIcon,
-  EyeIcon,
-  EyeSlashIcon,
+  CogIcon,
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
-import Button from "../components/common/Button";
+
+// Import new settings components (we'll create these)
+import NotificationSettings from "../components/settings/NotificationSettings";
+import SecuritySettings from "../components/settings/SecuritySettings";
+import PreferencesSettings from "../components/settings/PreferencesSettings";
+
+interface SettingsTab {
+  id: string;
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  component: React.ComponentType;
+  description: string;
+}
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle form submission
-    console.log("Settings updated:", formData);
-  };
+  const [activeTab, setActiveTab] = useState("profile");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (!user) {
     return (
@@ -54,168 +49,221 @@ const SettingsPage: React.FC = () => {
     );
   }
 
+  // Define available tabs based on user role
+  const getAvailableTabs = (): SettingsTab[] => {
+    const ProfileComponent =
+      user.role === "restaurant" ? RestaurantSettings : StaffSettings;
+
+    const baseTabs: SettingsTab[] = [
+      {
+        id: "profile",
+        name: "Profile & Account",
+        icon: UserIcon,
+        component: ProfileComponent,
+        description: "Manage your profile information and account settings",
+      },
+      {
+        id: "notifications",
+        name: "Notifications",
+        icon: BellIcon,
+        component: NotificationSettings,
+        description: "Configure email and notification preferences",
+      },
+      {
+        id: "security",
+        name: "Security",
+        icon: ShieldCheckIcon,
+        component: SecuritySettings,
+        description: "Password, authentication, and security settings",
+      },
+      {
+        id: "preferences",
+        name: "Preferences",
+        icon: CogIcon,
+        component: PreferencesSettings,
+        description: "Theme, language, and display preferences",
+      },
+    ];
+
+    return baseTabs;
+  };
+
+  const availableTabs = getAvailableTabs();
+
+  // Filter tabs based on search query
+  const filteredTabs = useMemo(() => {
+    if (!searchQuery.trim()) return availableTabs;
+
+    return availableTabs.filter(
+      (tab) =>
+        tab.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tab.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [availableTabs, searchQuery]);
+
+  const activeTabData = availableTabs.find((tab) => tab.id === activeTab);
+  const ActiveComponent =
+    activeTabData?.component || (() => <div>Tab not found</div>);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto">
+        <div className="p-4 lg:p-6">
+          <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-              <p className="text-gray-600 mt-2">
+            <div className="mb-6 lg:mb-8">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+                Settings
+              </h1>
+              <p className="text-gray-600">
                 Manage your account settings and preferences.
               </p>
             </div>
 
-            {/* Settings Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Navigation */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search settings..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Mobile Tab Dropdown - Visible only on mobile */}
+            <div className="lg:hidden mb-6">
+              <div className="relative">
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-lg shadow-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <div className="flex items-center">
+                    {activeTabData && (
+                      <>
+                        <activeTabData.icon className="h-5 w-5 text-gray-600 mr-3" />
+                        <span className="font-medium text-gray-900">
+                          {activeTabData.name}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <ChevronDownIcon
+                    className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+                      mobileMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {mobileMenuOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {filteredTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-50 ${
+                          activeTab === tab.id
+                            ? "bg-blue-50 border-l-4 border-blue-500"
+                            : ""
+                        } ${
+                          tab.id === filteredTabs[filteredTabs.length - 1].id
+                            ? "rounded-b-lg"
+                            : ""
+                        }`}
+                      >
+                        <tab.icon className="h-5 w-5 text-gray-600 mr-3" />
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {tab.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {tab.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Settings Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Desktop Sidebar Navigation - Hidden on mobile */}
+              <div className="hidden lg:block lg:col-span-1">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:p-6 sticky top-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Settings
                   </h2>
                   <nav className="space-y-2">
-                    <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md">
-                      <UserIcon className="h-5 w-5 mr-3" />
-                      Profile
-                    </button>
-                    <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
-                      <KeyIcon className="h-5 w-5 mr-3" />
-                      Security
-                    </button>
-                    <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
-                      <BellIcon className="h-5 w-5 mr-3" />
-                      Notifications
-                    </button>
+                    {filteredTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`w-full flex items-start px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out ${
+                          activeTab === tab.id
+                            ? "text-blue-600 bg-blue-50 border border-blue-200"
+                            : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        <tab.icon className="h-5 w-5 mr-3 flex-shrink-0 mt-0.5" />
+                        <div className="text-left">
+                          <div className="font-medium">{tab.name}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {tab.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </nav>
+
+                  {/* Search Results Info */}
+                  {searchQuery.trim() && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-600">
+                        {filteredTabs.length} setting
+                        {filteredTabs.length !== 1 ? "s" : ""} found
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center mb-6">
-                    <CogIcon className="h-6 w-6 text-gray-600 mr-3" />
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      Profile Information
-                    </h2>
+              {/* Content Area */}
+              <div className="col-span-1 lg:col-span-3">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                  {/* Tab Header */}
+                  <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                    <div className="flex items-center">
+                      {activeTabData && (
+                        <>
+                          <activeTabData.icon className="h-6 w-6 text-gray-600 mr-3" />
+                          <div>
+                            <h2 className="text-xl font-semibold text-gray-900">
+                              {activeTabData.name}
+                            </h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {activeTabData.description}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                      <label
-                        htmlFor="name"
-                        className="block text-sm font-medium text-gray-700 mb-2"
-                      >
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="email"
-                        className="block text-sm font-medium text-gray-700 mb-2"
-                      >
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">
-                        Change Password
-                      </h3>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label
-                            htmlFor="currentPassword"
-                            className="block text-sm font-medium text-gray-700 mb-2"
-                          >
-                            Current Password
-                          </label>
-                          <div className="relative">
-                            <input
-                              type={showPassword ? "text" : "password"}
-                              id="currentPassword"
-                              name="currentPassword"
-                              value={formData.currentPassword}
-                              onChange={handleInputChange}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                            />
-                            <button
-                              type="button"
-                              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? (
-                                <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                              ) : (
-                                <EyeIcon className="h-5 w-5 text-gray-400" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor="newPassword"
-                            className="block text-sm font-medium text-gray-700 mb-2"
-                          >
-                            New Password
-                          </label>
-                          <input
-                            type="password"
-                            id="newPassword"
-                            name="newPassword"
-                            value={formData.newPassword}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor="confirmPassword"
-                            className="block text-sm font-medium text-gray-700 mb-2"
-                          >
-                            Confirm New Password
-                          </label>
-                          <input
-                            type="password"
-                            id="confirmPassword"
-                            name="confirmPassword"
-                            value={formData.confirmPassword}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-6">
-                      <Button type="submit" variant="primary">
-                        Save Changes
-                      </Button>
-                    </div>
-                  </form>
+                  {/* Tab Content */}
+                  <div className="p-4 lg:p-6">
+                    <ActiveComponent />
+                  </div>
                 </div>
               </div>
             </div>

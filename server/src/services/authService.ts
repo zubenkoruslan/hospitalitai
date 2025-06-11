@@ -14,7 +14,7 @@ import NotificationService from "./notificationService";
 interface SignupData {
   email: string;
   password?: string;
-  role: "restaurant" | "staff";
+  role: "restaurant" | "staff" | "admin";
   name: string;
   restaurantName?: string;
   restaurantId?: string; // For staff role
@@ -246,7 +246,8 @@ class AuthService {
       }
 
       let restaurantName: string | undefined = undefined;
-      if (userDoc.restaurantId) {
+      // Admin users don't have a restaurantId, only restaurant/staff users do
+      if (userDoc.role !== "admin" && userDoc.restaurantId) {
         const restaurant = await Restaurant.findById(
           userDoc.restaurantId
         ).lean();
@@ -295,7 +296,8 @@ class AuthService {
       }
 
       let restaurantNameStr: string | undefined;
-      if (user.restaurantId) {
+      // Admin users don't have a restaurantId, only restaurant/staff users do
+      if (user.role !== "admin" && user.restaurantId) {
         const restaurant = await Restaurant.findById(user.restaurantId).lean();
         if (restaurant) {
           restaurantNameStr = restaurant.name;
@@ -372,7 +374,11 @@ class AuthService {
 
       const { password, __v, ...userObject } = user.toObject();
 
-      if (!restaurantNameUpdated && user.restaurantId) {
+      if (
+        !restaurantNameUpdated &&
+        user.role !== "admin" &&
+        user.restaurantId
+      ) {
         const restaurant = await Restaurant.findById(user.restaurantId).lean();
         if (restaurant) restaurantNameUpdated = restaurant.name;
       }

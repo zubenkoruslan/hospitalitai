@@ -41,6 +41,25 @@ export class QuestionTaggingService {
         "gluten-free",
         "dairy-free",
         "nut-free",
+        "steak",
+        "beef",
+        "chicken",
+        "fish",
+        "pork",
+        "lamb",
+        "pasta",
+        "salad",
+        "soup",
+        "burger",
+        "sandwich",
+        "pizza",
+        "dry-aged",
+        "grilled",
+        "roasted",
+        "braised",
+        "seared",
+        "tomahawk",
+        "angus",
       ],
       secondary: [
         "contains",
@@ -298,6 +317,9 @@ export class QuestionTaggingService {
       });
     });
 
+    // Apply food-first logic for dishes that contain wine ingredients
+    this.applyFoodFirstLogic(scores, text);
+
     // Context-based boosting
     if (context) {
       this.applyContextBoosting(scores, context, text);
@@ -312,6 +334,159 @@ export class QuestionTaggingService {
     }
 
     return scores;
+  }
+
+  /**
+   * Apply food-first logic for items that are primarily food but contain wine/beverage ingredients
+   */
+  private static applyFoodFirstLogic(
+    scores: Record<KnowledgeCategory, number>,
+    text: string
+  ): void {
+    // Wine pairing/service questions (should stay wine knowledge)
+    const winePairingIndicators = [
+      "wine pairs",
+      "wine pairing",
+      "wine selection",
+      "wine recommend",
+      "which wine",
+      "what wine",
+      "wine goes with",
+      "wine matches",
+      "pairs best",
+      "wine for",
+    ];
+
+    // Cocktail preparation (should stay beverage knowledge)
+    const cocktailIndicators = [
+      "cocktail",
+      "mixed drink",
+      "how to make",
+      "how do you make",
+      "bartender",
+      "shake",
+      "stir",
+      "garnish",
+      "sangria",
+      "margarita",
+      "mojito",
+    ];
+
+    // Check for wine pairing questions first
+    const isWinePairingQuestion = winePairingIndicators.some((indicator) =>
+      text.includes(indicator)
+    );
+
+    // Check for cocktail preparation
+    const isCocktailQuestion = cocktailIndicators.some((indicator) =>
+      text.includes(indicator)
+    );
+
+    if (isWinePairingQuestion) {
+      scores[KnowledgeCategory.WINE_KNOWLEDGE] += 4;
+      return; // Skip other processing for wine pairing questions
+    }
+
+    if (isCocktailQuestion) {
+      scores[KnowledgeCategory.BEVERAGE_KNOWLEDGE] += 4;
+      return; // Skip other processing for cocktail questions
+    }
+
+    // Strong food indicators that should override wine/beverage classification
+    const strongFoodIndicators = [
+      "steak",
+      "chicken",
+      "beef",
+      "pork",
+      "lamb",
+      "fish",
+      "salmon",
+      "pasta",
+      "risotto",
+      "burger",
+      "sandwich",
+      "pizza",
+      "salad",
+      "soup",
+      "appetizer",
+      "entree",
+      "dessert",
+      "dish",
+      "how long",
+      "dry-aged",
+      "grilled",
+      "roasted",
+      "braised",
+      "seared",
+      "baked",
+      "fried",
+    ];
+
+    // Wine as ingredient indicators (not as beverage)
+    const wineAsIngredientIndicators = [
+      "wine jus",
+      "red wine jus",
+      "white wine jus",
+      "wine sauce",
+      "wine reduction",
+      "wine braised",
+      "cooked in wine",
+      "wine marinated",
+      "wine glaze",
+    ];
+
+    // Check if this is clearly a food item
+    const hasStrongFoodIndicator = strongFoodIndicators.some((indicator) =>
+      text.includes(indicator)
+    );
+
+    // Check if wine is mentioned as an ingredient rather than a beverage
+    const hasWineAsIngredient = wineAsIngredientIndicators.some((indicator) =>
+      text.includes(indicator)
+    );
+
+    if (hasStrongFoodIndicator || hasWineAsIngredient) {
+      // Boost food knowledge significantly
+      scores[KnowledgeCategory.FOOD_KNOWLEDGE] += 3;
+
+      // If wine is mentioned as ingredient, don't penalize but don't boost wine knowledge either
+      if (hasWineAsIngredient) {
+        // Remove the wine knowledge boost that was added by keywords
+        scores[KnowledgeCategory.WINE_KNOWLEDGE] = Math.max(
+          0,
+          scores[KnowledgeCategory.WINE_KNOWLEDGE] - 2
+        );
+      }
+    }
+
+    // Check for beverage preparation vs food preparation context
+    const beveragePreparationContext = [
+      "recipe for cocktail",
+      "mix",
+      "serve in glass",
+    ];
+
+    const foodPreparationContext = [
+      "how long",
+      "what temperature",
+      "how is it prepared",
+      "cooking method",
+      "ingredients in",
+      "allergens in",
+      "contains",
+    ];
+
+    const hasBeveragePrep = beveragePreparationContext.some((context) =>
+      text.includes(context)
+    );
+
+    const hasFoodPrep = foodPreparationContext.some((context) =>
+      text.includes(context)
+    );
+
+    if (hasFoodPrep && !hasBeveragePrep) {
+      scores[KnowledgeCategory.FOOD_KNOWLEDGE] += 2;
+    }
   }
 
   /**

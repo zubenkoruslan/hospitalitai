@@ -64,7 +64,7 @@ export class EmailService {
     email: string,
     userName: string,
     resetToken: string,
-    userRole: "restaurant" | "staff"
+    userRole: "restaurant" | "staff" | "admin"
   ): Promise<void> {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
@@ -139,10 +139,14 @@ export class EmailService {
     email: string,
     userName: string,
     resetUrl: string,
-    userRole: "restaurant" | "staff"
+    userRole: "restaurant" | "staff" | "admin"
   ): string {
     const roleTitle =
-      userRole === "restaurant" ? "Restaurant Owner" : "Staff Member";
+      userRole === "restaurant"
+        ? "Restaurant Owner"
+        : userRole === "admin"
+        ? "Administrator"
+        : "Staff Member";
 
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

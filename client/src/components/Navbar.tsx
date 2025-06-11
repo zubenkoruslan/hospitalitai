@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { UserRole } from "../types/user";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -14,6 +15,7 @@ import {
   ChevronRightIcon,
   UserIcon,
   MapPinIcon,
+  PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import { MapPinIcon as MapPinIconSolid } from "@heroicons/react/24/solid";
 
@@ -97,14 +99,18 @@ const Navbar: React.FC<NavbarProps> = ({
     };
   }, [isMobile, isCollapsed, isHovered, isPinned]);
 
-  // Base navigation items with icons
-  const baseNavItems = [
-    {
-      name: "Dashboard",
-      path: user?.role === "staff" ? "/staff/dashboard" : "/dashboard",
-      icon: HomeIcon,
-    },
-  ];
+  // Base navigation items with icons (exclude dashboard for admin users)
+  const baseNavItems =
+    user?.role === UserRole.Admin
+      ? []
+      : [
+          {
+            name: "Dashboard",
+            path:
+              user?.role === UserRole.Staff ? "/staff/dashboard" : "/dashboard",
+            icon: HomeIcon,
+          },
+        ];
 
   // Navigation items specific to restaurant role
   const restaurantNavItems = [
@@ -135,6 +141,15 @@ const Navbar: React.FC<NavbarProps> = ({
     },
   ];
 
+  // Navigation items specific to admin role
+  const adminNavItems = [
+    {
+      name: "Platform Analytics",
+      path: "/admin/analytics",
+      icon: PresentationChartLineIcon,
+    },
+  ];
+
   // Settings navigation item
   const settingsNavItem = {
     name: "Settings",
@@ -145,7 +160,8 @@ const Navbar: React.FC<NavbarProps> = ({
   // Combine main navigation items based on role
   const mainNavItems = [
     ...baseNavItems,
-    ...(user?.role === "restaurant" ? restaurantNavItems : []),
+    ...(user?.role === UserRole.RestaurantOwner ? restaurantNavItems : []),
+    ...(user?.role === UserRole.Admin ? adminNavItems : []),
     settingsNavItem,
   ];
 
@@ -232,10 +248,21 @@ const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Link
-                to={baseNavItems[0].path}
+                to={
+                  user?.role === UserRole.Admin
+                    ? "/admin/analytics"
+                    : baseNavItems[0]?.path || "/dashboard"
+                }
                 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hover:from-primary-600 hover:to-accent-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 rounded-lg px-2 py-1 whitespace-nowrap"
-                onClick={(e) => handleNavigationClick(e, baseNavItems[0].path)}
-                aria-label="QuizCrunch - Go to dashboard"
+                onClick={(e) =>
+                  handleNavigationClick(
+                    e,
+                    user?.role === UserRole.Admin
+                      ? "/admin/analytics"
+                      : baseNavItems[0]?.path || "/dashboard"
+                  )
+                }
+                aria-label="QuizCrunch - Go to main page"
               >
                 QuizCrunch
               </Link>

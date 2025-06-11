@@ -155,46 +155,44 @@ const QuizItem: React.FC<QuizItemProps> = ({
     nextAvailableAt && new Date() < new Date(nextAvailableAt);
 
   return (
-    <Card
+    <div
       data-testid={`quiz-item-${quizId}`}
-      variant="default"
-      hover={true}
-      className={`flex flex-col justify-between h-full transition-all duration-200 ${
+      className={`flex flex-col justify-between h-full transition-all duration-300 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.02] border border-primary/20 ${
         isCompletedOverall
-          ? "border-green-200 bg-green-50/30"
+          ? "bg-gradient-to-br from-green-50 via-emerald-50 to-white"
           : isQuizOnCooldown
-          ? "border-amber-200 bg-amber-50/30"
-          : "border-slate-200 hover:border-blue-300"
+          ? "bg-gradient-to-br from-amber-50 via-yellow-50 to-white"
+          : "bg-gradient-to-br from-white via-primary-50 to-accent-50"
       }`}
     >
-      <div className="flex-grow space-y-3">
+      <div className="flex-grow space-y-3 p-4">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex-grow min-w-0">
             <h3
-              className="text-base sm:text-lg font-semibold text-slate-900 mb-1 line-clamp-2"
+              className="text-lg sm:text-xl font-medium text-dark-slate mb-1 line-clamp-2 tracking-tight"
               title={title}
             >
               {title}
             </h3>
             {description && (
-              <p className="text-sm text-slate-600 line-clamp-2">
+              <p className="text-sm text-muted-gray line-clamp-2">
                 {description}
               </p>
             )}
           </div>
           <div className="flex-shrink-0 ml-3">
             {isCompletedOverall ? (
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircleIcon className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-md">
+                <CheckCircleIcon className="h-5 w-5 text-white" />
               </div>
             ) : isQuizOnCooldown ? (
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <ClockIcon className="h-5 w-5 text-amber-600" />
+              <div className="p-2 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-xl shadow-md">
+                <ClockIcon className="h-5 w-5 text-white" />
               </div>
             ) : (
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <PlayIcon className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-gradient-to-br from-primary to-primary-600 rounded-xl shadow-md">
+                <PlayIcon className="h-5 w-5 text-white" />
               </div>
             )}
           </div>
@@ -203,17 +201,19 @@ const QuizItem: React.FC<QuizItemProps> = ({
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-slate-700">Progress</span>
-            <span className="text-sm font-semibold text-slate-900">
+            <span className="text-sm font-medium text-dark-slate">
+              Progress
+            </span>
+            <span className="text-sm font-semibold text-primary-600">
               {overallProgressPercentage}%
             </span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2.5">
+          <div className="w-full bg-slate-200 rounded-full h-2 shadow-inner">
             <div
-              className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
+              className={`h-2 rounded-full transition-all duration-500 ease-out ${
                 isCompletedOverall
-                  ? "bg-gradient-to-r from-green-500 to-emerald-500"
-                  : "bg-gradient-to-r from-blue-500 to-indigo-500"
+                  ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                  : "bg-gradient-to-r from-primary to-primary-600"
               }`}
               style={{ width: `${overallProgressPercentage}%` }}
             ></div>
@@ -223,22 +223,28 @@ const QuizItem: React.FC<QuizItemProps> = ({
         {/* Average Score */}
         {progress?.averageScore !== null &&
           progress?.averageScore !== undefined && (
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <div className="bg-gradient-to-r from-secondary-50 to-secondary-100 rounded-xl p-3 border border-secondary-200 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">
-                  Your Average
-                </span>
-                <span
-                  className={`text-lg font-bold ${
-                    progress.averageScore >= 80
-                      ? "text-green-600"
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-gradient-to-br from-secondary to-secondary-600 rounded-lg shadow-sm">
+                    <ChartBarIcon className="h-4 w-4 text-white flex-shrink-0" />
+                  </div>
+                  <span className="text-sm font-medium text-dark-slate">
+                    Your Average
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg font-semibold text-secondary-600">
+                    {progress.averageScore.toFixed(1)}%
+                  </span>
+                  <span className="text-sm">
+                    {progress.averageScore >= 80
+                      ? "🌟 Excellent"
                       : progress.averageScore >= 70
-                      ? "text-blue-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {progress.averageScore.toFixed(1)}%
-                </span>
+                      ? "👍 Good"
+                      : "📈 Improving"}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -296,48 +302,46 @@ const QuizItem: React.FC<QuizItemProps> = ({
       </div>
 
       {/* Action Button */}
-      <div className="flex-shrink-0 mt-4 pt-4 border-t border-slate-200">
+      <div className="flex-shrink-0 mt-4 pt-4 border-t border-white/50 px-4">
         {isQuizOnCooldown ? (
-          <div className="text-center space-y-2">
-            <Button
-              variant="secondary"
-              className="w-full bg-amber-50 text-amber-700 border-amber-200 cursor-not-allowed"
+          <div className="text-center space-y-3">
+            <button
+              className="w-full bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 border border-amber-300 rounded-xl px-4 py-3 font-medium cursor-not-allowed shadow-md"
               disabled
             >
-              <ClockIcon className="h-4 w-4 mr-2" />
+              <ClockIcon className="h-4 w-4 mr-2 inline" />
               Quiz completed today
-            </Button>
+            </button>
             <p className="text-xs text-amber-600">
               {formatAvailability(nextAvailableAt)}
             </p>
           </div>
         ) : !isCompletedOverall ? (
-          <Button
-            variant="primary"
-            className="w-full shadow-lg"
+          <button
+            className="w-full bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl px-4 py-3 font-medium shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
             onClick={() => navigate(`/staff/quiz/${quizId}/take`)}
           >
-            <PlayIcon className="h-4 w-4 mr-2" />
+            <PlayIcon className="h-4 w-4 mr-2 inline" />
             <span className="hidden sm:inline">Take Quiz</span>
             <span className="sm:hidden">Start</span>
-          </Button>
+          </button>
         ) : progress && progress.attempts.length === 0 ? (
           <div className="text-center">
-            <div className="inline-flex items-center px-3 py-2 rounded-lg bg-slate-100 text-slate-600">
+            <div className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 text-slate-600 shadow-md">
               <CheckCircleIcon className="h-4 w-4 mr-2" />
-              <span className="text-sm">Quiz completed</span>
+              <span className="text-sm font-medium">Quiz completed</span>
             </div>
           </div>
         ) : (
-          <div className="text-center">
-            <div className="inline-flex items-center px-3 py-2 rounded-lg bg-green-100 text-green-700">
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-100 to-green-200 text-green-700 shadow-md">
               <CheckCircleIcon className="h-4 w-4 mr-2" />
               <span className="text-sm font-medium">Completed!</span>
             </div>
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -617,67 +621,72 @@ const StaffDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-primary-50">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-        <div className="p-4 sm:p-6">
+        <div className="p-6 sm:p-8">
           <div className="max-w-7xl mx-auto">
             {/* Enhanced Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-accent/5 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8 border border-primary/10 shadow-lg backdrop-blur-sm">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-primary-50 to-accent-50 rounded-3xl p-8 sm:p-12 mb-8 sm:mb-12 border border-primary/20 shadow-xl backdrop-blur-sm">
               {/* Background decoration */}
               <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full blur-3xl"></div>
 
               <div className="relative">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center space-x-3 sm:space-x-4 mb-4 sm:mb-0">
-                    <div className="p-3 sm:p-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg flex-shrink-0">
-                      <UserIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                  <div className="flex items-center space-x-4 sm:space-x-6 mb-6 sm:mb-0">
+                    <div className="p-4 sm:p-5 bg-gradient-to-br from-primary to-primary-600 rounded-3xl shadow-xl flex-shrink-0">
+                      <UserIcon className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                     </div>
                     <div className="min-w-0">
-                      <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">
+                      <h1 className="text-3xl sm:text-5xl font-light text-dark-slate truncate tracking-tight">
                         {user?.name}
                       </h1>
-                      <p className="text-slate-600 text-sm sm:text-base mt-1">
+                      <p className="text-muted-gray text-lg sm:text-xl mt-2 font-light">
                         {user?.professionalRole || "Staff"} at{" "}
-                        {user?.restaurantName}
+                        <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium">
+                          {user?.restaurantName}
+                        </span>
                       </p>
                     </div>
                   </div>
 
-                  {/* Quick action button for mobile */}
+                  {/* Quick action button */}
                   <div className="flex-shrink-0">
                     {pendingQuizzes.length > 0 && (
-                      <Button
-                        variant="primary"
+                      <button
                         onClick={() =>
                           navigate(`/staff/quiz/${pendingQuizzes[0]._id}/take`)
                         }
-                        className="w-full sm:w-auto bg-white/80 backdrop-blur-sm hover:bg-white/90 text-blue-600 border-blue-200 hover:border-blue-300"
+                        className="bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-8 py-4 rounded-2xl font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center space-x-3"
                       >
-                        <PlayIcon className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">
+                        <PlayIcon className="h-5 w-5" />
+                        <span className="hidden sm:inline text-lg">
                           Continue Learning
                         </span>
                         <span className="sm:hidden">Start Quiz</span>
-                      </Button>
+                      </button>
                     )}
                   </div>
                 </div>
 
                 {/* Training progress overview */}
-                <div className="mt-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                    <div className="flex items-center space-x-2">
-                      <BookOpenIcon className="h-5 w-5 text-slate-600 flex-shrink-0" />
-                      <span className="text-sm font-medium text-slate-800">
+                <div className="mt-8 p-6 bg-white/80 backdrop-blur-sm rounded-2xl border border-white/50 shadow-lg">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-gradient-to-br from-accent to-accent-600 rounded-xl shadow-md">
+                        <BookOpenIcon className="h-5 w-5 text-white flex-shrink-0" />
+                      </div>
+                      <span className="text-lg font-medium text-dark-slate">
                         Training Progress
                       </span>
                     </div>
-                    <div className="text-sm text-slate-600">
-                      {completedQuizzes.length} of {quizzes.length} quizzes
-                      completed
+                    <div className="flex items-center space-x-3">
+                      <span className="text-muted-gray font-light">
+                        {completedQuizzes.length} of {quizzes.length} quizzes
+                        completed
+                      </span>
                       {quizzes.length > 0 && (
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                        <span className="bg-gradient-to-r from-primary to-accent text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
                           {Math.round(
                             (completedQuizzes.length / quizzes.length) * 100
                           )}
@@ -686,67 +695,236 @@ const StaffDashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Average Score Section */}
+                  {rankingData &&
+                    rankingData.myAverageScore !== null &&
+                    rankingData.myAverageScore !== undefined && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <ChartBarIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm font-medium text-slate-800">
+                              Average Score
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`text-lg font-bold ${
+                                rankingData.myAverageScore >= 80
+                                  ? "text-green-600"
+                                  : rankingData.myAverageScore >= 70
+                                  ? "text-blue-600"
+                                  : "text-amber-600"
+                              }`}
+                            >
+                              {rankingData.myAverageScore.toFixed(1)}%
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {rankingData.myAverageScore >= 80
+                                ? "🌟 Excellent"
+                                : rankingData.myAverageScore >= 70
+                                ? "👍 Good"
+                                : "📈 Improving"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Your Rank Section */}
+                  {rankingData &&
+                    rankingData.myRank !== null &&
+                    rankingData.totalRankedStaff > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <TrophyIcon className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+                            <span className="text-sm font-medium text-slate-800">
+                              Your Rank
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-slate-600">
+                              #{rankingData.myRank} of{" "}
+                              {rankingData.totalRankedStaff}
+                            </span>
+                            {rankingData.myRank <= 3 && (
+                              <span className="text-lg">
+                                {rankingData.myRank === 1
+                                  ? "🥇"
+                                  : rankingData.myRank === 2
+                                  ? "🥈"
+                                  : "🥉"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
 
-            {/* Enhanced Stats Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
-              {/* Quizzes Completed */}
-              <Card variant="elevated" className="border-0 shadow-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg flex-shrink-0">
-                    <CheckCircleIcon className="h-6 w-6 text-white" />
+            {/* Error Message */}
+            {(quizError ||
+              rankingError ||
+              leaderboardError ||
+              perQuizLeaderboardError) && (
+              <Card
+                variant="outlined"
+                className="border-red-200 bg-red-50/50 mb-6"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
                   </div>
-                  <div className="flex-grow min-w-0">
-                    <p className="text-sm font-medium text-slate-600 mb-1">
-                      Quizzes Completed
-                    </p>
-                    <p className="text-3xl font-bold text-slate-900 truncate">
-                      {completedQuizzes.length}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {pendingQuizzes.length > 0
-                        ? `${pendingQuizzes.length} pending`
-                        : "All caught up!"}
-                    </p>
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-800 mb-1">
+                      Unable to load data
+                    </h3>
+                    <ErrorMessage
+                      message={
+                        quizError ||
+                        rankingError ||
+                        leaderboardError ||
+                        perQuizLeaderboardError ||
+                        "An error occurred"
+                      }
+                    />
                   </div>
                 </div>
               </Card>
+            )}
 
-              {/* Average Score */}
-              <Card variant="elevated" className="border-0 shadow-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg flex-shrink-0">
-                    <ChartBarIcon className="h-6 w-6 text-white" />
+            {/* Enhanced Quizzes Section */}
+            <div className="bg-gradient-to-br from-white via-slate-50 to-primary-50 border border-primary/20 shadow-xl overflow-hidden rounded-3xl">
+              <div className="bg-gradient-to-r from-primary-50 via-accent-50 to-white px-6 sm:px-8 py-6 border-b border-primary/20">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-primary to-primary-600 rounded-2xl shadow-lg">
+                      <AcademicCapIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl sm:text-3xl font-light text-dark-slate tracking-tight">
+                        Available
+                        <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium ml-2">
+                          Quizzes
+                        </span>
+                      </h2>
+                      <p className="text-lg text-muted-gray font-light">
+                        {quizzes.length} quiz{quizzes.length !== 1 ? "es" : ""}{" "}
+                        ready for you
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-grow min-w-0">
-                    <p className="text-sm font-medium text-slate-600 mb-1">
-                      Average Score
-                    </p>
-                    <p className="text-3xl font-bold text-slate-900 truncate">
-                      {rankingData?.myAverageScore !== null &&
-                      rankingData?.myAverageScore !== undefined
-                        ? `${rankingData.myAverageScore.toFixed(1)}%`
-                        : "N/A"}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {rankingData?.myAverageScore !== null &&
-                      rankingData?.myAverageScore !== undefined
-                        ? rankingData.myAverageScore >= 80
-                          ? "Excellent performance!"
-                          : rankingData.myAverageScore >= 70
-                          ? "Good progress"
-                          : "Keep improving"
-                        : "Take a quiz to see your score"}
-                    </p>
-                  </div>
+
+                  {/* Filter/Sort options - could be added later */}
+                  {pendingQuizzes.length > 0 && completedQuizzes.length > 0 && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {pendingQuizzes.length} pending
+                      </span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                        {completedQuizzes.length} completed
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </Card>
+              </div>
+
+              <div className="p-6 sm:p-8">
+                {quizzes.length === 0 ? (
+                  <div className="text-center py-16 sm:py-24">
+                    <div className="relative">
+                      <div className="mx-auto w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-primary-100 to-accent-100 rounded-3xl flex items-center justify-center mb-8 shadow-xl">
+                        <AcademicCapIcon className="h-12 w-12 sm:h-16 sm:w-16 text-primary-600" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-light text-dark-slate mb-4 tracking-tight">
+                      No quizzes
+                      <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium ml-2">
+                        available
+                      </span>
+                    </h3>
+                    <p className="text-lg text-muted-gray max-w-md mx-auto leading-relaxed font-light">
+                      Check back later for new training materials. Your manager
+                      may be preparing new content for you.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Pending Quizzes */}
+                    {pendingQuizzes.length > 0 && (
+                      <div className="space-y-6">
+                        <div className="flex items-center space-x-4">
+                          <div className="p-3 bg-gradient-to-br from-primary to-primary-600 rounded-2xl shadow-lg">
+                            <PlayIcon className="h-6 w-6 text-white" />
+                          </div>
+                          <h3 className="text-2xl font-light text-dark-slate tracking-tight">
+                            Continue
+                            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium ml-2">
+                              Learning
+                            </span>
+                          </h3>
+                          <span className="bg-gradient-to-r from-primary to-accent text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
+                            {pendingQuizzes.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                          {pendingQuizzes.map((quizDisplayItem) => (
+                            <QuizItem
+                              key={quizDisplayItem._id}
+                              quizDisplayItem={quizDisplayItem}
+                              onViewAttemptIncorrectAnswers={
+                                handleOpenAttemptIncorrectAnswersModal
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Completed Quizzes */}
+                    {completedQuizzes.length > 0 && (
+                      <div className="space-y-6">
+                        {pendingQuizzes.length > 0 && (
+                          <div className="border-t border-primary/20 pt-8"></div>
+                        )}
+                        <div className="flex items-center space-x-4">
+                          <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl shadow-lg">
+                            <CheckCircleIcon className="h-6 w-6 text-white" />
+                          </div>
+                          <h3 className="text-2xl font-light text-dark-slate tracking-tight">
+                            Completed
+                            <span className="bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent font-medium ml-2">
+                              Quizzes
+                            </span>
+                          </h3>
+                          <span className="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
+                            {completedQuizzes.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                          {completedQuizzes.map((quizDisplayItem) => (
+                            <QuizItem
+                              key={quizDisplayItem._id}
+                              quizDisplayItem={quizDisplayItem}
+                              onViewAttemptIncorrectAnswers={
+                                handleOpenAttemptIncorrectAnswersModal
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Leaderboard Section */}
-            <Card variant="elevated" className="border-0 shadow-lg mb-8">
+            <Card variant="elevated" className="border-0 shadow-lg mt-8">
               <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-4 sm:px-6 py-4 border-b border-slate-200">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                   <div className="flex items-center space-x-3">
@@ -1041,23 +1219,22 @@ const StaffDashboard: React.FC = () => {
                                                   : "text-slate-900"
                                               }`}
                                             >
-                                              {performer.score}/
-                                              {performer.totalQuestions}
+                                              {performer.score}%
                                             </div>
-                                            <div
-                                              className={`text-xs ${
-                                                isCurrentUser
-                                                  ? "text-blue-600"
-                                                  : "text-slate-600"
-                                              }`}
-                                            >
-                                              {Math.round(
-                                                (performer.score /
-                                                  performer.totalQuestions) *
-                                                  100
-                                              )}
-                                              %
-                                            </div>
+                                            {performer.completionTime && (
+                                              <div
+                                                className={`text-xs ${
+                                                  isCurrentUser
+                                                    ? "text-blue-600"
+                                                    : "text-slate-500"
+                                                }`}
+                                              >
+                                                {Math.round(
+                                                  performer.completionTime / 60
+                                                )}
+                                                m
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1093,154 +1270,6 @@ const StaffDashboard: React.FC = () => {
                       </div>
                     )}
                   </>
-                )}
-              </div>
-            </Card>
-
-            {/* Error Message */}
-            {(quizError ||
-              rankingError ||
-              leaderboardError ||
-              perQuizLeaderboardError) && (
-              <Card
-                variant="outlined"
-                className="border-red-200 bg-red-50/50 mb-6"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
-                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-red-800 mb-1">
-                      Unable to load data
-                    </h3>
-                    <ErrorMessage
-                      message={
-                        quizError ||
-                        rankingError ||
-                        leaderboardError ||
-                        perQuizLeaderboardError ||
-                        "An error occurred"
-                      }
-                    />
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {/* Enhanced Quizzes Section */}
-            <Card
-              variant="elevated"
-              className="border-0 shadow-lg overflow-hidden"
-            >
-              <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-4 sm:px-6 py-4 border-b border-slate-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-lg">
-                      <AcademicCapIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
-                        Available Quizzes
-                      </h2>
-                      <p className="text-sm text-slate-600">
-                        {quizzes.length} quiz{quizzes.length !== 1 ? "es" : ""}{" "}
-                        available
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Filter/Sort options - could be added later */}
-                  {pendingQuizzes.length > 0 && completedQuizzes.length > 0 && (
-                    <div className="flex items-center space-x-2 text-sm">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                        {pendingQuizzes.length} pending
-                      </span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
-                        {completedQuizzes.length} completed
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-4 sm:p-6">
-                {quizzes.length === 0 ? (
-                  <div className="text-center py-12 sm:py-16">
-                    <div className="relative">
-                      <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-                        <AcademicCapIcon className="h-10 w-10 sm:h-12 sm:w-12 text-slate-500" />
-                      </div>
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-3">
-                      No quizzes available
-                    </h3>
-                    <p className="text-slate-600 max-w-md mx-auto leading-relaxed">
-                      Check back later for new training materials. Your manager
-                      may be preparing new content for you.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Pending Quizzes */}
-                    {pendingQuizzes.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                          <div className="p-1.5 bg-blue-100 rounded-lg">
-                            <PlayIcon className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            Continue Learning
-                          </h3>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-                            {pendingQuizzes.length}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                          {pendingQuizzes.map((quizDisplayItem) => (
-                            <QuizItem
-                              key={quizDisplayItem._id}
-                              quizDisplayItem={quizDisplayItem}
-                              onViewAttemptIncorrectAnswers={
-                                handleOpenAttemptIncorrectAnswersModal
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Completed Quizzes */}
-                    {completedQuizzes.length > 0 && (
-                      <div className="space-y-4">
-                        {pendingQuizzes.length > 0 && (
-                          <div className="border-t border-slate-200 pt-6"></div>
-                        )}
-                        <div className="flex items-center space-x-2">
-                          <div className="p-1.5 bg-green-100 rounded-lg">
-                            <CheckCircleIcon className="h-4 w-4 text-green-600" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            Completed Quizzes
-                          </h3>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                            {completedQuizzes.length}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                          {completedQuizzes.map((quizDisplayItem) => (
-                            <QuizItem
-                              key={quizDisplayItem._id}
-                              quizDisplayItem={quizDisplayItem}
-                              onViewAttemptIncorrectAnswers={
-                                handleOpenAttemptIncorrectAnswersModal
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 )}
               </div>
             </Card>

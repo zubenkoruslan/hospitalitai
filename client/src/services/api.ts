@@ -840,6 +840,15 @@ const transformMenuItemFormData = (
         .map((s) => s.trim())
         .filter((s) => s !== "");
     }
+  } else {
+    // For non-wine items, exclude all wine-specific fields from the request
+    delete backendData.wineStyle;
+    delete backendData.producer;
+    delete backendData.grapeVariety;
+    delete backendData.vintage;
+    delete backendData.region;
+    delete backendData.servingOptions;
+    delete backendData.suggestedPairingsText;
   }
 
   // Remove properties that are purely for form state if any (e.g. empty string for itemType)

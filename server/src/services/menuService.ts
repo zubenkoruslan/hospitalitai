@@ -1963,337 +1963,503 @@ class MenuService {
     let sourceFormat: "pdf" | "excel" | "csv" | "json" | "word" = "pdf";
     let structuredData: ParsedMenuData | null = null;
 
-    // 1. DETECT FORMAT based on file extension
-    const fileExtension = path.extname(multerFilePath).toLowerCase();
+    try {
+      // 1. DETECT FORMAT based on file extension
+      const fileExtension = path.extname(multerFilePath).toLowerCase();
 
-    console.log(
-      `[MenuService.getMenuUploadPreview] Processing file: ${originalFileName}, extension: ${fileExtension}`
-    );
+      console.log(
+        `[MenuService.getMenuUploadPreview] Processing file: ${originalFileName}, extension: ${fileExtension}`
+      );
 
-    switch (fileExtension) {
-      case ".pdf":
-        sourceFormat = "pdf";
-        break;
-      case ".xlsx":
-      case ".xls":
-        sourceFormat = "excel";
-        break;
-      case ".csv":
-        sourceFormat = "csv";
-        break;
-      case ".json":
-        sourceFormat = "json";
-        break;
-      case ".docx":
-        sourceFormat = "word";
-        break;
-      default:
-        // Fallback to PDF for backwards compatibility
-        sourceFormat = "pdf";
-        console.warn(
-          `[MenuService.getMenuUploadPreview] Unknown file extension ${fileExtension}, defaulting to PDF processing`
-        );
-    }
-
-    // 2. ROUTE TO APPROPRIATE PARSER
-    if (sourceFormat === "pdf") {
-      // Original PDF processing with AI
-      try {
-        const dataBuffer = fs.readFileSync(multerFilePath);
-        const pdfData = await pdfParse(dataBuffer);
-        rawText = pdfData.text;
-      } catch (error: any) {
-        console.error("Error reading or parsing PDF for preview:", error);
-        globalErrors.push("Failed to read or parse PDF: " + error.message);
-        return {
-          previewId,
-          filePath: multerFilePath,
-          sourceFormat: "pdf",
-          parsedMenuName:
-            originalFileName?.replace(/\.pdf$/i, "") || "Menu from PDF",
-          parsedItems: [],
-          detectedCategories: [],
-          summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
-          globalErrors,
-          rawAIText: rawText.substring(0, 5000),
-          rawAIOutput: null,
-        };
-      }
-
-      if (!rawText.trim()) {
-        globalErrors.push("No text content could be extracted from the PDF.");
-      }
-
-      try {
-        if (rawText.trim()) {
-          parsedAIOutput = await getAIRawExtraction(rawText, originalFileName);
-        }
-      } catch (error: any) {
-        console.error("Error calling AI for preview:", error);
-        globalErrors.push("AI processing failed: " + error.message);
-        if (error instanceof AppError && error.additionalDetails) {
+      // Determine source format with better validation
+      switch (fileExtension) {
+        case ".pdf":
+          sourceFormat = "pdf";
+          break;
+        case ".xlsx":
+        case ".xls":
+          sourceFormat = "excel";
+          break;
+        case ".csv":
+          sourceFormat = "csv";
+          break;
+        case ".json":
+          sourceFormat = "json";
+          break;
+        case ".docx":
+          sourceFormat = "word";
+          break;
+        default:
+          // More strict handling of unknown formats
           globalErrors.push(
-            "AI Details: " + JSON.stringify(error.additionalDetails)
+            `Unsupported file format: ${fileExtension}. Supported formats: .pdf, .xlsx, .xls, .csv, .json, .docx`
           );
-        }
+          return {
+            previewId,
+            filePath: multerFilePath,
+            sourceFormat: "pdf", // Default for typing consistency
+            parsedMenuName:
+              originalFileName?.replace(/\.[^.]+$/i, "") || "Unknown Menu",
+            parsedItems: [],
+            detectedCategories: [],
+            summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+            globalErrors,
+          };
       }
-    } else {
-      // New structured data processing
-      try {
-        console.log(
-          `[MenuService.getMenuUploadPreview] Using FileParserService for ${sourceFormat} file`
-        );
-        structuredData = await FileParserService.parseMenuFile(
-          multerFilePath,
-          originalFileName ||
-            `menu.${sourceFormat === "excel" ? "xlsx" : sourceFormat}`
-        );
-        console.log(
-          `[MenuService.getMenuUploadPreview] Parsed ${structuredData.items.length} items from ${sourceFormat} file`
-        );
-      } catch (error: any) {
-        console.error(`Error parsing ${sourceFormat} file for preview:`, error);
+
+      // 2. VALIDATE FILE EXISTS AND IS READABLE
+      if (!fs.existsSync(multerFilePath)) {
         globalErrors.push(
-          `Failed to parse ${sourceFormat} file: ` + error.message
+          "Uploaded file not found or was removed during processing"
         );
         return {
           previewId,
           filePath: multerFilePath,
           sourceFormat,
-          parsedMenuName:
-            originalFileName?.replace(/\.[^.]+$/i, "") ||
-            `Menu from ${sourceFormat.toUpperCase()}`,
+          parsedMenuName: originalFileName?.replace(/\.[^.]+$/i, "") || "Menu",
           parsedItems: [],
           detectedCategories: [],
           summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
           globalErrors,
         };
       }
-    }
 
-    // 3. CONVERT TO PREVIEW FORMAT
-    let rawMenuItems: (GeminiProcessedMenuItem | RawMenuItem)[] = [];
+      // 3. ROUTE TO APPROPRIATE PARSER WITH IMPROVED ERROR HANDLING
+      if (sourceFormat === "pdf") {
+        // PDF processing with AI
+        try {
+          const dataBuffer = fs.readFileSync(multerFilePath);
+          if (dataBuffer.length === 0) {
+            throw new Error("PDF file is empty");
+          }
 
-    if (sourceFormat === "pdf" && parsedAIOutput) {
-      rawMenuItems = parsedAIOutput.menuItems;
-    } else if (structuredData) {
-      rawMenuItems = structuredData.items;
-    }
+          const pdfData = await pdfParse(dataBuffer);
+          rawText = pdfData.text?.trim() || "";
 
-    const parsedItems: ParsedMenuItem[] = rawMenuItems.map(
-      (item, index): ParsedMenuItem => {
-        // 4. APPLY ENHANCED MENU PARSING INTELLIGENCE
-        const enhancedItem = MenuService.enhanceRawMenuItem(item);
+          if (!rawText) {
+            globalErrors.push(
+              "No text content could be extracted from the PDF. The file may contain only images or be corrupted."
+            );
+          } else {
+            // Validate text content quality
+            if (rawText.length < 50) {
+              globalErrors.push(
+                "Very little text content extracted from PDF. Results may be incomplete."
+              );
+            }
 
-        const isNameValid = !!(
-          enhancedItem.itemName && enhancedItem.itemName.trim().length > 0
-        );
-        const isCategoryValid = !!(
-          enhancedItem.itemCategory &&
-          enhancedItem.itemCategory.trim().length > 0
-        );
+            // Call AI service with retry logic
+            try {
+              parsedAIOutput = await getAIRawExtraction(
+                rawText,
+                originalFileName
+              );
+              if (
+                !parsedAIOutput ||
+                !parsedAIOutput.menuItems ||
+                parsedAIOutput.menuItems.length === 0
+              ) {
+                globalErrors.push(
+                  "AI was unable to extract menu items from the PDF content"
+                );
+              }
+            } catch (aiError: any) {
+              console.error("AI processing error:", aiError);
+              globalErrors.push(
+                `AI processing failed: ${aiError.message || "Unknown AI error"}`
+              );
 
-        // Base fields common to all item types
-        const baseFields: ParsedMenuItem["fields"] = {
-          name: {
-            value: enhancedItem.itemName,
-            originalValue: enhancedItem.itemName,
-            isValid: isNameValid,
-            errorMessage: isNameValid ? undefined : "Name cannot be empty.",
-          },
-          price: {
-            value:
-              enhancedItem.itemPrice === undefined
-                ? null
-                : enhancedItem.itemPrice,
-            originalValue:
-              enhancedItem.itemPrice === undefined
-                ? null
-                : enhancedItem.itemPrice,
-            isValid: true, // Placeholder, consider validating non-negative if not null
-          },
-          category: {
-            value: enhancedItem.itemCategory,
-            originalValue: enhancedItem.itemCategory,
-            isValid: isCategoryValid,
-            errorMessage: isCategoryValid
-              ? undefined
-              : "Category cannot be empty.",
-          },
-          itemType: {
-            value: enhancedItem.itemType || "food",
-            originalValue: enhancedItem.itemType || "food",
-            isValid: true, // Assuming itemType from enhanced processing is always valid
-          },
-          ingredients: {
-            value: enhancedItem.itemIngredients || [],
-            originalValue: enhancedItem.itemIngredients || [],
-            isValid: true, // Placeholder
-          },
-          isGlutenFree: {
-            value: enhancedItem.isGlutenFree || false,
-            originalValue: enhancedItem.isGlutenFree || false,
-            isValid: true,
-          },
-          isVegan: {
-            value: enhancedItem.isVegan || false,
-            originalValue: enhancedItem.isVegan || false,
-            isValid: true,
-          },
-          isVegetarian: {
-            value: enhancedItem.isVegetarian || false,
-            originalValue: enhancedItem.isVegetarian || false,
-            isValid: true,
-          },
-        };
+              // Add more specific error details for debugging
+              if (aiError instanceof AppError && aiError.additionalDetails) {
+                globalErrors.push(
+                  `AI Details: ${JSON.stringify(aiError.additionalDetails)}`
+                );
+              }
+            }
+          }
+        } catch (pdfError: any) {
+          console.error("PDF processing error:", pdfError);
+          globalErrors.push(
+            `Failed to read or parse PDF: ${
+              pdfError.message || "Unknown PDF error"
+            }`
+          );
 
-        // Wine-specific field transformations
-        if (enhancedItem.itemType === "wine") {
-          baseFields.wineStyle = {
-            value: enhancedItem.wineStyle || null,
-            originalValue: enhancedItem.wineStyle || null,
-            isValid: true, // Assuming valid if provided
+          // Return early with error state
+          return {
+            previewId,
+            filePath: multerFilePath,
+            sourceFormat: "pdf",
+            parsedMenuName:
+              originalFileName?.replace(/\.pdf$/i, "") || "Menu from PDF",
+            parsedItems: [],
+            detectedCategories: [],
+            summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+            globalErrors,
+            rawAIText: rawText.substring(0, 5000),
+            rawAIOutput: null,
           };
-          baseFields.wineProducer = {
-            value: enhancedItem.wineProducer || null,
-            originalValue: enhancedItem.wineProducer || null,
-            isValid: true,
+        }
+      } else {
+        // Structured data processing (Excel, CSV, JSON, Word)
+        try {
+          console.log(
+            `[MenuService.getMenuUploadPreview] Using FileParserService for ${sourceFormat} file`
+          );
+
+          // Validate file size before processing
+          const fileStats = fs.statSync(multerFilePath);
+          const fileSizeMB = fileStats.size / (1024 * 1024);
+
+          if (fileSizeMB > 10) {
+            throw new Error(
+              `File size (${fileSizeMB.toFixed(1)}MB) exceeds the 10MB limit`
+            );
+          }
+
+          structuredData = await FileParserService.parseMenuFile(
+            multerFilePath,
+            originalFileName ||
+              `menu.${sourceFormat === "excel" ? "xlsx" : sourceFormat}`
+          );
+
+          if (
+            !structuredData ||
+            !structuredData.items ||
+            structuredData.items.length === 0
+          ) {
+            globalErrors.push(
+              `No menu items found in the ${sourceFormat.toUpperCase()} file. Please check the file format and content.`
+            );
+          } else {
+            console.log(
+              `[MenuService.getMenuUploadPreview] Successfully parsed ${structuredData.items.length} items from ${sourceFormat} file`
+            );
+          }
+        } catch (parseError: any) {
+          console.error(`Error parsing ${sourceFormat} file:`, parseError);
+          globalErrors.push(
+            `Failed to parse ${sourceFormat.toUpperCase()} file: ${
+              parseError.message || "Unknown parsing error"
+            }`
+          );
+
+          // Return early with error state
+          return {
+            previewId,
+            filePath: multerFilePath,
+            sourceFormat,
+            parsedMenuName:
+              originalFileName?.replace(/\.[^.]+$/i, "") ||
+              `Menu from ${sourceFormat.toUpperCase()}`,
+            parsedItems: [],
+            detectedCategories: [],
+            summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+            globalErrors,
           };
-          baseFields.wineGrapeVariety = {
-            value: enhancedItem.wineGrapeVariety?.join(", ") || null,
-            originalValue: enhancedItem.wineGrapeVariety?.join(", ") || null,
-            isValid: true,
+        }
+      }
+
+      // 4. CONVERT TO PREVIEW FORMAT WITH VALIDATION
+      let rawMenuItems: (GeminiProcessedMenuItem | RawMenuItem)[] = [];
+
+      if (sourceFormat === "pdf" && parsedAIOutput?.menuItems) {
+        rawMenuItems = parsedAIOutput.menuItems;
+      } else if (structuredData?.items) {
+        rawMenuItems = structuredData.items;
+      }
+
+      // Validate we have items to process
+      if (rawMenuItems.length === 0) {
+        const errorMsg =
+          sourceFormat === "pdf"
+            ? "No menu items could be extracted from the PDF"
+            : `No valid items found in the ${sourceFormat.toUpperCase()} file`;
+        globalErrors.push(errorMsg);
+      }
+
+      // 5. PROCESS ITEMS WITH BETTER ERROR HANDLING
+      const parsedItems: ParsedMenuItem[] = [];
+      const processingErrors: string[] = [];
+
+      rawMenuItems.forEach((item, index) => {
+        try {
+          // Apply enhanced menu parsing intelligence
+          const enhancedItem = MenuService.enhanceRawMenuItem(item);
+
+          // Validate required fields
+          const isNameValid = !!enhancedItem.itemName?.trim();
+          const isCategoryValid = !!enhancedItem.itemCategory?.trim();
+
+          if (!isNameValid) {
+            processingErrors.push(`Item ${index + 1}: Missing or empty name`);
+          }
+          if (!isCategoryValid) {
+            processingErrors.push(
+              `Item ${index + 1}: Missing or empty category`
+            );
+          }
+
+          // Create base fields with proper validation
+          const baseFields: ParsedMenuItem["fields"] = {
+            name: {
+              value: enhancedItem.itemName || "",
+              originalValue: enhancedItem.itemName || "",
+              isValid: isNameValid,
+              errorMessage: isNameValid ? undefined : "Name cannot be empty.",
+            },
+            price: {
+              value: enhancedItem.itemPrice ?? null,
+              originalValue: enhancedItem.itemPrice ?? null,
+              isValid:
+                enhancedItem.itemPrice === null ||
+                enhancedItem.itemPrice === undefined ||
+                enhancedItem.itemPrice >= 0,
+              errorMessage:
+                enhancedItem.itemPrice !== null &&
+                enhancedItem.itemPrice !== undefined &&
+                enhancedItem.itemPrice < 0
+                  ? "Price cannot be negative"
+                  : undefined,
+            },
+            category: {
+              value: enhancedItem.itemCategory || "Uncategorized",
+              originalValue: enhancedItem.itemCategory || "Uncategorized",
+              isValid: isCategoryValid,
+              errorMessage: isCategoryValid
+                ? undefined
+                : "Category cannot be empty.",
+            },
+            itemType: {
+              value: enhancedItem.itemType || "food",
+              originalValue: enhancedItem.itemType || "food",
+              isValid: ["food", "beverage", "wine"].includes(
+                enhancedItem.itemType || "food"
+              ),
+            },
+            ingredients: {
+              value: Array.isArray(enhancedItem.itemIngredients)
+                ? enhancedItem.itemIngredients
+                : [],
+              originalValue: Array.isArray(enhancedItem.itemIngredients)
+                ? enhancedItem.itemIngredients
+                : [],
+              isValid: true,
+            },
+            isGlutenFree: {
+              value: Boolean(enhancedItem.isGlutenFree),
+              originalValue: Boolean(enhancedItem.isGlutenFree),
+              isValid: true,
+            },
+            isVegan: {
+              value: Boolean(enhancedItem.isVegan),
+              originalValue: Boolean(enhancedItem.isVegan),
+              isValid: true,
+            },
+            isVegetarian: {
+              value: Boolean(enhancedItem.isVegetarian),
+              originalValue: Boolean(enhancedItem.isVegetarian),
+              isValid: true,
+            },
           };
-          baseFields.wineVintage = {
-            // Enhanced processing gives number, UI might treat as string or number. Store as is for now.
-            value:
-              enhancedItem.wineVintage === undefined
-                ? null
-                : enhancedItem.wineVintage,
-            originalValue:
-              enhancedItem.wineVintage === undefined
-                ? null
-                : enhancedItem.wineVintage,
-            isValid: true, // Could add validation e.g. sensible year range
-          };
-          baseFields.wineRegion = {
-            value: enhancedItem.wineRegion || null,
-            originalValue: enhancedItem.wineRegion || null,
-            isValid: true,
-          };
-          baseFields.wineServingOptions = {
-            value: (enhancedItem.wineServingOptions || []).map((opt) => ({
-              id: uuidv4(), // Generate unique ID for client-side keying
-              size: opt.size,
-              price:
-                opt.price === null || opt.price === undefined
-                  ? ""
-                  : String(opt.price), // Convert price to string for UI input
-            })),
-            originalValue: (enhancedItem.wineServingOptions || []).map(
-              (opt) => ({
-                id: uuidv4(), // Ensure original also has unique IDs if compared/used
-                size: opt.size,
+
+          // Add wine-specific fields only for wine items
+          if (enhancedItem.itemType === "wine") {
+            baseFields.wineStyle = {
+              value: enhancedItem.wineStyle || null,
+              originalValue: enhancedItem.wineStyle || null,
+              isValid: true,
+            };
+            baseFields.wineProducer = {
+              value: enhancedItem.wineProducer || null,
+              originalValue: enhancedItem.wineProducer || null,
+              isValid: true,
+            };
+            baseFields.wineGrapeVariety = {
+              value: Array.isArray(enhancedItem.wineGrapeVariety)
+                ? enhancedItem.wineGrapeVariety.join(", ")
+                : enhancedItem.wineGrapeVariety || null,
+              originalValue: Array.isArray(enhancedItem.wineGrapeVariety)
+                ? enhancedItem.wineGrapeVariety.join(", ")
+                : enhancedItem.wineGrapeVariety || null,
+              isValid: true,
+            };
+            baseFields.wineVintage = {
+              value: enhancedItem.wineVintage ?? null,
+              originalValue: enhancedItem.wineVintage ?? null,
+              isValid:
+                !enhancedItem.wineVintage ||
+                (enhancedItem.wineVintage >= 1800 &&
+                  enhancedItem.wineVintage <= new Date().getFullYear() + 5),
+            };
+            baseFields.wineRegion = {
+              value: enhancedItem.wineRegion || null,
+              originalValue: enhancedItem.wineRegion || null,
+              isValid: true,
+            };
+            baseFields.wineServingOptions = {
+              value: (enhancedItem.wineServingOptions || []).map((opt) => ({
+                id: uuidv4(),
+                size: opt.size || "",
                 price:
                   opt.price === null || opt.price === undefined
                     ? ""
                     : String(opt.price),
-              })
-            ),
-            isValid: true, // Placeholder; validation would be more complex, per option
+              })),
+              originalValue: (enhancedItem.wineServingOptions || []).map(
+                (opt) => ({
+                  id: uuidv4(),
+                  size: opt.size || "",
+                  price:
+                    opt.price === null || opt.price === undefined
+                      ? ""
+                      : String(opt.price),
+                })
+              ),
+              isValid: true,
+            };
+            baseFields.winePairings = {
+              value: Array.isArray(enhancedItem.winePairings)
+                ? enhancedItem.winePairings.join(", ")
+                : enhancedItem.winePairings || null,
+              originalValue: Array.isArray(enhancedItem.winePairings)
+                ? enhancedItem.winePairings.join(", ")
+                : enhancedItem.winePairings || null,
+              isValid: true,
+            };
+          }
+
+          // Create the parsed menu item
+          const parsedItem: ParsedMenuItem = {
+            id: uuidv4(),
+            internalIndex: index,
+            fields: baseFields,
+            originalSourceData: enhancedItem,
+            status: "new",
+            conflictResolution: { status: "no_conflict" },
+            userAction: "keep",
           };
-          baseFields.winePairings = {
-            value: enhancedItem.winePairings?.join(", ") || null,
-            originalValue: enhancedItem.winePairings?.join(", ") || null,
-            isValid: true,
-          };
+
+          parsedItems.push(parsedItem);
+        } catch (itemError: any) {
+          console.error(`Error processing item ${index + 1}:`, itemError);
+          processingErrors.push(
+            `Item ${index + 1}: Processing failed - ${itemError.message}`
+          );
+        }
+      });
+
+      // Add processing errors to global errors
+      if (processingErrors.length > 0) {
+        globalErrors.push(...processingErrors.slice(0, 10)); // Limit to first 10 errors
+        if (processingErrors.length > 10) {
+          globalErrors.push(
+            `... and ${
+              processingErrors.length - 10
+            } more item processing errors`
+          );
+        }
+      }
+
+      // 6. FINALIZE PREVIEW DATA WITH CONSISTENT NORMALIZATION
+      const detectedCategories = new Set<string>();
+      let itemsWithPotentialErrors = 0;
+
+      // Helper function for consistent category normalization
+      const normalizeCategory = (category?: string): string => {
+        if (!category || category.trim() === "") return "Uncategorized";
+        return category
+          .trim()
+          .toLowerCase()
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+      };
+
+      // Process each item for final validation and normalization
+      parsedItems.forEach((item) => {
+        // Count items with validation errors
+        if (
+          !item.fields.name.isValid ||
+          !item.fields.category.isValid ||
+          !item.fields.price.isValid
+        ) {
+          itemsWithPotentialErrors++;
         }
 
-        return {
-          id: uuidv4(),
-          internalIndex: index,
-          fields: baseFields,
-          originalSourceData: enhancedItem, // Store the enhanced item as source data
-          status: "new", // Initial status
-          conflictResolution: { status: "no_conflict" }, // Default assumption
-          userAction: "keep", // Default action
-        };
+        // Normalize and collect categories
+        if (item.fields.category.value) {
+          const normalizedCategory = normalizeCategory(
+            String(item.fields.category.value)
+          );
+          detectedCategories.add(normalizedCategory);
+
+          // Update item's category to use normalized version
+          item.fields.category.value = normalizedCategory;
+          item.fields.category.originalValue = normalizedCategory;
+        }
+      });
+
+      // 7. DETERMINE PARSED MENU NAME
+      let parsedMenuName: string;
+      if (sourceFormat === "pdf") {
+        parsedMenuName =
+          parsedAIOutput?.menuName ||
+          originalFileName?.replace(/\.pdf$/i, "") ||
+          "Menu from PDF";
+      } else if (structuredData?.menuName) {
+        parsedMenuName = structuredData.menuName;
+      } else {
+        parsedMenuName =
+          originalFileName?.replace(/\.[^.]+$/i, "") ||
+          `Menu from ${sourceFormat.toUpperCase()}`;
       }
-    );
 
-    // 5. FINALIZE PREVIEW DATA
-    const detectedCategories = new Set<string>();
-    let itemsWithPotentialErrors = 0;
+      console.log(
+        `[MenuService.getMenuUploadPreview] Successfully processed ${parsedItems.length} items from ${sourceFormat} file (${itemsWithPotentialErrors} with potential errors)`
+      );
 
-    // Helper function to normalize category names consistently
-    const normalizeCategory = (category?: string): string => {
-      if (!category || category.trim() === "") return "Uncategorized";
-      return category
-        .trim()
-        .toLowerCase()
-        .split(" ")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    };
+      // 8. RETURN STRUCTURED PREVIEW DATA
+      return {
+        previewId,
+        filePath: multerFilePath,
+        sourceFormat,
+        parsedMenuName,
+        parsedItems,
+        detectedCategories: Array.from(detectedCategories).sort(),
+        summary: {
+          totalItemsParsed: parsedItems.length,
+          itemsWithPotentialErrors,
+        },
+        globalErrors,
+        // PDF-specific fields (only include for PDF)
+        ...(sourceFormat === "pdf" && {
+          rawAIText: rawText.substring(0, 5000),
+          rawAIOutput: parsedAIOutput,
+        }),
+      };
+    } catch (error: any) {
+      console.error(
+        "[MenuService.getMenuUploadPreview] Unexpected error:",
+        error
+      );
 
-    parsedItems.forEach((item) => {
-      if (!item.fields.name.isValid || !item.fields.category.isValid) {
-        item.fields.name.errorMessage = "Invalid name or category";
-        item.fields.category.errorMessage = "Invalid name or category";
-        itemsWithPotentialErrors++;
-      }
-      if (item.fields.category.value) {
-        // Normalize the category before adding to prevent duplicates
-        const normalizedCategory = normalizeCategory(
-          String(item.fields.category.value)
-        );
-        detectedCategories.add(normalizedCategory);
-
-        // Also update the item's category to use the normalized version
-        item.fields.category.value = normalizedCategory;
-        item.fields.category.originalValue = normalizedCategory;
-      }
-    });
-
-    // Determine parsed menu name based on source format
-    let parsedMenuName: string;
-    if (sourceFormat === "pdf") {
-      parsedMenuName =
-        parsedAIOutput?.menuName ||
-        originalFileName?.replace(/\.pdf$/i, "") ||
-        "Menu from PDF";
-    } else if (structuredData) {
-      parsedMenuName =
-        structuredData.menuName ||
-        originalFileName?.replace(/\.[^.]+$/i, "") ||
-        `Menu from ${sourceFormat.toUpperCase()}`;
-    } else {
-      parsedMenuName =
-        originalFileName?.replace(/\.[^.]+$/i, "") ||
-        `Menu from ${sourceFormat.toUpperCase()}`;
+      // Return a safe error state
+      return {
+        previewId,
+        filePath: multerFilePath,
+        sourceFormat,
+        parsedMenuName: originalFileName?.replace(/\.[^.]+$/i, "") || "Menu",
+        parsedItems: [],
+        detectedCategories: [],
+        summary: { totalItemsParsed: 0, itemsWithPotentialErrors: 0 },
+        globalErrors: [
+          `Unexpected error during processing: ${
+            error.message || "Unknown error"
+          }`,
+        ],
+      };
     }
-
-    console.log(
-      `[MenuService.getMenuUploadPreview] Successfully processed ${parsedItems.length} items from ${sourceFormat} file with Enhanced Menu Parsing intelligence`
-    );
-
-    return {
-      previewId,
-      filePath: multerFilePath,
-      sourceFormat,
-      parsedMenuName,
-      parsedItems,
-      detectedCategories: Array.from(detectedCategories),
-      summary: {
-        totalItemsParsed: parsedItems.length,
-        itemsWithPotentialErrors,
-      },
-      globalErrors,
-      // PDF-specific fields (only for PDF)
-      rawAIText:
-        sourceFormat === "pdf" ? rawText.substring(0, 5000) : undefined,
-      rawAIOutput: sourceFormat === "pdf" ? parsedAIOutput : undefined,
-    };
   }
 
   static async processPdfMenuUpload(

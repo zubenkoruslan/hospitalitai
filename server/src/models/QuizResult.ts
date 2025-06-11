@@ -131,6 +131,11 @@ quizResultSchema.index({ userId: 1, quizId: 1 });
 // Compound index for restaurant-level aggregation/filtering by user
 quizResultSchema.index({ restaurantId: 1, userId: 1 });
 
+// Add indexes for analytics queries
+quizResultSchema.index({ createdAt: 1, restaurantId: 1 });
+quizResultSchema.index({ restaurantId: 1, createdAt: 1 });
+quizResultSchema.index({ createdAt: 1, overallScore: 1 });
+
 // Ensure only one result entry per user per quiz attempt (conceptually)
 // Mongoose unique index on {userId, quizId} might be too strict if re-takes are allowed.
 // Application logic should handle preventing duplicate in-progress attempts if needed.
