@@ -1,5 +1,4 @@
 import mongoose, { Types } from "mongoose";
-import Menu, { IMenu } from "../models/Menu";
 import MenuItem, {
   IMenuItem,
   ItemType,
@@ -8,17 +7,17 @@ import MenuItem, {
   WineStyleType,
 } from "../models/MenuItem";
 import { AppError } from "../utils/errorHandler";
-import pdfParse from "pdf-parse";
-import fs from "fs";
-import path from "path";
+
+// Import new services
+import { MenuCrudService, MenuData } from "./MenuCrudService";
+import { MenuImportService } from "./MenuImportService";
 import {
-  GoogleGenerativeAI,
-  FunctionDeclaration,
-  FunctionDeclarationSchemaType,
-  FunctionDeclarationSchema,
-  FunctionCallingMode,
-} from "@google/generative-ai";
-import { v4 as uuidv4 } from "uuid";
+  MenuErrorHandler,
+  MenuValidationError,
+  MenuNotFoundError,
+  MenuConflictError,
+  ErrorContextBuilder,
+} from "./MenuErrorHandler";
 import {
   GeminiAIServiceOutput,
   MenuUploadPreview,
@@ -64,11 +63,7 @@ import {
   RawMenuItem,
 } from "./fileParserService";
 
-interface MenuData {
-  name: string;
-  description?: string;
-  isActive?: boolean;
-}
+// MenuData interface moved to MenuCrudService
 
 interface ExtractedMenuItem {
   itemName: string;
@@ -88,14 +83,17 @@ interface _InternalMenuAIDataStructure {
 
 // System instruction for the AI
 const _systemInstruction = `
-You are an AI assistant specialized in parsing restaurant menu data from unstructured text. Your primary goal is to extract detailed information about the menu and its items.
-The user will provide text extracted from a menu document (typically a PDF).
+🔧 GEMINI 2.0 MENU PARSER SYSTEM 🔧
 
-CRITICAL: You MUST use the 'extract_menu_data' function call to structure your response. Do NOT return plain JSON text. Use the function call format.
+You are a specialized menu data extraction system. Your ONLY response format is the extract_menu_data function call.
 
-FUNCTION CALL REQUIREMENT: Always call the extract_menu_data function with the extracted data. The system expects a function call, not plain text JSON.
+⚠️ CRITICAL RULES:
+1. NEVER respond with plain text
+2. ALWAYS use extract_menu_data function call
+3. FORBIDDEN: JSON text responses
+4. REQUIRED: Function call format only
 
-If the function call mechanism is not working, as a fallback you may provide valid JSON, but the preferred method is always the function call.
+Your task: Parse menu text and call extract_menu_data with structured data.
 
 When you process the menu text, please extract the following:
 
@@ -220,139 +218,322 @@ When suggesting winePairings for wine items, follow these principles:
 Return the structured data using the extract_menu_data function call.
 `;
 
-const menuExtractionFunctionSchema: FunctionDeclaration = {
-  name: "extract_menu_data",
-  description:
-    "Extracts structured menu data from raw menu text according to the provided instructions and schema.",
-  parameters: {
-    type: FunctionDeclarationSchemaType.OBJECT,
-    properties: {
-      menuName: {
-        type: FunctionDeclarationSchemaType.STRING,
-        description:
-          'The overall name of the menu (e.g., "Dinner Menu"). Use original filename if not found in text.',
-      },
-      menuItems: {
-        type: FunctionDeclarationSchemaType.ARRAY,
-        description: "A list of all items found on the menu.",
-        items: {
-          type: FunctionDeclarationSchemaType.OBJECT,
-          properties: {
-            itemName: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                'The name of the menu item (e.g., "Classic Burger").',
-            },
-            itemPrice: {
-              type: FunctionDeclarationSchemaType.NUMBER,
-              description:
-                "The price of the menu item as a number (e.g., 12.99). Null if not applicable or not listed. For wine items, this might be omitted if wineServingOptions are provided. If present, it could represent a primary price like a bottle price.",
-            },
-            itemType: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                'The type of the item, must be "food", "beverage", or "wine".',
-            },
-            itemIngredients: {
-              type: FunctionDeclarationSchemaType.ARRAY,
-              description:
-                'List of ingredients for the item (e.g., ["caramelised onion", "tomato relish"]).',
-              items: {
-                type: FunctionDeclarationSchemaType.STRING,
-              } as FunctionDeclarationSchema,
-            },
-            itemCategory: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                'The category the item belongs to, e.g., "Starters", "Main Courses".',
-            },
-            isGlutenFree: {
-              type: FunctionDeclarationSchemaType.BOOLEAN,
-              description:
-                "True if the item is marked or inferred as gluten-free, otherwise false.",
-            },
-            isVegan: {
-              type: FunctionDeclarationSchemaType.BOOLEAN,
-              description:
-                "True if the item is marked or inferred as vegan, otherwise false.",
-            },
-            isVegetarian: {
-              type: FunctionDeclarationSchemaType.BOOLEAN,
-              description:
-                "True if the item is marked or inferred as vegetarian, otherwise false.",
-            },
-            wineStyle: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                "The style of the wine. Must be one of: 'still', 'sparkling', 'champagne', 'dessert', 'fortified', 'other'. Only applicable if itemType is 'wine'.",
-            },
-            wineProducer: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                "The producer or winery of the wine (e.g., 'Chateau Montelena'). Only applicable if itemType is 'wine'.",
-            },
-            wineGrapeVariety: {
-              type: FunctionDeclarationSchemaType.ARRAY,
-              description:
-                "List of grape varieties used in the wine (e.g., ['Chardonnay'], ['Cabernet Sauvignon', 'Merlot']). Only applicable if itemType is 'wine'.",
-              items: {
-                type: FunctionDeclarationSchemaType.STRING,
-              } as FunctionDeclarationSchema,
-            },
-            wineVintage: {
-              type: FunctionDeclarationSchemaType.NUMBER,
-              description:
-                "The vintage year of the wine (e.g., 2020). Only applicable if itemType is 'wine'.",
-            },
-            wineRegion: {
-              type: FunctionDeclarationSchemaType.STRING,
-              description:
-                "The geographical region of origin for the wine (e.g., 'Napa Valley, USA', 'Bordeaux, France'). Only applicable if itemType is 'wine'.",
-            },
-            wineServingOptions: {
-              type: FunctionDeclarationSchemaType.ARRAY,
-              description:
-                "List of serving options for the wine, each with a size and price. Only applicable if itemType is 'wine'.",
-              items: {
-                type: FunctionDeclarationSchemaType.OBJECT,
-                properties: {
-                  size: {
-                    type: FunctionDeclarationSchemaType.STRING,
-                    description:
-                      "Serving size (e.g., '125ml', '175ml', 'glass', '500ml carafe', 'bottle', 'standard').",
-                  },
-                  price: {
-                    type: FunctionDeclarationSchemaType.NUMBER,
-                    description:
-                      "Price for this serving size (e.g., 8.50). Null if not applicable.",
-                  },
-                },
-                required: ["size", "price"],
-              } as FunctionDeclarationSchema,
-            },
-            winePairings: {
-              type: FunctionDeclarationSchemaType.ARRAY,
-              description:
-                "List of food item names from the CURRENT MENU that AI suggests pairing with this wine. Only applicable if itemType is 'wine'.",
-              items: {
-                type: FunctionDeclarationSchemaType.STRING,
-              } as FunctionDeclarationSchema,
-            },
-          },
-          required: [
-            "itemName",
-            "itemType",
-            "itemIngredients",
-            "itemCategory",
-            "isGlutenFree",
-            "isVegan",
-            "isVegetarian",
-          ],
-        } as FunctionDeclarationSchema,
-      },
-    },
-    required: ["menuName", "menuItems"],
-  } as FunctionDeclarationSchema,
+// Menu extraction function schema moved to AIMenuProcessorService
+
+// Helper function to fix common JSON formatting issues
+function fixCommonJSONIssues(jsonStr: string): string {
+  return jsonStr
+    .replace(/,(\s*[}\]])/g, "$1") // Remove trailing commas
+    .replace(/([{,]\s*)(\w+):/g, '$1"$2":') // Quote unquoted keys
+    .replace(/:\s*'([^']*)'/g, ': "$1"') // Replace single quotes with double quotes
+    .replace(/\n|\r/g, " ") // Replace newlines with spaces
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
+}
+
+// Find matching closing brace
+function findMatchingBrace(str: string, startIndex: number): number {
+  let braceCount = 1;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = startIndex + 1; i < str.length; i++) {
+    const char = str[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === "{") {
+        braceCount++;
+      } else if (char === "}") {
+        braceCount--;
+        if (braceCount === 0) {
+          return i;
+        }
+      }
+    }
+  }
+
+  return -1;
+}
+
+// Attempt to reconstruct partial JSON
+function attemptPartialJSONReconstruction(
+  jsonStr: string,
+  originalFileName?: string
+): GeminiAIServiceOutput | null {
+  console.log("🔧 Attempting partial JSON reconstruction");
+
+  try {
+    // Extract menu name
+    const menuNameMatch = jsonStr.match(/"menuName"\s*:\s*"([^"]*)"/);
+    const menuName =
+      menuNameMatch?.[1] ||
+      originalFileName?.replace(/\.[^/.]+$/, "") ||
+      "Uploaded Menu";
+
+    // Extract individual items
+    const items: any[] = [];
+    const itemPattern = /"itemName"\s*:\s*"([^"]*)"[^}]*}/g;
+    let match;
+
+    while ((match = itemPattern.exec(jsonStr)) !== null) {
+      const itemStart = jsonStr.indexOf("{", match.index);
+      const itemEnd = findMatchingBrace(jsonStr, itemStart);
+
+      if (itemEnd > itemStart) {
+        try {
+          const itemStr = jsonStr.substring(itemStart, itemEnd + 1);
+          const item = JSON.parse(fixCommonJSONIssues(itemStr));
+          items.push(item);
+        } catch (itemParseError) {
+          console.log("⚠️ Failed to parse individual item, skipping");
+        }
+      }
+    }
+
+    if (items.length > 0) {
+      console.log(`✅ Reconstructed ${items.length} items`);
+      return { menuName, menuItems: items };
+    }
+  } catch (error: any) {
+    console.log("❌ Partial reconstruction failed:", error.message);
+  }
+
+  return null;
+}
+
+// Enhanced JSON extraction with better pattern matching and wine menu support
+async function extractJSONFromTextResponse(
+  responseText: string,
+  originalFileName?: string
+): Promise<GeminiAIServiceOutput> {
+  console.log("🔧 Attempting intelligent JSON extraction from text response");
+
+  // Check if this is a wine menu for specialized extraction
+  const isWineMenu =
+    originalFileName?.toLowerCase().includes("wine") ||
+    /\b(wine|vintage|bottle|glass|ml|chardonnay|cabernet|merlot|pinot|sauvignon|bordeaux|burgundy|champagne|prosecco)\b/i.test(
+      responseText
+    );
+
+  if (isWineMenu) {
+    console.log(
+      "🍷 Wine menu detected - applying enhanced extraction patterns"
+    );
+  }
+
+  let parsedData: GeminiAIServiceOutput | null = null;
+
+  try {
+    // Strategy 1: Direct JSON parse (sometimes gemini-1.5-flash returns clean JSON)
+    parsedData = JSON.parse(responseText) as GeminiAIServiceOutput;
+    console.log("✅ Direct JSON parse successful");
+  } catch (directParseError) {
+    console.log("❌ Direct JSON parse failed, trying extraction methods");
+
+    // Strategy 2: Extract from markdown code blocks
+    let jsonMatch = responseText.match(
+      /```(?:json)?\s*([\s\S]*?)(?:\s*```|$)/i
+    );
+    if (!jsonMatch) {
+      // Strategy 3: Find JSON object boundaries
+      jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    }
+
+    if (jsonMatch) {
+      let jsonStr = (jsonMatch[1] || jsonMatch[0]).trim();
+      console.log("📝 Extracted JSON string length:", jsonStr.length);
+
+      // Strategy 4: Fix common JSON issues
+      jsonStr = fixCommonJSONIssues(jsonStr);
+
+      try {
+        parsedData = JSON.parse(jsonStr) as GeminiAIServiceOutput;
+        console.log("✅ Extracted JSON parse successful");
+      } catch (extractedParseError) {
+        console.log("❌ Extracted JSON parse failed");
+
+        // Strategy 5: Attempt partial reconstruction
+        parsedData = attemptPartialJSONReconstruction(
+          jsonStr,
+          originalFileName
+        );
+      }
+    }
+  }
+
+  // Validate and enhance the extracted data
+  if (
+    parsedData &&
+    parsedData.menuItems &&
+    Array.isArray(parsedData.menuItems)
+  ) {
+    console.log(
+      `✅ Successfully extracted ${parsedData.menuItems.length} items`
+    );
+
+    // Ensure required fields are present with wine-specific validation
+    parsedData.menuItems = parsedData.menuItems.map((item) => {
+      const baseItem = {
+        ...item, // Preserve any additional fields like wine-specific data first
+        itemName: item.itemName || "Unknown Item",
+        itemPrice: item.itemPrice || null,
+        itemType: item.itemType || "food",
+        itemIngredients: item.itemIngredients || [],
+        itemCategory: item.itemCategory || "Uncategorized",
+        isGlutenFree: Boolean(item.isGlutenFree),
+        isVegan: Boolean(item.isVegan),
+        isVegetarian: Boolean(item.isVegetarian),
+      };
+
+      // Wine-specific validation and enhancement
+      if (baseItem.itemType === "wine" && isWineMenu) {
+        // Ensure wine-specific fields are properly formatted
+        if (
+          baseItem.wineStyle &&
+          ![
+            "still",
+            "sparkling",
+            "champagne",
+            "dessert",
+            "fortified",
+            "other",
+          ].includes(baseItem.wineStyle)
+        ) {
+          baseItem.wineStyle = "other";
+        }
+
+        // Validate wine serving options format
+        if (
+          baseItem.wineServingOptions &&
+          Array.isArray(baseItem.wineServingOptions)
+        ) {
+          baseItem.wineServingOptions = baseItem.wineServingOptions.filter(
+            (option) =>
+              option &&
+              option.size &&
+              option.price !== undefined &&
+              option.price !== null
+          );
+        }
+
+        // Ensure grape varieties is an array
+        if (
+          baseItem.wineGrapeVariety &&
+          !Array.isArray(baseItem.wineGrapeVariety)
+        ) {
+          baseItem.wineGrapeVariety = [];
+        }
+
+        console.log(
+          `🍷 Wine item validated: ${baseItem.itemName} (${
+            baseItem.wineStyle || "unknown style"
+          })`
+        );
+      }
+
+      return baseItem;
+    });
+
+    return enhanceWinePairings(parsedData);
+  } else {
+    console.error("❌ Failed to extract valid menu data from text response");
+    throw new AppError(
+      "AI returned text response but no valid menu data could be extracted",
+      500,
+      {
+        responseLength: responseText.length,
+        responsePreview: responseText.substring(0, 500),
+        extractionAttempted: true,
+      }
+    );
+  }
+}
+
+// Wine-specific text preprocessing to improve AI parsing
+function preprocessWineMenuText(rawText: string, fileName?: string): string {
+  let processedText = rawText;
+
+  // Check if this looks like a wine menu
+  const isWineMenu =
+    fileName?.toLowerCase().includes("wine") ||
+    /\b(wine|vintage|bottle|glass|ml|chardonnay|cabernet|merlot|pinot|sauvignon|bordeaux|burgundy|champagne|prosecco)\b/i.test(
+      rawText
+    );
+
+  if (isWineMenu) {
+    console.log("🍷 Detected wine menu - applying wine-specific preprocessing");
+
+    // Normalize common wine terminology
+    processedText = processedText
+      // Standardize vintage years
+      .replace(/(\d{4})\s*v(?:intage)?/gi, "$1")
+      // Standardize serving sizes
+      .replace(/(\d+)\s*mls?\b/gi, "$1ml")
+      .replace(/(\d+)\s*ozs?\b/gi, "$1oz")
+      // Normalize wine regions
+      .replace(/\bA\.O\.C\.?\b/gi, "AOC")
+      .replace(/\bD\.O\.C\.?\b/gi, "DOC")
+      .replace(/\bD\.O\.C\.G\.?\b/gi, "DOCG")
+      // Clean up common OCR artifacts in wine menus
+      .replace(/[""'']/g, '"')
+      .replace(/–|—/g, "-")
+      // Normalize price formatting
+      .replace(/\$\s*(\d+)/g, "$$$1")
+      .replace(/(\d+)\s*\$/g, "$$$1")
+      // Fix common spacing issues around wine data
+      .replace(/(\d{4})\s+([A-Z])/g, "$1 $2")
+      // Ensure proper spacing around commas in wine descriptions
+      .replace(/,(?!\s)/g, ", ")
+      .replace(/\s+,/g, ",");
+
+    console.log(
+      `🍷 Wine text preprocessing complete - ${rawText.length} → ${processedText.length} chars`
+    );
+  }
+
+  return processedText;
+}
+
+// Enhanced retry mechanism with exponential backoff
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: Error = new Error("No attempts made");
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Retry attempt ${attempt}/${maxRetries}`);
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      console.log(`❌ Attempt ${attempt} failed:`, error.message);
+
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`⏳ Waiting ${delay}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 async function getAIRawExtraction(
@@ -364,260 +545,273 @@ async function getAIRawExtraction(
     throw new Error("GEMINI_API_KEY is not set");
   }
 
+  // Validate that we have meaningful text to process
+  const trimmedText = rawText.trim();
+  if (!trimmedText || trimmedText.length < 10) {
+    throw new AppError(
+      "No readable text content found in the document. The file may be corrupted, contain only images, or be in an unsupported format.",
+      400,
+      {
+        originalFileName,
+        textLength: rawText.length,
+        trimmedLength: trimmedText.length,
+      }
+    );
+  }
+
   const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
+
+  // Enhanced configuration for gemini-2.0-flash with wine menu optimizations
   const model = genAI.getGenerativeModel({
     model: AI_MODEL_NAME,
     systemInstruction: _systemInstruction,
     tools: [{ functionDeclarations: [menuExtractionFunctionSchema] }],
     toolConfig: {
       functionCallingConfig: {
-        mode: FunctionCallingMode.ANY, // Force function calling for more reliable results
-        allowedFunctionNames: ["extract_menu_data"],
+        mode: FunctionCallingMode.ANY, // ⭐ Force function calling for Gemini 2.0
+        allowedFunctionNames: ["extract_menu_data"], // ⭐ Explicitly allow our function
       },
+    },
+    generationConfig: {
+      temperature: 0.0, // ⭐ Deterministic for Gemini 2.0 function calling
+      topK: 1,
+      topP: 1.0,
+      maxOutputTokens: 12288, // ⭐ Higher token limit for complex wine menus
     },
   });
 
-  const chat = model.startChat({});
-  const promptParts = [
-    "Original Filename: " + (originalFileName || "Unknown"),
-    "Input Text to Parse: " + rawText,
-  ];
+  // ⭐ Enhanced prompt creation for direct generateContent calls with wine menu optimization
+  const createEnhancedPrompt = (attempt: number) => {
+    // Preprocess text for wine menus
+    const preprocessedText = preprocessWineMenuText(rawText, originalFileName);
+
+    // Ensure rawText is not empty to avoid "contents.parts must not be empty" error
+    const textToProcess =
+      preprocessedText.trim() ||
+      "No readable text could be extracted from the document.";
+
+    // Detect if this is a wine menu for specialized instructions
+    const isWineMenu =
+      originalFileName?.toLowerCase().includes("wine") ||
+      /\b(wine|vintage|bottle|glass|ml|chardonnay|cabernet|merlot|pinot|sauvignon|bordeaux|burgundy|champagne|prosecco)\b/i.test(
+        textToProcess
+      );
+
+    const wineSpecificInstructions = isWineMenu
+      ? `
+
+🍷 WINE MENU SPECIFIC INSTRUCTIONS:
+- This appears to be a wine menu - pay special attention to wine-specific data
+- Extract wine regions, vintages, and serving options carefully
+- Use your extensive wine knowledge to identify grape varieties even when not explicitly mentioned
+- For classic appellations (Bordeaux, Burgundy, Champagne, etc.), apply standard grape variety knowledge
+- Extract multiple serving sizes (125ml, 175ml, glass, bottle, carafe) with their respective prices
+- Preserve producer/winery names exactly as written
+- Look for wine styles: still, sparkling, champagne, dessert, fortified
+- Extract vintage years as numbers
+- For wine pairings, only suggest food items that actually appear in this menu
+- If wine serving options are listed, extract them as an array with size and price
+- Be especially careful with itemType classification - wine vs beverage vs food
+
+WINE PARSING EXAMPLES:
+- "Château Margaux 2015, Bordeaux" → wineProducer: "Château Margaux", wineVintage: 2015, wineRegion: "Bordeaux", wineGrapeVariety: ["Cabernet Sauvignon", "Merlot"]
+- "Dom Pérignon Champagne" → wineStyle: "champagne", wineGrapeVariety: ["Chardonnay", "Pinot Noir"]
+- "Glass £12 | Bottle £45" → wineServingOptions: [{"size": "glass", "price": 12}, {"size": "bottle", "price": 45}]`
+      : "";
+
+    const baseContent = `Original Filename: ${
+      originalFileName || "Unknown"
+    }${wineSpecificInstructions}
+
+Input Text to Parse:
+${textToProcess}`;
+
+    if (attempt === 1) {
+      return `🚨 GEMINI 2.0 FUNCTION CALLING REQUIREMENT 🚨
+MANDATORY: You MUST ONLY respond using the extract_menu_data function call. 
+TEXT RESPONSES ARE COMPLETELY FORBIDDEN.
+DO NOT GENERATE ANY PLAIN TEXT - FUNCTION CALL ONLY.
+
+${baseContent}
+
+⚠️ CRITICAL: The extract_menu_data function call is your ONLY allowed response format. No exceptions.`;
+    } else if (attempt === 2) {
+      return `FUNCTION CALL REQUIRED: You are REQUIRED to call the extract_menu_data function. Text responses will cause system failure.
+Function calling is MANDATORY and NON-NEGOTIABLE for this request.
+
+${baseContent}
+
+URGENT: Use the function call format, not plain JSON text. The system expects a function call response ONLY.`;
+    } else {
+      return `FINAL ERROR RECOVERY MODE: Previous attempts failed because function calling was not used.
+YOU MUST CALL extract_menu_data FUNCTION - ABSOLUTELY NO EXCEPTIONS
+TEXT RESPONSES WILL BE REJECTED - FUNCTION CALLS ONLY
+
+${baseContent}
+
+LAST CHANCE: Function call is the ONLY acceptable response format. The extract_menu_data function MUST be called.`;
+    }
+  };
 
   try {
-    console.log(`Sending request to Gemini AI with model: ${AI_MODEL_NAME}`);
-    const result = await chat.sendMessage(promptParts);
+    console.log(`🚀 Sending request to Gemini AI with model: ${AI_MODEL_NAME}`);
 
-    // Add more detailed logging
-    console.log("AI Response received");
-    console.log(
-      "Function calls available:",
-      result.response.functionCalls()?.length || 0
+    // ⭐ Retry mechanism with different prompting strategies
+    let lastError: Error | null = null;
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`🎯 Attempt ${attempt}/${maxAttempts}`);
+
+        const promptText = createEnhancedPrompt(attempt);
+
+        // Validate prompt text before sending
+        if (!promptText || !promptText.trim()) {
+          throw new Error(
+            "Generated prompt text is empty - cannot send request to AI"
+          );
+        }
+
+        console.log(
+          `🔍 Sending to ${AI_MODEL_NAME} with prompt length: ${promptText.length}`
+        );
+        console.log(
+          `🔧 Tool config: ${JSON.stringify(model.toolConfig, null, 2)}`
+        );
+
+        const result = await model.generateContent(promptText);
+
+        console.log("🤖 AI Response received");
+        console.log(
+          `📊 Response text length: ${result.response.text?.()?.length || 0}`
+        );
+        console.log(
+          `🔧 Function calls available: ${
+            result.response.functionCalls()?.length || 0
+          }`
+        );
+        console.log(
+          `⚠️ Finish reason: ${
+            result.response.candidates?.[0]?.finishReason || "unknown"
+          }`
+        );
+
+        if (result.response.text?.()?.length > 0) {
+          console.log(
+            `📝 Response preview: ${result.response.text().substring(0, 200)}`
+          );
+        }
+
+        const call = result.response.functionCalls()?.[0];
+
+        if (call && call.name === "extract_menu_data") {
+          console.log(
+            "✅ Successfully received extract_menu_data function call"
+          );
+          let extractedData = call.args as GeminiAIServiceOutput;
+
+          // Validate the extracted data
+          if (
+            !extractedData.menuItems ||
+            !Array.isArray(extractedData.menuItems)
+          ) {
+            throw new Error(
+              "Invalid function call response: missing or invalid menuItems array"
+            );
+          }
+
+          console.log(
+            `📊 Extracted ${extractedData.menuItems.length} menu items`
+          );
+
+          // Post-process to enhance wine pairings
+          extractedData = enhanceWinePairings(extractedData);
+
+          // Then enhance grape varieties using web search and inference
+          extractedData = await enhanceWineGrapeVarieties(extractedData);
+
+          return extractedData;
+        } else {
+          const responseText = result.response.text();
+          console.log(
+            `❌ Attempt ${attempt} failed: No function call received`
+          );
+          console.log("Response length:", responseText.length);
+          console.log("Response preview:", responseText.substring(0, 200));
+
+          if (attempt === maxAttempts) {
+            // On final attempt, try intelligent JSON extraction with wine-specific handling
+            console.log(
+              "🔧 Final attempt: Using intelligent JSON extraction with wine menu optimization"
+            );
+            return await extractJSONFromTextResponse(
+              responseText,
+              originalFileName
+            );
+          }
+
+          lastError = new Error(
+            `Function call not received on attempt ${attempt}`
+          );
+        }
+      } catch (attemptError: any) {
+        console.error(`❌ Attempt ${attempt} error:`, attemptError.message);
+        console.error(`🔧 Error details:`, attemptError);
+
+        // Check for Gemini 2.0 specific errors
+        if (
+          attemptError.message?.includes("400") ||
+          attemptError.message?.includes("Bad Request")
+        ) {
+          console.error(
+            `🚨 Gemini 2.0 API Error - this might be a function calling configuration issue`
+          );
+        }
+
+        lastError = attemptError;
+
+        if (attempt < maxAttempts) {
+          // Wait before retry with exponential backoff
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          console.log(`⏳ Waiting ${delay}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw lastError || new Error("All attempts failed");
+  } catch (error: any) {
+    console.error("💥 Error in AI processing:", error);
+
+    // Enhanced error with more context including wine menu specific details
+    const isWineMenu =
+      originalFileName?.toLowerCase().includes("wine") ||
+      /\b(wine|vintage|bottle|glass|ml|chardonnay|cabernet|merlot|pinot|sauvignon|bordeaux|burgundy|champagne|prosecco)\b/i.test(
+        rawText
+      );
+
+    const enhancedError = new AppError(
+      `AI processing failed after 3 attempts: ${error.message}${
+        isWineMenu
+          ? " (Wine menu detected - specialized processing attempted)"
+          : ""
+      }`,
+      500,
+      {
+        originalError: error.message,
+        modelUsed: AI_MODEL_NAME,
+        attemptsCount: 3,
+        textLength: rawText.length,
+        fileName: originalFileName,
+        isWineMenu: isWineMenu,
+        preprocessingApplied: isWineMenu,
+        textPreview: rawText.substring(0, 500),
+        enhancedPrompting: isWineMenu,
+      }
     );
 
-    const call = result.response.functionCalls()?.[0];
-
-    if (call && call.name === "extract_menu_data") {
-      console.log("Successfully received extract_menu_data function call");
-      let extractedData = call.args as GeminiAIServiceOutput;
-
-      // Post-process to enhance wine pairings
-      extractedData = enhanceWinePairings(extractedData);
-
-      return extractedData;
-    } else {
-      const responseText = result.response.text();
-      console.log(
-        "No function call received, attempting to parse JSON from text response"
-      );
-
-      // Try to extract JSON from the text response as a fallback
-      try {
-        console.log("Attempting to parse JSON from text response");
-        console.log("Response text length:", responseText.length);
-        console.log("Response text preview:", responseText.substring(0, 1000));
-
-        // First try to parse the response directly as JSON (since gemini-2.0-flash sometimes returns direct JSON)
-        let parsedData: GeminiAIServiceOutput | null = null;
-
-        try {
-          parsedData = JSON.parse(responseText) as GeminiAIServiceOutput;
-          console.log("Successfully parsed direct JSON response");
-        } catch (directParseError) {
-          console.log("Direct JSON parse failed, trying other methods");
-
-          // Look for JSON-like content in the response
-          // First try to match JSON wrapped in markdown code blocks (with optional closing block for truncated responses)
-          let jsonMatch = responseText.match(
-            /```json\s*([\s\S]*?)(?:\s*```|$)/
-          );
-          if (!jsonMatch) {
-            console.log("No markdown JSON blocks found, trying raw JSON match");
-            // Fallback to looking for raw JSON (from first { to last })
-            jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          } else {
-            console.log("Found markdown JSON block (potentially truncated)");
-          }
-
-          if (jsonMatch) {
-            let jsonStr = jsonMatch[1] || jsonMatch[0]; // Use capture group if available, otherwise full match
-            console.log("Extracted JSON string length:", jsonStr.length);
-            console.log("Extracted JSON preview:", jsonStr.substring(0, 500));
-
-            // If the JSON string seems truncated (doesn't end with } or ]), try to fix it
-            jsonStr = jsonStr.trim();
-            if (!jsonStr.endsWith("}") && !jsonStr.endsWith("]")) {
-              console.log("JSON appears truncated, attempting to complete it");
-
-              // Try to find the last complete item in the menuItems array
-              const menuItemsMatch = jsonStr.match(
-                /"menuItems"\s*:\s*\[([\s\S]*)/
-              );
-              if (menuItemsMatch) {
-                const itemsContent = menuItemsMatch[1];
-
-                // Find all complete items (those that end with '}' followed by optional comma and whitespace)
-                const completeItems = [];
-                let currentItem = "";
-                let braceCount = 0;
-                let inString = false;
-                let escapeNext = false;
-
-                for (let i = 0; i < itemsContent.length; i++) {
-                  const char = itemsContent[i];
-
-                  if (escapeNext) {
-                    escapeNext = false;
-                    currentItem += char;
-                    continue;
-                  }
-
-                  if (char === "\\") {
-                    escapeNext = true;
-                    currentItem += char;
-                    continue;
-                  }
-
-                  if (char === '"' && !escapeNext) {
-                    inString = !inString;
-                  }
-
-                  if (!inString) {
-                    if (char === "{") {
-                      if (braceCount === 0) {
-                        // Starting a new item
-                        currentItem = char;
-                      } else {
-                        currentItem += char;
-                      }
-                      braceCount++;
-                    } else if (char === "}") {
-                      currentItem += char;
-                      braceCount--;
-                      if (braceCount === 0) {
-                        // Found a complete item
-                        completeItems.push(currentItem.trim());
-                        currentItem = "";
-                        // Skip past any comma and whitespace
-                        while (
-                          i + 1 < itemsContent.length &&
-                          /[,\s]/.test(itemsContent[i + 1])
-                        ) {
-                          i++;
-                        }
-                      }
-                    } else if (braceCount > 0) {
-                      currentItem += char;
-                    }
-                  } else if (braceCount > 0) {
-                    currentItem += char;
-                  }
-                }
-
-                if (completeItems.length > 0) {
-                  // Extract menu name more carefully
-                  const menuNameMatch = jsonStr.match(
-                    /"menuName"\s*:\s*"([^"]*)"/
-                  );
-                  const menuName = menuNameMatch
-                    ? menuNameMatch[1]
-                    : "Wine-menu.pdf";
-
-                  // Reconstruct the JSON with only complete items
-                  const reconstructedJson = {
-                    menuName: menuName,
-                    menuItems: completeItems.map((item) => JSON.parse(item)),
-                  };
-
-                  jsonStr = JSON.stringify(reconstructedJson, null, 2);
-                  console.log(
-                    `Reconstructed JSON with ${completeItems.length} complete items`
-                  );
-                  console.log(
-                    "Reconstructed JSON preview:",
-                    jsonStr.substring(0, 500)
-                  );
-                }
-              }
-            }
-
-            try {
-              parsedData = JSON.parse(jsonStr) as GeminiAIServiceOutput;
-              console.log("Successfully parsed extracted JSON data");
-            } catch (extractedParseError) {
-              console.log("Failed to parse extracted JSON");
-            }
-          }
-        }
-
-        if (parsedData) {
-          console.log("Parsed menu name:", parsedData.menuName);
-          console.log("Parsed items count:", parsedData.menuItems?.length || 0);
-
-          // Validate that it has the expected structure
-          if (
-            parsedData &&
-            parsedData.menuItems &&
-            Array.isArray(parsedData.menuItems)
-          ) {
-            console.log(
-              "JSON structure validation passed, processing wine enhancements"
-            );
-
-            // First enhance wine pairings
-            parsedData = enhanceWinePairings(parsedData);
-
-            // Then enhance grape varieties using web search and inference
-            parsedData = await enhanceWineGrapeVarieties(parsedData);
-
-            return parsedData;
-          } else {
-            console.error("JSON structure validation failed:", {
-              hasMenuItems: !!parsedData?.menuItems,
-              isArray: Array.isArray(parsedData?.menuItems),
-              parsedDataKeys: parsedData ? Object.keys(parsedData) : null,
-            });
-          }
-        } else {
-          console.log("No valid JSON data could be extracted from response");
-        }
-      } catch (parseError) {
-        console.error("Failed to parse JSON from text response:", parseError);
-        console.error("Parse error details:", {
-          message:
-            parseError instanceof Error ? parseError.message : "Unknown error",
-          responseLength: responseText.length,
-          responsePreview: responseText.substring(0, 500),
-        });
-      }
-
-      console.error(
-        `Gemini did not return the expected function call. Model: ${AI_MODEL_NAME}`,
-        "Function calls available:",
-        result.response.functionCalls()?.length || 0,
-        "Response text length:",
-        responseText.length,
-        "Response text preview:",
-        responseText.substring(0, 500)
-      );
-      throw new AppError(
-        "AI failed to process the menu using the expected function call structure. The response text was: " +
-          responseText.substring(0, 500) +
-          (responseText.length > 500 ? "..." : ""),
-        500,
-        {
-          aiResponseText: responseText,
-          reason: "No function call or incorrect function call name",
-          modelUsed: AI_MODEL_NAME,
-          functionCallsCount: result.response.functionCalls()?.length || 0,
-        }
-      );
-    }
-  } catch (error: any) {
-    console.error("Error calling Gemini API:", error);
-    throw new AppError(`AI processing failed: ${error.message}`, 500, {
-      originalError: error.message,
-      modelUsed: AI_MODEL_NAME,
-    });
+    throw enhancedError;
   }
 }
 
@@ -2048,8 +2242,11 @@ class MenuService {
               );
             }
 
-            // Call AI service with retry logic
+            // Call AI service with retry logic and wine menu optimizations
             try {
+              console.log(
+                "🤖 Starting AI extraction with wine menu enhancements"
+              );
               parsedAIOutput = await getAIRawExtraction(
                 rawText,
                 originalFileName

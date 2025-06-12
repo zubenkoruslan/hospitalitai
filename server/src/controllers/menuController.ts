@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
-import MenuService from "../services/menuService";
+import MenuServiceRefactored from "../services/MenuServiceRefactored";
 import { AppError } from "../utils/errorHandler";
 import MenuItem from "../models/MenuItem"; // Used in getMenuByIdWithItems and deleteCategoryAndReassignItems
 import ItemService from "../services/itemService"; // Added import for ItemService
@@ -21,6 +21,7 @@ import {
 } from "../types/menuUploadTypes"; // Import the new type
 import { Types } from "mongoose";
 import MenuImportJob from "../models/MenuImportJobModel"; // Import the correct model
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
 // Using Express Request type and will work with the existing global AuthPayload if possible.
 // This local type definition is a temporary workaround if global augmentation isn't perfectly matched.
@@ -39,528 +40,253 @@ interface AuthenticatedRequest extends Request {
   file?: Express.Multer.File;
 }
 
-// --- Create Menu ---
-export const createMenu = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
+// ================= MENU CRUD OPERATIONS =================
+
+/**
+ * Get all menus for a restaurant
+ */
+export const getMenus = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const menu = await MenuService.createMenu(req.body, restaurantId);
-    res.status(201).json(menu);
-  } catch (error) {
-    next(error);
+    const { restaurantId } = req.user!;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string;
+    const isActive = req.query.isActive as string;
+
+    const options = {
+      page,
+      limit,
+      search,
+      isActive:
+        isActive === "true" ? true : isActive === "false" ? false : undefined,
+    };
+
+    const result = await MenuServiceRefactored.getMenus(restaurantId, options);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching menus:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error fetching menus",
+    });
   }
 };
 
-// --- Get All Menus for a Restaurant ---
-export const getAllMenus = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
+/**
+ * Get a specific menu by ID
+ */
+export const getMenuById = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const status = req.query.status as
-      | "all"
-      | "active"
-      | "inactive"
-      | undefined;
-    const menus = await MenuService.getAllMenus(restaurantId, status);
-    res.status(200).json(menus);
-  } catch (error) {
-    next(error);
-  }
-};
+    const { restaurantId } = req.user!;
+    const { menuId } = req.params;
 
-// --- Get Single Menu with its Items ---
-export const getMenuById = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const menu = await MenuService.getMenuById(req.params.menuId, restaurantId);
+    const menu = await MenuServiceRefactored.getMenuById(menuId, restaurantId);
     if (!menu) {
-      return next(new AppError("Menu not found", 404));
+      return res.status(404).json({ message: "Menu not found" });
     }
-    res.status(200).json(menu);
-  } catch (error) {
-    next(error);
+
+    res.json(menu);
+  } catch (error: any) {
+    console.error("Error fetching menu:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error fetching menu",
+    });
   }
 };
 
-// --- Update Menu Details ---
-export const updateMenu = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
+/**
+ * Create a new menu
+ */
+export const createMenu = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
+    const { restaurantId } = req.user!;
+    const { name, isActive = true } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ message: "Menu name is required" });
     }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const menu = await MenuService.updateMenu(
-      req.params.menuId,
+
+    const menuData = { name, isActive };
+    const menu = await MenuServiceRefactored.createMenu(menuData, restaurantId);
+
+    res.status(201).json(menu);
+  } catch (error: any) {
+    console.error("Error creating menu:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error creating menu",
+    });
+  }
+};
+
+/**
+ * Update a menu
+ */
+export const updateMenu = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { restaurantId } = req.user!;
+    const { menuId } = req.params;
+    const updates = req.body;
+
+    const menu = await MenuServiceRefactored.updateMenu(
+      menuId,
+      updates,
+      restaurantId
+    );
+    if (!menu) {
+      return res.status(404).json({ message: "Menu not found" });
+    }
+
+    res.json(menu);
+  } catch (error: any) {
+    console.error("Error updating menu:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error updating menu",
+    });
+  }
+};
+
+/**
+ * Delete a menu
+ */
+export const deleteMenu = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { restaurantId } = req.user!;
+    const { menuId } = req.params;
+
+    await MenuServiceRefactored.deleteMenu(menuId, restaurantId);
+    res.status(204).send();
+  } catch (error: any) {
+    console.error("Error deleting menu:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error deleting menu",
+    });
+  }
+};
+
+// ================= MENU UPLOAD & IMPORT OPERATIONS =================
+
+/**
+ * Upload and preview menu file
+ */
+export const uploadMenuPreview = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const { restaurantId } = req.user!;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const result = await MenuServiceRefactored.getMenuUploadPreview(
+      req.file.path,
+      req.file.originalname,
+      restaurantId
+    );
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error in menu upload preview:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error processing uploaded file",
+    });
+  }
+};
+
+/**
+ * Finalize menu import
+ */
+export const finalizeMenuImport = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const { restaurantId } = req.user!;
+
+    const result = await MenuServiceRefactored.finalizeMenuImport(
       req.body,
       restaurantId
     );
-    if (!menu) {
-      return next(new AppError("Menu not found for update", 404));
-    }
-    res.status(200).json(menu);
-  } catch (error) {
-    next(error);
-  }
-};
-
-// --- Delete Menu ---
-export const deleteMenu = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const result = await MenuService.deleteMenu(
-      req.params.menuId,
-      restaurantId
-    );
-    if (result.deletedMenuCount === 0) {
-      return next(new AppError("Menu not found for deletion", 404));
-    }
-    res.status(200).json({
-      message: `Menu and ${result.deletedItemsCount} associated items deleted successfully.`,
-      ...result,
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error finalizing menu import:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error finalizing menu import",
     });
-  } catch (error) {
-    next(error);
   }
 };
 
-export const uploadMenuPdf = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+/**
+ * Process conflict resolution
+ */
+export const processConflictResolution = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
-    const restaurantIdString = req.user?.restaurantId;
-    const restaurantId = new mongoose.Types.ObjectId(restaurantIdString);
+    const { restaurantId } = req.user!;
 
-    // ---- START DEBUG LOGS ----
-    console.log(
-      "uploadMenuPdf controller - req.headers:",
-      JSON.stringify(req.headers, null, 2)
-    );
-    console.log(
-      "uploadMenuPdf controller - req.body:",
-      JSON.stringify(req.body, null, 2)
-    ); // req.body might be empty or undefined with multer, file is in req.file
-    console.log("uploadMenuPdf controller - req.file:", req.file);
-    // ---- END DEBUG LOGS ----
-
-    if (!req.file) {
-      return next(new AppError("No PDF file uploaded.", 400));
-    }
-
-    const filePath = req.file.path;
-    const menu = await MenuService.processPdfMenuUpload(
-      filePath,
+    const result = await MenuServiceRefactored.processConflictResolution({
+      ...req.body,
       restaurantId,
-      req.file.originalname
-    );
-
-    res.status(201).json({
-      message: "Menu PDF uploaded and processed successfully.",
-      data: menu,
-    });
-  } catch (error) {
-    // MenuService.processPdfMenuUpload handles file cleanup in its finally block
-    next(error);
-  }
-};
-
-export const deleteCategoryAndReassignItems = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { menuId, categoryName: encodedCategoryName } = req.params;
-    const restaurantId = req.user?.restaurantId; // Get restaurantId from authenticated user
-    const categoryName = decodeURIComponent(encodedCategoryName);
-
-    if (!restaurantId) {
-      return next(new AppError("User not associated with a restaurant.", 403));
-    }
-
-    // This check remains as it's specific business logic not covered by simple validation
-    if (
-      categoryName.toLowerCase() === "uncategorized" ||
-      categoryName.toLowerCase() === "non assigned"
-    ) {
-      return next(
-        new AppError(`The category "${categoryName}" cannot be deleted.`, 400)
-      );
-    }
-
-    // Call the service method to handle the logic
-    const result = await ItemService.reassignItemsCategory(
-      menuId,
-      categoryName,
-      "Non Assigned", // The new category name is hardcoded here as per original logic
-      new mongoose.Types.ObjectId(restaurantId) // Pass restaurantId to the service
-    );
-
-    // This logging can be useful for developers/admins
-    if (result.matchedCount === 0 && result.modifiedCount === 0) {
-      console.log(
-        `No items found for category "${categoryName}" in menu "${menuId}", or category did not exist.`
-      );
-    }
-
-    res.status(200).json({
-      message: `Category "${categoryName}" processed. Items (if any) reassigned to "Non Assigned".`,
-      data: {
-        matchedCount: result.matchedCount,
-        modifiedCount: result.modifiedCount,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// --- Update Menu Activation Status ---
-export const updateMenuActivationStatus = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const { isActive } = req.body;
-    if (typeof isActive !== "boolean") {
-      return next(new AppError("isActive field must be a boolean", 400));
-    }
-
-    const menu = await MenuService.updateMenuActivationStatus(
-      req.params.menuId,
-      restaurantId,
-      isActive
-    );
-
-    if (!menu) {
-      return next(new AppError("Menu not found or not updated", 404));
-    }
-    res.status(200).json(menu);
-  } catch (error) {
-    next(error);
-  }
-};
-
-// --- NEW: Handle Menu Upload for Preview ---
-export const handleMenuUploadPreview = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError(
-          "User not authenticated or restaurantId missing for preview",
-          401
-        )
-      );
-    }
-    if (!req.file) {
-      return next(
-        new AppError(
-          "No menu file uploaded for preview. Supported formats: PDF, Excel (.xlsx/.xls), CSV, JSON, Word (.docx)",
-          400
-        )
-      );
-    }
-
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const multerFilePath = req.file.path; // Path from multer
-    const originalFileName = req.file.originalname;
-
-    console.log(
-      `[menuController.handleMenuUploadPreview] File received: ${originalFileName}, path: ${multerFilePath}`
-    );
-
-    const previewData: MenuUploadPreview =
-      await MenuService.getMenuUploadPreview(
-        multerFilePath,
-        restaurantId,
-        originalFileName
-      );
-
-    res.status(200).json(previewData);
-  } catch (error) {
-    console.error("[menuController.handleMenuUploadPreview] Error: ", error);
-    // Ensure temp file is cleaned up if an error occurs before service could do it (e.g. auth error)
-    // Note: MenuService.getMenuUploadPreview is expected NOT to delete the file.
-    // Deletion for preview files might need a cron job or specific user action if not imported.
-    next(error);
-  }
-};
-
-// Controller for FINALIZING menu import from preview data
-export const handleFinalizeMenuImport = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId || !req.user.userId) {
-      return next(
-        new AppError(
-          "User not authenticated, restaurantId, or userId missing for import",
-          401
-        )
-      );
-    }
-    const restaurantId = new Types.ObjectId(req.user.restaurantId);
-    const userId = new Types.ObjectId(req.user.userId);
-    const importData: FinalImportRequestBody = req.body;
-
-    if (
-      !importData ||
-      !importData.filePath ||
-      !importData.previewId ||
-      !importData.itemsToImport
-    ) {
-      return next(
-        new AppError(
-          "Invalid request body for menu import. Missing required fields (filePath, previewId, itemsToImport).",
-          400
-        )
-      );
-    }
-
-    console.log(
-      `[menuController.handleFinalizeMenuImport] Received request to finalize import for previewId: ${importData.previewId}`
-    );
-
-    const serviceResponse = await MenuService.finalizeMenuImport(
-      importData,
-      restaurantId,
-      userId
-    );
-
-    if ("jobId" in serviceResponse) {
-      res.status(202).json(serviceResponse);
-    } else {
-      const importResult = serviceResponse as ImportResult;
-      if (importResult.overallStatus === "failed") {
-        if (
-          importResult.message.includes("not found") ||
-          importResult.message.includes("must be provided") ||
-          importResult.message.includes(
-            "Failed to create asynchronous import job"
-          )
-        ) {
-          return res.status(400).json(importResult);
-        }
-        return res.status(500).json(importResult);
-      }
-      res.status(200).json(importResult);
-    }
-  } catch (error) {
-    console.error(
-      "[menuController.handleFinalizeMenuImport] Unexpected controller error: ",
-      error
-    );
-    next(error);
-  }
-};
-
-export const handleProcessMenuForConflictResolution = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
-  try {
-    if (!req.user || !req.user.restaurantId) {
-      return next(
-        new AppError("User not authenticated or restaurantId missing", 401)
-      );
-    }
-
-    console.log(
-      "[handleProcessMenuForConflictResolution] Request body:",
-      JSON.stringify(req.body, null, 2)
-    );
-
-    const restaurantIdString = req.user.restaurantId.toString();
-    const { itemsToProcess, targetMenuId } =
-      req.body as ProcessConflictResolutionRequest;
-
-    // Enhanced validation with detailed logging
-    if (
-      !itemsToProcess ||
-      !Array.isArray(itemsToProcess) ||
-      itemsToProcess.length === 0
-    ) {
-      console.error(
-        "[handleProcessMenuForConflictResolution] Invalid itemsToProcess:",
-        {
-          itemsToProcess,
-          isArray: Array.isArray(itemsToProcess),
-          length: itemsToProcess?.length,
-        }
-      );
-      return next(
-        new AppError("itemsToProcess must be a non-empty array.", 400)
-      );
-    }
-
-    // Log each item for debugging
-    itemsToProcess.forEach((item, index) => {
-      console.log(`[handleProcessMenuForConflictResolution] Item ${index}:`, {
-        id: item.id,
-        hasFields: !!item.fields,
-        itemType: item.fields?.itemType?.value,
-        name: item.fields?.name?.value,
-        category: item.fields?.category?.value,
-        userAction: item.userAction,
-        importAction: item.importAction,
-      });
     });
 
-    // Construct the request object for the service call
-    const conflictRequestData: ProcessConflictResolutionRequest = {
-      itemsToProcess,
-      restaurantId: restaurantIdString,
-      targetMenuId: targetMenuId,
-    };
-
-    console.log(
-      "[handleProcessMenuForConflictResolution] Calling service with:",
-      {
-        restaurantId: restaurantIdString,
-        targetMenuId,
-        itemCount: itemsToProcess.length,
-      }
-    );
-
-    const result = await MenuService.processMenuForConflictResolution(
-      conflictRequestData // Pass the single object argument
-    );
-
-    console.log("[handleProcessMenuForConflictResolution] Service result:", {
-      processedItemsCount: result.processedItems.length,
-      summary: result.summary,
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error processing conflict resolution:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error processing conflict resolution",
     });
-
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("[handleProcessMenuForConflictResolution] Error:", error);
-
-    // Provide more detailed error information
-    if (error instanceof Error) {
-      console.error("[handleProcessMenuForConflictResolution] Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-
-    next(error);
   }
 };
 
+/**
+ * Get menu import job status
+ */
 export const getMenuImportJobStatus = async (
   req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<any> => {
+  res: Response
+) => {
   try {
     const { jobId } = req.params;
-    // No need to validate ObjectId format here if validateObjectId middleware is used in route
 
-    if (!req.user || !req.user.restaurantId || !req.user.userId) {
-      return next(
-        new AppError("User not authenticated or missing required IDs.", 401)
-      );
-    }
-
-    const job = await MenuImportJob.findById(jobId);
-
-    if (!job) {
-      return next(new AppError("Import job not found.", 404));
-    }
-
-    if (
-      job.restaurantId.toString() !== req.user.restaurantId.toString() &&
-      job.userId.toString() !== req.user.userId.toString()
-    ) {
-      return next(
-        new AppError("Access denied to this import job status.", 403)
-      );
-    }
-
-    // Access result fields from the result object or provide defaults
-    const result = job.result;
-
-    const jobStatusResponse = {
-      jobId: job._id,
-      status: job.status,
-      message: job.errorMessage || result?.message || "Job status retrieved.",
-      overallStatus: result?.overallStatus || job.status,
-      menuId: result?.menuId,
-      menuName: result?.menuName,
-      itemsProcessed: result?.itemsProcessed || 0,
-      itemsCreated: result?.itemsCreated || 0,
-      itemsUpdated: result?.itemsUpdated || 0,
-      itemsSkipped: result?.itemsSkipped || 0,
-      itemsErrored: result?.itemsErrored || 0,
-      createdAt: job.createdAt,
-      processedAt: job.processedAt,
-      completedAt: job.completedAt,
-      errorDetails: result?.errorDetails,
-      errorReport: result?.errorReport,
-    };
-
-    res.status(200).json(jobStatusResponse);
-  } catch (error) {
-    next(error);
+    const status = await MenuServiceRefactored.getMenuImportJobStatus(jobId);
+    res.json(status);
+  } catch (error: any) {
+    console.error("Error getting job status:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error getting job status",
+    });
   }
 };
 
-// Placeholder for other menu controller functions if this is a new file
-// export const createMenu = async (req: Request, res: Response, next: NextFunction) => { ... };
-// export const getMenu = async (req: Request, res: Response, next: NextFunction) => { ... };
+// ================= MENU STATISTICS =================
+
+/**
+ * Get menu statistics
+ */
+export const getMenuStats = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const { restaurantId } = req.user!;
+
+    const stats = await MenuServiceRefactored.getMenuStats(restaurantId);
+    res.json(stats);
+  } catch (error: any) {
+    console.error("Error getting menu stats:", error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Error getting menu statistics",
+    });
+  }
+};
+
+// ================= LEGACY COMPATIBILITY =================
+
+/**
+ * Legacy method names for backward compatibility
+ */
+export const getMenusForRestaurant = getMenus;
+export const createMenuForRestaurant = createMenu;
+export const getMenusByRestaurant = getMenus;

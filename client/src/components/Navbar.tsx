@@ -23,12 +23,19 @@ import { MapPinIcon as MapPinIconSolid } from "@heroicons/react/24/solid";
 interface NavbarProps {
   isBlockingNavigation?: boolean;
   onAttemptBlockedNavigation?: () => boolean;
+  hidden?: boolean; // Add hidden prop to completely hide navbar
 }
 
 const Navbar: React.FC<NavbarProps> = ({
   isBlockingNavigation = false,
   onAttemptBlockedNavigation,
+  hidden = false,
 }) => {
+  // Return null if navbar should be hidden (e.g., during quiz taking)
+  if (hidden) {
+    return null;
+  }
+
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     // Always start collapsed on desktop

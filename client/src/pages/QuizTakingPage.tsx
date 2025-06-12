@@ -548,7 +548,7 @@ const QuizTakingPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        <Navbar />
+        <Navbar hidden={true} />
         <main className="flex-grow flex items-center justify-center max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
           <LoadingSpinner message="Loading quiz questions..." />
         </main>
@@ -690,7 +690,7 @@ const QuizTakingPage: React.FC = () => {
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        <Navbar />
+        <Navbar hidden={true} />
         <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
           <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -719,22 +719,37 @@ const QuizTakingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar
+        hidden={true}
         isBlockingNavigation={isQuizInProgress}
         onAttemptBlockedNavigation={confirmNavigation}
       />
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
         {/* Header Section */}
         <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-              <AcademicCapIcon className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+                <AcademicCapIcon className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">
+                  {quizTitle}
+                </h1>
+                <p className="text-slate-600 mt-2">
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">{quizTitle}</h1>
-              <p className="text-slate-600 mt-2">
-                Question {currentQuestionIndex + 1} of {questions.length}
-              </p>
-            </div>
+            {/* Exit Quiz Button */}
+            <Button
+              variant="secondary"
+              onClick={handleCancelQuiz}
+              className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 bg-white/80 hover:bg-white border-slate-300"
+              disabled={isSubmitting || isCancelling}
+            >
+              <span className="hidden sm:inline">Exit Quiz</span>
+              <span className="sm:hidden">Exit</span>
+            </Button>
           </div>
         </div>
 

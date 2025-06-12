@@ -104,7 +104,6 @@ const ArchivedQuizAnalyticsSchema: Schema<IArchivedQuizAnalytics> = new Schema(
     originalQuizId: {
       type: Schema.Types.ObjectId,
       required: true,
-      index: true,
     },
     restaurantId: {
       type: Schema.Types.ObjectId,
@@ -129,7 +128,6 @@ const ArchivedQuizAnalyticsSchema: Schema<IArchivedQuizAnalytics> = new Schema(
       type: Date,
       required: true,
       default: Date.now,
-      index: true,
     },
     archivedBy: {
       type: Schema.Types.ObjectId,

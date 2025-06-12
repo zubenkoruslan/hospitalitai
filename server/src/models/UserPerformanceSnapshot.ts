@@ -57,7 +57,6 @@ const UserPerformanceSnapshotSchema: Schema<IUserPerformanceSnapshot> =
         type: Date,
         required: true,
         default: Date.now,
-        index: true,
       },
       snapshotReason: {
         type: String,

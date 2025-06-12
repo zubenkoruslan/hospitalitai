@@ -78,9 +78,9 @@ const limiter = rateLimit({
 });
 // app.use(limiter); // Rate limiting disabled for development
 
-// Body Parsing
-app.use(express.json()); // For parsing application/json
-app.use(express.urlencoded({ extended: true }));
+// Body Parsing - Increased limits for menu and document uploads
+app.use(express.json({ limit: "10mb" })); // For parsing application/json
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const uri: string =
   process.env.MONGODB_URI || "mongodb://localhost:27017/hospitality-training";

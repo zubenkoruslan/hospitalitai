@@ -49,7 +49,6 @@ const userSchema = new Schema<IUser>(
         values: ["restaurant", "staff", "admin"],
         message: "{VALUE} is not a supported role",
       },
-      index: true, // Added index for role filtering
     },
     restaurantId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -68,12 +67,9 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-// Add compound index for common staff lookups
+// Add compound indexes for efficient queries
 userSchema.index({ restaurantId: 1, role: 1 });
-
-// Add compound indexes for admin analytics queries
 userSchema.index({ role: 1, createdAt: 1 });
-userSchema.index({ restaurantId: 1, role: 1 });
 userSchema.index({ createdAt: 1, role: 1 });
 
 // Pre-save hook to hash password

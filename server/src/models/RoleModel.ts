@@ -25,7 +25,6 @@ const RoleSchema: Schema<IRole> = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Restaurant", // Ensures this refers to a document in the 'restaurants' collection
       required: [true, "Restaurant ID is required for a role."],
-      index: true, // Index for efficient querying by restaurantId
     },
   },
   {
