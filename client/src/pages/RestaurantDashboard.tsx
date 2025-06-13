@@ -12,7 +12,7 @@ import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
-import PdfMenuUpload from "../components/menu/PdfMenuUpload"; // Corrected import path
+
 import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
 import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
@@ -112,17 +112,6 @@ const RestaurantDashboard: React.FC = () => {
     const overallAverage = sumOfAverages / staffWithScores.length;
     return overallAverage.toFixed(1); // Display raw average score
   }, [staffData]);
-
-  const openPdfUploadModal = () => {
-    setUploadMessage(null); // Clear previous messages
-    setIsPdfUploadModalOpen(true);
-  };
-
-  const handleFileSelectedForDashboardUpload = (file: File) => {
-    setIsPdfUploadModalOpen(false); // Close the modal
-    // Navigate to MenuUploadPage, passing the file in state
-    navigate("/menu-upload-path", { state: { fileToUpload: file } });
-  };
 
   // Helper function to format notification time
   const formatNotificationTime = (dateString: string) => {
@@ -590,7 +579,7 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
                 <div className="p-6 space-y-4">
                   <button
-                    onClick={openPdfUploadModal}
+                    onClick={() => navigate("/upload")}
                     className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                   >
                     <DocumentArrowUpIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
@@ -1078,13 +1067,13 @@ const RestaurantDashboard: React.FC = () => {
           {/* Quick actions menu */}
           <div className="absolute bottom-16 right-0 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
             <div className="bg-white rounded-lg shadow-xl border border-slate-200 p-2 space-y-1 min-w-48">
-              <button
-                onClick={openPdfUploadModal}
+              <Link
+                to="/upload"
                 className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors duration-150"
               >
                 <DocumentArrowUpIcon className="h-4 w-4" />
-                <span>Upload Menu PDF</span>
-              </button>
+                <span>Upload Menu</span>
+              </Link>
               <Link
                 to="/quiz-management"
                 className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-green-50 hover:text-green-700 rounded-md transition-colors duration-150"
@@ -1111,15 +1100,6 @@ const RestaurantDashboard: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* PDF Upload Modal */}
-      {isPdfUploadModalOpen && (
-        <PdfMenuUpload
-          isOpen={isPdfUploadModalOpen}
-          onClose={() => setIsPdfUploadModalOpen(false)}
-          onFileSelected={handleFileSelectedForDashboardUpload}
-        />
-      )}
     </div>
   );
 };

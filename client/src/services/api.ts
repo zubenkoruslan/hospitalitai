@@ -935,22 +935,6 @@ export const deleteMenuCategory = async (
   return response.data; // Assuming backend sends back some confirmation or updated menu
 };
 
-// PDF Upload for Menu - This function is deprecated and will be removed.
-export const processPdfMenuUpload = async (
-  restaurantId: string,
-  formData: FormData
-): Promise<IMenuWithItemsClient> => {
-  const response = await api.post<{
-    message: string;
-    data: IMenuWithItemsClient;
-  }>(`/menus/upload/pdf/${restaurantId}`, formData, {
-    headers: {
-      // Axios handles Content-Type for FormData automatically
-    },
-  });
-  return response.data.data;
-};
-
 // Role Endpoints
 /**
  * Fetches all roles for the current restaurant.
@@ -1190,7 +1174,9 @@ export const uploadSopDocument = async (
   data: SopDocumentUploadData
 ): Promise<{
   message: string;
-  document: ISopDocument;
+  documentId: string;
+  title: string;
+  status: string;
 }> => {
   const formData = new FormData();
   formData.append("title", data.title);
@@ -1930,4 +1916,108 @@ export const getTemplateInfo = async (): Promise<any> => {
     console.error("Error fetching template info:", error);
     throw new Error("Failed to fetch template information");
   }
+};
+
+// ===== CLEAN MENU API METHODS =====
+
+export interface CleanMenuItem {
+  name: string;
+  description?: string;
+  price?: number;
+  category: string;
+  itemType: "food" | "beverage" | "wine";
+  // Wine-specific fields
+  vintage?: number;
+  producer?: string;
+  region?: string;
+  grapeVariety?: string[];
+  servingOptions?: Array<{ size: string; price: number }>;
+  // Food-specific fields
+  ingredients?: string[];
+  cookingMethods?: string[];
+  allergens?: string[];
+  isDairyFree?: boolean;
+  isSpicy?: boolean;
+  cuisineType?: string;
+  // Beverage-specific fields
+  spiritType?: string;
+  beerStyle?: string;
+  cocktailIngredients?: string[];
+  alcoholContent?: string;
+  servingStyle?: string;
+  isNonAlcoholic?: boolean;
+  temperature?: string;
+  // Dietary fields
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  confidence: number;
+  originalText: string;
+}
+
+export interface CleanMenuParseResult {
+  menuName: string;
+  items: CleanMenuItem[];
+  totalItemsFound: number;
+  processingNotes: string[];
+}
+
+export interface CleanMenuImportRequest {
+  cleanResult: CleanMenuParseResult;
+  restaurantId: string;
+  targetMenuId?: string;
+  menuName?: string;
+}
+
+export interface CleanMenuImportResponse {
+  success: boolean;
+  data: {
+    menuId: string;
+    menuName: string;
+    totalItems: number;
+    importedItems: number;
+    failedItems: number;
+    processingNotes: string[];
+  };
+  message: string;
+}
+
+/**
+ * Upload and parse a menu file (supports PDF, CSV, Excel, Word, JSON, TXT)
+ */
+export const uploadCleanMenu = async (
+  file: File
+): Promise<CleanMenuParseResult> => {
+  const formData = new FormData();
+  formData.append("menuFile", file);
+
+  const response = await api.post<{
+    success: boolean;
+    data: CleanMenuParseResult;
+    message: string;
+  }>("/upload/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  if (!response.data.success) {
+    throw new Error(response.data.message || "Failed to parse menu");
+  }
+
+  return response.data.data;
+};
+
+/**
+ * Import clean menu results to database
+ */
+export const importCleanMenu = async (
+  importRequest: CleanMenuImportRequest
+): Promise<CleanMenuImportResponse> => {
+  const response = await api.post<CleanMenuImportResponse>(
+    "/upload/import",
+    importRequest
+  );
+
+  return response.data;
 };

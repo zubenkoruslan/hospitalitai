@@ -63,6 +63,20 @@ export interface IMenuItem extends Document {
   isVegetarian: boolean;
   isVegan: boolean;
 
+  // Food-specific enhancement fields
+  cookingMethods?: string[];
+  allergens?: string[];
+  isSpicy?: boolean;
+
+  // Beverage-specific enhancement fields
+  spiritType?: string;
+  beerStyle?: string;
+  cocktailIngredients?: string[];
+  alcoholContent?: string;
+  servingStyle?: string;
+  isNonAlcoholic?: boolean;
+  temperature?: string;
+
   // Wine-specific fields
   wineStyle?: WineStyleType;
   producer?: string;
@@ -89,6 +103,21 @@ export interface ILeanMenuItem {
   isDairyFree: boolean;
   isVegetarian: boolean;
   isVegan: boolean;
+
+  // Food-specific enhancement fields
+  cookingMethods?: string[];
+  allergens?: string[];
+  isSpicy?: boolean;
+
+  // Beverage-specific enhancement fields
+  spiritType?: string;
+  beerStyle?: string;
+  cocktailIngredients?: string[];
+  alcoholContent?: string;
+  servingStyle?: string;
+  isNonAlcoholic?: boolean;
+  temperature?: string;
+
   wineStyle?: WineStyleType;
   producer?: string;
   grapeVariety?: string[];
@@ -192,6 +221,51 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       default: true,
       index: true,
     },
+
+    // Food-specific enhancement fields
+    cookingMethods: {
+      type: [{ type: String, trim: true }],
+      default: undefined,
+    },
+    allergens: {
+      type: [{ type: String, trim: true }],
+      default: undefined,
+    },
+    isSpicy: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Beverage-specific enhancement fields
+    spiritType: {
+      type: String,
+      trim: true,
+    },
+    beerStyle: {
+      type: String,
+      trim: true,
+    },
+    cocktailIngredients: {
+      type: [{ type: String, trim: true }],
+      default: undefined,
+    },
+    alcoholContent: {
+      type: String,
+      trim: true,
+    },
+    servingStyle: {
+      type: String,
+      trim: true,
+    },
+    isNonAlcoholic: {
+      type: Boolean,
+      default: false,
+    },
+    temperature: {
+      type: String,
+      trim: true,
+    },
+
     // Wine-specific schema fields
     wineStyle: {
       type: String,

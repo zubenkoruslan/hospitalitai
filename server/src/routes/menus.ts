@@ -1,20 +1,15 @@
 import express from "express";
 import {
   createMenu,
-  getAllMenus,
+  getMenus,
   getMenuById,
   updateMenu,
   deleteMenu,
   updateMenuActivationStatus,
-  handleMenuUploadPreview,
-  handleFinalizeMenuImport,
-  uploadMenuPdf,
   deleteCategoryAndReassignItems,
-  handleProcessMenuForConflictResolution,
-  getMenuImportJobStatus,
 } from "../controllers/menuController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
-import { uploadPdf, uploadMenu } from "../middleware/uploadMiddleware";
+
 import {
   handleValidationErrors,
   validateCreateMenu,
@@ -22,8 +17,6 @@ import {
   validateObjectId,
   validateMenuIdParam,
   validateCategoryNameParam,
-  validateFinalMenuImportData,
-  validateProcessConflictResolutionData,
 } from "../middleware/validationMiddleware";
 import { body } from "express-validator";
 
@@ -35,7 +28,7 @@ router.get(
   protect,
   validateObjectId("restaurantId"),
   handleValidationErrors,
-  getAllMenus
+  getMenus
 );
 
 // GET a single menu by its ID, including its items
@@ -82,38 +75,6 @@ router.delete(
   deleteMenu
 );
 
-// Route to upload a menu PDF for a specific restaurant
-router.post(
-  "/upload/pdf/:restaurantId",
-  protect,
-  restrictTo("restaurant"),
-  uploadPdf.single("menuPdf"),
-  validateObjectId("restaurantId"),
-  handleValidationErrors,
-  uploadMenuPdf
-);
-
-// Enhanced Route: Upload a menu file (multiple formats) to get a preview for interactive correction
-router.post(
-  "/upload/preview", // No restaurantId in path, will be taken from req.user
-  protect, // Ensure user is authenticated
-  restrictTo("restaurant"),
-  uploadMenu.single("menuFile"), // Enhanced multi-format upload middleware (PDF, Excel, CSV, JSON, Word)
-  // No specific body/param validation here as we rely on file upload and auth context
-  // handleValidationErrors, // Not strictly needed if no preceding validators that add to req.errors
-  handleMenuUploadPreview
-);
-
-// Backwards Compatibility Route: Upload a menu PDF using the old field name "menuPdf"
-router.post(
-  "/upload/preview/pdf", // Explicit PDF route for backwards compatibility
-  protect, // Ensure user is authenticated
-  restrictTo("restaurant"),
-  uploadPdf.single("menuPdf"), // Original PDF-only middleware with old field name
-  // No specific body/param validation here as we rely on file upload and auth context
-  handleMenuUploadPreview
-);
-
 // New route for deleting a category within a specific menu
 router.delete(
   "/:menuId/categories/:categoryName",
@@ -134,35 +95,6 @@ router.patch(
   body("isActive").isBoolean().withMessage("isActive must be a boolean."), // Validate isActive in body
   handleValidationErrors,
   updateMenuActivationStatus
-);
-
-// POST /api/menus/upload/import
-router.post(
-  "/upload/import",
-  protect,
-  restrictTo("restaurant"),
-  validateFinalMenuImportData,
-  handleFinalizeMenuImport
-);
-
-// POST /api/menus/upload/process - For conflict resolution
-router.post(
-  "/upload/process",
-  protect,
-  restrictTo("restaurant"),
-  validateProcessConflictResolutionData,
-  handleValidationErrors,
-  handleProcessMenuForConflictResolution
-);
-
-// GET /api/menus/upload/status/:jobId - For async import job status
-router.get(
-  "/upload/status/:jobId",
-  protect,
-  restrictTo("restaurant"),
-  validateObjectId("jobId"), // Validate that jobId is a valid ObjectId
-  handleValidationErrors,
-  getMenuImportJobStatus
 );
 
 export default router;

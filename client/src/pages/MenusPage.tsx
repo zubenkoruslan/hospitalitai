@@ -27,8 +27,7 @@ import {
   ChartBarIcon,
   BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
-import PdfMenuUpload from "../components/menu/PdfMenuUpload";
-import MenuUpload from "../components/menu/MenuUpload";
+
 import TemplateDownloadSection from "../components/menu/TemplateDownloadSection";
 import { useMenus } from "../hooks/useMenus";
 
@@ -84,10 +83,7 @@ const MenusPage: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [currentMenu, setCurrentMenu] = useState<IMenuClient | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] =
-    useState<boolean>(false);
-  const [isMenuUploadModalOpen, setIsMenuUploadModalOpen] =
-    useState<boolean>(false);
+
   const [isTemplatesSectionExpanded, setIsTemplatesSectionExpanded] =
     useState<boolean>(false);
   const [isTogglingMenuStatus, setIsTogglingMenuStatus] = useState<
@@ -143,16 +139,12 @@ const MenusPage: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const openPdfUploadModal = () => {
-    setIsPdfUploadModalOpen(true);
+  const toggleTemplatesSection = () => {
+    setIsTemplatesSectionExpanded(!isTemplatesSectionExpanded);
   };
 
   const openMenuUploadModal = () => {
-    setIsMenuUploadModalOpen(true);
-  };
-
-  const toggleTemplatesSection = () => {
-    setIsTemplatesSectionExpanded(!isTemplatesSectionExpanded);
+    navigate("/upload");
   };
 
   const closeModal = () => {
@@ -162,8 +154,6 @@ const MenusPage: React.FC = () => {
     setFormData(initialFormData);
     setFormError(null);
     setIsSubmitting(false);
-    setIsPdfUploadModalOpen(false);
-    setIsMenuUploadModalOpen(false);
   };
 
   // --- Form Handlers ---
@@ -257,11 +247,6 @@ const MenusPage: React.FC = () => {
     } finally {
       setIsTogglingMenuStatus(null);
     }
-  };
-
-  const handleFileSelectedForUpload = (file: File) => {
-    setIsPdfUploadModalOpen(false);
-    navigate("/menu-upload-path", { state: { fileToUpload: file } });
   };
 
   return (
@@ -660,24 +645,6 @@ const MenusPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* PDF Upload Modal */}
-      {isPdfUploadModalOpen && (
-        <PdfMenuUpload
-          isOpen={isPdfUploadModalOpen}
-          onClose={closeModal}
-          onFileSelected={handleFileSelectedForUpload}
-        />
-      )}
-
-      {/* Multi-Format Menu Upload Modal */}
-      {isMenuUploadModalOpen && (
-        <MenuUpload
-          isOpen={isMenuUploadModalOpen}
-          onClose={closeModal}
-          onFileSelected={handleFileSelectedForUpload}
-        />
       )}
     </div>
   );

@@ -36,7 +36,7 @@ import CreateQuizPage from "./pages/CreateQuizPage";
 import SettingsPage from "./pages/SettingsPage";
 import SopManagementPage from "./pages/SopManagementPage";
 import SopDocumentDetailPage from "./pages/SopDocumentDetailPage";
-import MenuUploadPage from "./pages/MenuUploadPage";
+import CleanMenuUploadPage from "./pages/CleanMenuUploadPage";
 import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -246,11 +246,12 @@ function App() {
                 path="/new-test-route"
                 element={<div>This is the new test route page!</div>}
               />
+
               <Route
-                path="/menu-upload-path"
+                path="/upload"
                 element={
                   <ProtectedRoute requiredRole="restaurant">
-                    <MenuUploadPage />
+                    <CleanMenuUploadPage />
                   </ProtectedRoute>
                 }
               />

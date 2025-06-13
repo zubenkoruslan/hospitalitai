@@ -96,7 +96,182 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
                   VG
                 </span>
               )}
+              {item.isSpicy && (
+                <span className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded-full text-xxs">
+                  Spicy
+                </span>
+              )}
+              {item.isNonAlcoholic && (
+                <span className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded-full text-xxs">
+                  Non-Alcoholic
+                </span>
+              )}
             </div>
+
+            {/* Enhanced Data Display */}
+            {/* Ingredients */}
+            {item.ingredients && item.ingredients.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xxs text-gray-600 font-medium mb-1">
+                  Ingredients:
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.ingredients.slice(0, 3).map((ingredient, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-green-100 text-green-700 text-xxs rounded-full"
+                    >
+                      {ingredient}
+                    </span>
+                  ))}
+                  {item.ingredients.length > 3 && (
+                    <span className="text-xxs text-gray-500">
+                      +{item.ingredients.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Cooking Methods */}
+            {item.cookingMethods && item.cookingMethods.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xxs text-gray-600 font-medium mb-1">
+                  Cooking:
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.cookingMethods.slice(0, 2).map((method, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xxs rounded-full"
+                    >
+                      {method}
+                    </span>
+                  ))}
+                  {item.cookingMethods.length > 2 && (
+                    <span className="text-xxs text-gray-500">
+                      +{item.cookingMethods.length - 2} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Allergens */}
+            {item.allergens && item.allergens.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xxs text-gray-600 font-medium mb-1">
+                  Allergens:
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.allergens.slice(0, 3).map((allergen, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-red-100 text-red-700 text-xxs rounded-full"
+                    >
+                      {allergen}
+                    </span>
+                  ))}
+                  {item.allergens.length > 3 && (
+                    <span className="text-xxs text-gray-500">
+                      +{item.allergens.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wine-specific info */}
+            {item.itemType === "wine" && (
+              <div className="mb-2">
+                {item.grapeVariety && item.grapeVariety.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-xxs text-gray-600 font-medium mb-1">
+                      Grape Variety:
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {item.grapeVariety.slice(0, 2).map((grape, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xxs rounded-full"
+                        >
+                          {grape}
+                        </span>
+                      ))}
+                      {item.grapeVariety.length > 2 && (
+                        <span className="text-xxs text-gray-500">
+                          +{item.grapeVariety.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1 text-xxs">
+                  {item.vintage && (
+                    <span className="text-gray-600">{item.vintage}</span>
+                  )}
+                  {item.producer && (
+                    <span className="text-gray-600">{item.producer}</span>
+                  )}
+                  {item.region && (
+                    <span className="text-gray-600">{item.region}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Beverage-specific info */}
+            {item.itemType === "beverage" && (
+              <div className="mb-2">
+                <div className="flex flex-wrap gap-1 text-xxs">
+                  {item.spiritType && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xxs rounded-full">
+                      {item.spiritType}
+                    </span>
+                  )}
+                  {item.beerStyle && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xxs rounded-full">
+                      {item.beerStyle}
+                    </span>
+                  )}
+                  {item.alcoholContent && (
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xxs rounded-full">
+                      {item.alcoholContent}
+                    </span>
+                  )}
+                  {item.temperature && (
+                    <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 text-xxs rounded-full">
+                      {item.temperature}
+                    </span>
+                  )}
+                </div>
+                {item.cocktailIngredients &&
+                  item.cocktailIngredients.length > 0 && (
+                    <div className="mt-1">
+                      <div className="text-xxs text-gray-600 font-medium mb-1">
+                        Cocktail Ingredients:
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {item.cocktailIngredients
+                          .slice(0, 3)
+                          .map((ingredient, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xxs rounded-full"
+                            >
+                              {ingredient}
+                            </span>
+                          ))}
+                        {item.cocktailIngredients.length > 3 && (
+                          <span className="text-xxs text-gray-500">
+                            +{item.cocktailIngredients.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
           </div>
 
           <div className="flex-shrink-0 flex flex-row space-x-2 justify-end">

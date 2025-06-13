@@ -21,6 +21,7 @@ import rateLimit from "express-rate-limit";
 // Import route files
 import authRoutes from "./routes/auth";
 import menuRoutes from "./routes/menus";
+import cleanMenuRoutes from "./routes/cleanMenus"; // New clean menu routes
 import itemRoutes from "./routes/items";
 import quizRoutes from "./routes/quiz";
 import { quizResultRouter } from "./routes/quizResult";
@@ -42,7 +43,7 @@ import debugRoutes from "./routes/debugRoutes"; // Import debug routes
 import templateRoutes from "./routes/templates"; // Import template routes
 
 // Import and start the menu import worker
-import "./workers/menuImportWorker"; // This will start the worker
+// Legacy menu import worker removed - using clean upload system now
 
 const app: Express = express();
 
@@ -108,6 +109,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/auth", passwordResetRoutes); // Mount password reset routes under /api/auth
 app.use("/api/menus", menuRoutes);
+app.use("/api/upload", cleanMenuRoutes); // Upload routes (formerly clean menu routes)
 app.use("/api/items", itemRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/quiz-results", quizResultRouter);

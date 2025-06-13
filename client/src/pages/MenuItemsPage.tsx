@@ -26,6 +26,7 @@ import {
   SparklesIcon, // For wine (elegant/premium feel)
   CakeIcon, // For food
   BeakerIcon, // For beverages (glass/liquid container)
+  ArrowUpTrayIcon, // For upload functionality
 } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
@@ -46,7 +47,8 @@ import {
 // Import item components
 import AddEditMenuItemModal from "../components/items/AddEditMenuItemModal"; // Import the new modal
 import MenuItemList from "../components/items/MenuItemList"; // Import the item list
-import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal"; // Import the delete modal
+import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal";
+
 // Import the custom hook
 import { useMenuData } from "../hooks/useMenuData";
 import MenuDetailsEditModal from "../components/menu/MenuDetailsEditModal"; // Import the new menu details modal
@@ -532,15 +534,25 @@ const MenuItemsPage: React.FC = () => {
                 : `${stats.currentTabCount} total`}
             </span>
           </div>
-          <div className="relative max-w-md flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+          <div className="flex items-center space-x-3">
+            <div className="relative max-w-md flex-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/clean-menu-upload")}
+              className="flex items-center gap-2 px-3 py-2 text-sm whitespace-nowrap"
+            >
+              <ArrowUpTrayIcon className="h-4 w-4" />
+              Upload Menu
+            </Button>
           </div>
         </div>
       </div>
@@ -676,6 +688,16 @@ const MenuItemsPage: React.FC = () => {
               <PlusIcon className="h-4 w-4" />
               Add {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Item
             </Button>
+            {!isEmptyDueToSearch && (
+              <Button
+                variant="secondary"
+                onClick={() => navigate("/clean-menu-upload")}
+                className="flex items-center gap-2"
+              >
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                Upload Menu
+              </Button>
+            )}
           </div>
         </div>
       );

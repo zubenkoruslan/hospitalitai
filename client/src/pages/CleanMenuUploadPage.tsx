@@ -88,6 +88,7 @@ const CleanMenuUploadPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<CleanMenuItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
@@ -161,12 +162,129 @@ const CleanMenuUploadPage: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
+  // Supported file types
+  const supportedTypes = {
+    "application/pdf": ["pdf"],
+    "text/csv": ["csv"],
+    "application/vnd.ms-excel": ["xls"],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+      "xlsx",
+    ],
+    "application/msword": ["doc"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+      "docx",
+    ],
+    "application/json": ["json"],
+    "text/plain": ["txt"],
+  };
+
+  const getAllowedExtensions = () => {
+    return Object.values(supportedTypes)
+      .flat()
+      .map((ext) => `.${ext}`)
+      .join(",");
+  };
+
+  const isFileTypeSupported = (file: File) => {
+    const fileType = file.type;
+    const fileExtension = file.name.toLowerCase().split(".").pop();
+
+    // Check by MIME type first
+    if (supportedTypes[fileType as keyof typeof supportedTypes]) {
+      return true;
+    }
+
+    // Check by file extension as fallback
+    for (const [mimeType, extensions] of Object.entries(supportedTypes)) {
+      if (extensions.includes(fileExtension || "")) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const getFileTypeDisplay = (file: File) => {
+    const extension = file.name.toLowerCase().split(".").pop();
+    switch (extension) {
+      case "pdf":
+        return { icon: "PDF", color: "bg-red-500" };
+      case "csv":
+        return { icon: "CSV", color: "bg-green-500" };
+      case "xls":
+      case "xlsx":
+        return { icon: "XLS", color: "bg-blue-500" };
+      case "doc":
+      case "docx":
+        return { icon: "DOC", color: "bg-indigo-500" };
+      case "json":
+        return { icon: "JSON", color: "bg-yellow-500" };
+      case "txt":
+        return { icon: "TXT", color: "bg-gray-500" };
+      default:
+        return { icon: "FILE", color: "bg-slate-500" };
+    }
+  };
+
+  const handleFileSelection = (selectedFile: File) => {
+    if (!isFileTypeSupported(selectedFile)) {
+      setError(
+        `Unsupported file type. Please upload: PDF, CSV, Excel (XLS/XLSX), Word (DOC/DOCX), JSON, or TXT files.`
+      );
+      return;
+    }
+
+    // Check file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (selectedFile.size > maxSize) {
+      setError(`File too large. Please upload files smaller than 50MB.`);
+      return;
+    }
+
+    setFile(selectedFile);
+    setResult(null);
+    setError(null);
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      setResult(null);
-      setError(null);
+      handleFileSelection(selectedFile);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 1) {
+      setError("Please upload only one file at a time.");
+      return;
+    }
+
+    const droppedFile = files[0];
+    if (droppedFile) {
+      handleFileSelection(droppedFile);
     }
   };
 
@@ -653,7 +771,7 @@ const CleanMenuUploadPage: React.FC = () => {
                         {category}
                       </option>
                     ))}
-                  <option value="custom">➕ Create New Category</option>
+                  <option value="custom">Create New Category</option>
                 </select>
 
                 {(editItem.category === customCategory ||
@@ -1229,10 +1347,10 @@ const CleanMenuUploadPage: React.FC = () => {
                     }`}
                   >
                     {item.itemType === "wine"
-                      ? "🍷 Wine"
+                      ? "Wine"
                       : item.itemType === "beverage"
-                      ? "🍹 Beverage"
-                      : "🍽️ Food"}
+                      ? "Beverage"
+                      : "Food"}
                   </span>
                   <span className="px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 rounded-full text-xs font-medium">
                     {item.category}
@@ -1313,7 +1431,7 @@ const CleanMenuUploadPage: React.FC = () => {
                           key={idx}
                           className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs rounded-full font-semibold shadow-md"
                         >
-                          🍇 {grape}
+                          {grape}
                         </span>
                       ))}
                     </div>
@@ -1353,7 +1471,7 @@ const CleanMenuUploadPage: React.FC = () => {
                           key={idx}
                           className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs rounded-full font-semibold shadow-md"
                         >
-                          🥬 {ingredient}
+                          {ingredient}
                         </span>
                       ))}
                     </div>
@@ -1371,7 +1489,7 @@ const CleanMenuUploadPage: React.FC = () => {
                           key={idx}
                           className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full font-semibold shadow-md"
                         >
-                          👨‍🍳 {method}
+                          {method}
                         </span>
                       ))}
                     </div>
@@ -1381,7 +1499,7 @@ const CleanMenuUploadPage: React.FC = () => {
                 {item.allergens && item.allergens.length > 0 && (
                   <div className="mb-4">
                     <span className="font-semibold text-green-900 block mb-3">
-                      ⚠️ Allergens:
+                      Allergens:
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {item.allergens.map((allergen, idx) => (
@@ -1404,12 +1522,12 @@ const CleanMenuUploadPage: React.FC = () => {
                     <div className="flex flex-wrap gap-2">
                       {item.isDairyFree && (
                         <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs rounded-full font-semibold shadow-md">
-                          🥛 Dairy-Free
+                          Dairy-Free
                         </span>
                       )}
                       {item.isSpicy && (
                         <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs rounded-full font-semibold shadow-md">
-                          🌶️ Spicy
+                          Spicy
                         </span>
                       )}
                     </div>
@@ -1427,7 +1545,7 @@ const CleanMenuUploadPage: React.FC = () => {
                         Spirit Type:
                       </span>
                       <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs rounded-full font-semibold shadow-md">
-                        🥃 {item.spiritType}
+                        {item.spiritType}
                       </span>
                     </div>
                   )}
@@ -1438,7 +1556,7 @@ const CleanMenuUploadPage: React.FC = () => {
                         Beer Style:
                       </span>
                       <span className="px-3 py-1.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs rounded-full font-semibold shadow-md">
-                        🍺 {item.beerStyle}
+                        {item.beerStyle}
                       </span>
                     </div>
                   )}
@@ -1480,7 +1598,7 @@ const CleanMenuUploadPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-blue-900">Type:</span>
                       <span className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs rounded-full font-semibold shadow-md">
-                        🚫 Non-Alcoholic
+                        Non-Alcoholic
                       </span>
                     </div>
                   )}
@@ -1498,7 +1616,7 @@ const CleanMenuUploadPage: React.FC = () => {
                             key={idx}
                             className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full font-semibold shadow-md"
                           >
-                            🍸 {ingredient}
+                            {ingredient}
                           </span>
                         ))}
                       </div>
@@ -1509,7 +1627,7 @@ const CleanMenuUploadPage: React.FC = () => {
 
             <details className="mt-4 bg-gradient-to-r from-slate-100 to-slate-50 rounded-xl p-4 border border-slate-200">
               <summary className="text-sm text-slate-600 cursor-pointer font-medium hover:text-slate-800 transition-colors">
-                📝 View Original Text
+                View Original Text
               </summary>
               <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
                 <p className="text-sm text-slate-600 font-mono leading-relaxed">
@@ -1552,7 +1670,7 @@ const CleanMenuUploadPage: React.FC = () => {
             bg: "bg-gradient-to-r from-purple-100 to-purple-200",
             border: "border-purple-300",
             text: "text-purple-900",
-            icon: "🍷",
+            icon: <span className="text-2xl">🍷</span>,
             headerBg: "bg-gradient-to-r from-purple-600 to-purple-700",
             shadow: "shadow-purple-200",
           };
@@ -1561,7 +1679,7 @@ const CleanMenuUploadPage: React.FC = () => {
             bg: "bg-gradient-to-r from-blue-100 to-blue-200",
             border: "border-blue-300",
             text: "text-blue-900",
-            icon: "🍹",
+            icon: <span className="text-2xl">🍸</span>,
             headerBg: "bg-gradient-to-r from-blue-600 to-blue-700",
             shadow: "shadow-blue-200",
           };
@@ -1570,7 +1688,7 @@ const CleanMenuUploadPage: React.FC = () => {
             bg: "bg-gradient-to-r from-green-100 to-green-200",
             border: "border-green-300",
             text: "text-green-900",
-            icon: "🍽️",
+            icon: <span className="text-2xl">🍽️</span>,
             headerBg: "bg-gradient-to-r from-green-600 to-green-700",
             shadow: "shadow-green-200",
           };
@@ -1579,7 +1697,7 @@ const CleanMenuUploadPage: React.FC = () => {
             bg: "bg-gradient-to-r from-slate-100 to-slate-200",
             border: "border-slate-300",
             text: "text-slate-900",
-            icon: "📄",
+            icon: <span className="text-2xl">📋</span>,
             headerBg: "bg-gradient-to-r from-slate-600 to-slate-700",
             shadow: "shadow-slate-200",
           };
@@ -1600,7 +1718,7 @@ const CleanMenuUploadPage: React.FC = () => {
             <div
               className={`w-14 h-14 ${style.headerBg} rounded-2xl flex items-center justify-center shadow-lg`}
             >
-              <span className="text-2xl text-white">{style.icon}</span>
+              {style.icon}
             </div>
             <div>
               <h4 className="font-bold text-xl tracking-tight">{category}</h4>
@@ -1827,7 +1945,7 @@ const CleanMenuUploadPage: React.FC = () => {
           <div className="text-3xl font-light text-blue-700 mb-2">
             {foodItems.length}
           </div>
-          <div className="text-sm font-medium text-blue-800">🍽️ Food</div>
+          <div className="text-sm font-medium text-blue-800">Food</div>
         </button>
 
         {/* Beverages */}
@@ -1843,7 +1961,7 @@ const CleanMenuUploadPage: React.FC = () => {
           <div className="text-3xl font-light text-green-700 mb-2">
             {beverageItems.length}
           </div>
-          <div className="text-sm font-medium text-green-800">🥤 Beverages</div>
+          <div className="text-sm font-medium text-green-800">Beverages</div>
         </button>
 
         {/* Wines */}
@@ -1859,7 +1977,7 @@ const CleanMenuUploadPage: React.FC = () => {
           <div className="text-3xl font-light text-purple-700 mb-2">
             {wineItems.length}
           </div>
-          <div className="text-sm font-medium text-purple-800">🍷 Wines</div>
+          <div className="text-sm font-medium text-purple-800">Wines</div>
         </button>
       </div>
     );
@@ -2004,68 +2122,212 @@ const CleanMenuUploadPage: React.FC = () => {
         </div>
 
         {filteredItems.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <button
-              onClick={() => expandAllCategories(sortedCategories)}
-              className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600"
-            >
-              🔽 Expand All
-            </button>
-            <button
-              onClick={collapseAllCategories}
-              className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600"
-            >
-              🔼 Collapse All
-            </button>
+          <div className="mb-6 p-6 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-wrap gap-3">
+              {/* View Controls */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700 mr-2">
+                  View:
+                </span>
+                <button
+                  onClick={() => expandAllCategories(sortedCategories)}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-2"
+                  style={{
+                    color: "#ffffff !important",
+                    backgroundColor: "#2563eb",
+                    border: "none",
+                  }}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="#ffffff"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                  <span style={{ color: "#ffffff !important" }}>
+                    Expand All
+                  </span>
+                </button>
+                <button
+                  onClick={collapseAllCategories}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-2"
+                  style={{
+                    color: "#ffffff !important",
+                    backgroundColor: "#2563eb",
+                    border: "none",
+                  }}
+                >
+                  <svg
+                    className="w-4 h-4 rotate-180"
+                    fill="none"
+                    stroke="#ffffff"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                  <span style={{ color: "#ffffff !important" }}>
+                    Collapse All
+                  </span>
+                </button>
+              </div>
 
-            {activeFilter !== "all" && (
-              <button
-                onClick={() => setActiveFilter("all")}
-                className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600"
-              >
-                🔄 Show All Items
-              </button>
-            )}
+              {/* Filter Controls */}
+              {activeFilter !== "all" && (
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-px bg-slate-300 mx-2"></div>
+                  <span className="text-sm font-medium text-slate-700 mr-2">
+                    Filter:
+                  </span>
+                  <button
+                    onClick={() => setActiveFilter("all")}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                      />
+                    </svg>
+                    Show All Items
+                  </button>
+                </div>
+              )}
 
-            {editMode && (
-              <>
-                <div className="border-l border-gray-300 mx-2"></div>
-                <button
-                  onClick={() => setShowCreateCategory(true)}
-                  className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-                >
-                  ➕ Create Category
-                </button>
-                <button
-                  onClick={selectAllItems}
-                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllItems}
-                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
-                >
-                  Deselect All
-                </button>
-                {selectedItems.size > 0 && (
-                  <>
-                    <button
-                      onClick={() => setShowCreateCategory(true)}
-                      className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+              {/* Edit Mode Controls */}
+              {editMode && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="h-6 w-px bg-slate-300 mx-2"></div>
+                  <span className="text-sm font-medium text-slate-700 mr-2">
+                    Actions:
+                  </span>
+
+                  <button
+                    onClick={() => setShowCreateCategory(true)}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      Move to New Category ({selectedItems.size})
-                    </button>
-                    <button
-                      onClick={handleBulkDelete}
-                      className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                    Create Category
+                  </button>
+
+                  <button
+                    onClick={selectAllItems}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      Delete Selected ({selectedItems.size})
-                    </button>
-                  </>
-                )}
-              </>
-            )}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Select All
+                  </button>
+
+                  <button
+                    onClick={deselectAllItems}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Deselect All
+                  </button>
+
+                  {selectedItems.size > 0 && (
+                    <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-300">
+                      <span className="text-sm font-medium text-slate-700">
+                        Selected ({selectedItems.size}):
+                      </span>
+                      <button
+                        onClick={() => setShowCreateCategory(true)}
+                        className="px-4 py-2 text-sm bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 12l2 2 4-4"
+                          />
+                        </svg>
+                        Move to Category
+                      </button>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="px-4 py-2 text-sm bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-1"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2140,14 +2402,14 @@ const CleanMenuUploadPage: React.FC = () => {
               <div className="text-xs text-gray-600">
                 {selectedItems.size > 0 ? (
                   <p>
-                    💡 You have {selectedItems.size} items selected. You can
-                    create an empty category or move the selected items to the
-                    new category.
+                    You have {selectedItems.size} items selected. You can create
+                    an empty category or move the selected items to the new
+                    category.
                   </p>
                 ) : (
                   <p>
-                    💡 This will create an empty category with a placeholder
-                    item that you can edit or delete.
+                    This will create an empty category with a placeholder item
+                    that you can edit or delete.
                   </p>
                 )}
               </div>
@@ -2196,119 +2458,30 @@ const CleanMenuUploadPage: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-primary-50">
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-primary-50">
-        <div className="container mx-auto px-6 py-12 max-w-6xl">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-light text-dark-slate mb-6 tracking-tight">
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium">
-                Menu Upload
-              </span>{" "}
-              <span className="font-medium">& Editor</span>
-            </h1>
-            <p className="text-xl text-muted-gray max-w-2xl mx-auto font-light leading-relaxed">
-              Upload PDF menus and edit the extracted items with AI-powered
-              analysis before importing
-            </p>
-          </div>
-
-          {/* Upload Section */}
-          <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 mb-8">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg
-                  className="w-8 h-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-medium text-dark-slate mb-2">
-                Upload Menu PDF
-              </h2>
-              <p className="text-muted-gray">
-                AI will analyze and extract menu items automatically
+      <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+        <div className="p-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h1 className="text-4xl md:text-5xl font-light text-dark-slate mb-6 tracking-tight">
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-medium">
+                  Menu Upload
+                </span>{" "}
+                <span className="font-medium">& Editor</span>
+              </h1>
+              <p className="text-xl text-muted-gray max-w-2xl mx-auto font-light leading-relaxed">
+                Upload PDF menus and edit the extracted items with AI-powered
+                analysis before importing
               </p>
             </div>
 
-            <div className="max-w-md mx-auto">
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-dark-slate mb-3">
-                  Select PDF File
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-muted-gray file:mr-4 file:py-3 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-gradient-to-r file:from-primary file:to-primary-600 file:text-white hover:file:from-primary-600 hover:file:to-primary-700 file:transition-all file:duration-200 file:cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {file && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white text-lg">📄</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-primary-800">
-                      {file.name}
-                    </div>
-                    <div className="text-sm text-primary-600">
-                      {Math.round(file.size / 1024)}KB
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={handleUpload}
-                disabled={!file || uploading}
-                className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-md"
-              >
-                {uploading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Analyzing Menu...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
-                    <span>Upload & Parse Menu</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-6 mb-8 shadow-lg">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+            {/* Upload Section */}
+            <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 mb-8">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-8 h-8 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -2317,26 +2490,233 @@ const CleanMenuUploadPage: React.FC = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                     />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="font-medium text-red-800 mb-1">
-                    Upload Error
+                <h2 className="text-2xl font-medium text-dark-slate mb-2">
+                  Upload Menu File
+                </h2>
+                <p className="text-muted-gray">
+                  AI will analyze and extract menu items automatically
+                </p>
+              </div>
+
+              <div className="max-w-2xl mx-auto">
+                {/* Supported file types info */}
+                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Supported File Types
                   </h3>
-                  <p className="text-red-700">{error}</p>
+                  <div className="grid grid-cols-4 gap-3 text-xs">
+                    <div className="flex items-center gap-1 text-red-700">
+                      <span className="w-2 h-2 bg-red-500 rounded"></span>
+                      PDF
+                    </div>
+                    <div className="flex items-center gap-1 text-green-700">
+                      <span className="w-2 h-2 bg-green-500 rounded"></span>
+                      CSV
+                    </div>
+                    <div className="flex items-center gap-1 text-blue-700">
+                      <span className="w-2 h-2 bg-blue-500 rounded"></span>
+                      Excel (XLS/XLSX)
+                    </div>
+                    <div className="flex items-center gap-1 text-indigo-700">
+                      <span className="w-2 h-2 bg-indigo-500 rounded"></span>
+                      Word (DOC/DOCX)
+                    </div>
+                    <div className="flex items-center gap-1 text-yellow-700">
+                      <span className="w-2 h-2 bg-yellow-500 rounded"></span>
+                      JSON
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-700">
+                      <span className="w-2 h-2 bg-gray-500 rounded"></span>
+                      Text (TXT)
+                    </div>
+                  </div>
                 </div>
+
+                {/* Drag and Drop Zone */}
+                <div
+                  className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${
+                    isDragOver
+                      ? "border-primary-400 bg-gradient-to-br from-primary-50 to-primary-100 scale-[1.02] shadow-lg"
+                      : "border-slate-300 bg-gradient-to-br from-slate-50 to-white hover:border-primary-300 hover:from-primary-50 hover:to-white"
+                  } cursor-pointer`}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById("fileInput")?.click()}
+                >
+                  <div
+                    className={`mx-auto mb-4 ${
+                      isDragOver ? "scale-110" : ""
+                    } transition-transform duration-300`}
+                  >
+                    {isDragOver ? (
+                      <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                        <svg
+                          className="w-8 h-8 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                          />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl flex items-center justify-center mx-auto">
+                        <svg
+                          className="w-8 h-8 text-slate-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className={`transition-colors duration-300 ${
+                      isDragOver ? "text-primary-700" : "text-slate-600"
+                    }`}
+                  >
+                    <p className="text-lg font-medium mb-2">
+                      {isDragOver
+                        ? "Drop your file here"
+                        : "Drag and drop your menu file"}
+                    </p>
+                    <p className="text-sm mb-4">
+                      {isDragOver
+                        ? "Release to upload"
+                        : "or click to browse files"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Maximum file size: 50MB
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept={getAllowedExtensions()}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Selected file display */}
+                {file && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 flex items-center gap-4">
+                    <div
+                      className={`w-12 h-12 ${
+                        getFileTypeDisplay(file).color
+                      } rounded-lg flex items-center justify-center shadow-md`}
+                    >
+                      <span className="text-white text-xs font-bold">
+                        {getFileTypeDisplay(file).icon}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-green-800">
+                        {file.name}
+                      </div>
+                      <div className="text-sm text-green-600 flex items-center gap-4">
+                        <span>{(file.size / 1024 / 1024).toFixed(2)}MB</span>
+                        <span>•</span>
+                        <span>{file.type || "Unknown type"}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFile(null);
+                        setError(null);
+                      }}
+                      className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
+                      title="Remove file"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                  className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-md"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Analyzing Menu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                      <span>Upload & Parse Menu</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-          )}
 
-          {/* Success Display */}
-          {result && (
-            <div className="space-y-8">
-              <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
+            {/* Error Display */}
+            {error && (
+              <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-6 mb-8 shadow-lg">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
                     <svg
                       className="w-6 h-6 text-white"
                       fill="none"
@@ -2347,30 +2727,28 @@ const CleanMenuUploadPage: React.FC = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-medium text-green-800 mb-1">
-                      Menu Parsed Successfully!
+                    <h3 className="font-medium text-red-800 mb-1">
+                      Upload Error
                     </h3>
-                    <p className="text-green-700">
-                      Successfully analyzed "{result.menuName}" with AI
-                      assistance
-                    </p>
+                    <p className="text-red-700">{error}</p>
                   </div>
                 </div>
               </div>
+            )}
 
-              {renderStatistics()}
-
-              {result.processingNotes.length > 0 && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+            {/* Success Display */}
+            {result && (
+              <div className="space-y-8">
+                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-2xl p-6 shadow-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
                       <svg
-                        className="w-5 h-5 text-white"
+                        className="w-6 h-6 text-white"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -2379,259 +2757,53 @@ const CleanMenuUploadPage: React.FC = () => {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-medium text-blue-900">
-                      AI Processing Insights
-                    </h3>
+                    <div>
+                      <h3 className="font-medium text-green-800 mb-1">
+                        Menu Parsed Successfully!
+                      </h3>
+                      <p className="text-green-700">
+                        Successfully analyzed "{result.menuName}" with AI
+                        assistance
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    {result.processingNotes.map((note, index) => {
-                      // Add icons for different types of notes
-                      let icon = "•";
-                      let bgColor = "bg-blue-100";
-                      let textColor = "text-blue-800";
+                </div>
 
-                      if (note.includes("Grape variety identification")) {
-                        icon = "🍇";
-                        bgColor = "bg-purple-100";
-                        textColor = "text-purple-800";
-                      }
-                      if (note.includes("AI parsing")) {
-                        icon = "🤖";
-                        bgColor = "bg-indigo-100";
-                        textColor = "text-indigo-800";
-                      }
-                      if (note.includes("Rate limit")) {
-                        icon = "⏰";
-                        bgColor = "bg-amber-100";
-                        textColor = "text-amber-800";
-                      }
-                      if (note.includes("Pattern matching")) {
-                        icon = "📋";
-                        bgColor = "bg-cyan-100";
-                        textColor = "text-cyan-800";
-                      }
-                      if (note.includes("Validation")) {
-                        icon = "✅";
-                        bgColor = "bg-green-100";
-                        textColor = "text-green-800";
-                      }
+                {renderStatistics()}
 
-                      return (
-                        <div
-                          key={index}
-                          className={`${bgColor} rounded-xl p-3 border border-opacity-20`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0">
-                              {icon}
-                            </span>
-                            <span
-                              className={`text-sm font-medium ${textColor}`}
+                {result.processingNotes.length > 0 && (
+                  <details className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
+                    <summary className="cursor-pointer p-4 hover:bg-blue-100/50 transition-colors rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-white"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
                             >
-                              {note}
-                            </span>
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                              />
+                            </svg>
                           </div>
+                          <span className="text-base font-medium text-blue-900">
+                            AI Processing Insights
+                          </span>
+                          <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
+                            {result.processingNotes.length} items
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {renderItems()}
-            </div>
-          )}
-
-          {/* Import Modal */}
-          {showImportModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
-              <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-8 max-w-lg w-full mx-4 transform">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                    <svg
-                      className="w-8 h-8 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-medium text-dark-slate mb-2">
-                    Finalize Menu Import
-                  </h3>
-                  <p className="text-muted-gray">
-                    Choose how to import your parsed menu items
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-slate mb-4">
-                      Import Option
-                    </label>
-                    <div className="space-y-3">
-                      <label className="flex items-center p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200 cursor-pointer hover:from-primary-100 hover:to-primary-150 transition-all duration-200">
-                        <input
-                          type="radio"
-                          name="importOption"
-                          value="new"
-                          checked={importOption === "new"}
-                          onChange={(e) =>
-                            setImportOption(
-                              e.target.value as "new" | "existing"
-                            )
-                          }
-                          className="mr-3 text-primary-600"
-                        />
-                        <div>
-                          <div className="font-medium text-primary-800">
-                            Create new menu
-                          </div>
-                          <div className="text-sm text-primary-600">
-                            Start fresh with these items
-                          </div>
-                        </div>
-                      </label>
-                      <label className="flex items-center p-4 bg-gradient-to-r from-accent-50 to-accent-100 rounded-xl border border-accent-200 cursor-pointer hover:from-accent-100 hover:to-accent-150 transition-all duration-200">
-                        <input
-                          type="radio"
-                          name="importOption"
-                          value="existing"
-                          checked={importOption === "existing"}
-                          onChange={(e) =>
-                            setImportOption(
-                              e.target.value as "new" | "existing"
-                            )
-                          }
-                          className="mr-3 text-accent-600"
-                        />
-                        <div>
-                          <div className="font-medium text-accent-800">
-                            Add to existing menu
-                          </div>
-                          <div className="text-sm text-accent-600">
-                            Append to an existing menu
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {importOption === "new" ? (
-                    <div>
-                      <label className="block text-sm font-medium text-dark-slate mb-3">
-                        New Menu Name
-                      </label>
-                      <input
-                        type="text"
-                        value={newMenuName}
-                        onChange={(e) => setNewMenuName(e.target.value)}
-                        className="w-full p-4 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
-                        placeholder="Enter menu name"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-dark-slate mb-3">
-                        Select Existing Menu
-                      </label>
-                      <select
-                        value={selectedMenuId}
-                        onChange={(e) => setSelectedMenuId(e.target.value)}
-                        className="w-full p-4 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
-                      >
-                        <option value="">Choose a menu...</option>
-                        {existingMenus.map((menu) => (
-                          <option key={menu._id} value={menu._id}>
-                            {menu.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 p-6 rounded-2xl">
-                    <h4 className="font-medium text-dark-slate mb-4">
-                      Import Summary
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-light text-slate-700">
-                          {editedItems.length}
-                        </div>
-                        <div className="text-xs font-medium text-slate-600">
-                          Total Items
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-light text-blue-600">
-                          {
-                            editedItems.filter(
-                              (item) => item.itemType === "food"
-                            ).length
-                          }
-                        </div>
-                        <div className="text-xs font-medium text-blue-700">
-                          🍽️ Food
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-light text-green-600">
-                          {
-                            editedItems.filter(
-                              (item) => item.itemType === "beverage"
-                            ).length
-                          }
-                        </div>
-                        <div className="text-xs font-medium text-green-700">
-                          🥤 Beverages
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-light text-purple-600">
-                          {
-                            editedItems.filter(
-                              (item) => item.itemType === "wine"
-                            ).length
-                          }
-                        </div>
-                        <div className="text-xs font-medium text-purple-700">
-                          🍷 Wines
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 mt-8">
-                  <button
-                    onClick={handleImport}
-                    disabled={
-                      importing ||
-                      (importOption === "new" && !newMenuName.trim()) ||
-                      (importOption === "existing" && !selectedMenuId)
-                    }
-                    className="flex-1 px-6 py-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-md flex items-center justify-center gap-3"
-                  >
-                    {importing ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Importing...</span>
-                      </>
-                    ) : (
-                      <>
                         <svg
-                          className="w-5 h-5"
+                          className="w-5 h-5 text-blue-600 transition-transform duration-200 transform [details[open]>&]:rotate-180"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -2640,27 +2812,306 @@ const CleanMenuUploadPage: React.FC = () => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            d="M19 9l-7 7-7-7"
                           />
                         </svg>
-                        <span>Import Menu</span>
-                      </>
+                      </div>
+                    </summary>
+                    <div className="px-4 pb-4 space-y-2">
+                      {result.processingNotes.map((note, index) => {
+                        // Add icons for different types of notes
+                        let icon = "•";
+                        let bgColor = "bg-blue-50";
+                        let textColor = "text-blue-700";
+                        let borderColor = "border-blue-200";
+
+                        if (note.includes("Grape variety identification")) {
+                          icon = "G";
+                          bgColor = "bg-purple-50";
+                          textColor = "text-purple-700";
+                          borderColor = "border-purple-200";
+                        }
+                        if (
+                          note.includes("AI parsing") ||
+                          note.includes("Parsed successfully")
+                        ) {
+                          icon = "A";
+                          bgColor = "bg-indigo-50";
+                          textColor = "text-indigo-700";
+                          borderColor = "border-indigo-200";
+                        }
+                        if (note.includes("Rate limit")) {
+                          icon = "R";
+                          bgColor = "bg-amber-50";
+                          textColor = "text-amber-700";
+                          borderColor = "border-amber-200";
+                        }
+                        if (note.includes("Pattern matching")) {
+                          icon = "P";
+                          bgColor = "bg-cyan-50";
+                          textColor = "text-cyan-700";
+                          borderColor = "border-cyan-200";
+                        }
+                        if (note.includes("Validation")) {
+                          icon = "V";
+                          bgColor = "bg-green-50";
+                          textColor = "text-green-700";
+                          borderColor = "border-green-200";
+                        }
+                        if (note.includes("Food enhancement")) {
+                          icon = "F";
+                          bgColor = "bg-emerald-50";
+                          textColor = "text-emerald-700";
+                          borderColor = "border-emerald-200";
+                        }
+                        if (
+                          note.includes("Beverage enhancement") ||
+                          (note.includes("Enhanced") &&
+                            note.includes("beverage"))
+                        ) {
+                          icon = "B";
+                          bgColor = "bg-teal-50";
+                          textColor = "text-teal-700";
+                          borderColor = "border-teal-200";
+                        }
+
+                        return (
+                          <div
+                            key={index}
+                            className={`${bgColor} rounded-lg p-2 border ${borderColor}`}
+                          >
+                            <span
+                              className={`text-xs font-medium ${textColor} leading-relaxed`}
+                            >
+                              {note}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                )}
+
+                {renderItems()}
+              </div>
+            )}
+
+            {/* Import Modal */}
+            {showImportModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-8 max-w-lg w-full mx-4 transform">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                      <svg
+                        className="w-8 h-8 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-2xl font-medium text-dark-slate mb-2">
+                      Finalize Menu Import
+                    </h3>
+                    <p className="text-muted-gray">
+                      Choose how to import your parsed menu items
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-dark-slate mb-4">
+                        Import Option
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200 cursor-pointer hover:from-primary-100 hover:to-primary-150 transition-all duration-200">
+                          <input
+                            type="radio"
+                            name="importOption"
+                            value="new"
+                            checked={importOption === "new"}
+                            onChange={(e) =>
+                              setImportOption(
+                                e.target.value as "new" | "existing"
+                              )
+                            }
+                            className="mr-3 text-primary-600"
+                          />
+                          <div>
+                            <div className="font-medium text-primary-800">
+                              Create new menu
+                            </div>
+                            <div className="text-sm text-primary-600">
+                              Start fresh with these items
+                            </div>
+                          </div>
+                        </label>
+                        <label className="flex items-center p-4 bg-gradient-to-r from-accent-50 to-accent-100 rounded-xl border border-accent-200 cursor-pointer hover:from-accent-100 hover:to-accent-150 transition-all duration-200">
+                          <input
+                            type="radio"
+                            name="importOption"
+                            value="existing"
+                            checked={importOption === "existing"}
+                            onChange={(e) =>
+                              setImportOption(
+                                e.target.value as "new" | "existing"
+                              )
+                            }
+                            className="mr-3 text-accent-600"
+                          />
+                          <div>
+                            <div className="font-medium text-accent-800">
+                              Add to existing menu
+                            </div>
+                            <div className="text-sm text-accent-600">
+                              Append to an existing menu
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {importOption === "new" ? (
+                      <div>
+                        <label className="block text-sm font-medium text-dark-slate mb-3">
+                          New Menu Name
+                        </label>
+                        <input
+                          type="text"
+                          value={newMenuName}
+                          onChange={(e) => setNewMenuName(e.target.value)}
+                          className="w-full p-4 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+                          placeholder="Enter menu name"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-dark-slate mb-3">
+                          Select Existing Menu
+                        </label>
+                        <select
+                          value={selectedMenuId}
+                          onChange={(e) => setSelectedMenuId(e.target.value)}
+                          className="w-full p-4 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+                        >
+                          <option value="">Choose a menu...</option>
+                          {existingMenus.map((menu) => (
+                            <option key={menu._id} value={menu._id}>
+                              {menu.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     )}
-                  </button>
-                  <button
-                    onClick={() => setShowImportModal(false)}
-                    disabled={importing}
-                    className="px-6 py-4 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
+
+                    <div className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 p-6 rounded-2xl">
+                      <h4 className="font-medium text-dark-slate mb-4">
+                        Import Summary
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-light text-slate-700">
+                            {editedItems.length}
+                          </div>
+                          <div className="text-xs font-medium text-slate-600">
+                            Total Items
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-light text-blue-600">
+                            {
+                              editedItems.filter(
+                                (item) => item.itemType === "food"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-xs font-medium text-blue-700">
+                            Food
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-light text-green-600">
+                            {
+                              editedItems.filter(
+                                (item) => item.itemType === "beverage"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-xs font-medium text-green-700">
+                            Beverages
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-light text-purple-600">
+                            {
+                              editedItems.filter(
+                                (item) => item.itemType === "wine"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-xs font-medium text-purple-700">
+                            Wines
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-8">
+                    <button
+                      onClick={handleImport}
+                      disabled={
+                        importing ||
+                        (importOption === "new" && !newMenuName.trim()) ||
+                        (importOption === "existing" && !selectedMenuId)
+                      }
+                      className="flex-1 px-6 py-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-md flex items-center justify-center gap-3"
+                    >
+                      {importing ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Importing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            />
+                          </svg>
+                          <span>Import Menu</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setShowImportModal(false)}
+                      disabled={importing}
+                      className="px-6 py-4 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 };
 

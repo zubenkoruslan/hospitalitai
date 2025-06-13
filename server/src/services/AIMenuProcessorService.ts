@@ -17,6 +17,7 @@ export interface AIProcessingOptions {
   isWineMenu?: boolean;
   maxRetries?: number;
   temperature?: number;
+  structuredData?: any; // For pre-processed JSON data
 }
 
 export interface AIProcessingResult {
@@ -203,13 +204,18 @@ export class AIMenuProcessorService {
         // Fix spacing issues
         .replace(/(\d{4})\s+([A-Z])/g, "$1 $2")
         .replace(/,(?!\s)/g, ", ")
-        .replace(/\s+,/g, ",");
+        .replace(/\s+,/g, ",")
+        // Preserve structure for wine menus - keep line breaks
+        .replace(/\r?\n/g, "\n") // Normalize line endings
+        .replace(/[ \t]+/g, " ") // Only collapse horizontal whitespace
+        .replace(/\n\s*\n\s*\n/g, "\n\n") // Reduce excessive line breaks to max 2
+        .trim();
+    } else {
+      // For non-wine menus, keep the original aggressive whitespace normalization
+      processedText = processedText
+        .replace(/\s+/g, " ") // Normalize whitespace
+        .trim();
     }
-
-    // General text cleanup
-    processedText = processedText
-      .replace(/\s+/g, " ") // Normalize whitespace
-      .trim();
 
     return processedText;
   }
@@ -230,8 +236,7 @@ export class AIMenuProcessorService {
       tools: [{ functionDeclarations: [this.functionSchema] }],
       toolConfig: {
         functionCallingConfig: {
-          mode: FunctionCallingMode.ANY,
-          allowedFunctionNames: ["extract_menu_data"],
+          mode: FunctionCallingMode.AUTO,
         },
       },
       generationConfig: {
@@ -286,6 +291,10 @@ export class AIMenuProcessorService {
         } else {
           const responseText = result.response.text();
           console.log(`❌ Attempt ${attempt}: No function call received`);
+          console.log(
+            `📝 Response text preview:`,
+            responseText?.substring(0, 500) || "(empty)"
+          );
 
           if (attempt === maxRetries) {
             // Final attempt: try JSON extraction
@@ -340,13 +349,20 @@ export class AIMenuProcessorService {
       ? `
 
 🍷 WINE MENU DETECTED - SPECIAL PROCESSING ACTIVE:
+STRUCTURE: This is a wine list with sections like SPARKLING, WHITE, RED, ROSÉ, etc.
+Each wine entry typically contains: [VINTAGE] [WINE NAME], [PRODUCER] [REGION], [COUNTRY] [GLASS PRICE] [BOTTLE PRICE]
+
+WINE PROCESSING GUIDELINES:
 - Apply extensive wine knowledge for grape variety identification
-- Extract wine regions, vintages, and serving options carefully
-- Use classic appellation knowledge (Bordeaux, Burgundy, etc.)
+- Extract wine regions, vintages, and serving options carefully  
+- Use classic appellation knowledge (Bordeaux, Burgundy, Champagne, etc.)
 - Preserve producer/winery names exactly as written
-- Look for multiple serving sizes with prices
+- Look for multiple serving sizes with prices (125ml, 175ml, bottle)
 - Extract wine styles: still, sparkling, champagne, dessert, fortified
-- For wine pairings, only suggest food items from THIS menu`
+- For wine pairings, only suggest food items from THIS menu
+- Pay attention to section headers (SPARKLING, WHITE, RED, etc.)
+- Parse price columns carefully - first price usually glass, second usually bottle
+- Watch for special notations: NV (Non-Vintage), organic symbols, vintage years`
       : "";
 
     const baseContent = `Original Filename: ${
@@ -357,29 +373,23 @@ Input Text to Parse:
 ${processedText}`;
 
     const attempts = {
-      1: `🚨 GEMINI 2.0 FUNCTION CALLING REQUIREMENT 🚨
-MANDATORY: You MUST ONLY respond using the extract_menu_data function call.
-TEXT RESPONSES ARE COMPLETELY FORBIDDEN.
-DO NOT GENERATE ANY PLAIN TEXT - FUNCTION CALL ONLY.
+      1: `Parse the following menu data and extract it using the extract_menu_data function.
 
 ${baseContent}
 
-⚠️ CRITICAL: The extract_menu_data function call is your ONLY allowed response format.`,
+Please call the extract_menu_data function with the parsed menu information.`,
 
-      2: `FUNCTION CALL REQUIRED: You are REQUIRED to call the extract_menu_data function.
-Text responses will cause system failure. Function calling is MANDATORY.
-
-${baseContent}
-
-URGENT: Use the function call format, not plain JSON text.`,
-
-      3: `FINAL ERROR RECOVERY MODE: Previous attempts failed - function calling was not used.
-YOU MUST CALL extract_menu_data FUNCTION - NO EXCEPTIONS
-TEXT RESPONSES WILL BE REJECTED
+      2: `You have a function called extract_menu_data available. Use it to parse this menu data:
 
 ${baseContent}
 
-LAST CHANCE: Function call is the ONLY acceptable response format.`,
+Call the extract_menu_data function now.`,
+
+      3: `Use the extract_menu_data function to extract menu items from this text:
+
+${baseContent}
+
+Make sure to call the function with proper menu data.`,
     };
 
     return attempts[attempt as keyof typeof attempts] || attempts[3];
@@ -709,16 +719,20 @@ LAST CHANCE: Function call is the ONLY acceptable response format.`,
    */
   private buildSystemInstruction(): string {
     return `
-You are a menu data extraction system. Parse menu text and use the extract_menu_data function to return structured data.
+You are a menu data extraction system that analyzes menu text and extracts structured information.
 
-ITEM TYPES:
+When given menu text, you should:
+1. Parse the menu items with their details
+2. Call the extract_menu_data function with the extracted information
+
+ITEM TYPES to classify:
 - "wine" for wines, sparkling wines, champagne
 - "beverage" for cocktails, beer, spirits, non-alcoholic drinks  
 - "food" for food items
 
-For wine items, extract wine-specific fields when available: wineStyle, wineProducer, wineGrapeVariety, wineVintage, wineRegion, wineServingOptions.
+For wine items, also extract: wineStyle, wineProducer, wineGrapeVariety, wineVintage, wineRegion, wineServingOptions when available.
 
-Always use the extract_menu_data function call to return results.
+You have access to an extract_menu_data function - use it to return the parsed data.
 `.trim();
   }
 
@@ -809,5 +823,451 @@ Always use the extract_menu_data function call to return results.
       textLength: rawText.length,
       isWineMenu,
     };
+  }
+
+  /**
+   * Process structured JSON data instead of raw text
+   */
+  async processStructuredData(
+    structuredData: any,
+    options: AIProcessingOptions = {}
+  ): Promise<AIProcessingResult> {
+    const startTime = Date.now();
+    const { originalFileName, maxRetries = 3, temperature = 0.1 } = options;
+
+    try {
+      // Convert structured data to a more readable format for AI
+      const formattedText = this.formatStructuredDataForAI(structuredData);
+
+      console.log("📊 Processing structured data:");
+      console.log(
+        `📋 Total items: ${structuredData.metadata?.totalItems || 0}`
+      );
+      console.log(
+        `🎯 Format: ${structuredData.metadata?.detectedFormat || "unknown"}`
+      );
+
+      // Use the existing AI processing with formatted text
+      const isWineMenu =
+        structuredData.metadata?.detectedFormat === "wine_menu";
+
+      const extractedData = await this.performAIExtraction(
+        formattedText,
+        originalFileName,
+        isWineMenu,
+        maxRetries,
+        temperature
+      );
+
+      return {
+        success: true,
+        data: extractedData,
+        metadata: this.buildMetadata(startTime, formattedText, isWineMenu, 1),
+      };
+    } catch (error: any) {
+      console.error("❌ Structured data processing failed:", error);
+      return {
+        success: false,
+        error: error.message,
+        metadata: this.buildMetadata(
+          startTime,
+          JSON.stringify(structuredData),
+          false,
+          1
+        ),
+      };
+    }
+  }
+
+  /**
+   * Transform structured PDF data directly to MenuItem schema format
+   */
+  async transformStructuredDataToMenuItems(
+    structuredData: any,
+    menuId: string,
+    restaurantId: string
+  ): Promise<GeminiAIServiceOutput> {
+    const rawMenuItems: GeminiProcessedMenuItem[] = [];
+
+    if (structuredData.sections) {
+      for (const [sectionName, items] of Object.entries(
+        structuredData.sections
+      )) {
+        if (Array.isArray(items) && items.length > 0) {
+          // Map section name to proper category
+          const category = this.mapSectionToCategory(sectionName);
+
+          items.forEach((item: any) => {
+            const menuItem = this.transformWineEntryToMenuItem(
+              item,
+              category,
+              sectionName
+            );
+            if (menuItem) {
+              rawMenuItems.push(menuItem);
+            }
+          });
+        }
+      }
+    }
+
+    console.log(
+      `🔄 Raw transformation: ${rawMenuItems.length} items extracted`
+    );
+
+    // Use AI to clean up unwanted entries
+    const cleanedMenuItems = await this.aiCleanupMenuItems(rawMenuItems);
+
+    console.log(
+      `✅ AI cleanup: ${cleanedMenuItems.length} valid items after filtering`
+    );
+
+    const result: GeminiAIServiceOutput = {
+      menuName: structuredData.title || "Wine Menu",
+      menuItems: cleanedMenuItems,
+    };
+
+    // Enhance with AI-generated grape varieties and pairings
+    return this.postProcessExtractedData(result);
+  }
+
+  /**
+   * Use AI to clean up and filter menu items, removing unwanted text entries
+   */
+  private async aiCleanupMenuItems(
+    menuItems: GeminiProcessedMenuItem[]
+  ): Promise<GeminiProcessedMenuItem[]> {
+    try {
+      // If we have a small number of items, skip AI cleanup to avoid overhead
+      if (menuItems.length <= 10) {
+        return menuItems;
+      }
+
+      // Sample a few items to show AI what we're working with
+      const sampleItems = menuItems.slice(0, 10).map((item) => ({
+        name: item.itemName,
+        producer: item.wineProducer,
+        region: item.wineRegion,
+        price: item.itemPrice,
+        originalLine: (item as any).originalLine || "N/A",
+      }));
+
+      const prompt = `
+You are a wine menu data validator. Review these extracted wine entries and identify which ones are valid wine items vs unwanted text (headers, descriptions, volume indicators, etc.).
+
+SAMPLE DATA:
+${JSON.stringify(sampleItems, null, 2)}
+
+RULES:
+- Valid wine entries have: wine name, producer/vineyard, region, and/or price
+- Invalid entries include: volume headers (125ML, 175ML), price headers (GLASS, BOTTLE), section descriptions, promotional text, empty entries
+- Wine names should be actual wine names, not descriptive text about wine-making
+
+Return a JSON array of indices (0-based) for items that should be KEPT (valid wine entries only):
+{"validIndices": [1, 2, 5, 7, ...]}
+
+Be strict - when in doubt, exclude the item.
+`;
+
+      const model = this.genAI.getGenerativeModel({
+        model: AI_MODEL_NAME,
+        systemInstruction:
+          "You are a precise data validator for wine menus. Only keep actual wine entries.",
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text().trim();
+
+      // Parse AI response
+      let validIndices: number[] = [];
+      try {
+        const parsed = JSON.parse(responseText);
+        if (Array.isArray(parsed.validIndices)) {
+          validIndices = parsed.validIndices.filter(
+            (i: any) => typeof i === "number" && i >= 0 && i < menuItems.length
+          );
+        }
+      } catch (parseError) {
+        console.warn(
+          "AI cleanup response parsing failed, keeping all items:",
+          parseError
+        );
+        return menuItems;
+      }
+
+      // If AI didn't return reasonable results, use fallback filtering
+      if (
+        validIndices.length === 0 ||
+        validIndices.length > menuItems.length * 0.9
+      ) {
+        console.log(
+          "🔄 AI cleanup results unreasonable, using fallback filtering"
+        );
+        return this.fallbackCleanupMenuItems(menuItems);
+      }
+
+      // Apply AI filtering
+      const cleanedItems = validIndices.map((index) => menuItems[index]);
+      console.log(
+        `🤖 AI filtered: ${menuItems.length} → ${cleanedItems.length} items`
+      );
+
+      return cleanedItems;
+    } catch (error: any) {
+      console.warn("AI cleanup failed, using fallback:", error.message);
+      return this.fallbackCleanupMenuItems(menuItems);
+    }
+  }
+
+  /**
+   * Fallback cleanup using rule-based filtering
+   */
+  private fallbackCleanupMenuItems(
+    menuItems: GeminiProcessedMenuItem[]
+  ): GeminiProcessedMenuItem[] {
+    const validItems = menuItems.filter((item) => {
+      // Rule-based filtering for obvious non-wine entries
+      const name = item.itemName.toLowerCase().trim();
+
+      // Skip volume headers
+      if (/^\d+(ml|cl)\s*(glass|bottle|carafe)?$/i.test(name)) {
+        return false;
+      }
+
+      // Skip price headers
+      if (
+        /^(glass|bottle|carafe|serving|wine|price|total)(\s+price)?$/i.test(
+          name
+        )
+      ) {
+        return false;
+      }
+
+      // Skip separator lines
+      if (/^[|\-_=+\s]+$/.test(name)) {
+        return false;
+      }
+
+      // Skip very short entries that don't look like wine names
+      if (name.length < 3) {
+        return false;
+      }
+
+      // Skip entries that are clearly descriptive text
+      if (name.length > 100 && !item.itemPrice && !item.wineProducer) {
+        return false;
+      }
+
+      // Skip entries that start with numbers but aren't vintages
+      if (/^\d+\s*(£|$|€|usd|gbp|eur)/i.test(name)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    console.log(
+      `🔧 Fallback filtered: ${menuItems.length} → ${validItems.length} items`
+    );
+    return validItems;
+  }
+
+  /**
+   * Map section names to proper categories
+   */
+  private mapSectionToCategory(sectionName: string): string {
+    const categoryMap: { [key: string]: string } = {
+      sparkling: "Sparkling Wine",
+      white: "White Wine",
+      red: "Red Wine",
+      rose: "Rosé Wine",
+      orange: "Orange Wine",
+      dessert: "Dessert Wine",
+      port: "Fortified Wine",
+      other: "Other Wine",
+    };
+
+    return categoryMap[sectionName.toLowerCase()] || "Other Wine";
+  }
+
+  /**
+   * Transform individual wine entry to MenuItem format
+   */
+  private transformWineEntryToMenuItem(
+    wineEntry: any,
+    category: string,
+    sectionName: string
+  ): GeminiProcessedMenuItem | null {
+    try {
+      // Skip invalid entries
+      if (!wineEntry.name || wineEntry.name.length < 2) {
+        return null;
+      }
+
+      // Skip headers and non-wine entries (basic patterns)
+      const invalidPatterns = [
+        /^\d+(ml|ML|cl|CL)\s*\|?\s*(BOTTLE|CARAFE|GLASS)?$/i,
+        /^(glass|bottle|carafe|serving|price|wine|total)\s*$/i,
+        /^[|]+$/,
+        /^\s*(ml|cl)\s*$/i,
+        /^(white|red|sparkling|rose|dessert)\s+(wine|wines?)?\s*$/i,
+        /^wine\s+(list|menu|selection)\s*$/i,
+        /^[£$€]\d+/i, // Prices at start of line
+        /^(wines?\s+)?(available\s+)?by\s+the\s+(glass|bottle|carafe)/i,
+        /^(wines?\s+with\s+|perfect\s+with\s+|pairs?\s+well\s+with)/i,
+      ];
+
+      if (invalidPatterns.some((pattern) => pattern.test(wineEntry.name))) {
+        return null;
+      }
+
+      // Skip descriptive text about wine-making or pairing
+      if (
+        wineEntry.name.length > 80 &&
+        !wineEntry.prices?.bottle &&
+        !wineEntry.prices?.glass
+      ) {
+        return null;
+      }
+
+      // Parse vintage correctly
+      let vintage: number | undefined;
+      if (wineEntry.vintage && wineEntry.vintage !== "NV") {
+        const vintageNum = parseInt(wineEntry.vintage);
+        if (
+          !isNaN(vintageNum) &&
+          vintageNum >= 1800 &&
+          vintageNum <= new Date().getFullYear() + 5
+        ) {
+          vintage = vintageNum;
+        }
+      }
+
+      // Determine primary price (prefer bottle, fallback to glass)
+      let primaryPrice: number | null = null;
+      if (wineEntry.prices?.bottle) {
+        primaryPrice = wineEntry.prices.bottle;
+      } else if (wineEntry.prices?.glass) {
+        primaryPrice = wineEntry.prices.glass;
+      }
+
+      // Create serving options array
+      const servingOptions: Array<{ size: string; price: number }> = [];
+      if (wineEntry.prices?.glass) {
+        servingOptions.push({ size: "Glass", price: wineEntry.prices.glass });
+      }
+      if (wineEntry.prices?.carafe) {
+        servingOptions.push({ size: "Carafe", price: wineEntry.prices.carafe });
+      }
+      if (wineEntry.prices?.bottle) {
+        servingOptions.push({ size: "Bottle", price: wineEntry.prices.bottle });
+      }
+
+      // Map wine style to valid enum values
+      const wineStyle = this.mapWineStyle(wineEntry.style, sectionName);
+
+      return {
+        itemName: wineEntry.name.trim(),
+        itemPrice: primaryPrice,
+        itemType: "wine" as const,
+        itemCategory: category,
+        itemIngredients: [], // Wines don't have ingredients list
+        isGlutenFree: true, // Wine is generally gluten-free
+        isVegan: false, // Default false, would need AI to determine
+        isVegetarian: true, // Wine is generally vegetarian
+
+        // Wine-specific fields
+        wineStyle,
+        wineProducer: wineEntry.producer?.trim() || undefined,
+        wineGrapeVariety: [], // Will be enhanced by AI
+        wineVintage: vintage,
+        wineRegion: wineEntry.region?.trim() || undefined,
+        wineServingOptions:
+          servingOptions.length > 0 ? servingOptions : undefined,
+        winePairings: [], // Will be enhanced by AI
+
+        // Store original line for AI cleanup reference
+        originalLine: wineEntry.originalLine,
+      } as GeminiProcessedMenuItem & { originalLine: string };
+    } catch (error) {
+      console.warn(`Failed to transform wine entry: ${wineEntry.name}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Map wine style to valid enum values
+   */
+  private mapWineStyle(
+    style: string | undefined,
+    sectionName: string
+  ): "still" | "sparkling" | "champagne" | "dessert" | "fortified" | "other" {
+    // Define allowed wine styles directly to avoid import issues
+    const WINE_STYLES = [
+      "still",
+      "sparkling",
+      "champagne",
+      "dessert",
+      "fortified",
+      "other",
+    ] as const;
+    type WineStyleType = (typeof WINE_STYLES)[number];
+
+    if (style && WINE_STYLES.includes(style as WineStyleType)) {
+      return style as WineStyleType;
+    }
+
+    // Map based on section name if style is not valid
+    const sectionStyleMap: { [key: string]: WineStyleType } = {
+      sparkling: "sparkling",
+      white: "still",
+      red: "still",
+      rose: "still",
+      orange: "still",
+      dessert: "dessert",
+      port: "fortified",
+    };
+
+    const mappedStyle = sectionStyleMap[sectionName.toLowerCase()];
+    return mappedStyle || "still";
+  }
+
+  /**
+   * Format structured data into readable text for AI processing (fallback method)
+   */
+  private formatStructuredDataForAI(structuredData: any): string {
+    let formattedText = `MENU: ${structuredData.title}\n\n`;
+
+    if (structuredData.sections) {
+      for (const [sectionName, items] of Object.entries(
+        structuredData.sections
+      )) {
+        if (Array.isArray(items) && items.length > 0) {
+          formattedText += `=== ${sectionName.toUpperCase()} ===\n`;
+
+          items.forEach((item: any) => {
+            formattedText += `${item.vintage || ""} ${item.name}`;
+            if (item.producer) formattedText += `, ${item.producer}`;
+            if (item.region) formattedText += ` ${item.region}`;
+            if (item.country) formattedText += `, ${item.country}`;
+
+            // Add prices
+            const prices: string[] = [];
+            if (item.prices?.glass) prices.push(`glass: ${item.prices.glass}`);
+            if (item.prices?.carafe)
+              prices.push(`carafe: ${item.prices.carafe}`);
+            if (item.prices?.bottle)
+              prices.push(`bottle: ${item.prices.bottle}`);
+            if (prices.length > 0) formattedText += ` | ${prices.join(", ")}`;
+
+            formattedText += "\n";
+          });
+          formattedText += "\n";
+        }
+      }
+    }
+
+    return formattedText;
   }
 }

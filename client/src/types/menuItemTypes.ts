@@ -18,6 +18,20 @@ export interface MenuItem {
   isVegetarian: boolean;
   isVegan: boolean;
 
+  // Food-specific enhancement fields
+  cookingMethods?: string[];
+  allergens?: string[];
+  isSpicy?: boolean;
+
+  // Beverage-specific enhancement fields
+  spiritType?: string;
+  beerStyle?: string;
+  cocktailIngredients?: string[];
+  alcoholContent?: string;
+  servingStyle?: string;
+  isNonAlcoholic?: boolean;
+  temperature?: string;
+
   // Wine-specific fields
   wineStyle?:
     | "still"
@@ -68,6 +82,20 @@ export interface MenuItemFormData {
   isDairyFree: boolean;
   isVegetarian: boolean;
   isVegan: boolean;
+
+  // Food-specific enhancement fields (as comma-separated strings for form input)
+  cookingMethods?: string;
+  allergens?: string;
+  isSpicy?: boolean;
+
+  // Beverage-specific enhancement fields
+  spiritType?: string;
+  beerStyle?: string;
+  cocktailIngredients?: string; // Comma-separated string for form input
+  alcoholContent?: string;
+  servingStyle?: string;
+  isNonAlcoholic?: boolean;
+  temperature?: string;
 
   // Wine-specific fields (optional, used only when itemType is "wine")
   wineStyle?: string; // Wine style for form input

@@ -148,7 +148,7 @@ const SopManagementPage: React.FC = () => {
       try {
         const response = await uploadSopDocument(uploadData);
         setUploadSuccess(
-          `Document "${response.document.title}" uploaded successfully. It will be processed shortly.`
+          `Document "${response.title}" uploaded successfully. It will be processed shortly.`
         );
         fetchDocuments(); // Refresh the list
         setIsUploadModalOpen(false); // Close modal on success
