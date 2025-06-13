@@ -13,7 +13,7 @@ Your restaurant's success depends on knowledgeable staff, but traditional traini
 - 🎯 **Inconsistent** - Different staff, different knowledge levels
 - 📋 **Manual** - Hours creating training materials from scratch
 
-**What if AI could solve all of this automatically?**
+**What if QuizCrunch could solve all of this automatically?**
 
 ---
 
@@ -35,7 +35,7 @@ Your restaurant's success depends on knowledgeable staff, but traditional traini
 
 ---
 
-## Revolutionary AI Capabilities
+## Revolutionary Capabilities
 
 ### 🍷 **Intelligent Wine Analysis**
 
@@ -113,8 +113,6 @@ Your restaurant's success depends on knowledgeable staff, but traditional traini
 
 ## Enterprise-Grade Technology
 
-**Powered by Google's Latest AI** - Gemini 2.0 provides restaurant-industry specific intelligence
-
 **Scalable Architecture** - Modern microservices handle everything from single locations to enterprise chains
 
 **Secure & Reliable** - Bank-level security with 99.9% uptime guarantee
@@ -126,12 +124,6 @@ Your restaurant's success depends on knowledgeable staff, but traditional traini
 ## Pricing That Makes Sense
 
 **ROI in Week 1** - Save more on training time than you spend on QuizCrunch
-
-**Per-Location Pricing** - Scales with your business
-
-- Small restaurants: Under $100/month
-- Multi-location: Volume discounts available
-- Enterprise: Custom solutions for hotel groups
 
 **No Setup Fees** - Start seeing results immediately
 
@@ -147,20 +139,11 @@ Your restaurant's success depends on knowledgeable staff, but traditional traini
 
 ---
 
-### Contact Us Today
-
-📧 **Email:** hello@quizcrunch.ai  
-📞 **Phone:** 1-800-QUIZ-123  
-🌐 **Demo:** www.quizcrunch.ai/demo
-
-_Join hundreds of restaurants already using AI to train smarter, not harder._
-
 ---
 
 ## Technical Specifications (For IT Teams)
 
 **Core Platform:** MERN Stack (MongoDB, Express.js, React, Node.js) with TypeScript
-**AI Engine:** Google Gemini 2.0 with hospitality-specific training
 **Architecture:** Microservices with specialized processing engines
 **Security:** JWT authentication, SOC 2 compliant
 **Integration:** RESTful APIs for POS and management system integration
