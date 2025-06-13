@@ -238,7 +238,7 @@ export class AIMenuProcessorService {
         temperature,
         topK: 1,
         topP: 1.0,
-        maxOutputTokens: 12288,
+        maxOutputTokens: 16384,
       },
     });
 
@@ -709,30 +709,16 @@ LAST CHANCE: Function call is the ONLY acceptable response format.`,
    */
   private buildSystemInstruction(): string {
     return `
-🔧 GEMINI 2.0 MENU PARSER SYSTEM 🔧
+You are a menu data extraction system. Parse menu text and use the extract_menu_data function to return structured data.
 
-You are a specialized menu data extraction system. Your ONLY response format is the extract_menu_data function call.
+ITEM TYPES:
+- "wine" for wines, sparkling wines, champagne
+- "beverage" for cocktails, beer, spirits, non-alcoholic drinks  
+- "food" for food items
 
-⚠️ CRITICAL RULES:
-1. NEVER respond with plain text
-2. ALWAYS use extract_menu_data function call
-3. FORBIDDEN: JSON text responses
-4. REQUIRED: Function call format only
+For wine items, extract wine-specific fields when available: wineStyle, wineProducer, wineGrapeVariety, wineVintage, wineRegion, wineServingOptions.
 
-Your task: Parse menu text and call extract_menu_data with structured data.
-
-ITEM TYPE CLASSIFICATION:
-- itemType: "wine" - Pure wines, wine by glass/bottle, sparkling wines, champagne
-- itemType: "beverage" - Mixed cocktails, beer, spirits, non-alcoholic drinks
-- itemType: "food" - All food items
-
-FOR WINE ITEMS: Extract wineStyle, wineProducer, wineGrapeVariety, wineVintage, wineRegion, wineServingOptions, winePairings
-
-Use your extensive wine knowledge to identify grape varieties even when not explicitly mentioned.
-Apply classic appellation knowledge for regional wines.
-For wine pairings, only suggest food items that appear in the provided menu text.
-
-Return structured data using the extract_menu_data function call.
+Always use the extract_menu_data function call to return results.
 `.trim();
   }
 
@@ -742,30 +728,30 @@ Return structured data using the extract_menu_data function call.
   private buildFunctionSchema(): FunctionDeclaration {
     return {
       name: "extract_menu_data",
-      description: "Extracts structured menu data from raw menu text",
+      description: "Extract wine menu data from text",
       parameters: {
         type: FunctionDeclarationSchemaType.OBJECT,
         properties: {
           menuName: {
             type: FunctionDeclarationSchemaType.STRING,
-            description: "The overall name of the menu",
+            description: "The menu name",
           },
           menuItems: {
             type: FunctionDeclarationSchemaType.ARRAY,
-            description: "Array of menu items",
+            description: "Array of wine items",
             items: {
               type: FunctionDeclarationSchemaType.OBJECT,
               properties: {
                 itemName: { type: FunctionDeclarationSchemaType.STRING },
                 itemPrice: { type: FunctionDeclarationSchemaType.NUMBER },
                 itemType: { type: FunctionDeclarationSchemaType.STRING },
+                itemCategory: { type: FunctionDeclarationSchemaType.STRING },
                 itemIngredients: {
                   type: FunctionDeclarationSchemaType.ARRAY,
                   items: {
                     type: FunctionDeclarationSchemaType.STRING,
                   } as FunctionDeclarationSchema,
                 },
-                itemCategory: { type: FunctionDeclarationSchemaType.STRING },
                 isGlutenFree: { type: FunctionDeclarationSchemaType.BOOLEAN },
                 isVegan: { type: FunctionDeclarationSchemaType.BOOLEAN },
                 isVegetarian: { type: FunctionDeclarationSchemaType.BOOLEAN },
@@ -798,15 +784,7 @@ Return structured data using the extract_menu_data function call.
                   } as FunctionDeclarationSchema,
                 },
               },
-              required: [
-                "itemName",
-                "itemType",
-                "itemIngredients",
-                "itemCategory",
-                "isGlutenFree",
-                "isVegan",
-                "isVegetarian",
-              ],
+              required: ["itemName", "itemType"],
             } as FunctionDeclarationSchema,
           },
         },
