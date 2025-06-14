@@ -5,7 +5,7 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-// import axios from "axios"; // Not directly used now, api instance is used
+
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api"; // Reverted to default import
@@ -14,7 +14,7 @@ import {
   getCurrentUser as getCurrentUserService,
 } from "../services/api"; // Import api services
 import { ClientUserMinimal, UserRole } from "../types/user"; // For context user type
-import { /* LoginCredentials, */ AuthResponse } from "../types/authTypes"; // For loginService params
+import { AuthResponse } from "../types/authTypes"; // For loginService params
 
 // Define the shape of the actual decoded JWT payload
 export interface DecodedToken {

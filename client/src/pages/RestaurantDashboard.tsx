@@ -96,7 +96,6 @@ const RestaurantDashboard: React.FC = () => {
 
   // State for menu upload modal
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null); // Can be used for feedback before navigation
 
   // Memoize calculations based on staffData from the hook
   const overallAveragePerformance = useMemo(() => {

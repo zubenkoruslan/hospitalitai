@@ -79,7 +79,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
     if (trend === undefined || trend === null) return null;
 
     const isPositive = trend > 0;
-    const isNegative = trend < 0;
 
     if (trend === 0) return null;
 

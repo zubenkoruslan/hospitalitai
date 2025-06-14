@@ -82,14 +82,11 @@ const QuizTakingPage: React.FC = () => {
   const navigate = useNavigate();
   // const location = useLocation(); // Potentially for quizTitle
 
-  // const [quizData, setQuizData] = useState<QuizForTaking | null>(null); // Old
   const [quizTitle, setQuizTitle] = useState<string>("Quiz Attempt"); // Default title
   const [questions, setQuestions] = useState<ClientQuestionForAttempt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [_currentAttemptId, setCurrentAttemptId] = useState<string | null>(
-    null
-  ); // Prefixed currentAttemptId
+  // Prefixed currentAttemptId
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   // Store answers as a map: { questionId: answerGiven }
@@ -98,7 +95,7 @@ const QuizTakingPage: React.FC = () => {
     Record<string, string | string[]>
   >({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  // const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null); // Old
+
   const [submissionResult, setSubmissionResult] =
     useState<ClientSubmitAttemptResponse | null>(null); // New type
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -176,8 +173,8 @@ const QuizTakingPage: React.FC = () => {
       const result = await startQuizAttempt(quizId);
       // const newAttemptId = response.attemptId; // No longer returned here
 
-      // setCurrentAttemptId(newAttemptId); // Attempt ID will be set on submit
-      setCurrentAttemptId(null); // Ensure it's null when starting/restarting an attempt viewing
+      // Attempt ID will be set on submit
+      // Ensure it's null when starting/restarting an attempt viewing
 
       if (result && result.questions && result.questions.length > 0) {
         setQuestions(result.questions);
@@ -536,9 +533,6 @@ const QuizTakingPage: React.FC = () => {
     questions.every((q) => userAnswers[q._id] !== undefined); // Prefixed
 
   const _totalQuestions = questions.length; // Prefixed totalQuestions
-  const _isFirstQuestionLocal = _isFirstQuestion; // Prefixed isFirstQuestion, and renamed to avoid conflict with line 633
-  const _isLastQuestionLocal = _isLastQuestion; // Prefixed isLastQuestion, and renamed to avoid conflict with line 634
-  const _allAnsweredLocal = _allAnswered; // Prefixed allAnswered, and renamed to avoid conflict with line 635
 
   // Show loading state
   if (isLoading) {

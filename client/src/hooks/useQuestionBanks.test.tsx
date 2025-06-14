@@ -1,4 +1,3 @@
-import React from "react";
 import { renderHook, act } from "@testing-library/react";
 import { useQuestionBanks } from "./useQuestionBanks";
 import * as api from "../services/api"; // To mock API calls

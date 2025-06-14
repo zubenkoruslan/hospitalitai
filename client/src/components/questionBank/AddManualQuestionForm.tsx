@@ -9,7 +9,7 @@ import {
 import Button from "../common/Button";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { createQuestion } from "../../services/api";
-import { useValidation } from "../../context/ValidationContext";
+
 import LoadingSpinner from "../common/LoadingSpinner";
 import KnowledgeCategorySelector from "../common/KnowledgeCategorySelector";
 
@@ -25,8 +25,6 @@ const questionTypes: QuestionType[] = [
   "multiple-choice-multiple",
   "true-false",
 ];
-
-const difficultyLevels = ["easy", "medium", "hard"];
 
 const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   onQuestionAdded,
@@ -54,8 +52,6 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
   // Knowledge Category State
   const [selectedKnowledgeCategory, setSelectedKnowledgeCategory] =
     useState<KnowledgeCategory>(KnowledgeCategory.FOOD_KNOWLEDGE);
-
-  const { formatErrorMessage } = useValidation();
 
   const handleOptionChange = (
     index: number,

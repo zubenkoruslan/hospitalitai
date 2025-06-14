@@ -384,8 +384,6 @@ const StaffDashboard: React.FC = () => {
     useState<boolean>(false);
   const [selectedAttemptForModal, setSelectedAttemptForModal] =
     useState<ClientQuizAttemptDetails | null>(null);
-  const [_modalError, setModalError] = useState<string | null>(null);
-  const [_modalLoading, setModalLoading] = useState<boolean>(false);
 
   // Combined loading state
   const isLoading =
@@ -506,8 +504,6 @@ const StaffDashboard: React.FC = () => {
   // MODIFIED/NEW: Handler for opening modal with specific attempt details
   const handleOpenAttemptIncorrectAnswersModal = useCallback(
     async (attemptId: string) => {
-      setModalLoading(true);
-      setModalError(null);
       setSelectedAttemptForModal(null);
 
       try {
@@ -515,13 +511,12 @@ const StaffDashboard: React.FC = () => {
         if (attemptDetailsResponse) {
           setSelectedAttemptForModal(attemptDetailsResponse);
         } else {
-          setModalError("Could not load attempt details.");
+          // Could not load attempt details
         }
       } catch (error) {
         console.error("Error fetching attempt details for modal:", error);
-        setModalError(formatApiError(error, "loading incorrect answers"));
+        // Error loading incorrect answers
       } finally {
-        setModalLoading(false);
         setIsIncorrectAnswersModalOpen(true);
       }
     },
@@ -531,7 +526,7 @@ const StaffDashboard: React.FC = () => {
   const handleCloseIncorrectAnswersModal = () => {
     setIsIncorrectAnswersModalOpen(false);
     setSelectedAttemptForModal(null);
-    setModalError(null);
+    // Clear modal error
   };
 
   // Show loading spinner if auth context is loading
