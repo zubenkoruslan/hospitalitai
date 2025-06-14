@@ -10,6 +10,7 @@ import {
 import QuizModel, { IQuiz } from "../models/QuizModel"; // Added IQuiz import
 import NotificationService from "../services/notificationService";
 import User from "../models/User";
+import { Types } from "mongoose";
 
 // Removed local GenerateQuizFromBanksRequestBody interface
 // Removed local SubmitQuizAttemptRequestBody interface
@@ -130,22 +131,22 @@ export const startQuizAttemptController = async (
     const staffUserId = new mongoose.Types.ObjectId(req.user.userId);
     const quizObjectId = new mongoose.Types.ObjectId(quizId);
 
-    const questions = await QuizService.startQuizAttempt(
+    const result = await QuizService.startQuizAttempt(
       staffUserId,
       quizObjectId
     );
 
     // No explicit attemptId is created or returned here by the service.
-    // The client will receive the questions array directly.
+    // The client will receive the quiz title and questions.
     // If questions.length is 0, the service itself handles the logic of quiz completion or no availability.
 
     res.status(200).json({
       status: "success",
       message:
-        questions.length > 0
+        result.questions.length > 0
           ? "Quiz attempt questions fetched."
           : "No new questions available for this quiz, or quiz completed.",
-      data: questions, // Send the array of questions directly
+      data: result, // Send the object with quizTitle and questions
     });
   } catch (error) {
     if (!(error instanceof AppError)) {
@@ -604,6 +605,70 @@ export const getAllIncorrectAnswersForStaffController = async (
         error
       );
     }
+    next(error);
+  }
+};
+
+/**
+ * Manually update quiz snapshots for all quizzes in a restaurant
+ * This is useful when question banks have been updated and quiz snapshot counts are stale
+ */
+export const updateQuizSnapshots = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const restaurantId = new Types.ObjectId(req.user?.restaurantId);
+
+    console.log(
+      `🔄 [QuizController] Manual snapshot update requested for restaurant: ${restaurantId}`
+    );
+
+    // Find all quizzes that source from question banks
+    const quizzes = await QuizModel.find({
+      restaurantId,
+      sourceType: "QUESTION_BANKS",
+      sourceQuestionBankIds: { $exists: true, $ne: [] },
+    });
+
+    if (quizzes.length === 0) {
+      res.status(200).json({
+        status: "success",
+        message: "No quizzes found that need snapshot updates",
+        data: { updatedCount: 0, totalQuizzes: 0 },
+      });
+      return;
+    }
+
+    // Get all unique question bank IDs
+    const allBankIds = [
+      ...new Set(
+        quizzes.flatMap((quiz) =>
+          quiz.sourceQuestionBankIds.map((id: Types.ObjectId) => id.toString())
+        )
+      ),
+    ].map((id: string) => new Types.ObjectId(id));
+
+    // Update snapshots for all question banks
+    const updatedCount = await QuizService.updateQuizSnapshotsForQuestionBanks(
+      allBankIds,
+      restaurantId
+    );
+
+    console.log(`✅ [QuizController] Updated ${updatedCount} quiz snapshots`);
+
+    res.status(200).json({
+      status: "success",
+      message: `Successfully updated quiz snapshots`,
+      data: {
+        updatedCount,
+        totalQuizzes: quizzes.length,
+        questionBanksProcessed: allBankIds.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating quiz snapshots:", error);
     next(error);
   }
 };

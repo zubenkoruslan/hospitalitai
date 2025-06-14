@@ -970,13 +970,13 @@ export class QuizService {
    *
    * @param staffUserId - The ID of the staff user.
    * @param quizId - The ID of the quiz definition.
-   * @returns A promise resolving to an array of questions for the attempt (QuestionForQuizAttempt[]).
+   * @returns A promise resolving to an object with quiz title and questions for the attempt.
    * @throws {AppError} If quiz not found, or other issues occur.
    */
   static async startQuizAttempt(
     staffUserId: Types.ObjectId,
     quizId: Types.ObjectId
-  ): Promise<QuestionForQuizAttempt[]> {
+  ): Promise<{ quizTitle: string; questions: QuestionForQuizAttempt[] }> {
     // 1. Fetch the Quiz definition
     const quiz = await QuizModel.findById(quizId).lean<PlainIQuiz>();
 
@@ -1035,7 +1035,7 @@ export class QuizService {
 
     // 3. If already completed, return empty array
     if (staffProgress.isCompletedOverall) {
-      return [];
+      return { quizTitle: quiz.title, questions: [] };
     }
 
     // 4. Fetch all unique, active question IDs from the Quiz's source question banks
@@ -1058,7 +1058,7 @@ export class QuizService {
     if (availablePoolIds.length === 0) {
       staffProgress.isCompletedOverall = true;
       await staffProgress.save();
-      return [];
+      return { quizTitle: quiz.title, questions: [] };
     }
 
     // 7. Randomly select N questions from availablePoolIds
@@ -1075,7 +1075,7 @@ export class QuizService {
       console.warn(
         `[QuizService.startQuizAttempt] WARNING: Selected 0 questions to present, but numberOfQuestionsPerAttempt is ${quiz.numberOfQuestionsPerAttempt}. This implies availablePoolIds was empty or smaller than N.`
       );
-      return []; // Explicitly return empty if nothing was selected to present
+      return { quizTitle: quiz.title, questions: [] }; // Explicitly return empty if nothing was selected to present
     }
 
     // 8. Fetch full question objects for these IDs
@@ -1094,7 +1094,26 @@ export class QuizService {
       )
       .filter((q) => q !== undefined) as QuestionForQuizAttempt[];
 
-    return orderedQuestions;
+    // 9. Randomize the order of options for each question to prevent pattern recognition
+    const questionsWithRandomizedOptions = orderedQuestions.map((question) => {
+      if (
+        question.questionType === "multiple-choice-single" ||
+        question.questionType === "multiple-choice-multiple"
+      ) {
+        // Create a copy of the options array and shuffle it
+        const shuffledOptions = [...question.options];
+        _shuffleArray(shuffledOptions);
+
+        return {
+          ...question,
+          options: shuffledOptions,
+        };
+      }
+      // For true-false questions, keep original order (True/False is standard)
+      return question;
+    });
+
+    return { quizTitle: quiz.title, questions: questionsWithRandomizedOptions };
   }
 
   /**
@@ -2034,6 +2053,93 @@ export class QuizService {
     } catch (error: any) {
       console.error("Error counting quizzes for restaurant:", error);
       throw new AppError("Failed to count quizzes.", 500);
+    }
+  }
+
+  /**
+   * Updates the totalUniqueQuestionsInSourceSnapshot for all quizzes that use the specified question banks
+   *
+   * @param questionBankIds - Array of question bank IDs that have been updated
+   * @param restaurantId - Restaurant ID to scope the update
+   * @returns Promise resolving to the number of quizzes updated
+   */
+  static async updateQuizSnapshotsForQuestionBanks(
+    questionBankIds: Types.ObjectId[],
+    restaurantId: Types.ObjectId
+  ): Promise<number> {
+    try {
+      console.log(
+        `🔄 [QuizService] Updating quiz snapshots for question banks: ${questionBankIds.map(
+          (id) => id.toString()
+        )}`
+      );
+
+      // Find all quizzes that source from these question banks
+      const affectedQuizzes = await QuizModel.find({
+        restaurantId,
+        sourceQuestionBankIds: { $in: questionBankIds },
+        sourceType: "QUESTION_BANKS",
+      });
+
+      if (affectedQuizzes.length === 0) {
+        console.log(
+          `📊 [QuizService] No quizzes found using these question banks`
+        );
+        return 0;
+      }
+
+      let updatedCount = 0;
+
+      for (const quiz of affectedQuizzes) {
+        try {
+          // Get current count of unique questions from this quiz's source banks
+          const currentQuestionIds =
+            await getUniqueValidQuestionIdsFromQuestionBanks(
+              quiz.sourceQuestionBankIds,
+              restaurantId
+            );
+
+          const newSnapshotCount = currentQuestionIds.length;
+          const oldSnapshotCount = quiz.totalUniqueQuestionsInSourceSnapshot;
+
+          if (newSnapshotCount !== oldSnapshotCount) {
+            // Update the quiz with the new snapshot count
+            await QuizModel.findByIdAndUpdate(quiz._id, {
+              $set: {
+                totalUniqueQuestionsInSourceSnapshot: newSnapshotCount,
+              },
+            });
+
+            console.log(
+              `✅ [QuizService] Updated quiz "${quiz.title}" snapshot: ${oldSnapshotCount} → ${newSnapshotCount} questions`
+            );
+            updatedCount++;
+          } else {
+            console.log(
+              `ℹ️ [QuizService] Quiz "${quiz.title}" snapshot unchanged: ${newSnapshotCount} questions`
+            );
+          }
+        } catch (quizError) {
+          console.error(
+            `❌ [QuizService] Failed to update snapshot for quiz "${quiz.title}":`,
+            quizError
+          );
+          // Continue with other quizzes even if one fails
+        }
+      }
+
+      console.log(
+        `🎯 [QuizService] Updated ${updatedCount}/${affectedQuizzes.length} quiz snapshots`
+      );
+
+      return updatedCount;
+    } catch (error) {
+      console.error(
+        `❌ [QuizService] Failed to update quiz snapshots for question banks:`,
+        error
+      );
+      // Don't throw error as this is a background update operation
+      return 0;
     }
   }
 }

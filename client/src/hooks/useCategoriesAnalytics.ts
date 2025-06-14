@@ -6,47 +6,77 @@ interface UseCategoriesAnalyticsReturn {
   categoriesData: CategoryAnalytics[];
   loading: boolean;
   error: string | null;
-  fetchCategoriesData: () => void;
+  fetchCategoriesData: () => Promise<void>;
+  refreshAnalytics: () => Promise<void>;
 }
 
-export function useCategoriesAnalytics(): UseCategoriesAnalyticsReturn {
+export const useCategoriesAnalytics = (): UseCategoriesAnalyticsReturn => {
   const [categoriesData, setCategoriesData] = useState<CategoryAnalytics[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
   const fetchCategoriesData = useCallback(async () => {
-    // Only fetch if user is a restaurant owner
-    if (!(user && user.role === "restaurant")) {
-      setError(
-        "Access denied. Only restaurant owners can view analytics data."
-      );
+    if (!user?.restaurantId) {
+      setError("No restaurant ID available");
       setLoading(false);
-      setCategoriesData([]);
       return;
     }
 
-    setLoading(true);
-    setError(null);
     try {
-      const fetchedData = await getCategoriesAnalytics();
-      setCategoriesData(fetchedData || []);
-    } catch (err: any) {
-      console.error("Error fetching categories analytics data:", err);
+      setLoading(true);
+      setError(null);
+      console.log("[Categories Analytics] Fetching analytics data...");
+
+      const data = await getCategoriesAnalytics();
+      setCategoriesData(data);
+
+      console.log(
+        "[Categories Analytics] Successfully fetched analytics data:",
+        data
+      );
+    } catch (err) {
+      console.error("[Categories Analytics] Error fetching analytics:", err);
       setError(
-        err.response?.data?.message ||
-          "Failed to fetch categories analytics data."
+        err instanceof Error ? err.message : "Failed to fetch analytics"
       );
       setCategoriesData([]);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.restaurantId]);
 
-  // Initial fetch on mount and when user changes
+  // Alias for refreshAnalytics to maintain backward compatibility
+  const refreshAnalytics = useCallback(async () => {
+    console.log("[Categories Analytics] Manually refreshing analytics data...");
+    await fetchCategoriesData();
+  }, [fetchCategoriesData]);
+
   useEffect(() => {
     fetchCategoriesData();
   }, [fetchCategoriesData]);
 
-  return { categoriesData, loading, error, fetchCategoriesData };
-}
+  // Listen for analytics refresh events
+  useEffect(() => {
+    const handleAnalyticsRefresh = () => {
+      console.log(
+        "[Categories Analytics] Received analytics refresh event, refetching data..."
+      );
+      fetchCategoriesData();
+    };
+
+    window.addEventListener("analytics-refresh", handleAnalyticsRefresh);
+
+    return () => {
+      window.removeEventListener("analytics-refresh", handleAnalyticsRefresh);
+    };
+  }, [fetchCategoriesData]);
+
+  return {
+    categoriesData,
+    loading,
+    error,
+    fetchCategoriesData,
+    refreshAnalytics,
+  };
+};

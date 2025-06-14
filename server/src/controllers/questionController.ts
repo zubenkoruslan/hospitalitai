@@ -141,8 +141,15 @@ export const updateQuestion = async (
 ): Promise<void> => {
   try {
     const { questionId } = req.params;
-    const { questionText, questionType, options, categories, difficulty } =
-      req.body;
+    const {
+      questionText,
+      questionType,
+      options,
+      categories,
+      difficulty,
+      knowledgeCategory,
+      explanation,
+    } = req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -160,6 +167,9 @@ export const updateQuestion = async (
     if (options !== undefined) updateData.options = options;
     if (categories !== undefined) updateData.categories = categories;
     if (difficulty !== undefined) updateData.difficulty = difficulty;
+    if (knowledgeCategory !== undefined)
+      updateData.knowledgeCategory = knowledgeCategory;
+    if (explanation !== undefined) updateData.explanation = explanation;
 
     // The check for empty updateData is now part of validateUpdateQuestionBody.
 

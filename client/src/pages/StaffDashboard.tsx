@@ -302,7 +302,7 @@ const QuizItem: React.FC<QuizItemProps> = ({
       </div>
 
       {/* Action Button */}
-      <div className="flex-shrink-0 mt-4 pt-4 border-t border-white/50 px-4">
+      <div className="flex-shrink-0 mt-4 pt-4 pb-4 border-t border-white/50 px-4">
         {isQuizOnCooldown ? (
           <div className="text-center space-y-3">
             <button
@@ -333,7 +333,7 @@ const QuizItem: React.FC<QuizItemProps> = ({
             </div>
           </div>
         ) : (
-          <div className="text-center mb-4">
+          <div className="text-center">
             <div className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-100 to-green-200 text-green-700 shadow-md">
               <CheckCircleIcon className="h-4 w-4 mr-2" />
               <span className="text-sm font-medium">Completed!</span>

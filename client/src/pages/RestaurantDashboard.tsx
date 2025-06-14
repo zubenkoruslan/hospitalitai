@@ -188,6 +188,23 @@ const RestaurantDashboard: React.FC = () => {
     },
   };
 
+  // Effect to listen for analytics refresh events
+  useEffect(() => {
+    const handleAnalyticsRefresh = () => {
+      console.log(
+        "[Restaurant Dashboard] Received analytics refresh event, refetching data..."
+      );
+      fetchMenus(); // Refresh menus in case categories changed
+      // The useCategoriesAnalytics hook will automatically refresh due to the event
+    };
+
+    window.addEventListener("analytics-refresh", handleAnalyticsRefresh);
+
+    return () => {
+      window.removeEventListener("analytics-refresh", handleAnalyticsRefresh);
+    };
+  }, [fetchMenus]);
+
   // Effect to prepare chart data when categoriesData changes
   useEffect(() => {
     console.log("Categories data received:", categoriesData); // Debug logging
@@ -989,7 +1006,11 @@ const RestaurantDashboard: React.FC = () => {
                               <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
                                 <span className="flex items-center">
                                   <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
-                                  {cat.totalQuestions} questions
+                                  {cat.totalQuestions} answered
+                                </span>
+                                <span className="flex items-center">
+                                  <UsersIcon className="h-3 w-3 mr-1" />
+                                  {cat.totalStaffParticipating} staff
                                 </span>
                               </div>
 
@@ -1024,11 +1045,12 @@ const RestaurantDashboard: React.FC = () => {
                       <ChartBarIcon className="h-10 w-10 text-slate-400" />
                     </div>
                     <h3 className="text-lg font-medium text-slate-900 mb-2">
-                      No Analytics Data Yet
+                      Analytics Coming Soon
                     </h3>
                     <p className="text-sm text-slate-500 mb-4 max-w-sm mx-auto">
-                      Analytics will appear once your staff begin completing
-                      quizzes across the four knowledge categories
+                      Knowledge category performance will appear here once your
+                      staff begin taking quizzes. Create quizzes and assign them
+                      to staff to see detailed analytics.
                     </p>
                     <div className="flex flex-wrap justify-center gap-2 mb-6">
                       <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">

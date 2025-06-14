@@ -18,6 +18,9 @@ import SopDocumentModel, {
 } from "../models/SopDocumentModel"; // Added import for SopDocumentModel
 import { generateQuestionsFromSopText, IGeneratedQuestion } from "./aiService";
 
+// Import QuizService for updating quiz snapshots when question banks change
+import type { QuizService } from "./quizService";
+
 // Define an interface for the data expected by createQuestionBankService
 // This should align with what the controller will pass from req.body
 export interface CreateQuestionBankData {
@@ -36,6 +39,11 @@ export interface UpdateQuestionBankData {
   targetQuestionCount?: number; // Added targetQuestionCount
   categories?: string[]; // ADDED: categories field
   // questions will be handled by separate dedicated functions usually
+  questions?: mongoose.Types.ObjectId[]; // ADDED: questions field for clearing questions
+
+  // ADDED: Menu connection change fields
+  sourceMenuId?: mongoose.Types.ObjectId | null;
+  sourceMenuName?: string;
 }
 
 interface MenuSpecificAiParams {
@@ -177,6 +185,71 @@ export const updateQuestionBankService = async (
       return null; // Or throw AppError
     }
 
+    // Get the current bank to check its source type
+    const currentBank = await QuestionBankModel.findOne({
+      _id: bankId,
+      restaurantId: restaurantId,
+    });
+
+    if (!currentBank) {
+      throw new AppError(
+        `Question bank not found with ID: ${bankId} for this restaurant.`,
+        404
+      );
+    }
+
+    // If changing menu connection, validate the new menu and clear existing questions
+    if (data.sourceMenuId !== undefined) {
+      if (data.sourceMenuId === null) {
+        // Removing menu connection
+        data.sourceMenuName = undefined;
+
+        // Clear existing questions when removing menu connection
+        console.log(
+          `[QuestionBank] Removing menu connection for bank ${bankId} - clearing existing questions`
+        );
+
+        // Delete all questions associated with this bank
+        await QuestionModel.deleteMany({
+          questionBankId: bankId,
+          restaurantId: restaurantId,
+        });
+
+        // Clear the questions array in the bank
+        data.questions = [];
+      } else {
+        // Changing to a new menu - validate it exists and belongs to restaurant
+        const menu = await MenuModel.findOne({
+          _id: data.sourceMenuId,
+          restaurantId: restaurantId,
+        });
+
+        if (!menu) {
+          throw new AppError(
+            `Menu with ID: ${data.sourceMenuId} not found or does not belong to this restaurant.`,
+            404
+          );
+        }
+
+        // Update the menu name for denormalization
+        data.sourceMenuName = menu.name;
+
+        console.log(
+          `[QuestionBank] Updating bank ${bankId} to connect to menu: ${menu.name} (${data.sourceMenuId}) - clearing existing questions`
+        );
+
+        // Clear existing questions when changing menu connection
+        // This ensures the quiz won't use questions from the old menu
+        await QuestionModel.deleteMany({
+          questionBankId: bankId,
+          restaurantId: restaurantId,
+        });
+
+        // Clear the questions array in the bank
+        data.questions = [];
+      }
+    }
+
     // data will now include targetQuestionCount if provided by controller
     const updatedBank = await QuestionBankModel.findOneAndUpdate(
       { _id: bankId, restaurantId: restaurantId },
@@ -187,6 +260,9 @@ export const updateQuestionBankService = async (
     return updatedBank;
   } catch (error) {
     console.error("Error updating question bank in service:", error);
+    if (error instanceof AppError) {
+      throw error;
+    }
     if (error instanceof mongoose.Error.ValidationError) {
       throw new AppError(`Validation Error: ${error.message}`, 400);
     }
@@ -270,6 +346,23 @@ export const addQuestionToBankService = async (
     bank.questions.push(objectQuestionId);
 
     await bank.save();
+
+    // 6. Update quiz snapshots asynchronously (don't await to avoid blocking the response)
+    setImmediate(async () => {
+      try {
+        const { QuizService } = await import("./quizService");
+        await QuizService.updateQuizSnapshotsForQuestionBanks(
+          [new mongoose.Types.ObjectId(bankId)],
+          restaurantId
+        );
+      } catch (error) {
+        console.error(
+          "Failed to update quiz snapshots after adding question to bank:",
+          error
+        );
+      }
+    });
+
     return bank.populate("questions"); // Populate questions before returning
   } catch (error) {
     console.error("Error adding question ID to bank in service:", error);

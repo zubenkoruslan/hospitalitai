@@ -7,7 +7,9 @@ import {
   updateQuestionBank,
   getSopDocumentDetails,
   getMenuWithItems,
+  getMenusByRestaurant,
 } from "../../services/api";
+import { IMenuClient } from "../../types/menuTypes";
 import Button from "../common/Button";
 import Input from "../common/Input";
 import TextArea from "../common/TextArea";
@@ -49,6 +51,14 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ADDED: Menu connection management
+  const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
+  const [isLoadingMenus, setIsLoadingMenus] = useState(false);
+  const [selectedMenuId, setSelectedMenuId] = useState<string>(
+    bankToEdit.sourceMenuId || ""
+  );
+  const [showMenuSelector, setShowMenuSelector] = useState(false);
 
   const buildNestedSopCategories = useCallback(
     (
@@ -144,6 +154,20 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
     },
     []
   );
+
+  // ADDED: Function to fetch available menus
+  const fetchAvailableMenus = useCallback(async () => {
+    setIsLoadingMenus(true);
+    try {
+      const menus = await getMenusByRestaurant(bankToEdit.restaurantId);
+      setAvailableMenus(menus);
+    } catch (error) {
+      console.error("Error fetching menus:", error);
+      setError("Failed to load available menus");
+    } finally {
+      setIsLoadingMenus(false);
+    }
+  }, [bankToEdit.restaurantId]);
 
   const fetchAndSetSourceCategories = useCallback(async () => {
     if (
@@ -380,6 +404,12 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
       hasChanges = true;
     }
 
+    // Check for menu connection changes
+    if (selectedMenuId !== (bankToEdit.sourceMenuId || "")) {
+      updateData.sourceMenuId = selectedMenuId || null;
+      hasChanges = true;
+    }
+
     if (!hasChanges) {
       setIsLoading(false);
       onCancel();
@@ -488,6 +518,82 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
         rows={3}
         disabled={isLoading}
       />
+
+      {/* ADDED: Menu Connection Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-medium text-gray-800">Menu Connection</h3>
+          {bankToEdit.sourceType === "MENU" && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (!showMenuSelector && availableMenus.length === 0) {
+                  fetchAvailableMenus();
+                }
+                setShowMenuSelector(!showMenuSelector);
+              }}
+              disabled={isLoading}
+              className="text-xs"
+            >
+              {showMenuSelector ? "Cancel" : "Change Menu"}
+            </Button>
+          )}
+        </div>
+
+        {bankToEdit.sourceType === "MENU" && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-md">
+            <p className="text-sm text-gray-600 mb-2">
+              <strong>Currently connected to:</strong>{" "}
+              {bankToEdit.sourceMenuName || "Unknown Menu"}
+              {bankToEdit.sourceMenuId && (
+                <span className="text-xs text-gray-500 ml-2">
+                  (ID: {bankToEdit.sourceMenuId})
+                </span>
+              )}
+            </p>
+
+            {showMenuSelector && (
+              <div className="mt-3">
+                {isLoadingMenus ? (
+                  <LoadingSpinner message="Loading available menus..." />
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select New Menu:
+                    </label>
+                    <select
+                      value={selectedMenuId}
+                      onChange={(e) => setSelectedMenuId(e.target.value)}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isLoading}
+                    >
+                      <option value="">-- No Menu Connection --</option>
+                      {availableMenus.map((menu) => (
+                        <option key={menu._id} value={menu._id}>
+                          {menu.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Warning:</strong> Changing the menu connection
+                      will clear all existing questions in this bank. You'll
+                      need to regenerate questions after saving.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {bankToEdit.sourceType !== "MENU" && (
+          <p className="text-sm text-gray-500 mb-4">
+            This question bank is not connected to a menu (Source type:{" "}
+            {bankToEdit.sourceType}).
+          </p>
+        )}
+      </div>
 
       <div>
         <h3 className="text-lg font-medium text-gray-800 mb-2">Categories</h3>

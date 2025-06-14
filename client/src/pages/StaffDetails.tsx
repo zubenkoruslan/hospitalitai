@@ -1127,11 +1127,11 @@ const StaffDetails: React.FC = () => {
             <div className="flex items-center gap-4">
               <Button
                 variant="secondary"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/staff")}
                 className="flex items-center gap-2"
               >
                 <ArrowLeftIcon className="h-4 w-4" />
-                Back
+                Back to Team Management
               </Button>
               <div className="text-sm text-gray-500">
                 Team Management → Staff Details

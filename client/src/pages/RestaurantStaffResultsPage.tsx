@@ -41,7 +41,7 @@ import {
 // Enhanced interfaces for comprehensive analytics
 interface LeaderboardEntry {
   rank: number;
-  userId: string;
+  userId: string | { _id: string; toString(): string };
   name: string;
   roleName?: string;
   overallAverageScore: number;
@@ -108,7 +108,7 @@ interface EnhancedRestaurantAnalytics {
 }
 
 interface CategoryChampion {
-  userId: string;
+  userId: string | { _id: string; toString(): string };
   name: string;
   roleName?: string;
   averageScore: number;
@@ -160,6 +160,13 @@ const useLeaderboardData = (timePeriod: string = "all") => {
         // Map the time period for leaderboards API
         const mappedTimePeriod = mapTimePeriodForLeaderboards(timePeriod);
 
+        console.log(
+          "[Leaderboard API] Fetching data for time period:",
+          timePeriod,
+          "mapped to:",
+          mappedTimePeriod
+        );
+
         const response = await fetch(
           `/api/analytics/leaderboards?timePeriod=${mappedTimePeriod}&limit=10`,
           {
@@ -170,13 +177,22 @@ const useLeaderboardData = (timePeriod: string = "all") => {
           }
         );
 
+        console.log("[Leaderboard API] Response status:", response.status);
+
         if (!response.ok) {
           throw new Error("Failed to fetch leaderboard data");
         }
 
         const result = await response.json();
+        console.log("[Leaderboard API] Full response:", result);
+        console.log(
+          "[Leaderboard API] Category champions specifically:",
+          result.data?.categoryChampions
+        );
+
         setLeaderboardData(result.data);
       } catch (err) {
+        console.error("[Leaderboard API] Error:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
@@ -214,6 +230,7 @@ const useEnhancedAnalytics = (selectedTimeframe: string = "30d") => {
         }
 
         const data = await response.json();
+
         setAnalytics(data.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -358,16 +375,25 @@ const TopPerformersLeaderboard: React.FC<{
     return "bg-slate-50 border-slate-200 text-slate-800";
   };
 
-  const handleStaffClick = (userId: string) => {
-    console.log("Navigating to staff ID:", userId, "Type:", typeof userId);
-    window.open(`/staff/${userId}`, "_blank");
+  const handleStaffClick = (
+    userId: string | { _id: string; toString(): string }
+  ) => {
+    // Ensure userId is always a string
+    const staffId =
+      typeof userId === "string" ? userId : userId._id || userId.toString();
+    console.log("Navigating to staff ID:", staffId, "Type:", typeof staffId);
+    window.open(`/staff/${staffId}`, "_blank");
   };
 
   return (
     <div className="space-y-3">
       {topPerformers.map((performer) => (
         <div
-          key={performer.userId}
+          key={
+            typeof performer.userId === "string"
+              ? performer.userId
+              : performer.userId._id || performer.userId.toString()
+          }
           className={`p-4 rounded-lg border ${getRankStyle(
             performer.rank
           )} hover:bg-gray-100 transition-colors cursor-pointer`}
@@ -408,10 +434,38 @@ const CategoryChampions: React.FC<{
 }> = ({ categoryChampions }) => {
   const navigate = useNavigate();
 
-  const handleStaffClick = (userId: string) => {
-    console.log("Navigating to staff ID:", userId, "Type:", typeof userId);
-    window.open(`/staff/${userId}`, "_blank");
+  // Debug logging for category champions
+  React.useEffect(() => {
+    console.log("[Category Champions] Received data:", categoryChampions);
+    if (categoryChampions) {
+      Object.entries(categoryChampions).forEach(([key, champion]) => {
+        console.log(`[Category Champions] ${key}:`, champion);
+      });
+    }
+  }, [categoryChampions]);
+
+  const handleStaffClick = (
+    userId: string | { _id: string; toString(): string }
+  ) => {
+    // Ensure userId is always a string
+    const staffId =
+      typeof userId === "string" ? userId : userId._id || userId.toString();
+    console.log("Navigating to staff ID:", staffId, "Type:", typeof staffId);
+    window.open(`/staff/${staffId}`, "_blank");
   };
+
+  if (!categoryChampions) {
+    console.log("[Category Champions] No categoryChampions data available");
+    return (
+      <div className="text-center py-8">
+        <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+        <p className="text-slate-500">No category champions data available</p>
+        <p className="text-slate-400 text-sm">
+          Complete category-specific quizzes to see champions
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -538,6 +592,25 @@ const RestaurantStaffResultsPage: React.FC = () => {
       mapTimePeriodForLeaderboards(selectedTimePeriod)
     );
   }, [analytics, staffData, leaderboardData, selectedTimePeriod]);
+
+  // Listen for analytics refresh events (when questions are updated)
+  React.useEffect(() => {
+    const handleAnalyticsRefresh = () => {
+      console.log(
+        "[Staff Results] Received analytics refresh event, refetching all data..."
+      );
+
+      // Force refresh all data by triggering re-fetch
+      // This will cause the hooks to refetch their data
+      window.location.reload(); // Simple but effective approach for comprehensive refresh
+    };
+
+    window.addEventListener("analytics-refresh", handleAnalyticsRefresh);
+
+    return () => {
+      window.removeEventListener("analytics-refresh", handleAnalyticsRefresh);
+    };
+  }, []);
 
   // Combine loading and error states
   const loading =

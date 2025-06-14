@@ -113,6 +113,7 @@ export class SopQuestionGenerationService {
     })[] = [];
     for (const selectedCat of allSelectedCategoryObjects) {
       try {
+        // Now using the new CleanAiQuestionService through LegacyAiQuestionService
         const categorySpecificQuestions =
           await LegacyAiQuestionService.generateQuestionsFromSopCategoryText(
             selectedCat.name,

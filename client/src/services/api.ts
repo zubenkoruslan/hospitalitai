@@ -645,11 +645,11 @@ export const deleteQuiz = async (quizId: string): Promise<void> => {
  */
 export const startQuizAttempt = async (
   quizId: string
-): Promise<ClientQuestionForAttempt[]> => {
+): Promise<{ quizTitle: string; questions: ClientQuestionForAttempt[] }> => {
   const response = await api.post<{
-    data: ClientQuestionForAttempt[];
+    data: { quizTitle: string; questions: ClientQuestionForAttempt[] };
   }>(`/quizzes/${quizId}/start-attempt`);
-  return response.data.data; // Backend now expected to return { data: questions[] }
+  return response.data.data; // Backend now returns { data: { quizTitle, questions } }
 };
 
 /**
@@ -1739,9 +1739,23 @@ export const resetPassword = async (
 export interface CategoryAnalytics {
   category: string;
   averageAccuracy: number;
-  staffParticipation: number;
   totalQuestions: number;
-  improvementTrend: number;
+  totalStaffParticipating: number;
+  last30DaysAccuracy: number;
+  accuracyTrend: number;
+  staffPerformanceLevels: {
+    strong: number;
+    average: number;
+    needsWork: number;
+  };
+  questionStats: {
+    totalAvailable: number;
+    aiGenerated: number;
+    manuallyCreated: number;
+    averageDifficulty: string;
+  };
+  trainingRecommendations: string[];
+  lastUpdated: string;
 }
 
 export const getCategoriesAnalytics = async (): Promise<
@@ -2019,5 +2033,32 @@ export const importCleanMenu = async (
     importRequest
   );
 
+  return response.data;
+};
+
+export interface ResetAnalyticsOptions {
+  resetQuizAttempts?: boolean;
+  resetStaffProgress?: boolean;
+  resetArchivedAnalytics?: boolean;
+}
+
+export interface ResetAnalyticsResult {
+  success: boolean;
+  message: string;
+  data?: {
+    analyticsDeleted: number;
+    snapshotsDeleted?: number;
+    archivedAnalyticsDeleted?: number;
+    progressResetCount?: number;
+    quizAttemptsDeleted?: number;
+    cacheCleared: boolean;
+  };
+  errors?: string[];
+}
+
+export const resetAnalytics = async (
+  options: ResetAnalyticsOptions = {}
+): Promise<ResetAnalyticsResult> => {
+  const response = await api.post("/analytics/reset", options);
   return response.data;
 };

@@ -61,10 +61,13 @@ export interface IUserKnowledgeAnalytics extends Document {
 
   // Overall completion time tracking
   totalQuizzesCompleted: number;
-  totalQuizCompletionTime: number; // Total time for all quizzes in seconds
+  totalQuizCompletionTime: number; // Total time in seconds
   averageQuizCompletionTime: number; // Average time per quiz in seconds
-  fastestQuizCompletionTime?: number; // Fastest complete quiz time
-  slowestQuizCompletionTime?: number; // Slowest complete quiz time
+  fastestQuizCompletionTime?: number; // Fastest single quiz time
+  slowestQuizCompletionTime?: number; // Slowest single quiz time
+
+  // Idempotency tracking to prevent double-counting
+  processedQuizAttempts: string[];
 
   // Trending data (last 30 days)
   last30Days: {
@@ -76,6 +79,16 @@ export interface IUserKnowledgeAnalytics extends Document {
 
   createdAt?: Date;
   updatedAt?: Date;
+
+  // Instance methods
+  updateCategoryStats(
+    category: KnowledgeCategory,
+    isCorrect: boolean,
+    subcategories?: string[],
+    difficulty?: "basic" | "intermediate" | "advanced"
+  ): void;
+  getCategoryField(category: KnowledgeCategory): string;
+  calculateOverallAccuracy(): number;
 }
 
 // Schema for category statistics
@@ -264,6 +277,12 @@ const UserKnowledgeAnalyticsSchema: Schema<IUserKnowledgeAnalytics> =
       slowestQuizCompletionTime: {
         type: Number,
         required: false,
+      },
+
+      // Idempotency tracking to prevent double-counting
+      processedQuizAttempts: {
+        type: [String],
+        default: [],
       },
 
       // Trending data (last 30 days)

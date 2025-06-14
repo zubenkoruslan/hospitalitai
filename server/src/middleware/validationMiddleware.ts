@@ -595,6 +595,10 @@ export const validateUpdateQuestionBody: ValidationChain[] = [
     .optional()
     .isString()
     .trim(), // Add .isIn(['easy', 'medium', 'hard']) if difficulties are fixed
+  body("explanation", "Explanation must be a string")
+    .optional()
+    .isString()
+    .trim(),
 
   // Knowledge Analytics fields
   body("knowledgeCategory", "Knowledge category must be a valid string")
@@ -684,10 +688,11 @@ export const validateUpdateQuestionBankBody: ValidationChain[] = [
       req.body.name === undefined &&
       req.body.description === undefined &&
       req.body.targetQuestionCount === undefined &&
-      req.body.categories === undefined
+      req.body.categories === undefined &&
+      req.body.sourceMenuId === undefined
     ) {
       throw new Error(
-        "No update data provided. Provide name, description, targetQuestionCount, or categories."
+        "No update data provided. Provide name, description, targetQuestionCount, categories, or sourceMenuId."
       );
     }
     return true;
@@ -719,6 +724,22 @@ export const validateUpdateQuestionBankBody: ValidationChain[] = [
     .withMessage(
       "Category names cannot be empty if categories array is provided."
     ),
+  body(
+    "sourceMenuId",
+    "Source menu ID must be a valid MongoDB ObjectId or null"
+  )
+    .optional()
+    .custom((value) => {
+      if (value === null || value === "") {
+        return true; // Allow null/empty to remove menu connection
+      }
+      if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) {
+        return true; // Valid ObjectId string
+      }
+      throw new Error(
+        "Source menu ID must be a valid MongoDB ObjectId or null"
+      );
+    }),
 ];
 
 export const validateAddQuestionToBankBody: ValidationChain[] = [

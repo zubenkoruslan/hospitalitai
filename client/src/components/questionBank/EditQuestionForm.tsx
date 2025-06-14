@@ -4,12 +4,14 @@ import {
   IOption,
   QuestionType,
   UpdateQuestionClientData,
+  KnowledgeCategory,
 } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { updateQuestion } from "../../services/api";
 import { useValidation } from "../../context/ValidationContext";
 import LoadingSpinner from "../common/LoadingSpinner";
+import KnowledgeCategorySelector from "../common/KnowledgeCategorySelector";
 
 // ADDED: Define available question types for the dropdown
 const availableQuestionTypes: QuestionType[] = [
@@ -47,6 +49,9 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   const [explanation, setExplanation] = useState(
     questionToEdit.explanation || ""
   );
+  const [knowledgeCategory, setKnowledgeCategory] = useState<KnowledgeCategory>(
+    questionToEdit.knowledgeCategory
+  );
 
   const [formError, setFormError] = useState<string | null>(null);
   const [internalIsLoading, setInternalIsLoading] = useState(false);
@@ -58,6 +63,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     setOptions(JSON.parse(JSON.stringify(questionToEdit.options || []))); // Keep full IOption
     setCategories([...questionToEdit.categories]);
     setExplanation(questionToEdit.explanation || "");
+    setKnowledgeCategory(questionToEdit.knowledgeCategory);
     setFormError(null); // Clear previous errors
     setInternalIsLoading(false); // Reset loading state
   }, [questionToEdit]);
@@ -182,6 +188,9 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 
     const updateData: UpdateQuestionClientData = {};
 
+    // Track if knowledge category is being updated
+    let isKnowledgeCategoryUpdated = false;
+
     if (questionText.trim() !== questionToEdit.questionText) {
       updateData.questionText = questionText.trim();
     }
@@ -225,6 +234,13 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     if ((explanation || null) !== (questionToEdit.explanation || null)) {
       updateData.explanation = explanation || undefined;
     }
+    if (knowledgeCategory !== questionToEdit.knowledgeCategory) {
+      updateData.knowledgeCategory = knowledgeCategory;
+      isKnowledgeCategoryUpdated = true;
+      console.log(
+        "[Edit Question] Knowledge category updated, will refresh analytics after save"
+      );
+    }
 
     if (Object.keys(updateData).length === 0) {
       setFormError("No changes detected to save.");
@@ -233,16 +249,33 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     }
 
     setInternalIsLoading(true);
+
     try {
       const updatedQuestion = await updateQuestion(
         questionToEdit._id,
         updateData
       );
+
+      console.log("[Edit Question] Question updated successfully");
+
+      // Refresh analytics if knowledge category was updated
+      if (isKnowledgeCategoryUpdated) {
+        console.log("[Edit Question] Triggering analytics refresh...");
+        // Trigger analytics refresh event
+        window.dispatchEvent(new CustomEvent("analytics-refresh"));
+
+        // Small delay to ensure backend cache has been invalidated
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("analytics-refresh"));
+        }, 500);
+      }
+
       onQuestionUpdated(updatedQuestion);
-      // onClose(); // Parent component will likely call onClose
-    } catch (err) {
-      console.error("Error updating question:", err);
-      setFormError(formatErrorMessage(err));
+      // The parent component (modal) will handle closing the modal
+    } catch (error: any) {
+      const message = formatErrorMessage(error);
+      setFormError(message);
+      console.error("Error updating question:", error);
     } finally {
       setInternalIsLoading(false);
     }
@@ -384,6 +417,16 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
           required
           className={commonInputClass}
           disabled={internalIsLoading}
+        />
+      </div>
+
+      <div>
+        <KnowledgeCategorySelector
+          selectedCategory={knowledgeCategory}
+          onCategoryChange={setKnowledgeCategory}
+          required={true}
+          disabled={internalIsLoading}
+          showTooltips={true}
         />
       </div>
 

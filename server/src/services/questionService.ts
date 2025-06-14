@@ -12,8 +12,13 @@ import MenuModel, { IMenu } from "../models/MenuModel";
 import LegacyAiQuestionService, {
   RawAiGeneratedQuestion,
 } from "./LegacyAiQuestionService";
-import { SimpleAiQuestionService } from "./SimpleAiQuestionService";
-import { SimpleMenuItem } from "../types/simpleQuestionTypes";
+import {
+  CleanAiQuestionService,
+  MenuItem,
+  QuestionGenerationRequest,
+} from "./CleanAiQuestionService";
+import { KnowledgeCategory } from "../models/QuestionModel";
+import { KnowledgeAnalyticsService } from "./knowledgeAnalyticsService";
 
 // Interface for the data needed to create a new question
 export interface NewQuestionData {
@@ -46,6 +51,7 @@ export interface UpdateQuestionData {
   }>;
   categories?: string[];
   difficulty?: "easy" | "medium" | "hard";
+  explanation?: string;
 
   // Knowledge Analytics fields
   knowledgeCategory?: string;
@@ -56,58 +62,61 @@ export const createQuestionService = async (
   data: NewQuestionData
 ): Promise<IQuestion> => {
   try {
-    if (data.questionType === "true-false" && data.options.length !== 2) {
-      throw new AppError(
-        "True/False questions must have exactly 2 options.",
-        400
-      );
-    }
-    if (
-      (data.questionType === "multiple-choice-single" ||
-        data.questionType === "multiple-choice-multiple") &&
-      (data.options.length < 2 || data.options.length > 6)
-    ) {
-      throw new AppError(
-        "Multiple choice questions must have between 2 and 6 options.",
-        400
-      );
-    }
-    const correctOptionsCount = data.options.filter(
-      (opt) => opt.isCorrect
-    ).length;
-    if (
-      data.questionType === "multiple-choice-single" ||
-      data.questionType === "true-false"
-    ) {
-      if (correctOptionsCount !== 1) {
+    // Validate options based on questionType (Basic validation)
+    if (data.questionType === "multiple-choice-single") {
+      if (!data.options || data.options.length < 2) {
         throw new AppError(
-          "Single-answer multiple choice and True/False questions must have exactly one correct option.",
+          "Multiple choice questions require at least 2 options.",
+          400
+        );
+      }
+      const correctAnswers = data.options.filter((opt) => opt.isCorrect);
+      if (correctAnswers.length !== 1) {
+        throw new AppError(
+          "Multiple choice (single) questions must have exactly 1 correct answer.",
           400
         );
       }
     } else if (data.questionType === "multiple-choice-multiple") {
-      if (correctOptionsCount < 1) {
+      if (!data.options || data.options.length < 2) {
         throw new AppError(
-          "Multiple-answer multiple choice questions must have at least one correct option.",
+          "Multiple choice questions require at least 2 options.",
+          400
+        );
+      }
+      const correctAnswers = data.options.filter((opt) => opt.isCorrect);
+      if (correctAnswers.length < 1) {
+        throw new AppError(
+          "Multiple choice (multiple) questions must have at least 1 correct answer.",
+          400
+        );
+      }
+    } else if (data.questionType === "true-false") {
+      if (!data.options || data.options.length !== 2) {
+        throw new AppError(
+          "True/False questions must have exactly 2 options.",
+          400
+        );
+      }
+      const correctAnswers = data.options.filter((opt) => opt.isCorrect);
+      if (correctAnswers.length !== 1) {
+        throw new AppError(
+          "True/False questions must have exactly 1 correct answer.",
           400
         );
       }
     }
-    // Prepare question data with knowledge analytics metadata
-    const questionData = {
-      ...data,
-      // Set knowledge analytics metadata
-      knowledgeCategoryAssignedBy: data.knowledgeCategory
-        ? "manual"
-        : undefined,
-      knowledgeCategoryAssignedAt: data.knowledgeCategory
-        ? new Date()
-        : undefined,
-    };
 
-    const newQuestion = new QuestionModel(questionData);
-    await newQuestion.save();
-    return newQuestion;
+    const newQuestion = new QuestionModel(data);
+    const savedQuestion = await newQuestion.save();
+
+    // Invalidate analytics cache since a new question affects question distribution
+    console.log(
+      `[Question Create] New question created, invalidating analytics cache`
+    );
+    await KnowledgeAnalyticsService.invalidateAnalyticsCache(data.restaurantId);
+
+    return savedQuestion;
   } catch (error) {
     if (error instanceof mongoose.Error.ValidationError) {
       const messages = Object.values(error.errors).map((e: any) => e.message);
@@ -187,6 +196,11 @@ export const updateQuestionService = async (
         404
       );
     }
+
+    // Check if knowledge category is being updated
+    const isKnowledgeCategoryUpdated =
+      data.knowledgeCategory &&
+      data.knowledgeCategory !== existingQuestion.knowledgeCategory;
 
     // Determine the question type to use for option validation
     let typeForValidation: QuestionType = existingQuestion.questionType;
@@ -274,6 +288,14 @@ export const updateQuestionService = async (
       );
     }
 
+    // Invalidate analytics cache if knowledge category was updated
+    if (isKnowledgeCategoryUpdated) {
+      console.log(
+        `[Question Update] Knowledge category changed for question ${questionId}, invalidating analytics cache`
+      );
+      await KnowledgeAnalyticsService.invalidateAnalyticsCache(restaurantId);
+    }
+
     return updatedQuestion;
   } catch (error) {
     if (error instanceof mongoose.Error.ValidationError) {
@@ -295,33 +317,42 @@ export const deleteQuestionService = async (
   questionId: string,
   restaurantId: mongoose.Types.ObjectId
 ): Promise<boolean> => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     if (!mongoose.Types.ObjectId.isValid(questionId)) {
       throw new AppError(`Invalid question ID format: ${questionId}`, 400);
     }
-    const objectQuestionId = new mongoose.Types.ObjectId(questionId);
-    const deletedQuestion = await QuestionModel.findOneAndDelete(
-      { _id: objectQuestionId, restaurantId: restaurantId },
-      { session }
-    );
-    if (!deletedQuestion) {
-      await session.abortTransaction();
-      session.endSession();
-      return false;
+
+    const existingQuestion = await QuestionModel.findOne({
+      _id: questionId,
+      restaurantId: restaurantId,
+    });
+
+    if (!existingQuestion) {
+      throw new AppError(
+        `Question not found with ID: ${questionId} for this restaurant.`,
+        404
+      );
     }
-    await QuestionBankModel.updateMany(
-      { restaurantId: restaurantId },
-      { $pull: { questions: objectQuestionId } },
-      { session }
+
+    // Soft delete by setting isActive to false
+    const deletedQuestion = await QuestionModel.findOneAndUpdate(
+      { _id: questionId, restaurantId: restaurantId },
+      { $set: { isActive: false } }, // Soft delete
+      { new: true }
     );
-    await session.commitTransaction();
-    session.endSession();
-    return true;
+
+    if (!deletedQuestion) {
+      return false; // Deletion failed
+    }
+
+    // Invalidate analytics cache since question deletion affects question distribution
+    console.log(
+      `[Question Delete] Question deleted, invalidating analytics cache`
+    );
+    await KnowledgeAnalyticsService.invalidateAnalyticsCache(restaurantId);
+
+    return true; // Deletion successful
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     if (error instanceof AppError) {
       throw error;
     }
@@ -329,19 +360,6 @@ export const deleteQuestionService = async (
     throw new AppError("Failed to delete question.", 500);
   }
 };
-
-// Interface for the data allowed when updating an existing question
-export interface UpdateQuestionData {
-  questionText?: string;
-  questionType?: QuestionType;
-  options?: Array<{
-    text: string;
-    isCorrect: boolean;
-    _id?: mongoose.Types.ObjectId;
-  }>;
-  categories?: string[];
-  difficulty?: "easy" | "medium" | "hard";
-}
 
 // New AiGenerationParams to align with client and new logic
 export interface AiGenerationParams {
@@ -462,61 +480,83 @@ export const generateAiQuestionsService = async (
       `[SimpleAI] Processing ${menuItemsToProcess.length} menu items`
     );
 
-    // 4. Convert to simple format (no complex processing)
-    const simpleItems: SimpleMenuItem[] = menuItemsToProcess.map((item) => ({
+    // 4. Convert to clean format for new service
+    const menuItems: MenuItem[] = menuItemsToProcess.map((item) => ({
       name: item.name,
-      description: item.description || "",
-      ingredients: item.ingredients || [],
-      allergens: item.allergens || [],
+      description: item.description || undefined,
       category: item.category,
-      // Basic wine info extraction from description/name for wine categories
-      grape: item.category.toLowerCase().includes("wine")
-        ? extractWineInfo(item.name + " " + (item.description || ""), "grape")
-        : undefined,
-      region: item.category.toLowerCase().includes("wine")
-        ? extractWineInfo(item.name + " " + (item.description || ""), "region")
-        : undefined,
-      vintage: item.category.toLowerCase().includes("wine")
-        ? extractWineInfo(item.name + " " + (item.description || ""), "vintage")
-        : undefined,
-      producer: item.category.toLowerCase().includes("wine")
-        ? extractWineInfo(
-            item.name + " " + (item.description || ""),
-            "producer"
-          )
-        : undefined,
+      itemType:
+        item.itemType === "beverage"
+          ? "beverage"
+          : item.category.toLowerCase().includes("wine")
+          ? "wine"
+          : "food",
+      ingredients: item.ingredients || undefined,
+      allergens: item.allergens || undefined,
+      price: item.price || undefined,
     }));
 
-    // 5. Generate questions with simple service (by category)
+    // 5. Generate questions with clean service
+    const cleanService = new CleanAiQuestionService();
     const allGeneratedQuestions: any[] = [];
     const categoriesToProcess = categoriesToFocus || [
-      ...new Set(simpleItems.map((item) => item.category)),
+      ...new Set(menuItems.map((item) => item.category)),
     ];
 
     for (const category of categoriesToProcess) {
-      const categoryItems = simpleItems.filter(
+      const categoryItems = menuItems.filter(
         (item) => item.category === category
       );
       if (categoryItems.length === 0) continue;
 
-      const focusArea = determineFocusArea(category);
-      const knowledgeCategory = mapToKnowledgeCategory(category);
+      const oldFocusArea = determineFocusArea(category);
+      // Map old focus areas to new clean service focus areas
+      const focusArea:
+        | "ingredients"
+        | "allergens"
+        | "wine_knowledge"
+        | "preparation"
+        | "service_knowledge"
+        | "safety_protocols" =
+        oldFocusArea === "wine"
+          ? "wine_knowledge"
+          : oldFocusArea === "allergens"
+          ? "allergens"
+          : oldFocusArea === "preparation"
+          ? "preparation"
+          : "ingredients";
+
+      const questionCount = categoryItems.length * numQuestionsPerItem;
 
       console.log(
-        `[SimpleAI] Generating ${
-          categoryItems.length * numQuestionsPerItem
-        } questions for category: ${category} (focus: ${focusArea})`
+        `[CleanAI] Generating ${questionCount} questions for category: ${category} (focus: ${focusArea})`
       );
 
-      const generatedQuestions =
-        await SimpleAiQuestionService.generateMenuQuestions({
-          menuItems: categoryItems,
-          questionCount: categoryItems.length * numQuestionsPerItem,
-          focusArea,
-          knowledgeCategory,
-        });
+      const request: QuestionGenerationRequest = {
+        menuItems: categoryItems,
+        focusArea,
+        questionCount,
+      };
 
-      allGeneratedQuestions.push(...generatedQuestions);
+      const result = await cleanService.generateMenuQuestions(request);
+
+      if (result.success) {
+        // Convert to legacy format for compatibility
+        const legacyQuestions = result.questions.map((q) => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options,
+          category: category,
+          explanation: q.explanation,
+          focus: focusArea,
+        }));
+        allGeneratedQuestions.push(...legacyQuestions);
+      } else {
+        console.warn(
+          `[CleanAI] Failed to generate questions for category ${category}:`,
+          result.errors
+        );
+      }
     }
 
     console.log(
@@ -542,6 +582,23 @@ export const generateAiQuestionsService = async (
     console.log(
       `[SimpleAI] Successfully saved ${savedQuestions.length} questions as pending review`
     );
+
+    // 7. Update quiz snapshots asynchronously (don't await to avoid blocking the response)
+    setImmediate(async () => {
+      try {
+        const { QuizService } = await import("./quizService");
+        await QuizService.updateQuizSnapshotsForQuestionBanks(
+          [new mongoose.Types.ObjectId(bankId)],
+          restaurantId
+        );
+      } catch (error) {
+        console.error(
+          "Failed to update quiz snapshots after AI question generation:",
+          error
+        );
+      }
+    });
+
     return savedQuestions;
   } catch (error) {
     console.error("Error in simplified AI question generation:", error);

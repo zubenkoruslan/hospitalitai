@@ -8,7 +8,10 @@ import {
   QuestionTaggingService,
   TaggingContext,
 } from "./questionTaggingService";
-import { SimpleAiQuestionService } from "./SimpleAiQuestionService";
+import {
+  CleanAiQuestionService,
+  SopQuestionRequest,
+} from "./CleanAiQuestionService";
 import SopDocumentModel from "../models/SopDocumentModel";
 
 /**
@@ -191,22 +194,34 @@ class LegacyAiQuestionService {
     );
 
     try {
-      // Use the new simplified service for SOP question generation
-      const questions = await SimpleAiQuestionService.generateSopQuestions({
+      // Use the new clean service for SOP question generation
+      const cleanService = new CleanAiQuestionService();
+      const request: SopQuestionRequest = {
         sopContent: sopCategoryText,
-        sopCategoryName: sopCategoryName,
+        title: sopCategoryName,
+        focusArea: "procedures",
         questionCount: targetQuestionCount,
-      });
+      };
+
+      const result = await cleanService.generateSopQuestions(request);
+
+      if (!result.success) {
+        throw new Error(
+          `Failed to generate SOP questions: ${result.errors.join(", ")}`
+        );
+      }
 
       // Convert to legacy format
-      const legacyQuestions: RawAiGeneratedQuestion[] = questions.map((q) => ({
-        questionText: q.questionText,
-        questionType: q.questionType,
-        options: q.options,
-        category: sopCategoryName,
-        explanation: q.explanation,
-        focus: "procedures",
-      }));
+      const legacyQuestions: RawAiGeneratedQuestion[] = result.questions.map(
+        (q) => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options,
+          category: sopCategoryName,
+          explanation: q.explanation,
+          focus: "procedures",
+        })
+      );
 
       console.log(
         `[LegacyAI] Generated ${legacyQuestions.length} SOP questions`

@@ -39,7 +39,7 @@ export interface AuthContextType {
   fetchUser: () => Promise<void>; // Added fetchUser
 }
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -56,7 +56,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchUser = async () => {
     try {
+      console.log("Fetching user data...");
       const { user: fetchedUser } = await getCurrentUserService();
+      console.log("User data fetched successfully:", fetchedUser?.name);
       setUser(fetchedUser);
     } catch (error) {
       console.error("Failed to fetch user:", error);
@@ -67,8 +69,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log("Initializing auth...");
       const storedToken = localStorage.getItem("authToken");
       if (storedToken) {
+        console.log("Found stored token, validating...");
         try {
           const decoded = jwtDecode<DecodedToken>(storedToken);
           if (decoded.exp && decoded.exp * 1000 < Date.now()) {
@@ -79,7 +83,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             "Authorization"
           ] = `Bearer ${storedToken}`;
           setToken(storedToken);
-          await fetchUser(); // Use fetchUser here
+
+          // Fetch user data with the valid token
+          await fetchUser();
         } catch (error) {
           console.error("Failed to initialize auth from stored token:", error);
           localStorage.removeItem("authToken");
@@ -88,10 +94,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           delete api.defaults.headers.common["Authorization"];
         }
       } else {
+        console.log("No stored token found");
         setToken(null);
         setUser(null);
         delete api.defaults.headers.common["Authorization"];
       }
+      console.log("Auth initialization complete");
       setIsLoading(false);
     };
 
@@ -102,6 +110,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
+      console.log("Attempting login...");
+
       const response: AuthResponse = await loginService({ email, password });
       const { token: receivedToken, user: loggedInUser } = response;
 
@@ -109,11 +119,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(receivedToken);
       setUser(loggedInUser);
       api.defaults.headers.common["Authorization"] = `Bearer ${receivedToken}`;
+      console.log("Login successful for:", loggedInUser?.name);
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message ||
         err.message ||
-        "Login failed. Please check credentials.";
+        "Login failed. Please check credentials or server connection.";
       console.error("Login API error:", err);
       setError(errorMessage);
       delete api.defaults.headers.common["Authorization"];
@@ -143,7 +154,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Don't render children until the initial auth check is complete.
   if (isLoading) {
-    return null; // Or a loading spinner component
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          fontSize: "18px",
+        }}
+      >
+        Loading...
+      </div>
+    ); // Show loading instead of null to prevent blank screen
   }
 
   return (
@@ -152,10 +175,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 };
 
 // Custom hook to use the AuthContext
-export const useAuth = () => {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === null) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
+
+// Export separately to fix Fast Refresh
+export { useAuth };

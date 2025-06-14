@@ -71,7 +71,11 @@ export interface UpdateQuestionBankData {
   name?: string;
   description?: string;
   categories?: string[]; // ADDED: To allow updating categories
+  questions?: string[]; // ADDED: To allow clearing questions when menu connection changes
   // questionIds?: string[]; // For managing questions within a bank later
+
+  // ADDED: Menu connection change fields
+  sourceMenuId?: string | null;
 }
 
 // For AI Question Generation (mirrors backend AiGenerationParams, ommitting restaurantId)

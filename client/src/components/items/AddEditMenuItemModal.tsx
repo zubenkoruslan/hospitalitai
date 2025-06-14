@@ -14,17 +14,34 @@ import Modal from "../common/Modal";
 
 // Define initialFormData outside the component for a stable reference
 const baseInitialFormData = {
-  // Renamed to avoid confusion, menuId will be added dynamically
+  // Basic fields
   name: "",
   description: "",
   price: "",
   ingredients: "",
-  itemType: "" as "" | "food" | "beverage" | "wine", // Include wine type
+  itemType: "" as "" | "food" | "beverage" | "wine",
   category: "",
+
+  // Dietary flags
   isGlutenFree: false,
   isDairyFree: false,
   isVegetarian: false,
   isVegan: false,
+
+  // Food-specific enhancement fields
+  cookingMethods: "",
+  allergens: "",
+  isSpicy: false,
+
+  // Beverage-specific enhancement fields
+  spiritType: "",
+  beerStyle: "",
+  cocktailIngredients: "",
+  alcoholContent: "",
+  servingStyle: "",
+  isNonAlcoholic: false,
+  temperature: "",
+
   // Wine-specific fields
   wineStyle: "",
   producer: "",
@@ -90,10 +107,13 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     Array<{ size: string; price: string }>
   >([]);
 
-  // State for expandable sections in wine modal
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  // State for expandable sections
+  const [isBasicInfoExpanded, setIsBasicInfoExpanded] = useState(true);
+  const [isEnhancementFieldsExpanded, setIsEnhancementFieldsExpanded] =
+    useState(false);
   const [isServingOptionsExpanded, setIsServingOptionsExpanded] =
     useState(false);
+  const [isDietaryInfoExpanded, setIsDietaryInfoExpanded] = useState(false);
 
   const isEditMode = currentItem !== null;
 
@@ -173,10 +193,29 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             ingredients: currentItem.ingredients?.join(", ") || "",
             itemType: itemType, // Use itemType from prop instead of currentItem
             category: categoryToSet,
+
+            // Dietary flags
             isGlutenFree: currentItem.isGlutenFree ?? false,
             isDairyFree: currentItem.isDairyFree ?? false,
             isVegetarian: currentItem.isVegetarian ?? false,
             isVegan: currentItem.isVegan ?? false,
+
+            // Food-specific enhancement fields
+            cookingMethods: currentItem.cookingMethods?.join(", ") || "",
+            allergens: currentItem.allergens?.join(", ") || "",
+            isSpicy: currentItem.isSpicy ?? false,
+
+            // Beverage-specific enhancement fields
+            spiritType: currentItem.spiritType || "",
+            beerStyle: currentItem.beerStyle || "",
+            cocktailIngredients:
+              currentItem.cocktailIngredients?.join(", ") || "",
+            alcoholContent: currentItem.alcoholContent || "",
+            servingStyle: currentItem.servingStyle || "",
+            isNonAlcoholic: currentItem.isNonAlcoholic ?? false,
+            temperature: currentItem.temperature || "",
+
+            // Wine-specific fields
             wineStyle: currentItem.wineStyle || "",
             producer: currentItem.producer || "",
             grapeVariety: currentItem.grapeVariety?.join(", ") || "",
@@ -201,14 +240,33 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
             setServingOptionsArray([]);
           }
 
-          // Auto-expand sections with content for wine items
-          if (itemType === "wine") {
-            setIsDescriptionExpanded(!!currentItem.description);
-            setIsServingOptionsExpanded(!!currentItem.servingOptions?.length);
-          } else {
-            setIsDescriptionExpanded(false);
-            setIsServingOptionsExpanded(false);
-          }
+          // Auto-expand sections with content
+          setIsBasicInfoExpanded(true);
+          setIsEnhancementFieldsExpanded(
+            !!(
+              currentItem.cookingMethods?.length ||
+              currentItem.allergens?.length ||
+              currentItem.spiritType ||
+              currentItem.beerStyle ||
+              currentItem.cocktailIngredients?.length ||
+              currentItem.alcoholContent ||
+              currentItem.servingStyle ||
+              currentItem.temperature
+            )
+          );
+          setIsServingOptionsExpanded(
+            itemType === "wine" && !!currentItem.servingOptions?.length
+          );
+          setIsDietaryInfoExpanded(
+            !!(
+              currentItem.isGlutenFree ||
+              currentItem.isDairyFree ||
+              currentItem.isVegetarian ||
+              currentItem.isVegan ||
+              currentItem.isSpicy ||
+              currentItem.isNonAlcoholic
+            )
+          );
 
           setFormError(null);
 
@@ -241,8 +299,10 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
           itemType: itemType, // Use itemType from prop
         });
         setServingOptionsArray([]);
-        setIsDescriptionExpanded(false);
+        setIsBasicInfoExpanded(true);
+        setIsEnhancementFieldsExpanded(false);
         setIsServingOptionsExpanded(false);
+        setIsDietaryInfoExpanded(false);
         setFormError(null);
       }
     }
@@ -479,287 +539,598 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         id="add-edit-item-form"
         className="space-y-6"
       >
-        {/* Item Name */}
-        <div>
-          <label
-            htmlFor="itemName"
-            className="block text-sm font-medium text-slate-700 mb-1"
+        {/* Basic Information Section */}
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+          <div
+            className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            onClick={() => setIsBasicInfoExpanded(!isBasicInfoExpanded)}
           >
-            Item Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="itemName"
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-            disabled={isSubmitting}
-            required
-          />
-        </div>
-
-        {/* Wine-specific fields in new order */}
-        {itemType === "wine" && (
-          <>
-            {/* Wine Style - Required for wine items */}
-            <div>
-              <label
-                htmlFor="wineStyle"
-                className="block text-sm font-medium text-slate-700 mb-1"
+            <h3 className="text-lg font-medium text-slate-900 flex items-center gap-2">
+              <svg
+                className="w-5 h-5 text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Wine Style <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="wineStyle"
-                name="wineStyle"
-                value={formData.wineStyle}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                disabled={isSubmitting}
-                required
-              >
-                <option value="">Select wine style...</option>
-                <option value="still">Still</option>
-                <option value="sparkling">Sparkling</option>
-                <option value="champagne">Champagne</option>
-                <option value="dessert">Dessert</option>
-                <option value="fortified">Fortified</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-
-            {/* Grape Variety */}
-            <div>
-              <label
-                htmlFor="grapeVariety"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                Grape Variety{" "}
-                <span className="text-sm text-slate-500">
-                  (comma-separated, optional)
-                </span>
-              </label>
-              <input
-                type="text"
-                id="grapeVariety"
-                name="grapeVariety"
-                value={formData.grapeVariety}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                placeholder="e.g., Chardonnay, Pinot Noir"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Vintage */}
-              <div>
-                <label
-                  htmlFor="vintage"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Vintage{" "}
-                  <span className="text-sm text-slate-500">(optional)</span>
-                </label>
-                <input
-                  type="number"
-                  id="vintage"
-                  name="vintage"
-                  value={formData.vintage}
-                  onChange={handleInputChange}
-                  className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="e.g., 2020"
-                  min="1800"
-                  max="2030"
-                  disabled={isSubmitting}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
-              </div>
+              </svg>
+              Basic Information
+            </h3>
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform ${
+                isBasicInfoExpanded ? "transform rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
 
-              {/* Producer */}
+          {isBasicInfoExpanded && (
+            <div className="p-4 space-y-6 bg-white">
+              {/* Item Name */}
               <div>
                 <label
-                  htmlFor="producer"
-                  className="block text-sm font-medium text-slate-700 mb-1"
+                  htmlFor="itemName"
+                  className="block text-sm font-medium text-slate-700 mb-2"
                 >
-                  Producer{" "}
-                  <span className="text-sm text-slate-500">(optional)</span>
+                  Item Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  id="producer"
-                  name="producer"
-                  value={formData.producer}
+                  id="itemName"
+                  name="name"
+                  value={formData.name}
                   onChange={handleInputChange}
                   className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                  placeholder="e.g., Château Margaux"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-medium text-slate-700 mb-2"
+                >
+                  Description{" "}
+                  <span className="text-sm text-slate-500">(optional)</span>
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                  placeholder="Describe this item..."
                   disabled={isSubmitting}
                 />
               </div>
-            </div>
 
-            {/* Region */}
-            <div>
-              <label
-                htmlFor="region"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                Region{" "}
-                <span className="text-sm text-slate-500">(optional)</span>
-              </label>
-              <input
-                type="text"
-                id="region"
-                name="region"
-                value={formData.region}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                placeholder="e.g., Bordeaux, France"
-                disabled={isSubmitting}
-              />
-            </div>
+              {/* Category */}
+              <div>
+                <label
+                  htmlFor="itemCategory"
+                  className="block text-sm font-medium text-slate-700 mb-2"
+                >
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    id="itemCategory"
+                    name="category"
+                    value={
+                      isAddingNewCategory
+                        ? "_add_new_category_"
+                        : formData.category
+                    }
+                    onChange={handleInputChange}
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                    disabled={
+                      isSubmitting || (!isAddingNewCategory && !itemType)
+                    }
+                    required={!isAddingNewCategory}
+                  >
+                    <option value="">Select or Add Category...</option>
+                    {combinedCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                    <option value="_add_new_category_">
+                      Add New Category...
+                    </option>
+                  </select>
+                </div>
+              </div>
 
-            {/* Suggested Food Pairings */}
-            <div>
-              <label
-                htmlFor="suggestedPairingsText"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                Suggested Food Pairings{" "}
-                <span className="text-sm text-slate-500">
-                  (comma-separated, optional)
-                </span>
-              </label>
-              <input
-                type="text"
-                id="suggestedPairingsText"
-                name="suggestedPairingsText"
-                value={formData.suggestedPairingsText}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                placeholder="e.g., Grilled salmon, Roasted chicken"
-                disabled={isSubmitting}
-              />
-            </div>
-          </>
-        )}
+              {isAddingNewCategory && (
+                <div className="p-4 border border-sky-200 bg-sky-50 rounded-lg">
+                  <label
+                    htmlFor="newCategoryName"
+                    className="block text-sm font-medium text-slate-700 mb-2"
+                  >
+                    New Category Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="newCategoryName"
+                    name="newCategoryName"
+                    value={newCategoryName}
+                    onChange={handleInputChange}
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
+                    placeholder="Enter new category name"
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+              )}
 
-        {/* Category - Show for all item types but positioned after wine fields for wine items */}
-        <div>
-          <label
-            htmlFor="itemCategory"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
-            Category <span className="text-red-500">*</span>
-          </label>
-          <div className="flex gap-2">
-            <select
-              id="itemCategory"
-              name="category"
-              value={
-                isAddingNewCategory ? "_add_new_category_" : formData.category
-              }
-              onChange={handleInputChange}
-              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-              disabled={isSubmitting || (!isAddingNewCategory && !itemType)}
-              required={!isAddingNewCategory}
-            >
-              <option value="">Select or Add Category...</option>
-              {combinedCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-              <option value="_add_new_category_">Add New Category...</option>
-            </select>
-          </div>
+              {/* Price - Hidden for wine items */}
+              {itemType !== "wine" && (
+                <div>
+                  <label
+                    htmlFor="price"
+                    className="block text-sm font-medium text-slate-700 mb-2"
+                  >
+                    Price{" "}
+                    <span className="text-sm text-slate-500">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">
+                      £
+                    </span>
+                    <input
+                      type="number"
+                      id="price"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full pl-8 pr-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Basic Ingredients for non-wine items */}
+              {itemType !== "wine" && (
+                <div>
+                  <label
+                    htmlFor="ingredients"
+                    className="block text-sm font-medium text-slate-700 mb-2"
+                  >
+                    Key Ingredients{" "}
+                    <span className="text-sm text-slate-500">
+                      (comma-separated, optional)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    id="ingredients"
+                    name="ingredients"
+                    value={formData.ingredients}
+                    onChange={handleInputChange}
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                    placeholder="e.g., Flour, Tomato, Cheese"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {isAddingNewCategory && (
-          <div className="mt-4 p-4 border border-sky-200 bg-sky-50 rounded-lg">
-            <label
-              htmlFor="newCategoryName"
-              className="block text-sm font-medium text-slate-700 mb-1"
+        {/* Item Type Specific Enhancement Fields */}
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+          <div
+            className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            onClick={() =>
+              setIsEnhancementFieldsExpanded(!isEnhancementFieldsExpanded)
+            }
+          >
+            <h3 className="text-lg font-medium text-slate-900 flex items-center gap-2">
+              <svg
+                className="w-5 h-5 text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"
+                />
+              </svg>
+              {itemType === "wine"
+                ? "Wine Details"
+                : itemType === "beverage"
+                ? "Beverage Details"
+                : "Food Details"}
+            </h3>
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform ${
+                isEnhancementFieldsExpanded ? "transform rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              New Category Name <span className="text-red-500">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                id="newCategoryName"
-                name="newCategoryName"
-                value={newCategoryName}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
-                placeholder="Enter new category name"
-                disabled={isSubmitting}
-                required
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
               />
-            </div>
+            </svg>
           </div>
-        )}
 
-        {/* Description - Expandable section */}
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-slate-700">
-              Description{" "}
-              <span className="text-sm text-slate-500">(optional)</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-              className="text-sky-600 hover:text-sky-700 text-sm font-medium flex items-center gap-1"
-            >
-              {isDescriptionExpanded ? (
+          {isEnhancementFieldsExpanded && (
+            <div className="p-4 space-y-6 bg-white">
+              {/* Wine-specific fields */}
+              {itemType === "wine" && (
                 <>
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 15l7-7 7 7"
+                  {/* Wine Style - Required for wine items */}
+                  <div>
+                    <label
+                      htmlFor="wineStyle"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Wine Style <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="wineStyle"
+                      name="wineStyle"
+                      value={formData.wineStyle}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      disabled={isSubmitting}
+                      required
+                    >
+                      <option value="">Select wine style...</option>
+                      <option value="still">Still</option>
+                      <option value="sparkling">Sparkling</option>
+                      <option value="champagne">Champagne</option>
+                      <option value="dessert">Dessert</option>
+                      <option value="fortified">Fortified</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Grape Variety */}
+                  <div>
+                    <label
+                      htmlFor="grapeVariety"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Grape Variety{" "}
+                      <span className="text-sm text-slate-500">
+                        (comma-separated, optional)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      id="grapeVariety"
+                      name="grapeVariety"
+                      value={formData.grapeVariety}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      placeholder="e.g., Chardonnay, Pinot Noir"
+                      disabled={isSubmitting}
                     />
-                  </svg>
-                  Collapse
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Vintage */}
+                    <div>
+                      <label
+                        htmlFor="vintage"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Vintage{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        id="vintage"
+                        name="vintage"
+                        value={formData.vintage}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="e.g., 2020"
+                        min="1800"
+                        max="2030"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    {/* Producer */}
+                    <div>
+                      <label
+                        htmlFor="producer"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Producer{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="producer"
+                        name="producer"
+                        value={formData.producer}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., Château Margaux"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Region */}
+                  <div>
+                    <label
+                      htmlFor="region"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Region{" "}
+                      <span className="text-sm text-slate-500">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="region"
+                      name="region"
+                      value={formData.region}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      placeholder="e.g., Bordeaux, France"
+                      disabled={isSubmitting}
                     />
-                  </svg>
-                  Expand
+                  </div>
+
+                  {/* Suggested Food Pairings */}
+                  <div>
+                    <label
+                      htmlFor="suggestedPairingsText"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Suggested Food Pairings{" "}
+                      <span className="text-sm text-slate-500">
+                        (comma-separated, optional)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      id="suggestedPairingsText"
+                      name="suggestedPairingsText"
+                      value={formData.suggestedPairingsText}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      placeholder="e.g., Grilled salmon, Roasted chicken"
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 </>
               )}
-            </button>
-          </div>
 
-          {isDescriptionExpanded && (
-            <div className="mt-2">
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                disabled={isSubmitting}
-              />
+              {/* Food-specific enhancement fields */}
+              {itemType === "food" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Cooking Methods */}
+                    <div>
+                      <label
+                        htmlFor="cookingMethods"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Cooking Methods{" "}
+                        <span className="text-sm text-slate-500">
+                          (comma-separated, optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="cookingMethods"
+                        name="cookingMethods"
+                        value={formData.cookingMethods}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., Grilled, Baked, Steamed"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    {/* Allergens */}
+                    <div>
+                      <label
+                        htmlFor="allergens"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Allergens{" "}
+                        <span className="text-sm text-slate-500">
+                          (comma-separated, optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="allergens"
+                        name="allergens"
+                        value={formData.allergens}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., Nuts, Dairy, Gluten"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Beverage-specific enhancement fields */}
+              {itemType === "beverage" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Spirit Type */}
+                    <div>
+                      <label
+                        htmlFor="spiritType"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Spirit Type{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="spiritType"
+                        name="spiritType"
+                        value={formData.spiritType}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., Vodka, Gin, Rum"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    {/* Beer Style */}
+                    <div>
+                      <label
+                        htmlFor="beerStyle"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Beer Style{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="beerStyle"
+                        name="beerStyle"
+                        value={formData.beerStyle}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., IPA, Lager, Stout"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Alcohol Content */}
+                    <div>
+                      <label
+                        htmlFor="alcoholContent"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Alcohol Content{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="alcoholContent"
+                        name="alcoholContent"
+                        value={formData.alcoholContent}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., 5.2% ABV, 40% vol"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    {/* Serving Style */}
+                    <div>
+                      <label
+                        htmlFor="servingStyle"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                      >
+                        Serving Style{" "}
+                        <span className="text-sm text-slate-500">
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        id="servingStyle"
+                        name="servingStyle"
+                        value={formData.servingStyle}
+                        onChange={handleInputChange}
+                        className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                        placeholder="e.g., Neat, On the rocks, Shaken"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cocktail Ingredients */}
+                  <div>
+                    <label
+                      htmlFor="cocktailIngredients"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Cocktail Ingredients{" "}
+                      <span className="text-sm text-slate-500">
+                        (comma-separated, optional)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      id="cocktailIngredients"
+                      name="cocktailIngredients"
+                      value={formData.cocktailIngredients}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      placeholder="e.g., Vodka, Lime juice, Mint"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+
+                  {/* Temperature */}
+                  <div>
+                    <label
+                      htmlFor="temperature"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Temperature{" "}
+                      <span className="text-sm text-slate-500">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="temperature"
+                      name="temperature"
+                      value={formData.temperature}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      placeholder="e.g., Hot, Cold, Iced, Frozen"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -904,125 +1275,140 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
           </div>
         )}
 
-        {/* Non-wine fields */}
-        {itemType !== "wine" && (
-          <>
-            {/* Ingredients / Grape Variety */}
-            <div>
-              <label
-                htmlFor="ingredients"
-                className="block text-sm font-medium text-slate-700 mb-1"
+        {/* Dietary Information Section */}
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+          <div
+            className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+            onClick={() => setIsDietaryInfoExpanded(!isDietaryInfoExpanded)}
+          >
+            <h3 className="text-lg font-medium text-slate-900 flex items-center gap-2">
+              <svg
+                className="w-5 h-5 text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Ingredients{" "}
-                <span className="text-sm text-slate-500">
-                  (comma-separated, optional)
-                </span>
-              </label>
-              <input
-                type="text"
-                id="ingredients"
-                name="ingredients"
-                value={formData.ingredients}
-                onChange={handleInputChange}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                placeholder="e.g., Flour, Tomato, Cheese"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            {/* Description for non-wine items (always visible) */}
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                Description{" "}
-                <span className="text-sm text-slate-500">(optional)</span>
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
-                disabled={isSubmitting}
-              />
-            </div>
-          </>
-        )}
-
-        {/* Price - Hidden for wine items */}
-        {itemType !== "wine" && (
-          <div>
-            <label
-              htmlFor="price"
-              className="block text-sm font-medium text-slate-700 mb-1"
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Dietary & Special Information
+            </h3>
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform ${
+                isDietaryInfoExpanded ? "transform rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Price <span className="text-sm text-slate-500">(optional)</span>
-            </label>
-            <input
-              type="number"
-              id="price"
-              name="price"
-              value={formData.price}
-              onChange={handleInputChange}
-              className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              placeholder="e.g., 12.99"
-              step="0.01"
-              min="0"
-              disabled={isSubmitting}
-            />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </div>
-        )}
 
-        {/* Dietary Flags - Hidden for wine items */}
-        {itemType !== "wine" && (
-          <div className="space-y-3 pt-2">
-            <h4 className="text-sm font-medium text-slate-700 mb-2">
-              Dietary Information{" "}
-              <span className="text-xs text-slate-500">(optional)</span>
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
-              {[
-                { name: "isGlutenFree", label: "Gluten-Free" },
-                { name: "isDairyFree", label: "Dairy-Free" },
-                { name: "isVegetarian", label: "Vegetarian" },
-                { name: "isVegan", label: "Vegan" },
-              ].map((flag) => (
-                <label
-                  key={flag.name}
-                  className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    id={flag.name}
-                    name={flag.name}
-                    checked={
-                      formData[flag.name as keyof MenuItemFormData] as boolean
-                    }
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
-                    disabled={
-                      isSubmitting ||
-                      (flag.name === "isVegetarian" && formData.isVegan)
-                    }
-                  />
-                  <span
-                    className={`text-sm ${
-                      isSubmitting ||
-                      (flag.name === "isVegetarian" && formData.isVegan)
-                        ? "text-slate-400"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    {flag.label}
-                  </span>
-                </label>
-              ))}
+          {isDietaryInfoExpanded && (
+            <div className="p-4 space-y-6 bg-white">
+              {/* Common dietary flags */}
+              <div>
+                <h4 className="text-sm font-medium text-slate-700 mb-3">
+                  Dietary Restrictions{" "}
+                  <span className="text-xs text-slate-500">(optional)</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                  {[
+                    { name: "isGlutenFree", label: "Gluten-Free" },
+                    { name: "isDairyFree", label: "Dairy-Free" },
+                    { name: "isVegetarian", label: "Vegetarian" },
+                    { name: "isVegan", label: "Vegan" },
+                  ].map((flag) => (
+                    <label
+                      key={flag.name}
+                      className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        id={flag.name}
+                        name={flag.name}
+                        checked={
+                          formData[
+                            flag.name as keyof MenuItemFormData
+                          ] as boolean
+                        }
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
+                        disabled={
+                          isSubmitting ||
+                          (flag.name === "isVegetarian" && formData.isVegan)
+                        }
+                      />
+                      <span
+                        className={`text-sm ${
+                          isSubmitting ||
+                          (flag.name === "isVegetarian" && formData.isVegan)
+                            ? "text-slate-400"
+                            : "text-slate-700"
+                        }`}
+                      >
+                        {flag.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Special characteristics */}
+              <div>
+                <h4 className="text-sm font-medium text-slate-700 mb-3">
+                  Special Characteristics{" "}
+                  <span className="text-xs text-slate-500">(optional)</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Spicy for food items */}
+                  {itemType === "food" && (
+                    <label className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        id="isSpicy"
+                        name="isSpicy"
+                        checked={formData.isSpicy}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
+                        disabled={isSubmitting}
+                      />
+                      <span className="text-sm text-slate-700">Spicy</span>
+                    </label>
+                  )}
+
+                  {/* Non-alcoholic for beverages */}
+                  {itemType === "beverage" && (
+                    <label className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        id="isNonAlcoholic"
+                        name="isNonAlcoholic"
+                        checked={formData.isNonAlcoholic}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500 focus:ring-offset-1 disabled:opacity-50 transition-colors"
+                        disabled={isSubmitting}
+                      />
+                      <span className="text-sm text-slate-700">
+                        Non-Alcoholic
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </form>
 
       {/* Sub-Modal for Adding New Category */}

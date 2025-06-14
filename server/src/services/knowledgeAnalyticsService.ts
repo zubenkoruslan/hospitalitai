@@ -177,6 +177,60 @@ export interface PredictiveInsights {
 
 export class KnowledgeAnalyticsService {
   /**
+   * Invalidate analytics cache for a restaurant
+   * Should be called when questions are updated, added, or deleted
+   */
+  static async invalidateAnalyticsCache(
+    restaurantId: Types.ObjectId
+  ): Promise<void> {
+    try {
+      const restaurantIdString = restaurantId.toString();
+
+      // Clear restaurant-level analytics cache
+      const restaurantCacheKey = cacheService.generateAnalyticsKey(
+        restaurantIdString,
+        "restaurant"
+      );
+      cacheService.delete(restaurantCacheKey);
+
+      // Clear enhanced analytics cache
+      const enhancedCacheKey = cacheService.generateAnalyticsKey(
+        restaurantIdString,
+        "enhanced"
+      );
+      cacheService.delete(enhancedCacheKey);
+
+      // Clear category-specific analytics cache
+      for (const category of Object.values(KnowledgeCategory)) {
+        const categoryCacheKey = cacheService.generateAnalyticsKey(
+          restaurantIdString,
+          "category",
+          { category }
+        );
+        cacheService.delete(categoryCacheKey);
+      }
+
+      // Clear leaderboard analytics cache
+      const leaderboardTypes = ["week", "month", "all"];
+      for (const timePeriod of leaderboardTypes) {
+        const leaderboardCacheKey = cacheService.generateAnalyticsKey(
+          restaurantIdString,
+          "leaderboards",
+          { timePeriod }
+        );
+        cacheService.delete(leaderboardCacheKey);
+      }
+
+      console.log(
+        `[Analytics] Cache invalidated for restaurant: ${restaurantIdString}`
+      );
+    } catch (error) {
+      console.error("Error invalidating analytics cache:", error);
+      // Don't throw error to avoid blocking the main operation
+    }
+  }
+
+  /**
    * Get comprehensive analytics for a restaurant
    */
   static async getRestaurantAnalytics(
@@ -493,6 +547,17 @@ export class KnowledgeAnalyticsService {
       });
     }
 
+    // **IDEMPOTENCY CHECK**: Ensure this quiz attempt hasn't been processed before
+    const processedAttempts = userAnalytics.processedQuizAttempts || [];
+    const attemptIdString = quizAttemptId.toString();
+
+    if (processedAttempts.includes(attemptIdString)) {
+      console.log(
+        `[Analytics] Quiz attempt ${attemptIdString} already processed for user ${userId}. Skipping to prevent double-counting.`
+      );
+      return;
+    }
+
     // Process each question in the attempt
     for (const questionAttempt of quizAttempt.questionsPresented) {
       const question = questionAttempt.questionId as any;
@@ -508,6 +573,12 @@ export class KnowledgeAnalyticsService {
         "basic" // Default difficulty for now
       );
     }
+
+    // **MARK ATTEMPT AS PROCESSED**: Add this attempt ID to the processed list
+    if (!userAnalytics.processedQuizAttempts) {
+      userAnalytics.processedQuizAttempts = [];
+    }
+    userAnalytics.processedQuizAttempts.push(attemptIdString);
 
     await userAnalytics.save();
   }
@@ -585,7 +656,7 @@ export class KnowledgeAnalyticsService {
       .lean();
 
     return topPerformers.map((analytics) => ({
-      userId: analytics.userId,
+      userId: (analytics.userId as any)._id,
       userName: (analytics.userId as any).name,
       overallAccuracy: analytics.overallAccuracy,
       strongestCategory: this.getStrongestCategory(analytics as any),
@@ -598,19 +669,38 @@ export class KnowledgeAnalyticsService {
   ): Promise<RestaurantKnowledgeAnalytics["staffNeedingSupport"]> {
     const staffNeedingSupport = await UserKnowledgeAnalyticsModel.find({
       restaurantId,
-      overallAccuracy: { $lt: 70 }, // Below 70% accuracy
+      overallAccuracy: { $lt: 75 }, // Below 75% accuracy
     })
       .populate("userId", "name")
       .sort({ overallAccuracy: 1 })
       .limit(limit)
       .lean();
 
-    return staffNeedingSupport.map((analytics) => ({
-      userId: analytics.userId,
-      userName: (analytics.userId as any).name,
-      overallAccuracy: analytics.overallAccuracy,
-      weakestCategory: this.getWeakestCategory(analytics as any),
-    }));
+    return staffNeedingSupport
+      .map((analytics) => {
+        // Count active categories (with questions answered)
+        const activeCategoryCount = [
+          analytics.foodKnowledge.totalQuestions,
+          analytics.beverageKnowledge.totalQuestions,
+          analytics.wineKnowledge.totalQuestions,
+          analytics.proceduresKnowledge.totalQuestions,
+        ].filter((count) => count > 0).length;
+
+        return {
+          userId: (analytics.userId as any)._id,
+          userName: (analytics.userId as any).name,
+          overallAccuracy: analytics.overallAccuracy,
+          weakestCategory: this.getWeakestCategory(analytics as any),
+          activeCategoryCount,
+        };
+      })
+      .filter((staff) => staff.activeCategoryCount >= 1) // Show if they have 1+ active categories
+      .map((staff) => ({
+        userId: staff.userId,
+        userName: staff.userName,
+        overallAccuracy: staff.overallAccuracy,
+        weakestCategory: staff.weakestCategory,
+      }));
   }
 
   private static async getQuestionDistribution(
@@ -646,22 +736,34 @@ export class KnowledgeAnalyticsService {
       {
         category: KnowledgeCategory.FOOD_KNOWLEDGE,
         accuracy: analytics.foodKnowledge.accuracy,
+        totalQuestions: analytics.foodKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.BEVERAGE_KNOWLEDGE,
         accuracy: analytics.beverageKnowledge.accuracy,
+        totalQuestions: analytics.beverageKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.WINE_KNOWLEDGE,
         accuracy: analytics.wineKnowledge.accuracy,
+        totalQuestions: analytics.wineKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.PROCEDURES_KNOWLEDGE,
         accuracy: analytics.proceduresKnowledge.accuracy,
+        totalQuestions: analytics.proceduresKnowledge.totalQuestions,
       },
     ];
 
-    return categories.reduce((max, current) =>
+    // Only consider categories with questions answered
+    const activeCategories = categories.filter((c) => c.totalQuestions > 0);
+
+    // If no active categories, default to Food Knowledge
+    if (activeCategories.length === 0) {
+      return KnowledgeCategory.FOOD_KNOWLEDGE;
+    }
+
+    return activeCategories.reduce((max, current) =>
       current.accuracy > max.accuracy ? current : max
     ).category;
   }
@@ -673,26 +775,41 @@ export class KnowledgeAnalyticsService {
       {
         category: KnowledgeCategory.FOOD_KNOWLEDGE,
         accuracy: analytics.foodKnowledge.accuracy,
+        totalQuestions: analytics.foodKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.BEVERAGE_KNOWLEDGE,
         accuracy: analytics.beverageKnowledge.accuracy,
+        totalQuestions: analytics.beverageKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.WINE_KNOWLEDGE,
         accuracy: analytics.wineKnowledge.accuracy,
+        totalQuestions: analytics.wineKnowledge.totalQuestions,
       },
       {
         category: KnowledgeCategory.PROCEDURES_KNOWLEDGE,
         accuracy: analytics.proceduresKnowledge.accuracy,
+        totalQuestions: analytics.proceduresKnowledge.totalQuestions,
       },
     ];
 
-    // Filter out categories with no questions answered
-    const activCategories = categories.filter((c) => c.accuracy > 0);
-    if (activCategories.length === 0) return KnowledgeCategory.FOOD_KNOWLEDGE;
+    // Only consider categories with questions answered
+    const activeCategories = categories.filter((c) => c.totalQuestions > 0);
 
-    return activCategories.reduce((min, current) =>
+    // If no active categories, default to Food Knowledge
+    if (activeCategories.length === 0) {
+      return KnowledgeCategory.FOOD_KNOWLEDGE;
+    }
+
+    // If only one active category, it's both strongest and weakest
+    // but we should handle this logic upstream to avoid showing
+    // someone as "needing support" in their only active category
+    if (activeCategories.length === 1) {
+      return activeCategories[0].category;
+    }
+
+    return activeCategories.reduce((min, current) =>
       current.accuracy < min.accuracy ? current : min
     ).category;
   }

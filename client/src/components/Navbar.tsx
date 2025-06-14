@@ -75,7 +75,8 @@ const Navbar: React.FC<NavbarProps> = ({
         setIsHovered(false);
         setShowContent(!isCollapsed);
       } else {
-        setShowContent(isHovered);
+        // On desktop, consider both hover and pinned states
+        setShowContent(isHovered || isPinned);
       }
     };
 

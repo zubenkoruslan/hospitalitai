@@ -306,7 +306,8 @@ export const updateQuestionBank = async (
 ): Promise<void> => {
   try {
     const { bankId } = req.params;
-    const { name, description, targetQuestionCount, categories } = req.body;
+    const { name, description, targetQuestionCount, categories, sourceMenuId } =
+      req.body;
 
     if (!req.user || !req.user.restaurantId) {
       return next(
@@ -322,6 +323,20 @@ export const updateQuestionBank = async (
       updateData.targetQuestionCount = targetQuestionCount;
     if (categories !== undefined) {
       updateData.categories = categories;
+    }
+
+    // Handle menu connection changes
+    if (sourceMenuId !== undefined) {
+      if (sourceMenuId === null || sourceMenuId === "") {
+        // Remove menu connection
+        updateData.sourceMenuId = null;
+      } else {
+        // Validate and set new menu connection
+        if (!mongoose.Types.ObjectId.isValid(sourceMenuId)) {
+          return next(new AppError("Invalid menu ID format.", 400));
+        }
+        updateData.sourceMenuId = new mongoose.Types.ObjectId(sourceMenuId);
+      }
     }
 
     const updatedBank = await QuestionBankService.updateQuestionBankService(
@@ -1100,6 +1115,7 @@ export const generateAiQuestionsForSopBank = async (
       restaurantId: restaurantIdString,
     };
 
+    // Now using CleanAiQuestionService through legacy compatibility layer
     const rawQuestions =
       await LegacyAiQuestionService.generateQuestionsFromSopCategoriesService(
         sopQuestionParams

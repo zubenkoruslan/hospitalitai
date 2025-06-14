@@ -5,6 +5,7 @@ import UserKnowledgeAnalyticsModel from "../models/UserKnowledgeAnalytics";
 import QuizAttemptModel from "../models/QuizAttempt";
 import { KnowledgeAnalyticsService } from "../services/knowledgeAnalyticsService";
 import { QuizResultService } from "../services/quizResultService";
+import { cacheService } from "../services/cacheService";
 
 // Extend the Request interface to include user data (same pattern as other controllers)
 interface AuthenticatedRequest extends Request {
@@ -285,7 +286,7 @@ export const getIndividualStaffAnalytics = async (
 };
 
 /**
- * Get leaderboard data for different metrics
+ * Get leaderboards with real category performance data
  * Enhanced for Phase 5 - leaderboards page
  * Simplified version for testing
  */
@@ -351,46 +352,69 @@ export const getLeaderboards = async (
         completionTime: 120, // Placeholder
       }));
 
-    // Generate real category champions (simplified for now)
-    const categoryChampions = {
-      foodKnowledge:
-        staffPerformanceData.length > 0
-          ? {
-              userId: staffPerformanceData[0].staff._id.toString(),
-              name: staffPerformanceData[0].staff.name,
-              roleName: "Waiter",
-              averageScore:
-                Math.round(staffPerformanceData[0].averageScore * 10) / 10,
-              totalQuestions: 9,
-              averageCompletionTime: 25,
-            }
-          : null,
-      beverageKnowledge: null,
-      wineKnowledge:
-        staffPerformanceData.length > 0
-          ? {
-              userId: staffPerformanceData[0].staff._id.toString(),
-              name: staffPerformanceData[0].staff.name,
-              roleName: "Waiter",
-              averageScore:
-                Math.round(staffPerformanceData[0].averageScore * 10) / 10,
-              totalQuestions: 12,
-              averageCompletionTime: 20,
-            }
-          : null,
-      proceduresKnowledge:
-        staffPerformanceData.length > 0
-          ? {
-              userId: staffPerformanceData[0].staff._id.toString(),
-              name: staffPerformanceData[0].staff.name,
-              roleName: "Waiter",
-              averageScore:
-                Math.round(staffPerformanceData[0].averageScore * 10) / 10,
-              totalQuestions: 39,
-              averageCompletionTime: 30,
-            }
-          : null,
+    // Get real category champions using UserKnowledgeAnalytics
+    const getAllCategoryChampions = async () => {
+      const categories = [
+        { key: "foodKnowledge", enum: "food-knowledge" as const },
+        { key: "beverageKnowledge", enum: "beverage-knowledge" as const },
+        { key: "wineKnowledge", enum: "wine-knowledge" as const },
+        { key: "proceduresKnowledge", enum: "procedures-knowledge" as const },
+      ];
+
+      const categoryChampions: Record<string, any> = {};
+
+      for (const category of categories) {
+        try {
+          // Get all staff analytics for this category
+          const staffAnalytics = await UserKnowledgeAnalyticsModel.find({
+            restaurantId,
+            [`${category.key}.totalQuestions`]: { $gt: 0 },
+          })
+            .populate("userId", "name")
+            .lean();
+
+          if (staffAnalytics.length === 0) {
+            categoryChampions[category.key] = null;
+            continue;
+          }
+
+          // Find the champion (highest accuracy with at least 3 questions)
+          const champion = staffAnalytics
+            .filter(
+              (analytics) =>
+                (analytics as any)[category.key].totalQuestions >= 3
+            )
+            .sort(
+              (a, b) =>
+                (b as any)[category.key].accuracy -
+                (a as any)[category.key].accuracy
+            )[0];
+
+          if (champion) {
+            const categoryStats = (champion as any)[category.key];
+            const user = champion.userId as any;
+
+            categoryChampions[category.key] = {
+              userId: champion.userId.toString(),
+              name: user.name,
+              roleName: "Waiter", // Placeholder
+              averageScore: Math.round(categoryStats.accuracy * 10) / 10,
+              totalQuestions: categoryStats.totalQuestions,
+              averageCompletionTime: categoryStats.averageCompletionTime || 25,
+            };
+          } else {
+            categoryChampions[category.key] = null;
+          }
+        } catch (error) {
+          console.error(`Error getting champion for ${category.key}:`, error);
+          categoryChampions[category.key] = null;
+        }
+      }
+
+      return categoryChampions;
     };
+
+    const categoryChampions = await getAllCategoryChampions();
 
     const realLeaderboards = {
       timePeriod,
@@ -432,6 +456,23 @@ export const getEnhancedRestaurantAnalytics = async (
       });
       return;
     }
+
+    // Check cache first
+    const cacheKey = cacheService.generateAnalyticsKey(
+      restaurantId.toString(),
+      "enhanced"
+    );
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      console.log("[Enhanced Analytics] Returning cached data");
+      res.status(200).json({
+        success: true,
+        data: cached,
+      });
+      return;
+    }
+
+    console.log("[Enhanced Analytics] Computing fresh analytics data...");
 
     // Get all staff for this restaurant
     const allStaff = await UserModel.find({
@@ -743,33 +784,28 @@ export const getEnhancedRestaurantAnalytics = async (
       }
     }
 
-    // Get top performers (minimum 1 quiz taken, since we only have limited data)
-    const topPerformers = staffPerformanceData
-      .filter((data) => data.quizzesTaken >= 1)
-      .sort((a, b) => b.averageScore - a.averageScore)
-      .slice(0, 5)
-      .map((data) => ({
-        userId: data.staff._id.toString(),
-        userName: data.staff.name,
-        overallAverageScore: Math.round(data.averageScore * 10) / 10,
-        strongestCategory: "procedures-knowledge" as any, // Placeholder
-      }));
-
-    // Get staff needing support (score < 70% or no quizzes taken)
-    const staffNeedingSupport = staffPerformanceData
-      .filter((data) => data.averageScore < 70 || data.quizzesTaken === 0)
-      .sort((a, b) => a.averageScore - b.averageScore)
-      .slice(0, 5)
-      .map((data) => ({
-        userId: data.staff._id.toString(),
-        userName: data.staff.name,
-        overallAverageScore: Math.round(data.averageScore * 10) / 10,
-        weakestCategory: "wine-knowledge" as any, // Placeholder
-      }));
-
-    // Get real question distribution from the analytics service
+    // Get real analytics data for top performers and staff needing support
     const realAnalytics =
       await KnowledgeAnalyticsService.getRestaurantAnalytics(restaurantId);
+
+    // Use the real top performers and staff needing support from analytics service
+    const topPerformers = realAnalytics.topPerformers.map((performer) => ({
+      userId: performer.userId.toString(),
+      userName: performer.userName,
+      overallAverageScore: Math.round(performer.overallAccuracy * 10) / 10,
+      strongestCategory: performer.strongestCategory,
+    }));
+
+    const staffNeedingSupport = realAnalytics.staffNeedingSupport.map(
+      (staff) => ({
+        userId: staff.userId.toString(),
+        userName: staff.userName,
+        overallAverageScore: Math.round(staff.overallAccuracy * 10) / 10,
+        weakestCategory: staff.weakestCategory,
+      })
+    );
+
+    // Get real question distribution from the analytics service
     const questionDistribution = realAnalytics.questionDistribution;
 
     const enhancedAnalytics = {
@@ -790,6 +826,9 @@ export const getEnhancedRestaurantAnalytics = async (
       questionDistribution,
       lastUpdated: new Date().toISOString(),
     };
+
+    // Cache the result
+    cacheService.set(cacheKey, enhancedAnalytics);
 
     res.status(200).json({
       success: true,
@@ -873,3 +912,77 @@ function calculateOverallCompletionTimeStats(analytics: any[]) {
     ),
   };
 }
+
+export const resetAnalytics = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { restaurantId } = req.user!;
+    const {
+      resetQuizAttempts = false,
+      resetStaffProgress = false,
+      resetArchivedAnalytics = false,
+    } = req.body;
+
+    if (!restaurantId) {
+      res.status(400).json({
+        success: false,
+        message: "Restaurant ID is required",
+      });
+      return;
+    }
+
+    console.log(
+      `[Analytics] Resetting analytics for restaurant: ${restaurantId}`
+    );
+
+    // Import the reset function
+    const { resetAllAnalytics } = await import(
+      "../scripts/reset-all-analytics"
+    );
+
+    // Execute the reset
+    const results = await resetAllAnalytics(restaurantId.toString(), {
+      resetQuizAttempts,
+      resetStaffProgress,
+      resetArchivedAnalytics,
+    });
+
+    if (results.success) {
+      res.status(200).json({
+        success: true,
+        message: "Analytics reset completed successfully",
+        data: {
+          analyticsDeleted: results.analyticsDeleted,
+          snapshotsDeleted: results.snapshotsDeleted,
+          archivedAnalyticsDeleted: results.archivedAnalyticsDeleted,
+          progressResetCount: results.progressResetCount,
+          quizAttemptsDeleted: results.quizAttemptsDeleted,
+          cacheCleared: results.cacheCleared,
+        },
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Analytics reset completed with errors",
+        errors: results.errors,
+        data: {
+          analyticsDeleted: results.analyticsDeleted,
+          snapshotsDeleted: results.snapshotsDeleted,
+          archivedAnalyticsDeleted: results.archivedAnalyticsDeleted,
+          progressResetCount: results.progressResetCount,
+          quizAttemptsDeleted: results.quizAttemptsDeleted,
+          cacheCleared: results.cacheCleared,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("[Analytics] Error resetting analytics:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset analytics",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};

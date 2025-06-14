@@ -36,6 +36,10 @@ import {
   AcademicCapIcon,
   ClockIcon,
   CheckCircleIcon,
+  InformationCircleIcon,
+  XMarkIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 
 // --- Interfaces ---
@@ -169,24 +173,16 @@ const QuizTakingPage: React.FC = () => {
       setUserAnswers(initialAnswers); // Initialize with localStorage data or empty
       userAnswersRef.current = initialAnswers; // Sync ref too
 
-      const fetchedQuestions = await startQuizAttempt(quizId);
+      const result = await startQuizAttempt(quizId);
       // const newAttemptId = response.attemptId; // No longer returned here
 
       // setCurrentAttemptId(newAttemptId); // Attempt ID will be set on submit
       setCurrentAttemptId(null); // Ensure it's null when starting/restarting an attempt viewing
 
-      if (fetchedQuestions && fetchedQuestions.length > 0) {
-        setQuestions(fetchedQuestions);
-        // Derive quizTitle from the first question's category
-        if (
-          fetchedQuestions[0].categories &&
-          fetchedQuestions[0].categories.length > 0
-        ) {
-          setQuizTitle(`${fetchedQuestions[0].categories[0]} Quiz`);
-        } else {
-          // Fallback if no category
-          setQuizTitle("Quiz Attempt");
-        }
+      if (result && result.questions && result.questions.length > 0) {
+        setQuestions(result.questions);
+        // Use the actual quiz title from the backend
+        setQuizTitle(result.quizTitle);
       } else {
         setError("No questions available for this quiz attempt.");
         setQuestions([]); // Ensure questions is empty
@@ -547,10 +543,18 @@ const QuizTakingPage: React.FC = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
         <Navbar hidden={true} />
-        <main className="flex-grow flex items-center justify-center max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
-          <LoadingSpinner message="Loading quiz questions..." />
+        <main className="flex-grow flex items-center justify-center px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-12 text-center max-w-md w-full">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <AcademicCapIcon className="h-8 w-8 text-white" />
+            </div>
+            <LoadingSpinner message="Loading quiz questions..." />
+            <p className="text-slate-600 mt-4 font-light">
+              Preparing your personalized quiz experience
+            </p>
+          </div>
         </main>
       </div>
     );
@@ -564,21 +568,23 @@ const QuizTakingPage: React.FC = () => {
   // Show quiz not found error
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
         <Navbar />
-        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-            <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <AcademicCapIcon className="h-8 w-8 text-red-600" />
+        <main className="flex-grow flex items-center justify-center px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-red-200 p-8 sm:p-12 text-center max-w-2xl w-full">
+            <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <XMarkIcon className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-red-600 mb-4">
+            <h1 className="text-2xl sm:text-3xl font-light text-slate-900 mb-4">
               Quiz Not Available
             </h1>
-            <ErrorMessage message={error} />
+            <div className="bg-red-50 rounded-2xl p-6 mb-8">
+              <ErrorMessage message={error} />
+            </div>
             <Button
               variant="secondary"
               onClick={() => navigate("/staff/dashboard")}
-              className="mt-4"
+              className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-8 py-3 rounded-full font-medium transition-all duration-200"
             >
               Back to Dashboard
             </Button>
@@ -599,88 +605,133 @@ const QuizTakingPage: React.FC = () => {
       totalQuestionsAttempted > 0 ? (score / totalQuestionsAttempted) * 100 : 0;
 
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        <Navbar />
-        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
-            <div className="text-center mb-8">
-              <div className="p-3 bg-green-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <CheckCircleIcon className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+        <Navbar hidden={true} />
+        <main className="flex-grow px-4 py-8 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Results Header */}
+            <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 sm:p-12 mb-8">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <CheckCircleIcon className="h-10 w-10 text-white" />
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-light text-slate-900 mb-6">
+                  Quiz Complete!
+                </h1>
+                <div className="bg-gradient-to-r from-slate-50 to-white rounded-2xl p-8 border border-slate-200 max-w-md mx-auto">
+                  <div className="text-4xl font-light text-slate-900 mb-2">
+                    {score}/{totalQuestionsAttempted}
+                  </div>
+                  <div className="text-2xl font-medium text-blue-600 mb-4">
+                    {percentage.toFixed(1)}%
+                  </div>
+                  <p className="text-slate-600 font-light">
+                    {percentage >= 70
+                      ? "🎉 Congratulations! You passed the quiz."
+                      : "📚 Keep studying and try again."}
+                  </p>
+                </div>
               </div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-4">
-                Quiz Complete!
-              </h1>
-              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                <h2 className="text-xl font-semibold text-slate-900 mb-4">
-                  Your Score: {score}/{totalQuestionsAttempted} (
-                  {percentage.toFixed(1)}%)
-                </h2>
-                <p className="text-slate-600">
-                  {percentage >= 70
-                    ? "Congratulations! You passed the quiz."
-                    : "Keep studying and try again."}
-                </p>
+            </div>
+
+            {/* Review Section */}
+            <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 sm:p-8">
+              <h2 className="text-2xl sm:text-3xl font-light text-slate-900 mb-8 text-center">
+                Review Your Answers
+              </h2>
+              {gradedQuestions && gradedQuestions.length > 0 ? (
+                <div className="space-y-6">
+                  {gradedQuestions.map((q, index) => (
+                    <div
+                      key={q.questionId}
+                      className={`rounded-2xl border p-6 transition-all duration-200 ${
+                        q.isCorrect
+                          ? "bg-gradient-to-r from-green-50 to-green-100 border-green-200"
+                          : "bg-gradient-to-r from-red-50 to-red-100 border-red-200"
+                      }`}
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            q.isCorrect
+                              ? "bg-green-500 text-white"
+                              : "bg-red-500 text-white"
+                          }`}
+                        >
+                          <span className="text-sm font-medium">
+                            {index + 1}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-slate-900 mb-3 leading-relaxed">
+                            {questions.find(
+                              (origQ) => origQ._id === q.questionId
+                            )?.questionText || "Question text not found"}
+                          </h3>
+                          <div className="space-y-2">
+                            <p className="text-sm text-slate-600">
+                              <span className="font-medium">Your answer:</span>{" "}
+                              {renderAnswer(
+                                q.answerGiven,
+                                questions.find(
+                                  (origQ) => origQ._id === q.questionId
+                                )?.options || []
+                              )}
+                            </p>
+                            {!q.isCorrect && (
+                              <p className="text-sm text-red-700 font-medium">
+                                <span className="font-medium">
+                                  Correct answer:
+                                </span>{" "}
+                                {renderAnswer(
+                                  q.correctAnswer,
+                                  questions.find(
+                                    (origQ) => origQ._id === q.questionId
+                                  )?.options || [],
+                                  true
+                                )}
+                              </p>
+                            )}
+                          </div>
+                          {!q.isCorrect && q.explanation && (
+                            <div className="mt-4 pt-4 border-t border-slate-200">
+                              <div className="flex items-start space-x-3">
+                                <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-sm font-medium text-blue-700 mb-1">
+                                    Explanation:
+                                  </p>
+                                  <p className="text-sm text-slate-700 leading-relaxed">
+                                    {q.explanation}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-slate-500 font-light">
+                    No review data available.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-center mt-12">
+                <Button
+                  variant="primary"
+                  onClick={() => navigate("/staff/dashboard")}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Back to Dashboard
+                </Button>
               </div>
             </div>
           </div>
-
-          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
-            <h2 className="text-2xl font-semibold text-slate-900 mb-6 text-center">
-              Review Your Answers
-            </h2>
-            {gradedQuestions && gradedQuestions.length > 0 ? (
-              <div className="space-y-4">
-                {gradedQuestions.map((q, index) => (
-                  <div
-                    key={q.questionId}
-                    className={`p-4 rounded-lg border ${
-                      q.isCorrect
-                        ? "bg-green-50 border-green-200"
-                        : "bg-red-50 border-red-200"
-                    }`}
-                  >
-                    <p className="font-semibold text-slate-900 mb-2">
-                      Question {index + 1}:{" "}
-                      {questions.find((origQ) => origQ._id === q.questionId)
-                        ?.questionText || "Question text not found"}
-                    </p>
-                    <p className="text-sm text-slate-600 mb-2">
-                      Your answer:{" "}
-                      {renderAnswer(
-                        q.answerGiven,
-                        questions.find((origQ) => origQ._id === q.questionId)
-                          ?.options || []
-                      )}
-                    </p>
-                    {!q.isCorrect && (
-                      <p className="text-sm text-red-600 font-medium">
-                        Correct answer:{" "}
-                        {renderAnswer(
-                          q.correctAnswer,
-                          questions.find((origQ) => origQ._id === q.questionId)
-                            ?.options || [],
-                          true
-                        )}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-slate-500">
-                No review data available.
-              </p>
-            )}
-
-            <div className="flex justify-center mt-8 space-x-4">
-              <Button
-                variant="primary"
-                onClick={() => navigate("/staff/dashboard")}
-              >
-                Back to Dashboard
-              </Button>
-            </div>
-          </Card>
         </main>
       </div>
     );
@@ -689,171 +740,212 @@ const QuizTakingPage: React.FC = () => {
   // --- Current Question Display ---
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
         <Navbar hidden={true} />
-        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-          <div className="bg-white shadow-lg rounded-xl p-6 mb-8">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+        <main className="flex-grow flex items-center justify-center px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-8 sm:p-12 text-center max-w-md w-full">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <AcademicCapIcon className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-light text-slate-900 mb-4">
               Loading Question...
             </h1>
-          </div>
-          <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8 text-center">
             <LoadingSpinner message="Preparing question..." />
-            <p className="mt-4 text-gray-600">
+            <p className="mt-6 text-slate-600 font-light">
               If this persists, please try returning to the dashboard.
             </p>
-            <div className="mt-8 text-center">
+            <div className="mt-8">
               <Button
                 onClick={() => navigate("/staff/dashboard")}
                 variant="secondary"
+                className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-6 py-3 rounded-full font-medium transition-all duration-200"
               >
                 Back to Dashboard
               </Button>
             </div>
-          </Card>
+          </div>
         </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       <Navbar
         hidden={true}
         isBlockingNavigation={isQuizInProgress}
         onAttemptBlockedNavigation={confirmNavigation}
       />
-      <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 w-full flex-grow">
-        {/* Header Section */}
-        <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100 shadow-sm mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                <AcademicCapIcon className="h-8 w-8 text-white" />
+      <main className="flex-grow px-4 py-6 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-3xl p-6 sm:p-8 border border-blue-200 shadow-lg mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
+                  <AcademicCapIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-light text-slate-900 leading-tight">
+                    {quizTitle}
+                  </h1>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <p className="text-slate-600 font-light">
+                      Question {currentQuestionIndex + 1} of {questions.length}
+                    </p>
+                    <div className="flex-1 bg-blue-200 rounded-full h-2 max-w-32">
+                      <div
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((currentQuestionIndex + 1) / questions.length) *
+                            100
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  {quizTitle}
-                </h1>
-                <p className="text-slate-600 mt-2">
-                  Question {currentQuestionIndex + 1} of {questions.length}
-                </p>
-              </div>
+              {/* Exit Quiz Button */}
+              <Button
+                variant="secondary"
+                onClick={handleCancelQuiz}
+                className="bg-white/80 hover:bg-white border-slate-300 text-slate-600 hover:text-slate-800 px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md self-start sm:self-auto"
+                disabled={isSubmitting || isCancelling}
+              >
+                <span className="hidden sm:inline">Exit Quiz</span>
+                <span className="sm:hidden">Exit</span>
+              </Button>
             </div>
-            {/* Exit Quiz Button */}
-            <Button
-              variant="secondary"
-              onClick={handleCancelQuiz}
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 bg-white/80 hover:bg-white border-slate-300"
-              disabled={isSubmitting || isCancelling}
-            >
-              <span className="hidden sm:inline">Exit Quiz</span>
-              <span className="sm:hidden">Exit</span>
-            </Button>
           </div>
-        </div>
 
-        {/* Main Quiz Content Card */}
-        <Card className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
-          {submitError && (
-            <div className="mb-6">
-              <ErrorMessage
-                message={submitError}
-                onDismiss={() => setSubmitError(null)}
-              />
-            </div>
-          )}
+          {/* Main Quiz Content Card */}
+          <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 sm:p-8">
+            {submitError && (
+              <div className="mb-6 bg-red-50 rounded-2xl p-4 border border-red-200">
+                <ErrorMessage
+                  message={submitError}
+                  onDismiss={() => setSubmitError(null)}
+                />
+              </div>
+            )}
 
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-              {currentQuestion.questionText}
-            </h2>
-            <div className="space-y-4 mb-8">
-              {currentQuestion.options.map((option) => (
-                <label
-                  key={option._id}
-                  className={`flex items-center p-4 rounded-lg border transition-all duration-150 cursor-pointer 
-                              ${
-                                isSelected(
-                                  currentQuestion._id,
-                                  option._id,
-                                  currentQuestion.questionType
-                                )
-                                  ? "bg-blue-50 border-blue-500 ring-2 ring-blue-400 shadow-md"
-                                  : "bg-gray-50 border-gray-300 hover:border-gray-400 hover:bg-gray-100"
-                              }`}
-                >
-                  <input
-                    type={
-                      currentQuestion.questionType ===
-                      "multiple-choice-multiple"
-                        ? "checkbox"
-                        : "radio"
-                    }
-                    name={`question-${currentQuestion._id}`}
-                    value={option._id}
-                    checked={isSelected(
-                      currentQuestion._id,
-                      option._id,
-                      currentQuestion.questionType
-                    )}
-                    onChange={() =>
-                      handleAnswerSelect(
-                        currentQuestion._id,
-                        option._id,
-                        currentQuestion.questionType
-                      )
-                    }
-                    className={`form-radio h-5 w-5 text-blue-600 mr-4 focus:ring-blue-500 focus:ring-offset-2 ${
+            <div>
+              <h2 className="text-xl sm:text-2xl font-medium text-slate-900 mb-8 leading-relaxed">
+                {currentQuestion.questionText}
+              </h2>
+              <div className="space-y-3 mb-8">
+                {currentQuestion.options.map((option, index) => (
+                  <label
+                    key={option._id}
+                    className={`flex items-center p-4 sm:p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
                       isSelected(
                         currentQuestion._id,
                         option._id,
                         currentQuestion.questionType
                       )
-                        ? "border-blue-500"
-                        : "border-gray-400"
+                        ? "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 ring-2 ring-blue-400 shadow-md"
+                        : "bg-gradient-to-r from-slate-50 to-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
                     }`}
-                  />
-                  <span className="text-gray-800 text-md">{option.text}</span>
-                </label>
-              ))}
+                  >
+                    <input
+                      type={
+                        currentQuestion.questionType ===
+                        "multiple-choice-multiple"
+                          ? "checkbox"
+                          : "radio"
+                      }
+                      name={`question-${currentQuestion._id}`}
+                      value={option._id}
+                      checked={isSelected(
+                        currentQuestion._id,
+                        option._id,
+                        currentQuestion.questionType
+                      )}
+                      onChange={() =>
+                        handleAnswerSelect(
+                          currentQuestion._id,
+                          option._id,
+                          currentQuestion.questionType
+                        )
+                      }
+                      className="form-radio h-5 w-5 text-blue-600 mr-4 focus:ring-blue-500 focus:ring-offset-2 border-slate-400"
+                    />
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 ${
+                          isSelected(
+                            currentQuestion._id,
+                            option._id,
+                            currentQuestion.questionType
+                          )
+                            ? "bg-blue-600 text-white"
+                            : "bg-slate-200 text-slate-600 group-hover:bg-slate-300"
+                        }`}
+                      >
+                        {String.fromCharCode(65 + index)}
+                      </div>
+                      <span className="text-slate-800 font-light leading-relaxed">
+                        {option.text}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+              <Button
+                onClick={goToPreviousQuestion}
+                disabled={currentQuestionIndex === 0 || isSubmitting}
+                variant="secondary"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+                <span>Previous</span>
+              </Button>
+
+              <div className="text-center">
+                <span className="text-sm text-slate-500 font-light">
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </span>
+              </div>
+
+              {currentQuestionIndex === questions.length - 1 ? (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  variant="primary"
+                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 py-3 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSpinner message="" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="h-4 w-4" />
+                      <span>Submit Answers</span>
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  onClick={goToNextQuestion}
+                  disabled={isSubmitting}
+                  variant="primary"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  <span>Next</span>
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
-
-          {/* Navigation */}
-          <div className="mt-8 pt-6 border-t border-gray-300 flex justify-between items-center">
-            <Button
-              onClick={goToPreviousQuestion}
-              disabled={currentQuestionIndex === 0 || isSubmitting}
-              variant="secondary"
-              className="py-2 px-4 text-sm"
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-gray-600">
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </span>
-            {currentQuestionIndex === questions.length - 1 ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                variant="primary"
-                className="py-2 px-4 text-sm"
-              >
-                {isSubmitting ? "Submitting..." : "Submit Answers"}
-              </Button>
-            ) : (
-              <Button
-                onClick={goToNextQuestion}
-                disabled={isSubmitting}
-                variant="primary"
-                className="py-2 px-4 text-sm"
-              >
-                Next
-              </Button>
-            )}
-          </div>
-        </Card>
+        </div>
       </main>
     </div>
   );

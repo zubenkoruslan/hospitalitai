@@ -2,7 +2,11 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
-import { IQuestion, IQuestionBank } from "../types/questionBankTypes";
+import {
+  IQuestion,
+  IQuestionBank,
+  KnowledgeCategory,
+} from "../types/questionBankTypes";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
@@ -15,6 +19,7 @@ import GenerateAiQuestionsFormSop from "../components/questionBank/GenerateAiQue
 import AiQuestionsPreview from "../components/questionBank/AiQuestionsPreview";
 import Card from "../components/common/Card";
 import ErrorMessage from "../components/common/ErrorMessage";
+import KnowledgeCategoryFilter from "../components/common/KnowledgeCategoryFilter";
 import {
   getMenusByRestaurant as fetchRestaurantMenus,
   getMenuWithItems,
@@ -35,6 +40,8 @@ import {
   CheckIcon,
   XMarkIcon,
   ChartPieIcon,
+  FunnelIcon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 
 // Enhanced component to display a single question with modern styling
@@ -134,7 +141,9 @@ const QuestionListItem: React.FC<{
 
             {question.knowledgeCategory && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-                {question.knowledgeCategory}
+                {question.knowledgeCategory
+                  .replace("-", " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
               </span>
             )}
           </div>
@@ -239,6 +248,53 @@ const QuestionBankDetailPage: React.FC = () => {
     );
   };
 
+  // ADDED: Helper function to apply filters to questions
+  const applyFiltersToQuestions = (questions: IQuestion[]): IQuestion[] => {
+    let filteredQuestions = [...questions];
+
+    // Filter by knowledge categories
+    if (selectedKnowledgeCategories.length > 0) {
+      filteredQuestions = filteredQuestions.filter((question) =>
+        selectedKnowledgeCategories.includes(question.knowledgeCategory)
+      );
+    }
+
+    // Filter by menu categories
+    if (selectedMenuCategories.length > 0) {
+      filteredQuestions = filteredQuestions.filter((question) =>
+        question.categories.some((category) =>
+          selectedMenuCategories.includes(category)
+        )
+      );
+    }
+
+    return filteredQuestions;
+  };
+
+  // ADDED: Get filtered active questions
+  const getFilteredActiveQuestions = (): IQuestion[] => {
+    const activeQuestions = getActiveQuestionsAsObjects();
+    return applyFiltersToQuestions(activeQuestions);
+  };
+
+  // ADDED: Get filtered pending questions
+  const getFilteredPendingQuestions = (): IQuestion[] => {
+    return applyFiltersToQuestions(pendingQuestions);
+  };
+
+  // ADDED: Get unique categories from all questions for filter options
+  const getUniqueMenuCategories = (): string[] => {
+    const allQuestions = [
+      ...getActiveQuestionsAsObjects(),
+      ...pendingQuestions,
+    ];
+    const categories = new Set<string>();
+    allQuestions.forEach((question) => {
+      question.categories.forEach((category) => categories.add(category));
+    });
+    return Array.from(categories).sort();
+  };
+
   // Local state for managing modals or forms for adding questions
   const [showAddManualQuestionModal, setShowAddManualQuestionModal] =
     useState(false);
@@ -303,6 +359,14 @@ const QuestionBankDetailPage: React.FC = () => {
   const [isProcessingPendingQuestions, setIsProcessingPendingQuestions] =
     useState(false);
 
+  // ADDED: State for filtering
+  const [selectedKnowledgeCategories, setSelectedKnowledgeCategories] =
+    useState<KnowledgeCategory[]>([]);
+  const [selectedMenuCategories, setSelectedMenuCategories] = useState<
+    string[]
+  >([]);
+  const [showFilters, setShowFilters] = useState(false);
+
   const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
     fetchQuestionBankById,
   ]);
@@ -312,11 +376,41 @@ const QuestionBankDetailPage: React.FC = () => {
       memoizedFetchQuestionBankById(bankId);
     }
     setSelectedQuestionIds([]); // Reset selection when bank changes
+    setSelectedPendingQuestionIds([]); // Reset pending selection when bank changes
+    setSelectedKnowledgeCategories([]); // Reset filters when bank changes
+    setSelectedMenuCategories([]);
+    setShowFilters(false);
   }, [bankId, memoizedFetchQuestionBankById]);
 
   // ADDED: Function to toggle category expansion
   const toggleCategoriesExpand = () => {
     setIsCategoriesExpanded((prev) => !prev);
+  };
+
+  // ADDED: Filter handler functions
+  const handleKnowledgeCategoryToggle = (category: KnowledgeCategory) => {
+    setSelectedKnowledgeCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const handleClearKnowledgeCategories = () => {
+    setSelectedKnowledgeCategories([]);
+  };
+
+  const handleMenuCategoryToggle = (category: string) => {
+    setSelectedMenuCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const handleClearAllFilters = () => {
+    setSelectedKnowledgeCategories([]);
+    setSelectedMenuCategories([]);
   };
 
   const requestRemoveQuestion = (questionId: string) => {
@@ -613,11 +707,11 @@ const QuestionBankDetailPage: React.FC = () => {
 
   const handleToggleSelectAll = () => {
     if (!currentQuestionBank || !currentQuestionBank.questions) return;
-    const activeQuestions = getActiveQuestionsAsObjects();
-    if (selectedQuestionIds.length === activeQuestions.length) {
+    const filteredQuestions = getFilteredActiveQuestions();
+    if (selectedQuestionIds.length === filteredQuestions.length) {
       setSelectedQuestionIds([]);
     } else {
-      setSelectedQuestionIds(activeQuestions.map((q) => q._id));
+      setSelectedQuestionIds(filteredQuestions.map((q) => q._id));
     }
   };
 
@@ -692,10 +786,11 @@ const QuestionBankDetailPage: React.FC = () => {
   };
 
   const handleToggleAllPendingQuestions = () => {
-    if (selectedPendingQuestionIds.length === pendingQuestions.length) {
+    const filteredPendingQuestions = getFilteredPendingQuestions();
+    if (selectedPendingQuestionIds.length === filteredPendingQuestions.length) {
       setSelectedPendingQuestionIds([]);
     } else {
-      setSelectedPendingQuestionIds(pendingQuestions.map((q) => q._id));
+      setSelectedPendingQuestionIds(filteredPendingQuestions.map((q) => q._id));
     }
   };
 
@@ -784,16 +879,21 @@ const QuestionBankDetailPage: React.FC = () => {
       );
     }
 
-    if (pendingQuestions.length === 0) {
+    const filteredPendingQuestions = getFilteredPendingQuestions();
+
+    if (filteredPendingQuestions.length === 0) {
       return (
         <div className="text-center py-12">
           <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 mb-2">
-            No pending questions
+            {pendingQuestions.length === 0
+              ? "No pending questions"
+              : "No questions match filters"}
           </h3>
           <p className="text-slate-500">
-            All AI-generated questions for this bank have been reviewed and
-            processed.
+            {pendingQuestions.length === 0
+              ? "All AI-generated questions for this bank have been reviewed and processed."
+              : "Try adjusting your filters to see more questions."}
           </p>
         </div>
       );
@@ -808,14 +908,16 @@ const QuestionBankDetailPage: React.FC = () => {
               type="checkbox"
               className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               checked={
-                selectedPendingQuestionIds.length === pendingQuestions.length
+                selectedPendingQuestionIds.length ===
+                  filteredPendingQuestions.length &&
+                filteredPendingQuestions.length > 0
               }
               onChange={handleToggleAllPendingQuestions}
               disabled={isProcessingPendingQuestions}
             />
             <span className="text-sm font-medium text-slate-700">
-              {selectedPendingQuestionIds.length} of {pendingQuestions.length}{" "}
-              selected
+              {selectedPendingQuestionIds.length} of{" "}
+              {filteredPendingQuestions.length} selected
             </span>
           </div>
           <div className="flex items-center space-x-3">
@@ -848,7 +950,7 @@ const QuestionBankDetailPage: React.FC = () => {
 
         {/* Questions list */}
         <div className="space-y-4">
-          {pendingQuestions.map((question) => (
+          {filteredPendingQuestions.map((question) => (
             <div
               key={question._id}
               className="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow relative"
@@ -875,7 +977,10 @@ const QuestionBankDetailPage: React.FC = () => {
                       {question.categories?.join(", ") || "N/A"}
                     </span>
                     <span>
-                      <strong>Knowledge:</strong> {question.knowledgeCategory}
+                      <strong>Knowledge:</strong>{" "}
+                      {question.knowledgeCategory
+                        .replace("-", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
                     </span>
                   </div>
                   {question.options && question.options.length > 0 && (
@@ -1340,23 +1445,106 @@ const QuestionBankDetailPage: React.FC = () => {
                     <h2 className="text-xl font-semibold text-slate-900">
                       Questions Management
                     </h2>
-                    {activeQuestionsTab === "active" &&
-                      getActiveQuestionsAsObjects().length > 0 && (
-                        <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="text-sm flex items-center space-x-2"
+                      >
+                        <FunnelIcon className="h-4 w-4" />
+                        <span>Filters</span>
+                        {(selectedKnowledgeCategories.length > 0 ||
+                          selectedMenuCategories.length > 0) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {selectedKnowledgeCategories.length +
+                              selectedMenuCategories.length}
+                          </span>
+                        )}
+                      </Button>
+                      {activeQuestionsTab === "active" &&
+                        getActiveQuestionsAsObjects().length > 0 && (
                           <Button
                             variant="secondary"
                             onClick={handleToggleSelectAll}
                             className="text-sm"
                           >
                             {selectedQuestionIds.length ===
-                            getActiveQuestionsAsObjects().length
+                            getFilteredActiveQuestions().length
                               ? "Deselect All"
                               : "Select All"}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Filter Panel */}
+                {showFilters && (
+                  <div className="bg-slate-50 border-b border-slate-200 p-6">
+                    <div className="space-y-6">
+                      {/* Knowledge Category Filter */}
+                      <div>
+                        <KnowledgeCategoryFilter
+                          selectedCategories={selectedKnowledgeCategories}
+                          onCategoryToggle={handleKnowledgeCategoryToggle}
+                          onClearAll={handleClearKnowledgeCategories}
+                          allowMultiple={true}
+                          showClearAll={true}
+                        />
+                      </div>
+
+                      {/* Menu Category Filter */}
+                      {getUniqueMenuCategories().length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-medium text-gray-700">
+                              Filter by Menu Category
+                            </h3>
+                            {selectedMenuCategories.length > 0 && (
+                              <button
+                                onClick={() => setSelectedMenuCategories([])}
+                                className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                              >
+                                Clear all
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {getUniqueMenuCategories().map((category) => (
+                              <button
+                                key={category}
+                                onClick={() =>
+                                  handleMenuCategoryToggle(category)
+                                }
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-200 ${
+                                  selectedMenuCategories.includes(category)
+                                    ? "bg-blue-100 text-blue-700 border-blue-200"
+                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                }`}
+                              >
+                                {category}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Clear All Filters */}
+                      {(selectedKnowledgeCategories.length > 0 ||
+                        selectedMenuCategories.length > 0) && (
+                        <div className="flex justify-end">
+                          <Button
+                            variant="secondary"
+                            onClick={handleClearAllFilters}
+                            className="text-sm"
+                          >
+                            Clear All Filters
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-6">
                   {/* Tabs */}
@@ -1370,7 +1558,12 @@ const QuestionBankDetailPage: React.FC = () => {
                             : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
                         }`}
                       >
-                        Active Questions ({getActiveQuestionsAsObjects().length}
+                        Active Questions ({getFilteredActiveQuestions().length}
+                        {(selectedKnowledgeCategories.length > 0 ||
+                          selectedMenuCategories.length > 0) &&
+                          getFilteredActiveQuestions().length !==
+                            getActiveQuestionsAsObjects().length &&
+                          ` of ${getActiveQuestionsAsObjects().length}`}
                         )
                       </button>
                       <button
@@ -1382,9 +1575,14 @@ const QuestionBankDetailPage: React.FC = () => {
                         }`}
                       >
                         Pending Review
-                        {pendingQuestions.length > 0 && (
+                        {getFilteredPendingQuestions().length > 0 && (
                           <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                            {pendingQuestions.length}
+                            {getFilteredPendingQuestions().length}
+                            {(selectedKnowledgeCategories.length > 0 ||
+                              selectedMenuCategories.length > 0) &&
+                              getFilteredPendingQuestions().length !==
+                                pendingQuestions.length &&
+                              ` of ${pendingQuestions.length}`}
                           </span>
                         )}
                       </button>
@@ -1394,7 +1592,7 @@ const QuestionBankDetailPage: React.FC = () => {
                   {/* Tab Content */}
                   {activeQuestionsTab === "active" && (
                     <>
-                      {getActiveQuestionsAsObjects().length === 0 ? (
+                      {getFilteredActiveQuestions().length === 0 ? (
                         <div className="text-center py-16">
                           <div className="relative">
                             <div className="mx-auto w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
@@ -1442,7 +1640,7 @@ const QuestionBankDetailPage: React.FC = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {getActiveQuestionsAsObjects().map((question) => (
+                          {getFilteredActiveQuestions().map((question) => (
                             <QuestionListItem
                               key={question._id}
                               question={question}

@@ -23,6 +23,7 @@ import {
   resetQuizProgressController,
   updateQuizController,
   getAllIncorrectAnswersForStaffController,
+  updateQuizSnapshots,
 } from "../controllers/quizController";
 
 const router: Router = express.Router();
@@ -73,6 +74,17 @@ router.get(
       next(error);
     }
   }
+);
+
+/**
+ * @route   POST /api/quiz/update-snapshots
+ * @desc    Manually update quiz snapshots when question banks have changed
+ * @access  Private (Restaurant Role)
+ */
+router.post(
+  "/update-snapshots",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
+  updateQuizSnapshots
 );
 
 /**

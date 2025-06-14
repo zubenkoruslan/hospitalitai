@@ -11,7 +11,7 @@ import UserKnowledgeAnalyticsModel from "../models/UserKnowledgeAnalytics";
 import {
   getEnhancedRestaurantAnalytics,
   getIndividualStaffAnalytics,
-  getLeaderboards,
+  resetAnalytics,
 } from "../controllers/analyticsController";
 
 const router = express.Router();
@@ -615,14 +615,14 @@ router.get(
       const topPerformers = usersWithRoles
         .filter((analytics) => analytics.totalQuestionsAnswered >= 10) // Minimum 10 questions
         .sort((a, b) => b.overallAccuracy - a.overallAccuracy)
-        .slice(0, 10)
+        .slice(0, parseInt(limit as string))
         .map((analytics, index) => ({
           rank: index + 1,
           userId: analytics.userId._id.toString(),
           name: (analytics.userId as any).name,
           roleName:
             (analytics.userDetails?.assignedRoleId as any)?.name || "Staff",
-          overallAccuracy: analytics.overallAccuracy,
+          overallAverageScore: analytics.overallAccuracy, // Changed from overallAccuracy to match frontend expectation
           totalQuestions: analytics.totalQuestionsAnswered,
           completionTime: analytics.averageQuizCompletionTime || 0,
         }));
@@ -674,7 +674,7 @@ router.get(
       };
 
       res.status(200).json({
-        status: "success",
+        success: true,
         data: leaderboards,
       });
     } catch (error) {
@@ -719,11 +719,8 @@ router.get(
 
       if (!quizzes || quizzes.length === 0) {
         res.status(200).json({
-          status: "success",
-          data: {
-            quizLeaderboards: [],
-            lastUpdated: new Date().toISOString(),
-          },
+          quizLeaderboards: [],
+          lastUpdated: new Date().toISOString(),
         });
         return;
       }
@@ -841,11 +838,8 @@ router.get(
       );
 
       res.status(200).json({
-        status: "success",
-        data: {
-          quizLeaderboards: filteredLeaderboards,
-          lastUpdated: new Date().toISOString(),
-        },
+        quizLeaderboards: filteredLeaderboards,
+        lastUpdated: new Date().toISOString(),
       });
     } catch (error) {
       console.error("Error fetching quiz leaderboards:", error);
@@ -864,5 +858,8 @@ router.get(
  * Enhanced for Phase 5 - restaurant overview dashboard
  */
 router.get("/restaurant/enhanced", protect, getEnhancedRestaurantAnalytics);
+
+// Reset analytics (destructive operation)
+router.post("/reset", resetAnalytics);
 
 export default router;

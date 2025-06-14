@@ -177,6 +177,18 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     try {
       const newQuestion = await createQuestion(data);
       if (newQuestion) {
+        console.log(
+          "[Add Manual Question] Question created successfully, triggering analytics refresh..."
+        );
+
+        // Trigger analytics refresh since a new question affects question distribution
+        window.dispatchEvent(new CustomEvent("analytics-refresh"));
+
+        // Small delay to ensure backend cache has been invalidated
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("analytics-refresh"));
+        }, 500);
+
         onQuestionAdded(newQuestion);
       } else {
         setFormError("Failed to create question. Please try again.");

@@ -22,6 +22,7 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/auth";
 import menuRoutes from "./routes/menus";
 import cleanMenuRoutes from "./routes/cleanMenus"; // New clean menu routes
+import cleanQuestionRoutes from "./routes/cleanQuestionRoutes"; // New clean question routes
 import itemRoutes from "./routes/items";
 import quizRoutes from "./routes/quiz";
 import { quizResultRouter } from "./routes/quizResult";
@@ -110,6 +111,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/auth", passwordResetRoutes); // Mount password reset routes under /api/auth
 app.use("/api/menus", menuRoutes);
 app.use("/api/upload", cleanMenuRoutes); // Upload routes (formerly clean menu routes)
+app.use("/api/clean-questions", cleanQuestionRoutes); // Clean AI question generation routes
 app.use("/api/items", itemRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/quiz-results", quizResultRouter);

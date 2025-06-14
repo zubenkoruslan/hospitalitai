@@ -924,8 +924,12 @@ const CleanMenuUploadPage: React.FC = () => {
                               const newOptions = [
                                 ...(editItem.servingOptions || []),
                               ];
-                              newOptions[servingIndex].price =
-                                parseFloat(e.target.value) || 0;
+                              const parsedValue = parseFloat(e.target.value);
+                              newOptions[servingIndex].price = isNaN(
+                                parsedValue
+                              )
+                                ? 0
+                                : parsedValue;
                               handleFieldChange("servingOptions", newOptions);
                             }}
                             className="w-20 p-2 border border-gray-300 rounded text-sm"
@@ -1449,7 +1453,11 @@ const CleanMenuUploadPage: React.FC = () => {
                           key={idx}
                           className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs rounded-full font-semibold shadow-md"
                         >
-                          {serving.size}: £{serving.price.toFixed(2)}
+                          {serving.size}: £
+                          {typeof serving.price === "number" &&
+                          !isNaN(serving.price)
+                            ? serving.price.toFixed(2)
+                            : "0.00"}
                         </span>
                       ))}
                     </div>

@@ -9,7 +9,8 @@
     "start": "ts-node src/server.ts",
     "build": "tsc",
     "dev": "NODE_ENV=development nodemon src/server.ts",
-    "test-email": "ts-node src/scripts/testEmail.ts"
+    "test-email": "ts-node src/scripts/testEmail.ts",
+    "reset-all-analytics": "ts-node src/scripts/reset-all-analytics.ts"
   },
   "keywords": [],
   "author": "",

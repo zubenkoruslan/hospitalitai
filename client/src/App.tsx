@@ -87,7 +87,11 @@ const FloatingNotificationBell: React.FC = () => {
     !location.pathname.startsWith("/reset-password") &&
     !location.pathname.startsWith("/staff/accept-invitation");
 
-  return isAuthenticatedPage ? <NotificationBell /> : null;
+  // Hide notification bell when user is taking a quiz to avoid distractions
+  const isQuizTakingPage =
+    location.pathname.includes("/quiz/") && location.pathname.endsWith("/take");
+
+  return isAuthenticatedPage && !isQuizTakingPage ? <NotificationBell /> : null;
 };
 
 function App() {

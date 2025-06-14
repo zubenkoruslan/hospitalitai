@@ -202,7 +202,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 };
 
 // Custom hook to use the notification context
-export const useNotifications = () => {
+const useNotifications = () => {
   const context = useContext(NotificationContext);
   if (context === undefined) {
     throw new Error(
@@ -212,4 +212,8 @@ export const useNotifications = () => {
   return context;
 };
 
-export default NotificationContext;
+// Export the hook separately to fix Fast Refresh
+export { useNotifications };
+
+// Removed default export to fix Fast Refresh compatibility
+// Use named exports: NotificationProvider and useNotifications
