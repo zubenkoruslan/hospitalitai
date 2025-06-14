@@ -158,89 +158,112 @@ const MenuItemsPage: React.FC = () => {
   );
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  // Search functionality
+  // Enhanced search functionality
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchResults, setSearchResults] = useState<{
     itemTypes: ("food" | "beverage" | "wine")[];
-    categories: Record<string, string[]>;
-    items: Record<string, MenuItem[]>;
-  }>({ itemTypes: [], categories: {}, items: {} });
+    categories: string[];
+    items: string[];
+  }>({ itemTypes: [], categories: [], items: [] });
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
-  // Filtered items based on search term
-  const filteredItems = useMemo(() => {
-    if (!items || !searchTerm.trim()) return items;
-
-    const search = searchTerm.toLowerCase();
-    return items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(search) ||
-        item.description?.toLowerCase().includes(search) ||
-        item.category?.toLowerCase().includes(search) ||
-        item.ingredients?.some((ingredient) =>
-          ingredient.toLowerCase().includes(search)
-        )
-    );
-  }, [items, searchTerm]);
-
-  // Search functionality
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setSearchResults({ itemTypes: [], categories: {}, items: {} });
+  // Enhanced search functionality
+  const performSearch = (searchTerm: string) => {
+    if (!items || !searchTerm.trim()) {
+      setSearchResults({ itemTypes: [], categories: [], items: [] });
       return;
     }
 
-    const search = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase();
     const matchingItemTypes: ("food" | "beverage" | "wine")[] = [];
-    const matchingCategories: Record<string, string[]> = {};
-    const matchingItems: Record<string, MenuItem[]> = {};
+    const matchingCategories: string[] = [];
+    const matchingItems: string[] = [];
 
     // Search through item types
-    if ("food".includes(search)) matchingItemTypes.push("food");
-    if ("beverage".includes(search) || "drink".includes(search))
+    if ("food".includes(term)) matchingItemTypes.push("food");
+    if ("beverage".includes(term) || "drink".includes(term))
       matchingItemTypes.push("beverage");
-    if ("wine".includes(search)) matchingItemTypes.push("wine");
+    if ("wine".includes(term)) matchingItemTypes.push("wine");
 
     // Search through categories and items
-    if (filteredItems) {
-      filteredItems.forEach((item) => {
-        const itemMatches =
-          item.name.toLowerCase().includes(search) ||
-          item.description?.toLowerCase().includes(search) ||
-          item.ingredients?.some((ing) => ing.toLowerCase().includes(search));
+    Object.entries(groupedItemsByTypeAndCategory).forEach(
+      ([itemType, categories]) => {
+        Object.entries(categories).forEach(([category, categoryItems]) => {
+          const categoryKey = `${itemType}-${category}`;
 
-        const categoryMatches = item.category?.toLowerCase().includes(search);
-
-        if (itemMatches || categoryMatches) {
-          const itemType = item.itemType;
-          const category = item.category || "Uncategorized";
-
-          if (!matchingCategories[itemType]) matchingCategories[itemType] = [];
-          if (!matchingCategories[itemType].includes(category)) {
-            matchingCategories[itemType].push(category);
+          // Check category name
+          const categoryMatches = category.toLowerCase().includes(term);
+          if (categoryMatches) {
+            matchingCategories.push(categoryKey);
+            // Auto-expand parent item type if category matches
+            setExpandedCategories((prev) => ({ ...prev, [itemType]: true }));
           }
 
-          if (!matchingItems[`${itemType}-${category}`]) {
-            matchingItems[`${itemType}-${category}`] = [];
-          }
-          if (itemMatches) {
-            matchingItems[`${itemType}-${category}`].push(item);
-          }
-        }
-      });
-    }
+          // Check items in this category
+          categoryItems.forEach((item) => {
+            const itemMatches =
+              item.name.toLowerCase().includes(term) ||
+              item.description?.toLowerCase().includes(term) ||
+              item.category?.toLowerCase().includes(term) ||
+              item.ingredients?.some((ingredient) =>
+                ingredient.toLowerCase().includes(term)
+              );
+
+            if (itemMatches) {
+              matchingItems.push(item._id);
+              // Auto-expand parent category and item type if item matches
+              if (!matchingCategories.includes(categoryKey)) {
+                setExpandedCategories((prev) => ({
+                  ...prev,
+                  [itemType]: true,
+                }));
+                setExpandedSubcategories((prev) => ({
+                  ...prev,
+                  [categoryKey]: true,
+                }));
+              }
+            }
+          });
+        });
+      }
+    );
 
     setSearchResults({
       itemTypes: matchingItemTypes,
       categories: matchingCategories,
       items: matchingItems,
     });
-  }, [searchTerm, filteredItems]);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    performSearch(value);
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm("");
+    setSearchResults({ itemTypes: [], categories: [], items: [] });
+  };
+
+  // Check if item matches search
+  const isSearchMatch = (
+    type: "itemType" | "category" | "item",
+    key: string
+  ) => {
+    if (!searchTerm.trim()) return false;
+    return type === "itemType"
+      ? searchResults.itemTypes.includes(key as "food" | "beverage" | "wine")
+      : type === "category"
+      ? searchResults.categories.includes(key)
+      : searchResults.items.includes(key);
+  };
 
   // Statistics
   const stats = useMemo(() => {
-    const currentItems = filteredItems || [];
+    const currentItems = items || [];
     const foodItems = currentItems.filter((item) => item.itemType === "food");
     const beverageItems = currentItems.filter(
       (item) => item.itemType === "beverage"
@@ -254,41 +277,41 @@ const MenuItemsPage: React.FC = () => {
       wineCount: wineItems.length,
       hasSearchResults: searchTerm.trim() !== "",
     };
-  }, [filteredItems, searchTerm]);
+  }, [items, searchTerm]);
 
   // New: Memoize unique food, beverage, and wine categories separately
   const uniqueFoodCategories = useMemo(() => {
-    if (!filteredItems) return [];
+    if (!items) return [];
     return [
       ...new Set(
-        filteredItems
+        items
           .filter((item) => item.itemType === "food" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [filteredItems]);
+  }, [items]);
 
   const uniqueBeverageCategories = useMemo(() => {
-    if (!filteredItems) return [];
+    if (!items) return [];
     return [
       ...new Set(
-        filteredItems
+        items
           .filter((item) => item.itemType === "beverage" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [filteredItems]);
+  }, [items]);
 
   const uniqueWineCategories = useMemo(() => {
-    if (!filteredItems) return [];
+    if (!items) return [];
     return [
       ...new Set(
-        filteredItems
+        items
           .filter((item) => item.itemType === "wine" && item.category)
           .map((item) => toTitleCase(item.category!))
       ),
     ].sort();
-  }, [filteredItems]);
+  }, [items]);
 
   // --- Modal Handlers ---
   const openAddModal = useCallback(() => {
@@ -466,11 +489,11 @@ const MenuItemsPage: React.FC = () => {
   // --- Data Grouping for Display ---
   // Memoize grouped items to avoid recalculation on every render
   const groupedItemsByTypeAndCategory = useMemo(() => {
-    if (!filteredItems || filteredItems.length === 0) {
+    if (!items || items.length === 0) {
       return { food: {}, beverage: {}, wine: {} }; // Ensure structure exists
     }
 
-    return filteredItems.reduce(
+    return items.reduce(
       (acc, item) => {
         const typeKey = item.itemType; // "food", "beverage", or "wine"
         const categoryKey = toTitleCase(item.category || "Uncategorized");
@@ -491,7 +514,7 @@ const MenuItemsPage: React.FC = () => {
         Record<string, MenuItem[]> // Categories within that type
       >
     );
-  }, [filteredItems]);
+  }, [items]);
 
   // --- Category Delete Handlers ---
   const openDeleteCategoryModal = useCallback((category: string) => {
@@ -573,15 +596,13 @@ const MenuItemsPage: React.FC = () => {
 
     const shouldShowItemType = (itemType: "food" | "beverage" | "wine") => {
       if (!isSearchActive) return true;
+      // Show if item type matches search or has matching categories/items
       return (
-        searchResults.categories[
-          itemType as keyof typeof searchResults.categories
-        ] &&
-        Object.keys(
-          searchResults.categories[
-            itemType as keyof typeof searchResults.categories
-          ]
-        ).length > 0
+        isSearchMatch("itemType", itemType) ||
+        searchResults.categories.some((cat) =>
+          cat.startsWith(`${itemType}-`)
+        ) ||
+        searchResults.items.length > 0
       );
     };
 
@@ -590,18 +611,14 @@ const MenuItemsPage: React.FC = () => {
       category: string
     ) => {
       if (!isSearchActive) return true;
+      const categoryKey = `${itemType}-${category}`;
+      // Show if category matches search or has matching items
       return (
-        searchResults.categories[
-          itemType as keyof typeof searchResults.categories
-        ]?.[category]?.length > 0
+        isSearchMatch("category", categoryKey) ||
+        groupedItemsByTypeAndCategory[itemType]?.[category]?.some((item) =>
+          isSearchMatch("item", item._id)
+        )
       );
-    };
-
-    const getHighlightClass = (text: string) => {
-      if (!isSearchActive) return "";
-      return text.toLowerCase().includes(searchTerm.toLowerCase())
-        ? "bg-yellow-200 dark:bg-yellow-800"
-        : "";
     };
 
     return (
@@ -635,13 +652,13 @@ const MenuItemsPage: React.FC = () => {
               type="text"
               placeholder="Search items, categories, ingredients..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
               aria-label="Search menu items"
             />
             {searchTerm && (
               <button
-                onClick={() => setSearchTerm("")}
+                onClick={clearSearch}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
                 aria-label="Clear search"
               >
@@ -654,11 +671,7 @@ const MenuItemsPage: React.FC = () => {
           {isSearchActive && (
             <div className="mt-3 flex items-center justify-between text-xs">
               <span className="text-slate-600">
-                {Object.values(searchResults.items).reduce(
-                  (acc, items) => acc + items.length,
-                  0
-                )}{" "}
-                items found
+                {searchResults.items.length} items found
               </span>
               {searchTerm && (
                 <span className="text-slate-500">
@@ -712,10 +725,12 @@ const MenuItemsPage: React.FC = () => {
                       }));
                     }}
                     className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all duration-200 group relative overflow-hidden ${
-                      isSelected
+                      isSearchMatch("itemType", itemType.key)
+                        ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                        : isSelected
                         ? "bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-2 border-blue-300 text-blue-800 shadow-lg"
                         : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
-                    } ${getHighlightClass(itemType.label)}`}
+                    }`}
                     aria-expanded={isExpanded}
                     aria-controls={`${itemType.key}-categories`}
                   >
@@ -758,7 +773,9 @@ const MenuItemsPage: React.FC = () => {
                       <div className="text-left">
                         <span
                           className={`font-bold text-lg ${
-                            isSelected
+                            isSearchMatch("itemType", itemType.key)
+                              ? "text-yellow-900"
+                              : isSelected
                               ? "text-blue-900"
                               : "text-slate-800 group-hover:text-slate-900"
                           }`}
@@ -767,7 +784,9 @@ const MenuItemsPage: React.FC = () => {
                         </span>
                         <div
                           className={`text-sm mt-1 font-medium ${
-                            isSelected
+                            isSearchMatch("itemType", itemType.key)
+                              ? "text-yellow-700"
+                              : isSelected
                               ? "text-blue-600"
                               : "text-slate-500 group-hover:text-slate-600"
                           }`}
@@ -858,10 +877,12 @@ const MenuItemsPage: React.FC = () => {
                                   }));
                                 }}
                                 className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative ${
-                                  isCategorySelected
+                                  isSearchMatch("category", categoryKey)
+                                    ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                                    : isCategorySelected
                                     ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-amber-800 shadow-md"
                                     : "hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100 text-slate-700 border-2 border-transparent hover:border-slate-300"
-                                } text-sm ${getHighlightClass(category)}`}
+                                } text-sm`}
                                 aria-expanded={
                                   expandedSubcategories[categoryKey]
                                 }
@@ -895,7 +916,9 @@ const MenuItemsPage: React.FC = () => {
                                   <div className="text-left">
                                     <span
                                       className={`font-semibold text-base ${
-                                        isCategorySelected
+                                        isSearchMatch("category", categoryKey)
+                                          ? "text-yellow-900"
+                                          : isCategorySelected
                                           ? "text-amber-900"
                                           : "text-slate-800"
                                       }`}
@@ -904,7 +927,9 @@ const MenuItemsPage: React.FC = () => {
                                     </span>
                                     <div
                                       className={`text-xs mt-0.5 ${
-                                        isCategorySelected
+                                        isSearchMatch("category", categoryKey)
+                                          ? "text-yellow-700"
+                                          : isCategorySelected
                                           ? "text-amber-600"
                                           : "text-slate-500"
                                       }`}
@@ -949,7 +974,13 @@ const MenuItemsPage: React.FC = () => {
                               <div
                                 id={`${categoryKey}-items`}
                                 className={`ml-8 overflow-hidden transition-all duration-300 ease-in-out ${
-                                  expandedSubcategories[categoryKey]
+                                  expandedSubcategories[categoryKey] ||
+                                  (isSearchActive &&
+                                    searchResults.items.some((itemId) =>
+                                      categoryItems.some(
+                                        (item) => item._id === itemId
+                                      )
+                                    ))
                                     ? "max-h-64 opacity-100"
                                     : "max-h-0 opacity-0"
                                 }`}
@@ -959,7 +990,12 @@ const MenuItemsPage: React.FC = () => {
                                   <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-green-200 via-green-300 to-transparent"></div>
 
                                   <div className="pl-4 space-y-1">
-                                    {categoryItems.slice(0, 5).map((item) => {
+                                    {(isSearchActive
+                                      ? categoryItems.filter((item) =>
+                                          isSearchMatch("item", item._id)
+                                        )
+                                      : categoryItems.slice(0, 5)
+                                    ).map((item) => {
                                       const isItemSelected =
                                         selectedItemId === item._id;
                                       return (
@@ -971,12 +1007,12 @@ const MenuItemsPage: React.FC = () => {
                                             setSelectedItemId(item._id);
                                           }}
                                           className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group relative ${
-                                            isItemSelected
+                                            isSearchMatch("item", item._id)
+                                              ? "bg-yellow-100 border border-yellow-300 text-yellow-900 shadow-md"
+                                              : isItemSelected
                                               ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-800 shadow-sm"
                                               : "hover:bg-slate-50 text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm"
-                                          } text-sm ${getHighlightClass(
-                                            item.name
-                                          )}`}
+                                          } text-sm`}
                                         >
                                           {/* Item indicator dot */}
                                           <div
@@ -1003,10 +1039,12 @@ const MenuItemsPage: React.FC = () => {
                                             />
                                           </div>
 
-                                          <div className="flex-1 text-left">
+                                          <div className="flex-1 text-left min-w-0">
                                             <span
                                               className={`font-medium ${
-                                                isItemSelected
+                                                isSearchMatch("item", item._id)
+                                                  ? "text-yellow-900"
+                                                  : isItemSelected
                                                   ? "text-green-900"
                                                   : "text-slate-800"
                                               }`}
@@ -1015,8 +1053,13 @@ const MenuItemsPage: React.FC = () => {
                                             </span>
                                             {item.description && (
                                               <div
-                                                className={`text-xs mt-0.5 truncate ${
-                                                  isItemSelected
+                                                className={`text-xs mt-0.5 line-clamp-2 ${
+                                                  isSearchMatch(
+                                                    "item",
+                                                    item._id
+                                                  )
+                                                    ? "text-yellow-700"
+                                                    : isItemSelected
                                                     ? "text-green-600"
                                                     : "text-slate-500"
                                                 }`}
