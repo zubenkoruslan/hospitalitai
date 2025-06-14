@@ -18,8 +18,7 @@ import {
   PlusIcon,
   PencilIcon,
   DocumentTextIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
+  ChevronRightIcon,
   MagnifyingGlassIcon,
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
@@ -27,6 +26,10 @@ import {
   CakeIcon, // For food
   BeakerIcon, // For beverages (glass/liquid container)
   ArrowUpTrayIcon, // For upload functionality
+  XMarkIcon,
+  FolderIcon,
+  ExclamationTriangleIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline"; // Ensure TrashIcon is imported
 // Import shared types
 import {
@@ -53,7 +56,6 @@ import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal";
 import { useMenuData } from "../hooks/useMenuData";
 import MenuDetailsEditModal from "../components/menu/MenuDetailsEditModal"; // Import the new menu details modal
 import DeleteCategoryModal from "../components/category/DeleteCategoryModal"; // Import DeleteCategoryModal
-import Card from "../components/common/Card"; // ADDED: Import Card component
 
 // --- Error Formatting Helper ---
 const formatApiError = (err: any, context: string): string => {
@@ -126,9 +128,7 @@ const MenuItemsPage: React.FC = () => {
   // State for editing menu details (name, description)
   const [isMenuDetailsModalOpen, setIsMenuDetailsModalOpen] =
     useState<boolean>(false); // New state for modal
-  const [_editedMenuName, setEditedMenuName] = useState<string>(""); // Prefixed
-  const [_editedMenuDescription, setEditedMenuDescription] =
-    useState<string>(""); // Prefixed
+
   const [isSavingMenuDetails, setIsSavingMenuDetails] =
     useState<boolean>(false);
   const [menuDetailsError, setMenuDetailsError] = useState<string | null>(null);
@@ -138,19 +138,33 @@ const MenuItemsPage: React.FC = () => {
     Record<string, boolean>
   >({});
 
+  // State for managing expanded subcategories (individual categories)
+  const [expandedSubcategories, setExpandedSubcategories] = useState<
+    Record<string, boolean>
+  >({});
+
   // State for deleting categories
   const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] =
     useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
-  // NEW: State for active tab
-  const [activeTab, setActiveTab] = useState<"food" | "beverage" | "wine">(
-    "food"
+  // Table of contents selection state
+  const [selectedItemType, setSelectedItemType] = useState<
+    "food" | "beverage" | "wine" | null
+  >(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null
   );
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   // Search functionality
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<{
+    itemTypes: ("food" | "beverage" | "wine")[];
+    categories: Record<string, string[]>;
+    items: Record<string, MenuItem[]>;
+  }>({ itemTypes: [], categories: {}, items: {} });
 
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
@@ -170,6 +184,60 @@ const MenuItemsPage: React.FC = () => {
     );
   }, [items, searchTerm]);
 
+  // Search functionality
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults({ itemTypes: [], categories: {}, items: {} });
+      return;
+    }
+
+    const search = searchTerm.toLowerCase();
+    const matchingItemTypes: ("food" | "beverage" | "wine")[] = [];
+    const matchingCategories: Record<string, string[]> = {};
+    const matchingItems: Record<string, MenuItem[]> = {};
+
+    // Search through item types
+    if ("food".includes(search)) matchingItemTypes.push("food");
+    if ("beverage".includes(search) || "drink".includes(search))
+      matchingItemTypes.push("beverage");
+    if ("wine".includes(search)) matchingItemTypes.push("wine");
+
+    // Search through categories and items
+    if (filteredItems) {
+      filteredItems.forEach((item) => {
+        const itemMatches =
+          item.name.toLowerCase().includes(search) ||
+          item.description?.toLowerCase().includes(search) ||
+          item.ingredients?.some((ing) => ing.toLowerCase().includes(search));
+
+        const categoryMatches = item.category?.toLowerCase().includes(search);
+
+        if (itemMatches || categoryMatches) {
+          const itemType = item.itemType;
+          const category = item.category || "Uncategorized";
+
+          if (!matchingCategories[itemType]) matchingCategories[itemType] = [];
+          if (!matchingCategories[itemType].includes(category)) {
+            matchingCategories[itemType].push(category);
+          }
+
+          if (!matchingItems[`${itemType}-${category}`]) {
+            matchingItems[`${itemType}-${category}`] = [];
+          }
+          if (itemMatches) {
+            matchingItems[`${itemType}-${category}`].push(item);
+          }
+        }
+      });
+    }
+
+    setSearchResults({
+      itemTypes: matchingItemTypes,
+      categories: matchingCategories,
+      items: matchingItems,
+    });
+  }, [searchTerm, filteredItems]);
+
   // Statistics
   const stats = useMemo(() => {
     const currentItems = filteredItems || [];
@@ -179,22 +247,14 @@ const MenuItemsPage: React.FC = () => {
     );
     const wineItems = currentItems.filter((item) => item.itemType === "wine");
 
-    const currentTabItems =
-      activeTab === "food"
-        ? foodItems
-        : activeTab === "beverage"
-        ? beverageItems
-        : wineItems;
-
     return {
       totalItems: currentItems.length,
       foodCount: foodItems.length,
       beverageCount: beverageItems.length,
       wineCount: wineItems.length,
-      currentTabCount: currentTabItems.length,
       hasSearchResults: searchTerm.trim() !== "",
     };
-  }, [filteredItems, activeTab, searchTerm]);
+  }, [filteredItems, searchTerm]);
 
   // New: Memoize unique food, beverage, and wine categories separately
   const uniqueFoodCategories = useMemo(() => {
@@ -230,15 +290,6 @@ const MenuItemsPage: React.FC = () => {
     ].sort();
   }, [filteredItems]);
 
-  // Effect to initialize editing fields when menuDetails load or change
-  useEffect(() => {
-    if (menuDetails) {
-      // Simpler condition, modal will handle its own state sync
-      setEditedMenuName(menuDetails.name);
-      setEditedMenuDescription(menuDetails.description || "");
-    }
-  }, [menuDetails]);
-
   // --- Modal Handlers ---
   const openAddModal = useCallback(() => {
     setCurrentItem(null);
@@ -263,23 +314,14 @@ const MenuItemsPage: React.FC = () => {
   }, []);
 
   const openMenuDetailsModal = useCallback(() => {
-    if (menuDetails) {
-      setEditedMenuName(menuDetails.name);
-      setEditedMenuDescription(menuDetails.description || "");
-    }
     setIsMenuDetailsModalOpen(true);
     setMenuDetailsError(null); // Clear previous errors when opening modal
-  }, [menuDetails]);
+  }, []);
 
   const closeMenuDetailsModal = useCallback(() => {
     setIsMenuDetailsModalOpen(false);
     setMenuDetailsError(null); // Clear errors when closing modal
-    // Optionally, reset editedName/Description if menuDetails have not changed
-    if (menuDetails) {
-      setEditedMenuName(menuDetails.name);
-      setEditedMenuDescription(menuDetails.description || "");
-    }
-  }, [menuDetails]);
+  }, []);
 
   // --- Form Submission (Callback for Modal) ---
   const handleMenuItemFormSubmit = useCallback(
@@ -306,15 +348,7 @@ const MenuItemsPage: React.FC = () => {
       setSuccessMessage(null);
 
       try {
-        // Prepare data for API based on MenuItemFormData, menuId is already in submittedFormData
-        const _dataForService: MenuItemFormData = {
-          // Prefixed
-          ...submittedFormData,
-          // price string to number conversion is handled by transformMenuItemFormData in api.ts
-          // ingredients string to array is handled by transformMenuItemFormData in api.ts
-        };
-        // Ensure boolean flags are correctly passed if not handled by transformMenuItemFormData for partial updates
-        // However, createMenuItem and updateMenuItem in api.ts use transformMenuItemFormData which handles this.
+        // Data transformation is handled by transformMenuItemFormData in api.ts
 
         const isEditMode = currentItemId !== null;
 
@@ -459,14 +493,6 @@ const MenuItemsPage: React.FC = () => {
     );
   }, [filteredItems]);
 
-  // --- Toggle Category Expansion ---
-  const toggleCategory = useCallback((categoryName: string) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryName]: !prev[categoryName],
-    }));
-  }, []);
-
   // --- Category Delete Handlers ---
   const openDeleteCategoryModal = useCallback((category: string) => {
     // Prevent deletion of special categories
@@ -520,296 +546,1202 @@ const MenuItemsPage: React.FC = () => {
     }
   }, [categoryToDelete, menuId, fetchData, closeDeleteCategoryModal]);
 
-  // --- Tab Navigation UI ---
-  const renderTabs = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Tab Header with Search */}
-      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <h3 className="text-lg font-semibold text-slate-900">Menu Items</h3>
-            <span className="text-sm text-slate-600">
-              {stats.hasSearchResults
-                ? `${stats.currentTabCount} found`
-                : `${stats.currentTabCount} total`}
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="relative max-w-md flex-1">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+  // --- Table of Contents Component ---
+  const renderTableOfContents = () => {
+    const itemTypes: Array<{
+      key: "food" | "beverage" | "wine";
+      label: string;
+      icon: any;
+      count: number;
+    }> = [
+      { key: "food", label: "Food", icon: CakeIcon, count: stats.foodCount },
+      {
+        key: "beverage",
+        label: "Beverages",
+        icon: BeakerIcon,
+        count: stats.beverageCount,
+      },
+      {
+        key: "wine",
+        label: "Wines",
+        icon: SparklesIcon,
+        count: stats.wineCount,
+      },
+    ];
+
+    const isSearchActive = searchTerm.trim() !== "";
+
+    const shouldShowItemType = (itemType: "food" | "beverage" | "wine") => {
+      if (!isSearchActive) return true;
+      return (
+        searchResults.categories[
+          itemType as keyof typeof searchResults.categories
+        ] &&
+        Object.keys(
+          searchResults.categories[
+            itemType as keyof typeof searchResults.categories
+          ]
+        ).length > 0
+      );
+    };
+
+    const shouldShowCategory = (
+      itemType: "food" | "beverage" | "wine",
+      category: string
+    ) => {
+      if (!isSearchActive) return true;
+      return (
+        searchResults.categories[
+          itemType as keyof typeof searchResults.categories
+        ]?.[category]?.length > 0
+      );
+    };
+
+    const getHighlightClass = (text: string) => {
+      if (!isSearchActive) return "";
+      return text.toLowerCase().includes(searchTerm.toLowerCase())
+        ? "bg-yellow-200 dark:bg-yellow-800"
+        : "";
+    };
+
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+        {/* Search Header */}
+        <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200 rounded-t-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Menu Navigation
+              </h3>
+              {/* Item count badge */}
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 min-w-[24px] justify-center">
+                {stats.totalItems}
+              </span>
             </div>
             <Button
-              variant="secondary"
-              onClick={() => navigate("/clean-menu-upload")}
-              className="flex items-center gap-2 px-3 py-2 text-sm whitespace-nowrap"
+              variant="primary"
+              onClick={openAddModal}
+              className="flex items-center gap-2 text-sm px-3 py-2"
             >
-              <ArrowUpTrayIcon className="h-4 w-4" />
+              <PlusIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Item</span>
+            </Button>
+          </div>
+
+          {/* Enhanced Search Input */}
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search items, categories, ingredients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
+              aria-label="Search menu items"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
+                aria-label="Clear search"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Summary */}
+          {isSearchActive && (
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <span className="text-slate-600">
+                {Object.values(searchResults.items).reduce(
+                  (acc, items) => acc + items.length,
+                  0
+                )}{" "}
+                items found
+              </span>
+              {searchTerm && (
+                <span className="text-slate-500">
+                  Searching for "{searchTerm}"
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Table of Contents with improved scrolling and hierarchy */}
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 max-h-full">
+          {itemTypes.map((itemType, index) => {
+            if (!shouldShowItemType(itemType.key)) return null;
+
+            const categories =
+              itemType.key === "food"
+                ? uniqueFoodCategories
+                : itemType.key === "beverage"
+                ? uniqueBeverageCategories
+                : uniqueWineCategories;
+
+            const isExpanded = expandedCategories[itemType.key];
+            const Icon = itemType.icon;
+            const isSelected =
+              selectedItemType === itemType.key && !selectedCategoryId;
+
+            return (
+              <div key={itemType.key}>
+                {/* Visual separator between item types */}
+                {index > 0 && (
+                  <div className="flex items-center my-6">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+                    <div className="px-3 text-xs font-medium text-slate-500 bg-white">
+                      {itemType.label} Section
+                    </div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {/* Item Type Button with enhanced visual feedback and hierarchy distinction */}
+                  <button
+                    onClick={() => {
+                      setSelectedItemType(itemType.key);
+                      setSelectedCategoryId(null);
+                      setSelectedItemId(null);
+                      setExpandedCategories((prev) => ({
+                        ...prev,
+                        [itemType.key]: !prev[itemType.key],
+                      }));
+                    }}
+                    className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all duration-200 group relative overflow-hidden ${
+                      isSelected
+                        ? "bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-2 border-blue-300 text-blue-800 shadow-lg"
+                        : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+                    } ${getHighlightClass(itemType.label)}`}
+                    aria-expanded={isExpanded}
+                    aria-controls={`${itemType.key}-categories`}
+                  >
+                    {/* Primary level indicator - thick left border */}
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-2 transition-all duration-200 ${
+                        isSelected
+                          ? "bg-gradient-to-b from-blue-400 to-blue-600"
+                          : "bg-transparent group-hover:bg-gradient-to-b group-hover:from-slate-300 group-hover:to-slate-400"
+                      }`}
+                    />
+
+                    {/* Background pattern for primary level */}
+                    <div
+                      className={`absolute inset-0 opacity-5 ${
+                        isSelected ? "bg-blue-600" : "bg-slate-600"
+                      }`}
+                      style={{
+                        backgroundImage: `radial-gradient(circle at 20% 50%, currentColor 1px, transparent 1px)`,
+                        backgroundSize: "20px 20px",
+                      }}
+                    />
+
+                    <div className="flex items-center space-x-4 relative z-10">
+                      <div
+                        className={`p-3 rounded-2xl transition-all duration-200 ${
+                          isSelected
+                            ? "bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-100 shadow-md"
+                            : "bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 group-hover:shadow-sm"
+                        }`}
+                      >
+                        <Icon
+                          className={`h-6 w-6 ${
+                            isSelected
+                              ? "text-blue-700"
+                              : "text-slate-600 group-hover:text-slate-700"
+                          }`}
+                        />
+                      </div>
+                      <div className="text-left">
+                        <span
+                          className={`font-bold text-lg ${
+                            isSelected
+                              ? "text-blue-900"
+                              : "text-slate-800 group-hover:text-slate-900"
+                          }`}
+                        >
+                          {itemType.label}
+                        </span>
+                        <div
+                          className={`text-sm mt-1 font-medium ${
+                            isSelected
+                              ? "text-blue-600"
+                              : "text-slate-500 group-hover:text-slate-600"
+                          }`}
+                        >
+                          Primary Category • {categories.length} subcategories
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-bold shadow-sm min-w-[24px] text-center ${
+                          isSelected
+                            ? "bg-blue-200 text-blue-800 border border-blue-300"
+                            : "bg-slate-200 text-slate-700 border border-slate-300 group-hover:bg-slate-300 group-hover:border-slate-400"
+                        }`}
+                      >
+                        {itemType.count}
+                      </span>
+                      {categories.length > 0 && (
+                        <div
+                          className={`p-2 rounded-full transition-all duration-200 ${
+                            isSelected
+                              ? "bg-blue-200"
+                              : "bg-slate-200 group-hover:bg-slate-300"
+                          }`}
+                        >
+                          <ChevronRightIcon
+                            className={`h-5 w-5 transition-transform duration-200 ${
+                              isExpanded ? "rotate-90" : ""
+                            } ${
+                              isSelected
+                                ? "text-blue-700"
+                                : "text-slate-600 group-hover:text-slate-700"
+                            }`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Categories with improved animation and better distinction */}
+                  <div
+                    id={`${itemType.key}-categories`}
+                    className={`transition-all duration-300 ease-in-out ${
+                      isExpanded
+                        ? "max-h-96 opacity-100 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100"
+                        : "max-h-0 opacity-0 overflow-hidden"
+                    }`}
+                  >
+                    {/* Category container with enhanced visual hierarchy */}
+                    <div className="ml-6 mt-3 space-y-3 relative">
+                      {/* Hierarchy connection line */}
+                      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-slate-300 via-slate-200 to-transparent"></div>
+
+                      <div className="pl-6 space-y-3">
+                        {categories.map((category, categoryIndex) => {
+                          if (!shouldShowCategory(itemType.key, category))
+                            return null;
+
+                          const categoryItems =
+                            groupedItemsByTypeAndCategory[itemType.key]?.[
+                              category
+                            ] || [];
+                          const categoryKey = `${itemType.key}-${category}`;
+                          const isCategorySelected =
+                            selectedCategoryId === categoryKey &&
+                            !selectedItemId;
+
+                          return (
+                            <div key={categoryKey} className="space-y-2">
+                              {/* Category separator */}
+                              {categoryIndex > 0 && (
+                                <div className="flex items-center my-4">
+                                  <div className="flex-1 h-px bg-gradient-to-r from-amber-200 via-amber-300 to-amber-200"></div>
+                                </div>
+                              )}
+
+                              {/* Enhanced Category Button with distinct styling and expansion */}
+                              <button
+                                onClick={() => {
+                                  setSelectedItemType(itemType.key);
+                                  setSelectedCategoryId(categoryKey);
+                                  setSelectedItemId(null);
+                                  // Toggle subcategory expansion
+                                  setExpandedSubcategories((prev) => ({
+                                    ...prev,
+                                    [categoryKey]: !prev[categoryKey],
+                                  }));
+                                }}
+                                className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative ${
+                                  isCategorySelected
+                                    ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-amber-800 shadow-md"
+                                    : "hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100 text-slate-700 border-2 border-transparent hover:border-slate-300"
+                                } text-sm ${getHighlightClass(category)}`}
+                                aria-expanded={
+                                  expandedSubcategories[categoryKey]
+                                }
+                                aria-controls={`${categoryKey}-items`}
+                              >
+                                {/* Category indicator line */}
+                                <div
+                                  className={`absolute left-0 top-0 bottom-0 w-1 rounded-r-full transition-all duration-200 ${
+                                    isCategorySelected
+                                      ? "bg-amber-400"
+                                      : "bg-transparent group-hover:bg-slate-300"
+                                  }`}
+                                />
+
+                                <div className="flex items-center space-x-4">
+                                  <div
+                                    className={`p-2.5 rounded-xl transition-all duration-200 ${
+                                      isCategorySelected
+                                        ? "bg-gradient-to-br from-amber-100 to-orange-100 shadow-sm"
+                                        : "bg-slate-100 group-hover:bg-slate-200 group-hover:shadow-sm"
+                                    }`}
+                                  >
+                                    <FolderIcon
+                                      className={`h-5 w-5 ${
+                                        isCategorySelected
+                                          ? "text-amber-600"
+                                          : "text-slate-500 group-hover:text-slate-600"
+                                      }`}
+                                    />
+                                  </div>
+                                  <div className="text-left">
+                                    <span
+                                      className={`font-semibold text-base ${
+                                        isCategorySelected
+                                          ? "text-amber-900"
+                                          : "text-slate-800"
+                                      }`}
+                                    >
+                                      {toTitleCase(category)}
+                                    </span>
+                                    <div
+                                      className={`text-xs mt-0.5 ${
+                                        isCategorySelected
+                                          ? "text-amber-600"
+                                          : "text-slate-500"
+                                      }`}
+                                    >
+                                      Subcategory • {categoryItems.length} items
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center ${
+                                      isCategorySelected
+                                        ? "bg-amber-200 text-amber-800"
+                                        : "bg-slate-200 text-slate-600 group-hover:bg-slate-300"
+                                    }`}
+                                  >
+                                    {categoryItems.length}
+                                  </span>
+                                  <div
+                                    className={`p-1.5 rounded-full transition-all duration-200 ${
+                                      isCategorySelected
+                                        ? "bg-amber-200"
+                                        : "bg-slate-200 group-hover:bg-slate-300"
+                                    }`}
+                                  >
+                                    <ChevronRightIcon
+                                      className={`h-4 w-4 transition-transform duration-200 ${
+                                        expandedSubcategories[categoryKey]
+                                          ? "rotate-90"
+                                          : ""
+                                      } ${
+                                        isCategorySelected
+                                          ? "text-amber-600"
+                                          : "text-slate-400 group-hover:text-slate-600"
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
+                              </button>
+
+                              {/* Individual Items with enhanced subcategory styling - Collapsible */}
+                              <div
+                                id={`${categoryKey}-items`}
+                                className={`ml-8 overflow-hidden transition-all duration-300 ease-in-out ${
+                                  expandedSubcategories[categoryKey]
+                                    ? "max-h-64 opacity-100"
+                                    : "max-h-0 opacity-0"
+                                }`}
+                              >
+                                <div className="space-y-1 relative pt-2">
+                                  {/* Items connection line */}
+                                  <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-green-200 via-green-300 to-transparent"></div>
+
+                                  <div className="pl-4 space-y-1">
+                                    {categoryItems.slice(0, 5).map((item) => {
+                                      const isItemSelected =
+                                        selectedItemId === item._id;
+                                      return (
+                                        <button
+                                          key={item._id}
+                                          onClick={() => {
+                                            setSelectedItemType(itemType.key);
+                                            setSelectedCategoryId(categoryKey);
+                                            setSelectedItemId(item._id);
+                                          }}
+                                          className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group relative ${
+                                            isItemSelected
+                                              ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-800 shadow-sm"
+                                              : "hover:bg-slate-50 text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm"
+                                          } text-sm ${getHighlightClass(
+                                            item.name
+                                          )}`}
+                                        >
+                                          {/* Item indicator dot */}
+                                          <div
+                                            className={`w-2 h-2 rounded-full mr-3 transition-all duration-200 ${
+                                              isItemSelected
+                                                ? "bg-green-400 shadow-sm"
+                                                : "bg-slate-300 group-hover:bg-slate-400"
+                                            }`}
+                                          />
+
+                                          <div
+                                            className={`p-1.5 rounded-lg mr-3 transition-all duration-200 ${
+                                              isItemSelected
+                                                ? "bg-green-100"
+                                                : "bg-slate-100 group-hover:bg-slate-200"
+                                            }`}
+                                          >
+                                            <ClipboardDocumentListIcon
+                                              className={`h-3.5 w-3.5 ${
+                                                isItemSelected
+                                                  ? "text-green-600"
+                                                  : "text-slate-500 group-hover:text-slate-600"
+                                              }`}
+                                            />
+                                          </div>
+
+                                          <div className="flex-1 text-left">
+                                            <span
+                                              className={`font-medium ${
+                                                isItemSelected
+                                                  ? "text-green-900"
+                                                  : "text-slate-800"
+                                              }`}
+                                            >
+                                              {item.name}
+                                            </span>
+                                            {item.description && (
+                                              <div
+                                                className={`text-xs mt-0.5 truncate ${
+                                                  isItemSelected
+                                                    ? "text-green-600"
+                                                    : "text-slate-500"
+                                                }`}
+                                              >
+                                                {item.description}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {item.price && (
+                                            <span
+                                              className={`text-xs font-bold px-2 py-1 rounded ${
+                                                isItemSelected
+                                                  ? "bg-green-100 text-green-700"
+                                                  : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                                              }`}
+                                            >
+                                              ${item.price}
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+
+                                    {/* Enhanced "Show more" indicator */}
+                                    {categoryItems.length > 5 && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedItemType(itemType.key);
+                                          setSelectedCategoryId(categoryKey);
+                                          setSelectedItemId(null);
+                                        }}
+                                        className="w-full p-3 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-all duration-200 border-2 border-dashed border-slate-200 hover:border-slate-300 group"
+                                      >
+                                        <div className="flex items-center justify-center space-x-2">
+                                          <div className="flex space-x-1">
+                                            <div className="w-1 h-1 bg-slate-400 rounded-full group-hover:bg-slate-600 transition-colors duration-200"></div>
+                                            <div className="w-1 h-1 bg-slate-400 rounded-full group-hover:bg-slate-600 transition-colors duration-200"></div>
+                                            <div className="w-1 h-1 bg-slate-400 rounded-full group-hover:bg-slate-600 transition-colors duration-200"></div>
+                                          </div>
+                                          <span className="font-medium">
+                                            View all {categoryItems.length}{" "}
+                                            items in {toTitleCase(category)}
+                                          </span>
+                                        </div>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Enhanced Empty Search State */}
+          {isSearchActive &&
+            Object.keys(searchResults.categories).length === 0 && (
+              <div className="text-center py-12 px-4">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-4">
+                  <MagnifyingGlassIcon className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No items found
+                </h3>
+                <p className="text-slate-500 mb-4">
+                  No items match "{searchTerm}". Try a different search term.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => setSearchTerm("")}
+                  className="text-sm"
+                >
+                  Clear search
+                </Button>
+              </div>
+            )}
+        </div>
+      </div>
+    );
+  };
+
+  // --- Enhanced Content Display Component ---
+  const ContentDisplay: React.FC = () => {
+    // Breadcrumb component for better navigation
+    const Breadcrumb: React.FC = () => {
+      if (!selectedItemType) return null;
+
+      const breadcrumbItems = [
+        {
+          label: toTitleCase(selectedItemType),
+          onClick: () => {
+            setSelectedCategoryId(null);
+            setSelectedItemId(null);
+          },
+        },
+      ];
+
+      if (selectedCategoryId) {
+        const [, category] = selectedCategoryId.split("-", 2);
+        breadcrumbItems.push({
+          label: toTitleCase(category),
+          onClick: () => setSelectedItemId(null),
+        });
+      }
+
+      if (selectedItemId) {
+        const selectedItem = items?.find((item) => item._id === selectedItemId);
+        if (selectedItem) {
+          breadcrumbItems.push({
+            label: selectedItem.name,
+            onClick: () => {},
+          });
+        }
+      }
+
+      return (
+        <nav
+          className="flex items-center space-x-2 text-sm text-slate-600 mb-4"
+          aria-label="Breadcrumb"
+        >
+          <button
+            onClick={() => {
+              setSelectedItemType(null);
+              setSelectedCategoryId(null);
+              setSelectedItemId(null);
+            }}
+            className="hover:text-slate-900 transition-colors duration-200"
+          >
+            Menu
+          </button>
+          {breadcrumbItems.map((item, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+              <button
+                onClick={item.onClick}
+                className={`hover:text-slate-900 transition-colors duration-200 ${
+                  index === breadcrumbItems.length - 1
+                    ? "text-slate-900 font-medium"
+                    : ""
+                }`}
+              >
+                {item.label}
+              </button>
+            </div>
+          ))}
+        </nav>
+      );
+    };
+
+    // Loading skeleton component
+    const ContentSkeleton: React.FC = () => (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-200 rounded-lg w-1/3 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (loading) {
+      return <ContentSkeleton />;
+    }
+
+    // Enhanced empty state
+    if (!selectedItemType && !selectedCategoryId && !selectedItemId) {
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center h-full flex flex-col justify-center">
+          <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 mb-6">
+            <ClipboardDocumentListIcon className="h-10 w-10 text-blue-600" />
+          </div>
+          <h3 className="text-2xl font-semibold text-slate-900 mb-3">
+            Welcome to Menu Management
+          </h3>
+          <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+            Select an item type or category from the navigation panel to view
+            and manage your menu items, or use the search to find specific items
+            quickly.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <Button
+              variant="primary"
+              onClick={openAddModal}
+              className="flex items-center gap-2 px-6 py-3"
+            >
+              <PlusIcon className="h-5 w-5" />
+              Add New Item
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/upload")}
+              className="flex items-center gap-2 px-6 py-3"
+            >
+              <ArrowUpTrayIcon className="h-5 w-5" />
               Upload Menu
             </Button>
           </div>
         </div>
-      </div>
+      );
+    }
 
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200 bg-white px-6">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            type="button"
-            onClick={() => setActiveTab("food")}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
-              activeTab === "food"
-                ? "border-amber-600 text-amber-700 bg-amber-50/50"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <CakeIcon className="h-4 w-4" />
-            <span>Food</span>
-            <span
-              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
-                activeTab === "food"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {stats.foodCount}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("beverage")}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
-              activeTab === "beverage"
-                ? "border-amber-600 text-amber-700 bg-amber-50/50"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <BeakerIcon className="h-4 w-4" />
-            <span>Beverages</span>
-            <span
-              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
-                activeTab === "beverage"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {stats.beverageCount}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("wine")}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
-              activeTab === "wine"
-                ? "border-amber-600 text-amber-700 bg-amber-50/50"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <SparklesIcon className="h-4 w-4" />
-            <span>Wines</span>
-            <span
-              className={`ml-2 py-0.5 px-2 rounded-full text-xs font-medium ${
-                activeTab === "wine"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {stats.wineCount}
-            </span>
-          </button>
-        </nav>
-      </div>
-    </div>
-  );
+    // Display individual item
+    if (selectedItemId) {
+      const selectedItem = items?.find((item) => item._id === selectedItemId);
+      if (!selectedItem) {
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Item not found
+            </h3>
+            <p className="text-slate-600">
+              The selected item could not be found.
+            </p>
+          </div>
+        );
+      }
 
-  // --- Render Logic for Categorized Items (Tab Content) ---
-  const renderCategorizedItems = () => {
-    const itemsToDisplay =
-      activeTab === "food"
-        ? groupedItemsByTypeAndCategory.food
-        : activeTab === "beverage"
-        ? groupedItemsByTypeAndCategory.beverage
-        : groupedItemsByTypeAndCategory.wine;
-
-    const uniqueCategoriesForTab =
-      activeTab === "food"
-        ? uniqueFoodCategories
-        : activeTab === "beverage"
-        ? uniqueBeverageCategories
-        : uniqueWineCategories;
-
-    const hasItemsInTab =
-      itemsToDisplay &&
-      Object.keys(itemsToDisplay).some((cat) => itemsToDisplay[cat].length > 0);
-
-    if (!hasItemsInTab) {
-      const isEmptyDueToSearch = stats.hasSearchResults && searchTerm.trim();
+      const Icon =
+        selectedItem.itemType === "food"
+          ? CakeIcon
+          : selectedItem.itemType === "beverage"
+          ? BeakerIcon
+          : SparklesIcon;
 
       return (
-        <div className="bg-white rounded-b-2xl p-12 text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
-            {isEmptyDueToSearch ? (
-              <MagnifyingGlassIcon className="h-8 w-8 text-slate-400" />
-            ) : (
-              <CakeIcon className="h-8 w-8 text-slate-400" />
-            )}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          <Breadcrumb />
+
+          {/* Enhanced Header */}
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 border-b border-slate-200 rounded-t-2xl">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start space-x-4">
+                <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl shadow-sm">
+                  <Icon className="h-8 w-8 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                    {selectedItem.name}
+                  </h1>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {toTitleCase(selectedItem.itemType)}
+                    </span>
+                    <span className="text-slate-500">•</span>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                      {toTitleCase(selectedItem.category || "Uncategorized")}
+                    </span>
+                  </div>
+                  {selectedItem.price && (
+                    <div className="mt-3">
+                      <span className="text-3xl font-bold text-green-600">
+                        ${selectedItem.price}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => openEditModal(selectedItem)}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Edit</span>
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => openDeleteModal(selectedItem)}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </div>
+            </div>
           </div>
-          <h3 className="text-xl font-semibold text-slate-900 mb-2">
-            {isEmptyDueToSearch
-              ? `No ${activeTab} items found`
-              : `No ${activeTab} items yet`}
-          </h3>
-          <p className="text-slate-600 mb-8 max-w-md mx-auto">
-            {isEmptyDueToSearch
-              ? `Try adjusting your search criteria or add new ${activeTab} items to this menu.`
-              : `Get started by adding your first ${activeTab} item to this menu.`}
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
-            {isEmptyDueToSearch && (
-              <Button
-                variant="secondary"
-                onClick={() => setSearchTerm("")}
-                className="flex items-center gap-2"
-              >
-                Clear Search
-              </Button>
+
+          {/* Enhanced Content */}
+          <div className="flex-1 p-6 space-y-8 overflow-y-auto">
+            {/* Description Section */}
+            {selectedItem.description && (
+              <div className="bg-slate-50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center">
+                  <DocumentTextIcon className="h-5 w-5 mr-2 text-slate-600" />
+                  Description
+                </h3>
+                <p className="text-slate-700 leading-relaxed text-base">
+                  {selectedItem.description}
+                </p>
+              </div>
             )}
-            <Button
-              variant="primary"
-              onClick={openAddModal}
-              className="flex items-center gap-2"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Item
-            </Button>
-            {!isEmptyDueToSearch && (
-              <Button
-                variant="secondary"
-                onClick={() => navigate("/clean-menu-upload")}
-                className="flex items-center gap-2"
-              >
-                <ArrowUpTrayIcon className="h-4 w-4" />
-                Upload Menu
-              </Button>
+
+            {/* Ingredients & Allergens Grid */}
+            {((selectedItem.ingredients &&
+              selectedItem.ingredients.length > 0) ||
+              (selectedItem.allergens &&
+                selectedItem.allergens.length > 0)) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Ingredients */}
+                {selectedItem.ingredients &&
+                  selectedItem.ingredients.length > 0 && (
+                    <div className="bg-amber-50 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                        <BeakerIcon className="h-5 w-5 mr-2 text-amber-600" />
+                        Ingredients
+                        <span className="ml-2 text-xs bg-amber-200 text-amber-800 px-2 py-1 rounded-full">
+                          {selectedItem.ingredients.length}
+                        </span>
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedItem.ingredients.map((ingredient, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium border border-amber-200 hover:bg-amber-200 transition-colors duration-200"
+                          >
+                            {ingredient}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Allergens */}
+                {selectedItem.allergens &&
+                  selectedItem.allergens.length > 0 && (
+                    <div className="bg-red-50 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                        <ExclamationTriangleIcon className="h-5 w-5 mr-2 text-red-600" />
+                        Allergens
+                        <span className="ml-2 text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full">
+                          {selectedItem.allergens.length}
+                        </span>
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedItem.allergens.map((allergen, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-2 bg-red-100 text-red-800 rounded-lg text-sm font-medium border border-red-200 hover:bg-red-200 transition-colors duration-200"
+                          >
+                            ⚠️ {allergen}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Wine-specific Information */}
+            {selectedItem.itemType === "wine" && (
+              <div className="bg-purple-50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                  <SparklesIcon className="h-5 w-5 mr-2 text-purple-600" />
+                  Wine Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {selectedItem.vintage && (
+                    <div className="text-center p-4 bg-white rounded-lg border border-purple-200">
+                      <div className="text-2xl font-bold text-purple-600 mb-1">
+                        {selectedItem.vintage}
+                      </div>
+                      <div className="text-sm text-slate-600">Vintage</div>
+                    </div>
+                  )}
+                  {selectedItem.region && (
+                    <div className="text-center p-4 bg-white rounded-lg border border-purple-200">
+                      <div className="text-lg font-semibold text-slate-900 mb-1">
+                        {selectedItem.region}
+                      </div>
+                      <div className="text-sm text-slate-600">Region</div>
+                    </div>
+                  )}
+                  {selectedItem.grapeVariety && (
+                    <div className="text-center p-4 bg-white rounded-lg border border-purple-200">
+                      <div className="inline-flex items-center px-3 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                        🍇 {selectedItem.grapeVariety}
+                      </div>
+                      <div className="text-sm text-slate-600 mt-2">
+                        Grape Variety
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="bg-slate-50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Quick Actions
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => openEditModal(selectedItem)}
+                  className="flex items-center gap-2"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Item
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    // Create a duplicate item
+                    const duplicateItem = {
+                      ...selectedItem,
+                      name: `${selectedItem.name} (Copy)`,
+                    };
+                    delete (duplicateItem as any)._id;
+                    openEditModal(duplicateItem as any);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4" />
+                  Duplicate
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => openDeleteModal(selectedItem)}
+                  className="flex items-center gap-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete Item
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Display category items
+    if (selectedCategoryId) {
+      const [itemType, category] = selectedCategoryId.split("-", 2);
+      const categoryItems =
+        groupedItemsByTypeAndCategory[
+          itemType as keyof typeof groupedItemsByTypeAndCategory
+        ]?.[category] || [];
+
+      const Icon =
+        itemType === "food"
+          ? CakeIcon
+          : itemType === "beverage"
+          ? BeakerIcon
+          : SparklesIcon;
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          <Breadcrumb />
+
+          {/* Enhanced Category Header */}
+          <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-6 border-b border-amber-200 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-gradient-to-br from-amber-100 to-amber-200 rounded-2xl shadow-sm">
+                  <Icon className="h-8 w-8 text-amber-600" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                    {toTitleCase(category)}
+                  </h1>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-200 text-amber-800">
+                      {toTitleCase(itemType)}
+                    </span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-600">
+                      {categoryItems.length}{" "}
+                      {categoryItems.length === 1 ? "item" : "items"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="secondary"
+                  onClick={openAddModal}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Item</span>
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => openDeleteCategoryModal(category)}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Delete Category</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced Items Grid */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {categoryItems.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
+                  <FolderIcon className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                  No items in this category
+                </h3>
+                <p className="text-slate-600 mb-6 max-w-sm mx-auto">
+                  This category is empty. Add your first item to get started.
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={openAddModal}
+                  className="flex items-center gap-2"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  Add First Item
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categoryItems.map((item) => (
+                  <div
+                    key={item._id}
+                    className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer group hover:border-slate-300"
+                    onClick={() => {
+                      setSelectedItemId(item._id);
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors duration-200">
+                          {item.name}
+                        </h3>
+                        {item.description && (
+                          <p className="text-slate-600 text-sm line-clamp-2 mb-3">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                      {item.price && (
+                        <div className="text-right">
+                          <span className="text-xl font-bold text-green-600">
+                            ${item.price}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Item Tags */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {item.ingredients &&
+                        item.ingredients
+                          .slice(0, 3)
+                          .map((ingredient, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-medium"
+                            >
+                              {ingredient}
+                            </span>
+                          ))}
+                      {item.ingredients && item.ingredients.length > 3 && (
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">
+                          +{item.ingredients.length - 3} more
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Wine-specific info */}
+                    {item.itemType === "wine" && (
+                      <div className="flex items-center space-x-4 text-xs text-slate-600 mb-4">
+                        {item.vintage && (
+                          <span className="flex items-center">
+                            <span className="font-medium">{item.vintage}</span>
+                          </span>
+                        )}
+                        {item.region && (
+                          <span className="flex items-center">
+                            📍 {item.region}
+                          </span>
+                        )}
+                        {item.grapeVariety && (
+                          <span className="flex items-center">
+                            🍇 {item.grapeVariety}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(item);
+                        }}
+                        className="flex items-center gap-1 text-xs px-3 py-1.5"
+                      >
+                        <PencilIcon className="h-3 w-3" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteModal(item);
+                        }}
+                        className="flex items-center gap-1 text-xs px-3 py-1.5"
+                      >
+                        <TrashIcon className="h-3 w-3" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
       );
     }
 
-    const displayCategoriesOrder =
-      uniqueCategoriesForTab.length > 0
-        ? uniqueCategoriesForTab
-        : Object.keys(itemsToDisplay).sort();
+    // Display item type overview
+    if (selectedItemType) {
+      const itemTypeItems =
+        items?.filter((item) => item.itemType === selectedItemType) || [];
+      const Icon =
+        selectedItemType === "food"
+          ? CakeIcon
+          : selectedItemType === "beverage"
+          ? BeakerIcon
+          : SparklesIcon;
+      const categories =
+        selectedItemType === "food"
+          ? uniqueFoodCategories
+          : selectedItemType === "beverage"
+          ? uniqueBeverageCategories
+          : uniqueWineCategories;
 
-    if (
-      uniqueCategoriesForTab.length === 0 &&
-      itemsToDisplay["Uncategorized"]
-    ) {
-      const idx = displayCategoriesOrder.indexOf("Uncategorized");
-      if (idx > -1) {
-        displayCategoriesOrder.splice(idx, 1);
-        displayCategoriesOrder.push("Uncategorized");
-      }
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Icon className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">
+                    {toTitleCase(selectedItemType)} Items
+                  </h2>
+                  <p className="text-slate-600">
+                    {itemTypeItems.length} total items • {categories.length}{" "}
+                    categories
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                onClick={openAddModal}
+                className="flex items-center gap-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add {toTitleCase(selectedItemType)} Item
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="grid gap-4">
+              {categories.map((category) => {
+                const categoryItems =
+                  groupedItemsByTypeAndCategory[selectedItemType]?.[category] ||
+                  [];
+                if (categoryItems.length === 0) return null;
+
+                return (
+                  <div
+                    key={category}
+                    className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                    onClick={() => {
+                      setSelectedCategoryId(`${selectedItemType}-${category}`);
+                      setSelectedItemId(null);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <FolderIcon className="h-5 w-5 text-slate-500" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">
+                            {toTitleCase(category)}
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            {categoryItems.length} item
+                            {categoryItems.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
     }
 
-    return (
-      <div className="bg-white rounded-b-2xl p-6">
-        {displayCategoriesOrder.map((category) => {
-          const itemsInCategory = itemsToDisplay[category];
-          if (!itemsInCategory || itemsInCategory.length === 0) return null;
-
-          console.log(
-            `[MenuItemsPage] Rendering category: "${category}", itemsInCategory:`,
-            JSON.stringify(itemsInCategory, null, 2)
-          );
-
-          const uniqueCategoryKey = `${activeTab}-${category}`;
-          console.log(
-            `[MenuItemsPage] Category: "${category}", Is Expanded: ${!!expandedCategories[
-              uniqueCategoryKey
-            ]}`
-          );
-
-          return (
-            <div key={uniqueCategoryKey} className="mb-6 last:mb-0">
-              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
-                <div
-                  className="flex justify-between items-center p-4 bg-gradient-to-r from-slate-50 to-slate-100 cursor-pointer hover:from-slate-100 hover:to-slate-200 transition-all duration-200"
-                  onClick={() => toggleCategory(uniqueCategoryKey)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
-                      toggleCategory(uniqueCategoryKey);
-                  }}
-                  aria-expanded={!!expandedCategories[uniqueCategoryKey]}
-                  aria-controls={`category-items-${uniqueCategoryKey}`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-amber-100 rounded-lg">
-                      <ClipboardDocumentListIcon className="h-5 w-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {toTitleCase(category)}
-                      </h3>
-                      <p className="text-sm text-slate-600">
-                        {itemsInCategory.length} item
-                        {itemsInCategory.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    {category !== "Uncategorized" && (
-                      <Button
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteCategoryModal(category);
-                        }}
-                        className="text-xs px-3 py-1 shadow-sm"
-                        aria-label={`Delete ${category} category`}
-                      >
-                        <TrashIcon className="h-3 w-3 mr-1" />
-                        Delete
-                      </Button>
-                    )}
-                    <div className="p-1">
-                      {expandedCategories[uniqueCategoryKey] ? (
-                        <ChevronUpIcon className="h-5 w-5 text-slate-400" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-slate-400" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {expandedCategories[uniqueCategoryKey] && (
-                  <div
-                    id={`category-items-${uniqueCategoryKey}`}
-                    className="p-4 bg-white border-t border-slate-200"
-                  >
-                    <MenuItemList
-                      items={itemsInCategory}
-                      onEdit={openEditModal}
-                      onDelete={openDeleteModal}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+    return null;
   };
 
   // --- Render Logic ---
@@ -1033,12 +1965,17 @@ const MenuItemsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Render tabs and categorized items */}
+              {/* Two-column layout: Table of Contents and Content Display */}
               {!loading && (
-                <>
-                  {renderTabs()}
-                  <div className="mt-6">{renderCategorizedItems()}</div>
-                </>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-400px)]">
+                  {/* Table of Contents - Left Column */}
+                  <div className="lg:col-span-1">{renderTableOfContents()}</div>
+
+                  {/* Content Display - Right Column */}
+                  <div className="lg:col-span-2">
+                    <ContentDisplay />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -1055,11 +1992,11 @@ const MenuItemsPage: React.FC = () => {
                 restaurantId={restaurantId ?? ""}
                 itemType={
                   currentItem?.itemType ?? // Use existing item's type when editing
-                  (activeTab === "beverage"
+                  (selectedItemType === "beverage"
                     ? "beverage"
-                    : activeTab === "wine"
+                    : selectedItemType === "wine"
                     ? "wine"
-                    : "food") // Default to activeTab for new items
+                    : "food") // Default to selectedItemType for new items
                 }
                 availableCategories={
                   currentItem?.itemType === "beverage"
@@ -1068,11 +2005,11 @@ const MenuItemsPage: React.FC = () => {
                     ? uniqueFoodCategories
                     : currentItem?.itemType === "wine"
                     ? uniqueWineCategories
-                    : activeTab === "beverage" // Fallback to activeTab for new items
+                    : selectedItemType === "beverage" // Fallback to selectedItemType for new items
                     ? uniqueBeverageCategories
-                    : activeTab === "wine"
+                    : selectedItemType === "wine"
                     ? uniqueWineCategories
-                    : uniqueFoodCategories // Default to food categories for new items if food tab active or other cases
+                    : uniqueFoodCategories // Default to food categories for new items
                 }
               />
             )}
