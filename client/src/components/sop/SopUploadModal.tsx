@@ -1,7 +1,6 @@
 import React, { useState, useCallback, FormEvent, memo } from "react";
 import Modal from "../common/Modal";
 import { useDropzone } from "react-dropzone";
-import { ArrowUpTrayIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface SopUploadModalProps {
   isOpen: boolean;
