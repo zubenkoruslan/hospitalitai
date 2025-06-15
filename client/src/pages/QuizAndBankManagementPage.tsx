@@ -24,6 +24,7 @@ import Modal from "../components/common/Modal";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  ChevronRightIcon,
   AcademicCapIcon,
   BookOpenIcon,
   PlusIcon,
@@ -42,6 +43,11 @@ import {
   SparklesIcon,
   CogIcon,
   QuestionMarkCircleIcon,
+  XMarkIcon,
+  HomeIcon,
+  ChartPieIcon,
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 
 // Question Bank Components
@@ -56,6 +62,16 @@ import EditQuizModal from "../components/quiz/EditQuizModal";
 // Define SourceType for filter
 type QuestionBankSourceFilterType = "ALL" | "SOP" | "MENU" | "MANUAL";
 
+// Define view types for navigation
+type ViewType = "overview" | "question-banks" | "quizzes";
+
+// Search results interface
+interface SearchResults {
+  sections: ViewType[];
+  questionBanks: string[];
+  quizzes: string[];
+}
+
 const QuizAndBankManagementPage: React.FC = () => {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId;
@@ -64,24 +80,37 @@ const QuizAndBankManagementPage: React.FC = () => {
   const [questionBanks, setQuestionBanks] = useState<IQuestionBank[]>([]);
   const [quizzes, setQuizzes] = useState<ClientIQuiz[]>([]);
 
-  // Search and filter states
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  // === PHASE 1: New Navigation State Variables ===
+  const [selectedView, setSelectedView] = useState<ViewType>("overview");
+  const [selectedQuestionBankId, setSelectedQuestionBankId] = useState<
+    string | null
+  >(null);
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
+
+  // Enhanced search state
+  const [globalSearchTerm, setGlobalSearchTerm] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<SearchResults>({
+    sections: [],
+    questionBanks: [],
+    quizzes: [],
+  });
+
+  // UI state for expandable sections in navigation
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({
+    "question-banks": true,
+    quizzes: true,
+  });
+
+  // Filter state (still used by new components)
   const [questionBankSourceFilter, setQuestionBankSourceFilter] =
     useState<QuestionBankSourceFilterType>("ALL");
-  const [isQuestionBankListVisible, setIsQuestionBankListVisible] =
-    useState<boolean>(true);
-  const [quizSearchTerm, setQuizSearchTerm] = useState<string>("");
 
   const [isLoadingBanks, setIsLoadingBanks] = useState<boolean>(false);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // Expansion states
-  const [isQuestionBanksExpanded, setIsQuestionBanksExpanded] =
-    useState<boolean>(true);
-  const [isQuizManagementExpanded, setIsQuizManagementExpanded] =
-    useState<boolean>(true);
 
   // Modal States - Question Banks
   const [isCreateBankModalOpen, setIsCreateBankModalOpen] = useState(false);
@@ -116,6 +145,133 @@ const QuizAndBankManagementPage: React.FC = () => {
     null
   );
 
+  // === PHASE 1: Navigation Helper Functions ===
+  const handleViewChange = (view: ViewType) => {
+    setSelectedView(view);
+    // Clear selections when changing main view
+    setSelectedQuestionBankId(null);
+    setSelectedQuizId(null);
+  };
+
+  const handleQuestionBankSelect = (bankId: string) => {
+    setSelectedView("question-banks");
+    setSelectedQuestionBankId(bankId);
+    setSelectedQuizId(null);
+  };
+
+  const handleQuizSelect = (quizId: string) => {
+    setSelectedView("quizzes");
+    setSelectedQuizId(quizId);
+    setSelectedQuestionBankId(null);
+  };
+
+  const toggleSectionExpansion = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  // === PHASE 1: Enhanced Search Implementation ===
+  const performGlobalSearch = useCallback(
+    (searchTerm: string) => {
+      if (!searchTerm.trim()) {
+        setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
+        return;
+      }
+
+      const term = searchTerm.toLowerCase();
+      const matchingSections: ViewType[] = [];
+      const matchingQuestionBanks: string[] = [];
+      const matchingQuizzes: string[] = [];
+
+      // Search in sections
+      if ("overview".includes(term) || "dashboard".includes(term)) {
+        matchingSections.push("overview");
+      }
+      if ("question".includes(term) || "bank".includes(term)) {
+        matchingSections.push("question-banks");
+      }
+      if ("quiz".includes(term) || "test".includes(term)) {
+        matchingSections.push("quizzes");
+      }
+
+      // Search in question banks
+      questionBanks.forEach((bank) => {
+        const matches =
+          bank.name.toLowerCase().includes(term) ||
+          bank.description?.toLowerCase().includes(term) ||
+          bank.sourceSopDocumentTitle?.toLowerCase().includes(term) ||
+          bank.sourceMenuName?.toLowerCase().includes(term) ||
+          bank.sourceType.toLowerCase().includes(term);
+
+        if (matches) {
+          matchingQuestionBanks.push(bank._id);
+        }
+      });
+
+      // Search in quizzes
+      quizzes.forEach((quiz) => {
+        const matches =
+          quiz.title.toLowerCase().includes(term) ||
+          quiz.description?.toLowerCase().includes(term) ||
+          quiz.targetRoles?.some((role) =>
+            (typeof role === "string" ? role : role.name)
+              .toLowerCase()
+              .includes(term)
+          );
+
+        if (matches) {
+          matchingQuizzes.push(quiz._id);
+        }
+      });
+
+      setSearchResults({
+        sections: matchingSections,
+        questionBanks: matchingQuestionBanks,
+        quizzes: matchingQuizzes,
+      });
+
+      // Auto-expand sections with matches
+      if (matchingQuestionBanks.length > 0) {
+        setExpandedSections((prev) => ({ ...prev, "question-banks": true }));
+      }
+      if (matchingQuizzes.length > 0) {
+        setExpandedSections((prev) => ({ ...prev, quizzes: true }));
+      }
+    },
+    [questionBanks, quizzes]
+  );
+
+  const handleGlobalSearchChange = (value: string) => {
+    setGlobalSearchTerm(value);
+    performGlobalSearch(value);
+  };
+
+  const clearGlobalSearch = () => {
+    setGlobalSearchTerm("");
+    setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
+  };
+
+  const isSearchMatch = (
+    type: "section" | "questionBank" | "quiz",
+    id: string
+  ) => {
+    if (!globalSearchTerm.trim()) return false;
+
+    switch (type) {
+      case "section":
+        return searchResults.sections.includes(id as ViewType);
+      case "questionBank":
+        return searchResults.questionBanks.includes(id);
+      case "quiz":
+        return searchResults.quizzes.includes(id);
+      default:
+        return false;
+    }
+  };
+
+  // Existing handlers and logic...
   const fetchBanks = useCallback(async () => {
     setIsLoadingBanks(true);
     setError(null);
@@ -133,47 +289,20 @@ const QuizAndBankManagementPage: React.FC = () => {
   }, []);
 
   // Filtered Question Banks based on search and filter
+  // Filtered question banks based on source filter only (search now handled by global search)
   const filteredQuestionBanks = React.useMemo(() => {
-    let filtered = questionBanks;
-
-    // Apply source filter
-    if (questionBankSourceFilter !== "ALL") {
-      filtered = filtered.filter(
-        (bank) => bank.sourceType === questionBankSourceFilter
-      );
+    if (questionBankSourceFilter === "ALL") {
+      return questionBanks;
     }
-
-    // Apply search filter
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (bank) =>
-          bank.name.toLowerCase().includes(search) ||
-          bank.description?.toLowerCase().includes(search) ||
-          bank.sourceSopDocumentTitle?.toLowerCase().includes(search) ||
-          bank.sourceMenuName?.toLowerCase().includes(search)
-      );
-    }
-
-    return filtered;
-  }, [questionBanks, questionBankSourceFilter, searchTerm]);
-
-  // Filtered Quizzes based on search
-  const filteredQuizzes = React.useMemo(() => {
-    if (!quizSearchTerm.trim()) return quizzes;
-
-    const search = quizSearchTerm.toLowerCase();
-    return quizzes.filter(
-      (quiz) =>
-        quiz.title.toLowerCase().includes(search) ||
-        quiz.description?.toLowerCase().includes(search) ||
-        quiz.targetRoles?.some((role) =>
-          (typeof role === "string" ? role : role.name)
-            .toLowerCase()
-            .includes(search)
-        )
+    return questionBanks.filter(
+      (bank) => bank.sourceType === questionBankSourceFilter
     );
-  }, [quizzes, quizSearchTerm]);
+  }, [questionBanks, questionBankSourceFilter]);
+
+  // All quizzes (search now handled by global search)
+  const filteredQuizzes = React.useMemo(() => {
+    return quizzes;
+  }, [quizzes]);
 
   const fetchQuizzesList = useCallback(async () => {
     setIsLoadingQuizzes(true);
@@ -193,6 +322,13 @@ const QuizAndBankManagementPage: React.FC = () => {
     fetchBanks();
     fetchQuizzesList();
   }, [fetchBanks, fetchQuizzesList]);
+
+  // Update global search when data changes
+  useEffect(() => {
+    if (globalSearchTerm.trim()) {
+      performGlobalSearch(globalSearchTerm);
+    }
+  }, [questionBanks, quizzes, globalSearchTerm, performGlobalSearch]);
 
   // Dismiss success/error messages
   const dismissMessages = () => {
@@ -370,11 +506,7 @@ const QuizAndBankManagementPage: React.FC = () => {
   const handleQuestionBankFilterChange = (
     type: QuestionBankSourceFilterType
   ) => {
-    setIsQuestionBankListVisible(false);
-    setTimeout(() => {
-      setQuestionBankSourceFilter(type);
-      setIsQuestionBankListVisible(true);
-    }, 300);
+    setQuestionBankSourceFilter(type);
   };
 
   // Statistics calculations
@@ -399,7 +531,1546 @@ const QuizAndBankManagementPage: React.FC = () => {
     };
   }, [questionBanks, quizzes]);
 
-  // Question Bank List Item Component
+  // === PHASE 1: Content Display Component ===
+  const ContentDisplay = () => {
+    // Breadcrumb component for better navigation
+    const Breadcrumb = () => {
+      const breadcrumbItems = [];
+
+      if (selectedView === "question-banks" && selectedQuestionBankId) {
+        const bank = questionBanks.find(
+          (b) => b._id === selectedQuestionBankId
+        );
+        breadcrumbItems.push(
+          {
+            label: "Question Banks",
+            onClick: () => setSelectedQuestionBankId(null),
+          },
+          { label: bank?.name || "Unknown", onClick: () => {} }
+        );
+      } else if (selectedView === "quizzes" && selectedQuizId) {
+        const quiz = quizzes.find((q) => q._id === selectedQuizId);
+        breadcrumbItems.push(
+          { label: "Quizzes", onClick: () => setSelectedQuizId(null) },
+          { label: quiz?.title || "Unknown", onClick: () => {} }
+        );
+      }
+
+      if (breadcrumbItems.length === 0) return null;
+
+      return (
+        <nav
+          className="flex items-center space-x-2 text-sm text-slate-600 mb-4"
+          aria-label="Breadcrumb"
+        >
+          <button
+            onClick={() => {
+              setSelectedView("overview");
+              setSelectedQuestionBankId(null);
+              setSelectedQuizId(null);
+            }}
+            className="hover:text-slate-900 transition-colors duration-200"
+          >
+            Management Center
+          </button>
+          {breadcrumbItems.map((item, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+              <button
+                onClick={item.onClick}
+                className={`hover:text-slate-900 transition-colors duration-200 ${
+                  index === breadcrumbItems.length - 1
+                    ? "text-slate-900 font-medium"
+                    : ""
+                }`}
+              >
+                {item.label}
+              </button>
+            </div>
+          ))}
+        </nav>
+      );
+    };
+
+    // Loading skeleton component
+    const ContentSkeleton = () => (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-200 rounded-lg w-1/3 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (isLoadingBanks || isLoadingQuizzes) {
+      return <ContentSkeleton />;
+    }
+
+    // Question Banks Overview
+    const QuestionBanksOverview = () => (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+        <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 p-6 border-b border-emerald-200 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl shadow-sm">
+                <BookOpenIcon className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-emerald-900 mb-2">
+                  Question Banks
+                </h1>
+                <p className="text-emerald-700">
+                  {stats.totalBanks} banks • {stats.totalQuestions} questions
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => setIsCreateBankModalOpen(true)}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Create Bank
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 p-6 overflow-y-auto">
+          {filteredQuestionBanks.length === 0 ? (
+            <div className="text-center py-12">
+              <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                No question banks found
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Create your first question bank to get started
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateBankModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Create Question Bank
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredQuestionBanks.map((bank) => (
+                <div
+                  key={bank._id}
+                  className="bg-white border border-gray-200 rounded-xl hover:border-emerald-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  onClick={() => handleQuestionBankSelect(bank._id)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-emerald-100 rounded-lg">
+                          <BookOpenIcon className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {bank.name}
+                          </h3>
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            {bank.sourceType}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <QuestionMarkCircleIcon className="h-4 w-4 mr-2" />
+                        {Array.isArray(bank.questions)
+                          ? bank.questions.length
+                          : bank.questionCount || 0}{" "}
+                        questions
+                      </div>
+                      <div className="flex items-center">
+                        <ClockIcon className="h-4 w-4 mr-2" />
+                        {bank.createdAt
+                          ? new Date(bank.createdAt).toLocaleDateString()
+                          : "Unknown date"}
+                      </div>
+                      {bank.sourceType === "SOP" &&
+                        bank.sourceSopDocumentTitle && (
+                          <div className="flex items-center text-blue-600">
+                            <DocumentTextIcon className="h-4 w-4 mr-2" />
+                            {bank.sourceSopDocumentTitle}
+                          </div>
+                        )}
+                      {bank.sourceType === "MENU" && bank.sourceMenuName && (
+                        <div className="flex items-center text-emerald-600">
+                          <ListBulletIcon className="h-4 w-4 mr-2" />
+                          {bank.sourceMenuName}
+                        </div>
+                      )}
+                    </div>
+
+                    {bank.description && (
+                      <p className="text-sm text-gray-600 mt-3 line-clamp-2">
+                        {bank.description}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManageBankQuestions(bank._id);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Manage
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBankToDelete(bank);
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    // Quizzes Overview
+    const QuizzesOverview = () => (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-6 border-b border-indigo-200 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl shadow-sm">
+                <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-indigo-900 mb-2">
+                  Quizzes
+                </h1>
+                <p className="text-indigo-700">
+                  {stats.totalQuizzes} total • {stats.activeQuizzes} active
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => setIsGenerateQuizModalOpen(true)}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"
+            >
+              <SparklesIcon className="h-4 w-4" />
+              Generate Quiz
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 p-6 overflow-y-auto">
+          {filteredQuizzes.length === 0 ? (
+            <div className="text-center py-12">
+              <AcademicCapIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                No quizzes found
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Generate your first quiz from question banks
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => setIsGenerateQuizModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <SparklesIcon className="h-4 w-4" />
+                Generate Quiz
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredQuizzes.map((quiz) => (
+                <div
+                  key={quiz._id}
+                  className="bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  onClick={() => handleQuizSelect(quiz._id)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-indigo-100 rounded-lg">
+                          <AcademicCapIcon className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {quiz.title}
+                          </h3>
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                              quiz.isAvailable
+                                ? "bg-green-100 text-green-800 border border-green-200"
+                                : "bg-gray-100 text-gray-800 border border-gray-200"
+                            }`}
+                          >
+                            {quiz.isAvailable ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <QuestionMarkCircleIcon className="h-4 w-4 mr-2" />
+                        {quiz.totalUniqueQuestionsInSourceSnapshot || 0}{" "}
+                        questions
+                      </div>
+                      <div className="flex items-center">
+                        <ClockIcon className="h-4 w-4 mr-2" />
+                        {quiz.createdAt
+                          ? new Date(quiz.createdAt).toLocaleDateString()
+                          : "Unknown date"}
+                      </div>
+                      {quiz.targetRoles && quiz.targetRoles.length > 0 && (
+                        <div className="flex items-center">
+                          <UserGroupIcon className="h-4 w-4 mr-2" />
+                          {quiz.targetRoles
+                            .map((role) =>
+                              typeof role === "string" ? role : role.name
+                            )
+                            .join(", ")}
+                        </div>
+                      )}
+                    </div>
+
+                    {quiz.description && (
+                      <p className="text-sm text-gray-600 mt-3 line-clamp-2">
+                        {quiz.description}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditQuizModal(quiz);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewQuizProgress(quiz._id);
+                          }}
+                          className="text-xs text-green-600 hover:text-green-800 font-medium"
+                        >
+                          Progress
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuizToDelete(quiz);
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    // Question Bank Detail View
+    const QuestionBankDetail = ({ bankId }: { bankId: string }) => {
+      const bank = questionBanks.find((b) => b._id === bankId);
+
+      if (!bank) {
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center h-full flex flex-col justify-center">
+            <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-red-100 mb-6">
+              <ExclamationTriangleIcon className="h-10 w-10 text-red-600" />
+            </div>
+            <h3 className="text-2xl font-semibold text-slate-900 mb-3">
+              Question Bank Not Found
+            </h3>
+            <p className="text-slate-600 mb-8">
+              The question bank you're looking for doesn't exist or has been
+              deleted.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedQuestionBankId(null);
+                setSelectedView("question-banks");
+              }}
+            >
+              Back to Question Banks
+            </Button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          <Breadcrumb />
+
+          <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 p-6 border-b border-emerald-200 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl shadow-sm">
+                  <BookOpenIcon className="h-8 w-8 text-emerald-600" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-emerald-900 mb-2">
+                    {bank.name}
+                  </h1>
+                  <div className="flex items-center space-x-4 text-emerald-700">
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      {bank.sourceType}
+                    </span>
+                    <span>
+                      {Array.isArray(bank.questions)
+                        ? bank.questions.length
+                        : bank.questionCount || 0}{" "}
+                      questions
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {bank.createdAt
+                        ? new Date(bank.createdAt).toLocaleDateString()
+                        : "Unknown date"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => handleManageBankQuestions(bank._id)}
+                  className="flex items-center gap-2"
+                >
+                  <CogIcon className="h-4 w-4" />
+                  Manage Questions
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setBankToDelete(bank)}
+                  className="flex items-center gap-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+            {/* Description */}
+            {bank.description && (
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-2">
+                  Description
+                </h3>
+                <p className="text-slate-700">{bank.description}</p>
+              </div>
+            )}
+
+            {/* Source Information */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">
+                Source Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Source Type
+                  </label>
+                  <p className="text-slate-900">{bank.sourceType}</p>
+                </div>
+                {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      SOP Document
+                    </label>
+                    <p className="text-slate-900">
+                      {bank.sourceSopDocumentTitle}
+                    </p>
+                  </div>
+                )}
+                {bank.sourceType === "MENU" && bank.sourceMenuName && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Menu
+                    </label>
+                    <p className="text-slate-900">{bank.sourceMenuName}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Created
+                  </label>
+                  <p className="text-slate-900">
+                    {bank.createdAt
+                      ? new Date(bank.createdAt).toLocaleDateString()
+                      : "Unknown date"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Last Updated
+                  </label>
+                  <p className="text-slate-900">
+                    {bank.updatedAt
+                      ? new Date(bank.updatedAt).toLocaleDateString()
+                      : "Unknown date"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-slate-50 rounded-xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">
+                Quick Actions
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => handleManageBankQuestions(bank._id)}
+                  className="flex items-center gap-2"
+                >
+                  <CogIcon className="h-4 w-4" />
+                  Manage Questions
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsGenerateQuizModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  Generate Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSelectedQuestionBankId(null);
+                    setSelectedView("question-banks");
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                  Back to Banks
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Quiz Detail View
+    const QuizDetail = ({ quizId }: { quizId: string }) => {
+      const quiz = quizzes.find((q) => q._id === quizId);
+
+      if (!quiz) {
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center h-full flex flex-col justify-center">
+            <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-red-100 mb-6">
+              <ExclamationTriangleIcon className="h-10 w-10 text-red-600" />
+            </div>
+            <h3 className="text-2xl font-semibold text-slate-900 mb-3">
+              Quiz Not Found
+            </h3>
+            <p className="text-slate-600 mb-8">
+              The quiz you're looking for doesn't exist or has been deleted.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedQuizId(null);
+                setSelectedView("quizzes");
+              }}
+            >
+              Back to Quizzes
+            </Button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          <Breadcrumb />
+
+          <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-6 border-b border-indigo-200 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl shadow-sm">
+                  <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-indigo-900 mb-2">
+                    {quiz.title}
+                  </h1>
+                  <div className="flex items-center space-x-4 text-indigo-700">
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-md text-sm font-medium ${
+                        quiz.isAvailable
+                          ? "bg-green-100 text-green-800 border border-green-200"
+                          : "bg-gray-100 text-gray-800 border border-gray-200"
+                      }`}
+                    >
+                      {quiz.isAvailable ? "Active" : "Inactive"}
+                    </span>
+                    <span>
+                      {quiz.totalUniqueQuestionsInSourceSnapshot || 0} questions
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {quiz.createdAt
+                        ? new Date(quiz.createdAt).toLocaleDateString()
+                        : "Unknown date"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => handleOpenEditQuizModal(quiz)}
+                  className="flex items-center gap-2"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleViewQuizProgress(quiz._id)}
+                  className="flex items-center gap-2"
+                >
+                  <ChartBarIcon className="h-4 w-4" />
+                  View Progress
+                </Button>
+                {quiz.isAvailable ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleDeactivateQuiz(quiz._id)}
+                    className="flex items-center gap-2"
+                  >
+                    <PauseIcon className="h-4 w-4" />
+                    Deactivate
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleActivateQuiz(quiz._id)}
+                    className="flex items-center gap-2"
+                  >
+                    <PlayIcon className="h-4 w-4" />
+                    Activate
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  onClick={() => setQuizToDelete(quiz)}
+                  className="flex items-center gap-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+            {/* Description */}
+            {quiz.description && (
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-2">
+                  Description
+                </h3>
+                <p className="text-slate-700">{quiz.description}</p>
+              </div>
+            )}
+
+            {/* Quiz Information */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">
+                Quiz Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Status
+                  </label>
+                  <p
+                    className={`font-medium ${
+                      quiz.isAvailable ? "text-green-600" : "text-gray-600"
+                    }`}
+                  >
+                    {quiz.isAvailable ? "Active" : "Inactive"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Questions
+                  </label>
+                  <p className="text-slate-900">
+                    {quiz.totalUniqueQuestionsInSourceSnapshot || 0}
+                  </p>
+                </div>
+                {quiz.targetRoles && quiz.targetRoles.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Target Roles
+                    </label>
+                    <p className="text-slate-900">
+                      {quiz.targetRoles
+                        .map((role) =>
+                          typeof role === "string" ? role : role.name
+                        )
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Created
+                  </label>
+                  <p className="text-slate-900">
+                    {quiz.createdAt
+                      ? new Date(quiz.createdAt).toLocaleDateString()
+                      : "Unknown date"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-600">
+                    Last Updated
+                  </label>
+                  <p className="text-slate-900">
+                    {quiz.updatedAt
+                      ? new Date(quiz.updatedAt).toLocaleDateString()
+                      : "Unknown date"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-slate-50 rounded-xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">
+                Quick Actions
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => handleOpenEditQuizModal(quiz)}
+                  className="flex items-center gap-2"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleViewQuizProgress(quiz._id)}
+                  className="flex items-center gap-2"
+                >
+                  <ChartBarIcon className="h-4 w-4" />
+                  View Progress
+                </Button>
+                {quiz.isAvailable ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleDeactivateQuiz(quiz._id)}
+                    className="flex items-center gap-2"
+                  >
+                    <PauseIcon className="h-4 w-4" />
+                    Deactivate
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleActivateQuiz(quiz._id)}
+                    className="flex items-center gap-2"
+                  >
+                    <PlayIcon className="h-4 w-4" />
+                    Activate
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSelectedQuizId(null);
+                    setSelectedView("quizzes");
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                  Back to Quizzes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Overview content
+    if (selectedView === "overview") {
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          <Breadcrumb />
+
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 border-b border-slate-200 rounded-t-2xl">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl shadow-sm">
+                <ChartPieIcon className="h-8 w-8 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                  Overview Dashboard
+                </h1>
+                <p className="text-slate-600">
+                  Monitor your training materials and quiz performance
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-600 text-sm font-medium">
+                      Question Banks
+                    </p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {stats.totalBanks}
+                    </p>
+                  </div>
+                  <BookOpenIcon className="h-8 w-8 text-blue-400" />
+                </div>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-600 text-sm font-medium">
+                      Total Questions
+                    </p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {stats.totalQuestions}
+                    </p>
+                  </div>
+                  <ListBulletIcon className="h-8 w-8 text-purple-400" />
+                </div>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-emerald-600 text-sm font-medium">
+                      Active Quizzes
+                    </p>
+                    <p className="text-2xl font-bold text-emerald-900">
+                      {stats.activeQuizzes}
+                    </p>
+                  </div>
+                  <PlayIcon className="h-8 w-8 text-emerald-400" />
+                </div>
+              </div>
+              <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-orange-600 text-sm font-medium">
+                      Total Quizzes
+                    </p>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {stats.totalQuizzes}
+                    </p>
+                  </div>
+                  <AcademicCapIcon className="h-8 w-8 text-orange-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-slate-50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Quick Actions
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => setIsCreateBankModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <BookOpenIcon className="h-4 w-4" />
+                  Create Question Bank
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsGenerateQuizModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  Generate Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleViewChange("question-banks")}
+                  className="flex items-center gap-2"
+                >
+                  <EyeIcon className="h-4 w-4" />
+                  View All Banks
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleViewChange("quizzes")}
+                  className="flex items-center gap-2"
+                >
+                  <ChartBarIcon className="h-4 w-4" />
+                  View All Quizzes
+                </Button>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Recent Items
+              </h3>
+              <div className="space-y-3">
+                {[...questionBanks.slice(0, 3), ...quizzes.slice(0, 2)].map(
+                  (item) => {
+                    const isBank = "sourceType" in item;
+                    return (
+                      <div
+                        key={item._id}
+                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-50 transition-colors duration-200"
+                      >
+                        <div
+                          className={`p-2 rounded-lg ${
+                            isBank ? "bg-emerald-100" : "bg-indigo-100"
+                          }`}
+                        >
+                          {isBank ? (
+                            <BookOpenIcon className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <AcademicCapIcon className="h-4 w-4 text-indigo-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-900 truncate">
+                            {isBank
+                              ? (item as IQuestionBank).name
+                              : (item as ClientIQuiz).title}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {isBank ? "Question Bank" : "Quiz"} •{" "}
+                            {item.createdAt
+                              ? new Date(item.createdAt).toLocaleDateString()
+                              : "Unknown date"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (isBank) {
+                              handleQuestionBankSelect(item._id);
+                            } else {
+                              handleQuizSelect(item._id);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          <ChevronRightIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Question Banks view
+    if (selectedView === "question-banks") {
+      if (selectedQuestionBankId) {
+        return <QuestionBankDetail bankId={selectedQuestionBankId} />;
+      }
+      return <QuestionBanksOverview />;
+    }
+
+    // Quizzes view
+    if (selectedView === "quizzes") {
+      if (selectedQuizId) {
+        return <QuizDetail quizId={selectedQuizId} />;
+      }
+      return <QuizzesOverview />;
+    }
+
+    // Default content when nothing is selected
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center h-full flex flex-col justify-center">
+        <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 mb-6">
+          <AcademicCapIcon className="h-10 w-10 text-blue-600" />
+        </div>
+        <h3 className="text-2xl font-semibold text-slate-900 mb-3">
+          Welcome to Quiz Management
+        </h3>
+        <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+          Select an item from the navigation panel to view details, or use the
+          overview to see your dashboard.
+        </p>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          <Button
+            variant="primary"
+            onClick={() => setIsCreateBankModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-3"
+          >
+            <BookOpenIcon className="h-5 w-5" />
+            Create Question Bank
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIsGenerateQuizModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-3"
+          >
+            <SparklesIcon className="h-5 w-5" />
+            Generate Quiz
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // === PHASE 1: Navigation Panel Component ===
+  const NavigationPanel = () => {
+    const isSearchActive = globalSearchTerm.trim() !== "";
+
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+        {/* Search Header */}
+        <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200 rounded-t-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Management Center
+              </h3>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 min-w-[24px] justify-center">
+                {stats.totalBanks + stats.totalQuizzes}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="secondary"
+                onClick={() => setIsCreateBankModalOpen(true)}
+                className="flex items-center gap-2 text-sm px-3 py-2"
+              >
+                <BookOpenIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">New Bank</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Global Search Input */}
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search banks, quizzes, content..."
+              value={globalSearchTerm}
+              onChange={(e) => handleGlobalSearchChange(e.target.value)}
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
+              aria-label="Global search"
+            />
+            {globalSearchTerm && (
+              <button
+                onClick={clearGlobalSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
+                aria-label="Clear search"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Summary */}
+          {isSearchActive && (
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <span className="text-slate-600">
+                {searchResults.questionBanks.length +
+                  searchResults.quizzes.length}{" "}
+                items found
+              </span>
+              <span className="text-slate-500">
+                Searching for "{globalSearchTerm}"
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Content */}
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 max-h-full">
+          {/* Overview Section */}
+          <div>
+            <button
+              onClick={() => handleViewChange("overview")}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
+                isSearchMatch("section", "overview")
+                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                  : selectedView === "overview"
+                  ? "bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-2 border-blue-300 text-blue-800 shadow-lg"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`p-3 rounded-xl transition-all duration-200 ${
+                    selectedView === "overview"
+                      ? "bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-100 shadow-md"
+                      : "bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 group-hover:shadow-sm"
+                  }`}
+                >
+                  <HomeIcon
+                    className={`h-6 w-6 ${
+                      selectedView === "overview"
+                        ? "text-blue-700"
+                        : "text-slate-600 group-hover:text-slate-700"
+                    }`}
+                  />
+                </div>
+                <div className="text-left">
+                  <span
+                    className={`font-bold text-lg ${
+                      isSearchMatch("section", "overview")
+                        ? "text-yellow-900"
+                        : selectedView === "overview"
+                        ? "text-blue-900"
+                        : "text-slate-800 group-hover:text-slate-900"
+                    }`}
+                  >
+                    Overview
+                  </span>
+                  <div
+                    className={`text-sm mt-1 font-medium ${
+                      isSearchMatch("section", "overview")
+                        ? "text-yellow-700"
+                        : selectedView === "overview"
+                        ? "text-blue-600"
+                        : "text-slate-500 group-hover:text-slate-600"
+                    }`}
+                  >
+                    Dashboard & Analytics
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Question Banks Section */}
+          <div>
+            <button
+              onClick={() => {
+                handleViewChange("question-banks");
+                toggleSectionExpansion("question-banks");
+              }}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
+                isSearchMatch("section", "question-banks") ||
+                searchResults.questionBanks.length > 0
+                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                  : selectedView === "question-banks"
+                  ? "bg-gradient-to-r from-emerald-50 via-emerald-100 to-emerald-50 border-2 border-emerald-300 text-emerald-800 shadow-lg"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`p-3 rounded-xl transition-all duration-200 ${
+                    selectedView === "question-banks"
+                      ? "bg-gradient-to-br from-emerald-100 via-emerald-200 to-emerald-100 shadow-md"
+                      : "bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 group-hover:shadow-sm"
+                  }`}
+                >
+                  <BookOpenIcon
+                    className={`h-6 w-6 ${
+                      selectedView === "question-banks"
+                        ? "text-emerald-700"
+                        : "text-slate-600 group-hover:text-slate-700"
+                    }`}
+                  />
+                </div>
+                <div className="text-left">
+                  <span
+                    className={`font-bold text-lg ${
+                      isSearchMatch("section", "question-banks") ||
+                      searchResults.questionBanks.length > 0
+                        ? "text-yellow-900"
+                        : selectedView === "question-banks"
+                        ? "text-emerald-900"
+                        : "text-slate-800 group-hover:text-slate-900"
+                    }`}
+                  >
+                    Question Banks
+                  </span>
+                  <div
+                    className={`text-sm mt-1 font-medium ${
+                      isSearchMatch("section", "question-banks") ||
+                      searchResults.questionBanks.length > 0
+                        ? "text-yellow-700"
+                        : selectedView === "question-banks"
+                        ? "text-emerald-600"
+                        : "text-slate-500 group-hover:text-slate-600"
+                    }`}
+                  >
+                    {stats.totalBanks} banks • {stats.totalQuestions} questions
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <span
+                  className={`text-xs px-2 py-1 rounded-full font-bold shadow-sm min-w-[24px] text-center ${
+                    selectedView === "question-banks"
+                      ? "bg-emerald-200 text-emerald-800 border border-emerald-300"
+                      : "bg-slate-200 text-slate-700 border border-slate-300 group-hover:bg-slate-300 group-hover:border-slate-400"
+                  }`}
+                >
+                  {stats.totalBanks}
+                </span>
+                <div
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    selectedView === "question-banks"
+                      ? "bg-emerald-200"
+                      : "bg-slate-200 group-hover:bg-slate-300"
+                  }`}
+                >
+                  <ChevronRightIcon
+                    className={`h-5 w-5 transition-transform duration-200 ${
+                      expandedSections["question-banks"] ? "rotate-90" : ""
+                    } ${
+                      selectedView === "question-banks"
+                        ? "text-emerald-700"
+                        : "text-slate-600 group-hover:text-slate-700"
+                    }`}
+                  />
+                </div>
+              </div>
+            </button>
+
+            {/* Question Banks List */}
+            {expandedSections["question-banks"] && (
+              <div className="ml-6 mt-3 space-y-2">
+                {(isSearchActive
+                  ? questionBanks.filter((bank) =>
+                      isSearchMatch("questionBank", bank._id)
+                    )
+                  : questionBanks.slice(0, 5)
+                ).map((bank) => (
+                  <button
+                    key={bank._id}
+                    onClick={() => handleQuestionBankSelect(bank._id)}
+                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 group ${
+                      isSearchMatch("questionBank", bank._id)
+                        ? "bg-yellow-100 border border-yellow-300 text-yellow-900 shadow-md"
+                        : selectedQuestionBankId === bank._id
+                        ? "bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 text-emerald-800 shadow-sm"
+                        : "hover:bg-slate-50 text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm"
+                    } text-sm`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div
+                          className={`p-2 rounded-lg transition-all duration-200 ${
+                            selectedQuestionBankId === bank._id
+                              ? "bg-emerald-200"
+                              : "bg-slate-100 group-hover:bg-slate-200"
+                          }`}
+                        >
+                          <BookOpenIcon
+                            className={`h-4 w-4 ${
+                              selectedQuestionBankId === bank._id
+                                ? "text-emerald-600"
+                                : "text-slate-500 group-hover:text-slate-600"
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={`font-medium truncate ${
+                              isSearchMatch("questionBank", bank._id)
+                                ? "text-yellow-900"
+                                : selectedQuestionBankId === bank._id
+                                ? "text-emerald-900"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            {bank.name}
+                          </div>
+                          <div
+                            className={`text-xs mt-0.5 ${
+                              isSearchMatch("questionBank", bank._id)
+                                ? "text-yellow-700"
+                                : selectedQuestionBankId === bank._id
+                                ? "text-emerald-600"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {bank.sourceType} •{" "}
+                            {Array.isArray(bank.questions)
+                              ? bank.questions.length
+                              : bank.questionCount || 0}{" "}
+                            questions
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {questionBanks.length > 5 && !isSearchActive && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => handleViewChange("question-banks")}
+                      className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg px-3 py-2 transition-all duration-200"
+                    >
+                      View all {questionBanks.length} question banks →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quizzes Section */}
+          <div>
+            <button
+              onClick={() => {
+                handleViewChange("quizzes");
+                toggleSectionExpansion("quizzes");
+              }}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
+                isSearchMatch("section", "quizzes") ||
+                searchResults.quizzes.length > 0
+                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                  : selectedView === "quizzes"
+                  ? "bg-gradient-to-r from-indigo-50 via-indigo-100 to-indigo-50 border-2 border-indigo-300 text-indigo-800 shadow-lg"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`p-3 rounded-xl transition-all duration-200 ${
+                    selectedView === "quizzes"
+                      ? "bg-gradient-to-br from-indigo-100 via-indigo-200 to-indigo-100 shadow-md"
+                      : "bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 group-hover:shadow-sm"
+                  }`}
+                >
+                  <AcademicCapIcon
+                    className={`h-6 w-6 ${
+                      selectedView === "quizzes"
+                        ? "text-indigo-700"
+                        : "text-slate-600 group-hover:text-slate-700"
+                    }`}
+                  />
+                </div>
+                <div className="text-left">
+                  <span
+                    className={`font-bold text-lg ${
+                      isSearchMatch("section", "quizzes") ||
+                      searchResults.quizzes.length > 0
+                        ? "text-yellow-900"
+                        : selectedView === "quizzes"
+                        ? "text-indigo-900"
+                        : "text-slate-800 group-hover:text-slate-900"
+                    }`}
+                  >
+                    Quizzes
+                  </span>
+                  <div
+                    className={`text-sm mt-1 font-medium ${
+                      isSearchMatch("section", "quizzes") ||
+                      searchResults.quizzes.length > 0
+                        ? "text-yellow-700"
+                        : selectedView === "quizzes"
+                        ? "text-indigo-600"
+                        : "text-slate-500 group-hover:text-slate-600"
+                    }`}
+                  >
+                    {stats.totalQuizzes} total • {stats.activeQuizzes} active
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <span
+                  className={`text-xs px-2 py-1 rounded-full font-bold shadow-sm min-w-[24px] text-center ${
+                    selectedView === "quizzes"
+                      ? "bg-indigo-200 text-indigo-800 border border-indigo-300"
+                      : "bg-slate-200 text-slate-700 border border-slate-300 group-hover:bg-slate-300 group-hover:border-slate-400"
+                  }`}
+                >
+                  {stats.totalQuizzes}
+                </span>
+                <div
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    selectedView === "quizzes"
+                      ? "bg-indigo-200"
+                      : "bg-slate-200 group-hover:bg-slate-300"
+                  }`}
+                >
+                  <ChevronRightIcon
+                    className={`h-5 w-5 transition-transform duration-200 ${
+                      expandedSections["quizzes"] ? "rotate-90" : ""
+                    } ${
+                      selectedView === "quizzes"
+                        ? "text-indigo-700"
+                        : "text-slate-600 group-hover:text-slate-700"
+                    }`}
+                  />
+                </div>
+              </div>
+            </button>
+
+            {/* Quizzes List */}
+            {expandedSections["quizzes"] && (
+              <div className="ml-6 mt-3 space-y-2">
+                {(isSearchActive
+                  ? quizzes.filter((quiz) => isSearchMatch("quiz", quiz._id))
+                  : quizzes.slice(0, 5)
+                ).map((quiz) => (
+                  <button
+                    key={quiz._id}
+                    onClick={() => handleQuizSelect(quiz._id)}
+                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 group ${
+                      isSearchMatch("quiz", quiz._id)
+                        ? "bg-yellow-100 border border-yellow-300 text-yellow-900 shadow-md"
+                        : selectedQuizId === quiz._id
+                        ? "bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-300 text-indigo-800 shadow-sm"
+                        : "hover:bg-slate-50 text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm"
+                    } text-sm`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div
+                          className={`p-2 rounded-lg transition-all duration-200 ${
+                            selectedQuizId === quiz._id
+                              ? "bg-indigo-200"
+                              : "bg-slate-100 group-hover:bg-slate-200"
+                          }`}
+                        >
+                          <AcademicCapIcon
+                            className={`h-4 w-4 ${
+                              selectedQuizId === quiz._id
+                                ? "text-indigo-600"
+                                : "text-slate-500 group-hover:text-slate-600"
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={`font-medium truncate ${
+                              isSearchMatch("quiz", quiz._id)
+                                ? "text-yellow-900"
+                                : selectedQuizId === quiz._id
+                                ? "text-indigo-900"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            {quiz.title}
+                          </div>
+                          <div
+                            className={`text-xs mt-0.5 flex items-center space-x-2 ${
+                              isSearchMatch("quiz", quiz._id)
+                                ? "text-yellow-700"
+                                : selectedQuizId === quiz._id
+                                ? "text-indigo-600"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                quiz.isAvailable
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {quiz.isAvailable ? "Active" : "Inactive"}
+                            </span>
+                            <span>•</span>
+                            <span>
+                              {quiz.totalUniqueQuestionsInSourceSnapshot || 0}{" "}
+                              questions
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {quizzes.length > 5 && !isSearchActive && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => handleViewChange("quizzes")}
+                      className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg px-3 py-2 transition-all duration-200"
+                    >
+                      View all {quizzes.length} quizzes →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Enhanced Empty Search State */}
+          {isSearchActive &&
+            searchResults.questionBanks.length === 0 &&
+            searchResults.quizzes.length === 0 && (
+              <div className="text-center py-12 px-4">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-4">
+                  <MagnifyingGlassIcon className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No results found
+                </h3>
+                <p className="text-slate-500 mb-4">
+                  No items match "{globalSearchTerm}". Try a different search
+                  term.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="text-sm"
+                >
+                  Clear search
+                </Button>
+              </div>
+            )}
+        </div>
+      </div>
+    );
+  };
+
+  // Legacy Question Bank List Item Component (for content display)
   const QuestionBankListItem: React.FC<{ bank: IQuestionBank }> = ({
     bank,
   }) => {
@@ -519,8 +2190,7 @@ const QuizAndBankManagementPage: React.FC = () => {
     }
 
     if (filteredQuestionBanks.length === 0) {
-      const hasSearchOrFilter =
-        searchTerm.trim() || questionBankSourceFilter !== "ALL";
+      const hasSearchOrFilter = questionBankSourceFilter !== "ALL";
 
       return (
         <div className="text-center py-12">
@@ -687,231 +2357,17 @@ const QuizAndBankManagementPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Question Banks Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 px-6 py-4 border-b border-emerald-200">
-                  <div className="flex justify-between items-center">
-                    <div
-                      className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
-                      onClick={() =>
-                        setIsQuestionBanksExpanded(!isQuestionBanksExpanded)
-                      }
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          setIsQuestionBanksExpanded(!isQuestionBanksExpanded);
-                        }
-                      }}
-                      aria-expanded={isQuestionBanksExpanded}
-                      aria-controls="question-banks-content"
-                    >
-                      <BookOpenIcon className="h-6 w-6 text-emerald-700 mr-3" />
-                      <h2 className="text-xl font-semibold text-emerald-900 mr-3">
-                        Question Banks
-                      </h2>
-                      <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs font-medium px-2 py-1 rounded-full border border-emerald-200">
-                        {stats.totalBanks}
-                      </span>
-                      {isQuestionBanksExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-emerald-600 ml-2" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-emerald-600 ml-2" />
-                      )}
-                    </div>
-                    <Button
-                      variant="primary"
-                      onClick={() => setIsCreateBankModalOpen(true)}
-                      disabled={!restaurantId}
-                      className="flex items-center space-x-2"
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                      <span>Create Question Bank</span>
-                    </Button>
-                  </div>
+              {/* === PHASE 1: Two-Column Layout Implementation === */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-400px)]">
+                {/* Left Navigation Panel */}
+                <div className="lg:col-span-1">
+                  <NavigationPanel />
                 </div>
 
-                {isQuestionBanksExpanded && (
-                  <div id="question-banks-content" className="p-6">
-                    {/* Search and Filter Controls */}
-                    <div className="mb-6 space-y-4">
-                      {/* Search Bar */}
-                      <div className="relative max-w-md">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Search question banks..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-
-                      {/* Filter Buttons */}
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <FunnelIcon className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm font-medium text-gray-700">
-                            Filter by source:
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {(
-                            [
-                              "ALL",
-                              "SOP",
-                              "MENU",
-                              "MANUAL",
-                            ] as QuestionBankSourceFilterType[]
-                          ).map((type) => (
-                            <Button
-                              key={type}
-                              variant={
-                                questionBankSourceFilter === type
-                                  ? "primary"
-                                  : "secondary"
-                              }
-                              onClick={() =>
-                                handleQuestionBankFilterChange(type)
-                              }
-                              className="px-3 py-1.5 text-sm"
-                            >
-                              {type.charAt(0).toUpperCase() +
-                                type.slice(1).toLowerCase()}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`transition-opacity duration-300 ease-in-out ${
-                        isQuestionBankListVisible ? "opacity-100" : "opacity-0"
-                      }`}
-                    >
-                      {renderQuestionBankList()}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Quizzes Section */}
-              <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 px-6 py-4 border-b border-indigo-200">
-                  <div className="flex justify-between items-center">
-                    <div
-                      className="flex items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors duration-150 ease-in-out"
-                      onClick={() =>
-                        setIsQuizManagementExpanded(!isQuizManagementExpanded)
-                      }
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          setIsQuizManagementExpanded(
-                            !isQuizManagementExpanded
-                          );
-                        }
-                      }}
-                      aria-expanded={isQuizManagementExpanded}
-                      aria-controls="quiz-management-content"
-                    >
-                      <AcademicCapIcon className="h-6 w-6 text-indigo-700 mr-3" />
-                      <h2 className="text-xl font-semibold text-indigo-900 mr-3">
-                        Quiz Management
-                      </h2>
-                      <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-1 rounded-full border border-indigo-200">
-                        {stats.totalQuizzes}
-                      </span>
-                      {isQuizManagementExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-indigo-600 ml-2" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-indigo-600 ml-2" />
-                      )}
-                    </div>
-                    <Button
-                      variant="primary"
-                      onClick={() => setIsGenerateQuizModalOpen(true)}
-                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
-                    >
-                      <SparklesIcon className="h-4 w-4" />
-                      <span>Generate Quiz</span>
-                    </Button>
-                  </div>
+                {/* Content Display Area */}
+                <div className="lg:col-span-2">
+                  <ContentDisplay />
                 </div>
-
-                {isQuizManagementExpanded && (
-                  <div id="quiz-management-content" className="p-6">
-                    {/* Search and Filter Controls */}
-                    <div className="mb-6 space-y-4">
-                      {/* Search Bar */}
-                      <div className="relative max-w-md">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Search quizzes..."
-                          value={quizSearchTerm}
-                          onChange={(e) => setQuizSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="transition-opacity duration-300 ease-in-out opacity-100">
-                      {isLoadingQuizzes && quizzes.length === 0 && (
-                        <div className="flex items-center justify-center py-12">
-                          <LoadingSpinner message="Loading quizzes..." />
-                        </div>
-                      )}
-                      {!isLoadingQuizzes &&
-                        filteredQuizzes.length === 0 &&
-                        !error && (
-                          <div className="text-center py-12">
-                            <AcademicCapIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                              {quizSearchTerm.trim()
-                                ? "No quizzes found"
-                                : "No quizzes yet"}
-                            </h3>
-                            <p className="text-gray-500 mb-6">
-                              {quizSearchTerm.trim()
-                                ? "Try adjusting your search criteria"
-                                : "Generate your first quiz from question banks"}
-                            </p>
-                            {!quizSearchTerm.trim() && (
-                              <Button
-                                variant="primary"
-                                onClick={() => setIsGenerateQuizModalOpen(true)}
-                                disabled={!restaurantId}
-                              >
-                                <SparklesIcon className="h-4 w-4 mr-2" />
-                                Generate Quiz
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      {!isLoadingQuizzes && filteredQuizzes.length > 0 && (
-                        <div className="space-y-3">
-                          <QuizList
-                            quizzes={filteredQuizzes}
-                            isLoading={false}
-                            onPreview={handleOpenEditQuizModal}
-                            onActivate={handleActivateQuiz}
-                            onDeactivate={handleDeactivateQuiz}
-                            onDelete={(quiz) => setQuizToDelete(quiz)}
-                            onViewProgress={handleViewQuizProgress}
-                            isDeletingQuizId={isDeletingQuizId}
-                          />
-                        </div>
-                      )}
-                      {isLoadingQuizzes && quizzes.length > 0 && (
-                        <div className="flex justify-center py-4">
-                          <LoadingSpinner />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
