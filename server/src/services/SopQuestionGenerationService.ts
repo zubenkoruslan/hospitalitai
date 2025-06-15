@@ -8,6 +8,7 @@ import QuestionModel, {
   IQuestion,
   QuestionType,
   IOption,
+  KnowledgeCategory,
 } from "../models/QuestionModel";
 import LegacyAiQuestionService, {
   RawAiGeneratedQuestion,
@@ -239,6 +240,10 @@ export class SopQuestionGenerationService {
         sopCategoryId: rawQ.originalSopCategoryId
           ? new Types.ObjectId(rawQ.originalSopCategoryId)
           : undefined,
+        // Required knowledge category fields
+        knowledgeCategory: KnowledgeCategory.PROCEDURES_KNOWLEDGE, // SOP questions are always procedures
+        knowledgeCategoryAssignedBy: "ai",
+        knowledgeCategoryAssignedAt: new Date(),
       };
 
       const newQuestion = new QuestionModel(questionData);

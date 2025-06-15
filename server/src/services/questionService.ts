@@ -4,6 +4,7 @@ import QuestionModel, {
   IQuestion,
   // IOption, // Removed unused IOption import
   QuestionType,
+  KnowledgeCategory,
 } from "../models/QuestionModel";
 import QuestionBankModel from "../models/QuestionBankModel";
 import { AppError } from "../utils/errorHandler";
@@ -17,7 +18,7 @@ import {
   MenuItem,
   QuestionGenerationRequest,
 } from "./CleanAiQuestionService";
-import { KnowledgeCategory } from "../models/QuestionModel";
+
 import { KnowledgeAnalyticsService } from "./knowledgeAnalyticsService";
 
 // Interface for the data needed to create a new question
@@ -38,6 +39,8 @@ export interface NewQuestionData {
   // Knowledge Analytics fields
   knowledgeCategory?: string;
   knowledgeSubcategories?: string[];
+  knowledgeCategoryAssignedBy?: "manual" | "ai" | "restaurant_edit";
+  knowledgeCategoryAssignedAt?: Date;
 }
 
 // Interface for the data allowed when updating an existing question
@@ -107,7 +110,18 @@ export const createQuestionService = async (
       }
     }
 
-    const newQuestion = new QuestionModel(data);
+    // Ensure required fields are always present with defaults
+    const questionDataWithDefaults = {
+      ...data,
+      knowledgeCategory:
+        data.knowledgeCategory || KnowledgeCategory.FOOD_KNOWLEDGE, // Default category
+      knowledgeCategoryAssignedBy:
+        data.knowledgeCategoryAssignedBy || data.createdBy, // Use createdBy as default
+      knowledgeCategoryAssignedAt:
+        data.knowledgeCategoryAssignedAt || new Date(),
+    };
+
+    const newQuestion = new QuestionModel(questionDataWithDefaults);
     const savedQuestion = await newQuestion.save();
 
     // Invalidate analytics cache since a new question affects question distribution

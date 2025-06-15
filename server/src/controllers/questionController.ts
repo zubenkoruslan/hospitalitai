@@ -41,6 +41,8 @@ export const createQuestion = async (
       difficulty,
       questionBankId: new mongoose.Types.ObjectId(questionBankId),
       knowledgeCategory,
+      knowledgeCategoryAssignedBy: "manual", // Since this is manually created
+      knowledgeCategoryAssignedAt: new Date(),
     };
 
     // Validate questionBankId presence (moved from service for early check)

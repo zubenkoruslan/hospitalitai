@@ -94,6 +94,11 @@ describe("QuizResultService Tests", () => {
         options: [{ text: "Paris", isCorrect: true }, { text: "London" }],
         restaurantId: testRestaurantId,
         createdBy: "manual",
+        categories: ["geography"],
+        questionBankId: new Types.ObjectId(),
+        knowledgeCategory: "food-knowledge",
+        knowledgeCategoryAssignedBy: "manual",
+        knowledgeCategoryAssignedAt: new Date(),
       });
       const quiz2 = await QuizModel.create({
         title: "Geography Quiz",
@@ -138,6 +143,11 @@ describe("QuizResultService Tests", () => {
         options: [{ text: "3" }, { text: "4", isCorrect: true }],
         restaurantId: testRestaurantId,
         createdBy: "manual",
+        categories: ["math"],
+        questionBankId: new Types.ObjectId(),
+        knowledgeCategory: "food-knowledge",
+        knowledgeCategoryAssignedBy: "manual",
+        knowledgeCategoryAssignedAt: new Date(),
       });
       const quiz1 = await QuizModel.create({
         title: "Math Quiz",

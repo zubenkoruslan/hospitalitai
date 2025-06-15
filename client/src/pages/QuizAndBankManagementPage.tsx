@@ -133,6 +133,9 @@ const QuizAndBankManagementPage: React.FC = () => {
   const [isAdvancedSearchMode, setIsAdvancedSearchMode] =
     useState<boolean>(false);
 
+  // Ref for search container to handle click outside
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
   // UI state for expandable sections in navigation
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
@@ -456,8 +459,8 @@ const QuizAndBankManagementPage: React.FC = () => {
     setGlobalSearchTerm(value);
     performGlobalSearch(value);
 
-    // Show suggestions when typing
-    if (value.trim()) {
+    // Show suggestions when typing (minimum 1 character)
+    if (value.trim().length > 0) {
       setShowSearchSuggestions(true);
       generateSearchSuggestions();
     } else {
@@ -690,6 +693,24 @@ const QuizAndBankManagementPage: React.FC = () => {
       );
     }
   }, [searchHistory]);
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowSearchSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Dismiss success/error messages
   const dismissMessages = () => {
@@ -1955,7 +1976,7 @@ const QuizAndBankManagementPage: React.FC = () => {
           </div>
 
           {/* Enhanced Global Search Input */}
-          <div className="relative">
+          <div className="relative" ref={searchContainerRef}>
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
@@ -1964,14 +1985,10 @@ const QuizAndBankManagementPage: React.FC = () => {
               onChange={(e) => handleGlobalSearchChange(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               onFocus={() => {
-                if (globalSearchTerm.trim()) {
+                if (globalSearchTerm.trim().length > 0) {
                   setShowSearchSuggestions(true);
                   generateSearchSuggestions();
                 }
-              }}
-              onBlur={() => {
-                // Delay hiding suggestions to allow clicking on them
-                setTimeout(() => setShowSearchSuggestions(false), 150);
               }}
               className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
               aria-label="Global search"
@@ -2006,7 +2023,11 @@ const QuizAndBankManagementPage: React.FC = () => {
                 {searchSuggestions.map((suggestion, index) => (
                   <button
                     key={`${suggestion.type}-${suggestion.text}`}
-                    onClick={() => selectSuggestion(suggestion)}
+                    onMouseDown={(e) => {
+                      // Prevent the input from losing focus
+                      e.preventDefault();
+                      selectSuggestion(suggestion);
+                    }}
                     className={`w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between transition-colors duration-150 ${
                       index === selectedSuggestionIndex
                         ? "bg-blue-50 border-l-2 border-blue-500"

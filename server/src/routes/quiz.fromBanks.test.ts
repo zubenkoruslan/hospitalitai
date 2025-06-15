@@ -9,6 +9,7 @@ import Question, {
   IQuestion,
   QuestionType,
   IOption,
+  KnowledgeCategory,
 } from "../models/QuestionModel"; // Import QuestionType and IOption
 import QuizModel, { IQuiz } from "../models/QuizModel";
 import jwt from "jsonwebtoken";
@@ -155,6 +156,10 @@ describe("/api/quizzes/from-banks Routes", function () {
         categories: ["Math", "Easy"],
         restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
+        questionBankId: new MongooseTypes.ObjectId(),
+        knowledgeCategory: KnowledgeCategory.FOOD_KNOWLEDGE,
+        knowledgeCategoryAssignedBy: "manual",
+        knowledgeCategoryAssignedAt: new Date(),
       };
       const q1: IQuestion = (await Question.create(q1Data)) as IQuestion;
 
@@ -169,6 +174,10 @@ describe("/api/quizzes/from-banks Routes", function () {
         categories: ["Math", "Easy"],
         restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
+        questionBankId: new MongooseTypes.ObjectId(),
+        knowledgeCategory: KnowledgeCategory.FOOD_KNOWLEDGE,
+        knowledgeCategoryAssignedBy: "manual",
+        knowledgeCategoryAssignedAt: new Date(),
       };
       const q2: IQuestion = (await Question.create(q2Data)) as IQuestion;
 
@@ -183,6 +192,10 @@ describe("/api/quizzes/from-banks Routes", function () {
         categories: ["Geography"],
         restaurantId: restaurant._id as MongooseTypes.ObjectId,
         createdBy: "manual", // Corrected type
+        questionBankId: new MongooseTypes.ObjectId(),
+        knowledgeCategory: KnowledgeCategory.FOOD_KNOWLEDGE,
+        knowledgeCategoryAssignedBy: "manual",
+        knowledgeCategoryAssignedAt: new Date(),
       };
       const q3: IQuestion = (await Question.create(q3Data)) as IQuestion;
 

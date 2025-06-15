@@ -1,6 +1,7 @@
 import QuestionModel, {
   IQuestion,
   QuestionType,
+  KnowledgeCategory,
 } from "../models/QuestionModel";
 import { Types } from "mongoose";
 import { AppError } from "../utils/errorHandler";
@@ -133,6 +134,10 @@ class LegacyAiQuestionService {
         }
 
         // Create question document
+        // Ensure required fields are always present with defaults
+        const finalKnowledgeCategory =
+          knowledgeCategory || KnowledgeCategory.PROCEDURES_KNOWLEDGE; // Default to procedures for SOP questions
+
         const questionData = {
           questionText: rawQ.questionText,
           questionType: rawQ.questionType as QuestionType,
@@ -146,12 +151,10 @@ class LegacyAiQuestionService {
           createdBy: "ai" as const,
           status: "pending_review" as const,
           explanation: rawQ.explanation?.substring(0, 500),
-          knowledgeCategory,
+          knowledgeCategory: finalKnowledgeCategory,
           knowledgeSubcategories,
-          knowledgeCategoryAssignedBy: knowledgeCategory ? "ai" : undefined,
-          knowledgeCategoryAssignedAt: knowledgeCategory
-            ? new Date()
-            : undefined,
+          knowledgeCategoryAssignedBy: "ai" as const, // Always set to "ai" since this is AI-generated
+          knowledgeCategoryAssignedAt: new Date(), // Always set current date
         };
 
         const newQuestion = new QuestionModel(questionData);
