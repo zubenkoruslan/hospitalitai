@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import {
   getQuestionBanks,
@@ -22,8 +22,6 @@ import SuccessNotification from "../components/common/SuccessNotification";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import Modal from "../components/common/Modal";
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
   ChevronRightIcon,
   AcademicCapIcon,
   BookOpenIcon,
@@ -55,7 +53,6 @@ import CreateQuestionBankForm from "../components/questionBank/CreateQuestionBan
 
 // Quiz Components
 import GenerateQuizFromBanksModal from "../components/quiz/GenerateQuizFromBanksModal";
-import QuizList from "../components/quiz/QuizList";
 import StaffQuizProgressModal from "../components/quiz/StaffQuizProgressModal";
 import EditQuizModal from "../components/quiz/EditQuizModal";
 
@@ -70,6 +67,28 @@ interface SearchResults {
   sections: ViewType[];
   questionBanks: string[];
   quizzes: string[];
+}
+
+// Enhanced search interfaces for Phase 3
+interface SearchFilters {
+  categories: string[];
+  sourceTypes: string[];
+  statuses: string[];
+  dateRange: {
+    start: Date | null;
+    end: Date | null;
+  };
+}
+
+interface SearchSuggestion {
+  text: string;
+  type: "recent" | "category" | "sourceType" | "status";
+  count?: number;
+}
+
+interface HighlightedText {
+  text: string;
+  isHighlighted: boolean;
 }
 
 const QuizAndBankManagementPage: React.FC = () => {
@@ -95,6 +114,25 @@ const QuizAndBankManagementPage: React.FC = () => {
     quizzes: [],
   });
 
+  // === PHASE 3: Enhanced Search State ===
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    categories: [],
+    sourceTypes: [],
+    statuses: [],
+    dateRange: { start: null, end: null },
+  });
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchSuggestions, setSearchSuggestions] = useState<
+    SearchSuggestion[]
+  >([]);
+  const [showSearchFilters, setShowSearchFilters] = useState<boolean>(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] =
+    useState<boolean>(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] =
+    useState<number>(-1);
+  const [isAdvancedSearchMode, setIsAdvancedSearchMode] =
+    useState<boolean>(false);
+
   // UI state for expandable sections in navigation
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
@@ -119,7 +157,6 @@ const QuizAndBankManagementPage: React.FC = () => {
   // Modal States - Quizzes
   const [isGenerateQuizModalOpen, setIsGenerateQuizModalOpen] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState<ClientIQuiz | null>(null);
-  const [isDeletingQuizId, setIsDeletingQuizId] = useState<string | null>(null);
 
   // Edit Quiz Modal states
   const [isEditQuizModalOpen, setIsEditQuizModalOpen] = useState(false);
@@ -172,7 +209,161 @@ const QuizAndBankManagementPage: React.FC = () => {
     }));
   };
 
-  // === PHASE 1: Enhanced Search Implementation ===
+  // === PHASE 3: Enhanced Search Utility Functions ===
+  const highlightText = useCallback(
+    (text: string, searchTerm: string): HighlightedText[] => {
+      if (!searchTerm.trim()) {
+        return [{ text, isHighlighted: false }];
+      }
+
+      const regex = new RegExp(
+        `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+        "gi"
+      );
+      const parts = text.split(regex);
+
+      return parts.map((part, index) => ({
+        text: part,
+        isHighlighted:
+          regex.test(part) && part.toLowerCase() === searchTerm.toLowerCase(),
+      }));
+    },
+    []
+  );
+
+  const generateSearchSuggestions = useCallback(() => {
+    const suggestions: SearchSuggestion[] = [];
+
+    // Add recent searches
+    searchHistory.slice(0, 3).forEach((term) => {
+      suggestions.push({ text: term, type: "recent" });
+    });
+
+    // Add category suggestions
+    const categories = Array.from(
+      new Set([
+        ...questionBanks.flatMap((bank) => bank.categories || []),
+        ...quizzes.flatMap(
+          (quiz) =>
+            quiz.targetRoles?.map((role) =>
+              typeof role === "string" ? role : role.name
+            ) || []
+        ),
+      ])
+    );
+
+    categories.slice(0, 5).forEach((category) => {
+      if (category && !suggestions.some((s) => s.text === category)) {
+        const count =
+          questionBanks.filter((bank) => bank.categories?.includes(category))
+            .length +
+          quizzes.filter((quiz) =>
+            quiz.targetRoles?.some(
+              (role) =>
+                (typeof role === "string" ? role : role.name) === category
+            )
+          ).length;
+        suggestions.push({ text: category, type: "category", count });
+      }
+    });
+
+    // Add source type suggestions
+    const sourceTypes = Array.from(
+      new Set(questionBanks.map((bank) => bank.sourceType))
+    );
+    sourceTypes.forEach((sourceType) => {
+      if (!suggestions.some((s) => s.text === sourceType)) {
+        const count = questionBanks.filter(
+          (bank) => bank.sourceType === sourceType
+        ).length;
+        suggestions.push({ text: sourceType, type: "sourceType", count });
+      }
+    });
+
+    setSearchSuggestions(suggestions);
+  }, [questionBanks, quizzes, searchHistory]);
+
+  const addToSearchHistory = useCallback((term: string) => {
+    if (!term.trim()) return;
+
+    setSearchHistory((prev) => {
+      const filtered = prev.filter((item) => item !== term);
+      return [term, ...filtered].slice(0, 10); // Keep last 10 searches
+    });
+  }, []);
+
+  const applyAdvancedFilters = useCallback(
+    (
+      items: (IQuestionBank | ClientIQuiz)[],
+      type: "questionBanks" | "quizzes"
+    ) => {
+      return items.filter((item) => {
+        // Category filter
+        if (searchFilters.categories.length > 0) {
+          if (type === "questionBanks") {
+            const bank = item as IQuestionBank;
+            if (
+              !bank.categories?.some((cat) =>
+                searchFilters.categories.includes(cat)
+              )
+            ) {
+              return false;
+            }
+          } else {
+            const quiz = item as ClientIQuiz;
+            if (
+              !quiz.targetRoles?.some((role) =>
+                searchFilters.categories.includes(
+                  typeof role === "string" ? role : role.name
+                )
+              )
+            ) {
+              return false;
+            }
+          }
+        }
+
+        // Source type filter (only for question banks)
+        if (type === "questionBanks" && searchFilters.sourceTypes.length > 0) {
+          const bank = item as IQuestionBank;
+          if (!searchFilters.sourceTypes.includes(bank.sourceType)) {
+            return false;
+          }
+        }
+
+        // Status filter (only for quizzes)
+        if (type === "quizzes" && searchFilters.statuses.length > 0) {
+          const quiz = item as ClientIQuiz;
+          const status = quiz.isAvailable ? "active" : "inactive";
+          if (!searchFilters.statuses.includes(status)) {
+            return false;
+          }
+        }
+
+        // Date range filter
+        if (searchFilters.dateRange.start || searchFilters.dateRange.end) {
+          const itemDate = new Date(item.createdAt || "");
+          if (
+            searchFilters.dateRange.start &&
+            itemDate < searchFilters.dateRange.start
+          ) {
+            return false;
+          }
+          if (
+            searchFilters.dateRange.end &&
+            itemDate > searchFilters.dateRange.end
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    },
+    [searchFilters]
+  );
+
+  // === PHASE 1 & 3: Enhanced Search Implementation ===
   const performGlobalSearch = useCallback(
     (searchTerm: string) => {
       if (!searchTerm.trim()) {
@@ -182,8 +373,8 @@ const QuizAndBankManagementPage: React.FC = () => {
 
       const term = searchTerm.toLowerCase();
       const matchingSections: ViewType[] = [];
-      const matchingQuestionBanks: string[] = [];
-      const matchingQuizzes: string[] = [];
+      let matchingQuestionBanks: string[] = [];
+      let matchingQuizzes: string[] = [];
 
       // Search in sections
       if ("overview".includes(term) || "dashboard".includes(term)) {
@@ -196,22 +387,31 @@ const QuizAndBankManagementPage: React.FC = () => {
         matchingSections.push("quizzes");
       }
 
-      // Search in question banks
-      questionBanks.forEach((bank) => {
+      // Enhanced search in question banks
+      let filteredBanks = questionBanks.filter((bank) => {
         const matches =
           bank.name.toLowerCase().includes(term) ||
           bank.description?.toLowerCase().includes(term) ||
           bank.sourceSopDocumentTitle?.toLowerCase().includes(term) ||
           bank.sourceMenuName?.toLowerCase().includes(term) ||
-          bank.sourceType.toLowerCase().includes(term);
+          bank.sourceType.toLowerCase().includes(term) ||
+          bank.categories?.some((cat) => cat.toLowerCase().includes(term));
 
-        if (matches) {
-          matchingQuestionBanks.push(bank._id);
-        }
+        return matches;
       });
 
-      // Search in quizzes
-      quizzes.forEach((quiz) => {
+      // Apply advanced filters if in advanced mode
+      if (isAdvancedSearchMode) {
+        filteredBanks = applyAdvancedFilters(
+          filteredBanks,
+          "questionBanks"
+        ) as IQuestionBank[];
+      }
+
+      matchingQuestionBanks = filteredBanks.map((bank) => bank._id);
+
+      // Enhanced search in quizzes
+      let filteredQuizzes = quizzes.filter((quiz) => {
         const matches =
           quiz.title.toLowerCase().includes(term) ||
           quiz.description?.toLowerCase().includes(term) ||
@@ -221,10 +421,18 @@ const QuizAndBankManagementPage: React.FC = () => {
               .includes(term)
           );
 
-        if (matches) {
-          matchingQuizzes.push(quiz._id);
-        }
+        return matches;
       });
+
+      // Apply advanced filters if in advanced mode
+      if (isAdvancedSearchMode) {
+        filteredQuizzes = applyAdvancedFilters(
+          filteredQuizzes,
+          "quizzes"
+        ) as ClientIQuiz[];
+      }
+
+      matchingQuizzes = filteredQuizzes.map((quiz) => quiz._id);
 
       setSearchResults({
         sections: matchingSections,
@@ -240,17 +448,114 @@ const QuizAndBankManagementPage: React.FC = () => {
         setExpandedSections((prev) => ({ ...prev, quizzes: true }));
       }
     },
-    [questionBanks, quizzes]
+    [questionBanks, quizzes, isAdvancedSearchMode, applyAdvancedFilters]
   );
 
+  // === PHASE 3: Enhanced Search Handlers ===
   const handleGlobalSearchChange = (value: string) => {
     setGlobalSearchTerm(value);
     performGlobalSearch(value);
+
+    // Show suggestions when typing
+    if (value.trim()) {
+      setShowSearchSuggestions(true);
+      generateSearchSuggestions();
+    } else {
+      setShowSearchSuggestions(false);
+    }
+
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const handleSearchSubmit = () => {
+    if (globalSearchTerm.trim()) {
+      addToSearchHistory(globalSearchTerm);
+      setShowSearchSuggestions(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (showSearchSuggestions && searchSuggestions.length > 0) {
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setSelectedSuggestionIndex((prev) =>
+            prev < searchSuggestions.length - 1 ? prev + 1 : 0
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setSelectedSuggestionIndex((prev) =>
+            prev > 0 ? prev - 1 : searchSuggestions.length - 1
+          );
+          break;
+        case "Enter":
+          e.preventDefault();
+          if (selectedSuggestionIndex >= 0) {
+            const suggestion = searchSuggestions[selectedSuggestionIndex];
+            setGlobalSearchTerm(suggestion.text);
+            performGlobalSearch(suggestion.text);
+            addToSearchHistory(suggestion.text);
+          } else {
+            handleSearchSubmit();
+          }
+          setShowSearchSuggestions(false);
+          break;
+        case "Escape":
+          setShowSearchSuggestions(false);
+          setSelectedSuggestionIndex(-1);
+          break;
+      }
+    } else if (e.key === "Enter") {
+      handleSearchSubmit();
+    }
+  };
+
+  const selectSuggestion = (suggestion: SearchSuggestion) => {
+    setGlobalSearchTerm(suggestion.text);
+    performGlobalSearch(suggestion.text);
+    addToSearchHistory(suggestion.text);
+    setShowSearchSuggestions(false);
   };
 
   const clearGlobalSearch = () => {
     setGlobalSearchTerm("");
     setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
+    setShowSearchSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const toggleAdvancedSearch = () => {
+    setIsAdvancedSearchMode(!isAdvancedSearchMode);
+    setShowSearchFilters(!showSearchFilters);
+    if (globalSearchTerm.trim()) {
+      performGlobalSearch(globalSearchTerm);
+    }
+  };
+
+  const updateSearchFilter = (filterType: keyof SearchFilters, value: any) => {
+    setSearchFilters((prev) => ({
+      ...prev,
+      [filterType]: value,
+    }));
+
+    // Re-run search with new filters
+    if (globalSearchTerm.trim()) {
+      performGlobalSearch(globalSearchTerm);
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchFilters({
+      categories: [],
+      sourceTypes: [],
+      statuses: [],
+      dateRange: { start: null, end: null },
+    });
+
+    if (globalSearchTerm.trim()) {
+      performGlobalSearch(globalSearchTerm);
+    }
   };
 
   const isSearchMatch = (
@@ -269,6 +574,32 @@ const QuizAndBankManagementPage: React.FC = () => {
       default:
         return false;
     }
+  };
+
+  // === PHASE 3: Highlighted Text Component ===
+  const HighlightedText: React.FC<{
+    text: string;
+    searchTerm: string;
+    className?: string;
+  }> = ({ text, searchTerm, className = "" }) => {
+    const highlightedParts = highlightText(text, searchTerm);
+
+    return (
+      <span className={className}>
+        {highlightedParts.map((part, index) => (
+          <span
+            key={index}
+            className={
+              part.isHighlighted
+                ? "bg-yellow-200 text-yellow-900 font-semibold px-1 rounded"
+                : ""
+            }
+          >
+            {part.text}
+          </span>
+        ))}
+      </span>
+    );
   };
 
   // Existing handlers and logic...
@@ -329,6 +660,36 @@ const QuizAndBankManagementPage: React.FC = () => {
       performGlobalSearch(globalSearchTerm);
     }
   }, [questionBanks, quizzes, globalSearchTerm, performGlobalSearch]);
+
+  // Initialize search suggestions when data loads
+  useEffect(() => {
+    if (questionBanks.length > 0 || quizzes.length > 0) {
+      generateSearchSuggestions();
+    }
+  }, [questionBanks, quizzes, generateSearchSuggestions]);
+
+  // Load search history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("quiz-management-search-history");
+    if (savedHistory) {
+      try {
+        const history = JSON.parse(savedHistory);
+        setSearchHistory(history);
+      } catch (error) {
+        console.warn("Failed to load search history:", error);
+      }
+    }
+  }, []);
+
+  // Save search history to localStorage when it changes
+  useEffect(() => {
+    if (searchHistory.length > 0) {
+      localStorage.setItem(
+        "quiz-management-search-history",
+        JSON.stringify(searchHistory)
+      );
+    }
+  }, [searchHistory]);
 
   // Dismiss success/error messages
   const dismissMessages = () => {
@@ -398,7 +759,6 @@ const QuizAndBankManagementPage: React.FC = () => {
 
   const handleDeleteQuiz = async () => {
     if (!quizToDelete) return;
-    setIsDeletingQuizId(quizToDelete._id);
     try {
       await deleteQuiz(quizToDelete._id);
       setQuizzes((prev) => prev.filter((q) => q._id !== quizToDelete._id));
@@ -407,7 +767,6 @@ const QuizAndBankManagementPage: React.FC = () => {
       setError(err.response?.data?.message || "Failed to delete quiz.");
     } finally {
       setQuizToDelete(null);
-      setIsDeletingQuizId(null);
     }
   };
 
@@ -501,12 +860,6 @@ const QuizAndBankManagementPage: React.FC = () => {
   const handleOpenEditQuizModal = (quiz: ClientIQuiz) => {
     setQuizToEdit(quiz);
     setIsEditQuizModalOpen(true);
-  };
-
-  const handleQuestionBankFilterChange = (
-    type: QuestionBankSourceFilterType
-  ) => {
-    setQuestionBankSourceFilter(type);
   };
 
   // Statistics calculations
@@ -814,7 +1167,10 @@ const QuizAndBankManagementPage: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 truncate">
-                            {quiz.title}
+                            <HighlightedText
+                              text={quiz.title}
+                              searchTerm={globalSearchTerm}
+                            />
                           </h3>
                           <span
                             className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
@@ -855,7 +1211,10 @@ const QuizAndBankManagementPage: React.FC = () => {
 
                     {quiz.description && (
                       <p className="text-sm text-gray-600 mt-3 line-clamp-2">
-                        {quiz.description}
+                        <HighlightedText
+                          text={quiz.description}
+                          searchTerm={globalSearchTerm}
+                        />
                       </p>
                     )}
 
@@ -1595,7 +1954,7 @@ const QuizAndBankManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Global Search Input */}
+          {/* Enhanced Global Search Input */}
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -1603,31 +1962,254 @@ const QuizAndBankManagementPage: React.FC = () => {
               placeholder="Search banks, quizzes, content..."
               value={globalSearchTerm}
               onChange={(e) => handleGlobalSearchChange(e.target.value)}
-              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
+              onKeyDown={handleSearchKeyDown}
+              onFocus={() => {
+                if (globalSearchTerm.trim()) {
+                  setShowSearchSuggestions(true);
+                  generateSearchSuggestions();
+                }
+              }}
+              onBlur={() => {
+                // Delay hiding suggestions to allow clicking on them
+                setTimeout(() => setShowSearchSuggestions(false), 150);
+              }}
+              className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
               aria-label="Global search"
             />
-            {globalSearchTerm && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
               <button
-                onClick={clearGlobalSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
-                aria-label="Clear search"
+                onClick={toggleAdvancedSearch}
+                className={`p-1 rounded-full transition-colors duration-200 ${
+                  isAdvancedSearchMode
+                    ? "text-blue-600 bg-blue-100 hover:bg-blue-200"
+                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                }`}
+                aria-label="Advanced search filters"
+                title="Advanced search"
               >
-                <XMarkIcon className="h-4 w-4" />
+                <FunnelIcon className="h-4 w-4" />
               </button>
+              {globalSearchTerm && (
+                <button
+                  onClick={clearGlobalSearch}
+                  className="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
+                  aria-label="Clear search"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Search Suggestions Dropdown */}
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                {searchSuggestions.map((suggestion, index) => (
+                  <button
+                    key={`${suggestion.type}-${suggestion.text}`}
+                    onClick={() => selectSuggestion(suggestion)}
+                    className={`w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between transition-colors duration-150 ${
+                      index === selectedSuggestionIndex
+                        ? "bg-blue-50 border-l-2 border-blue-500"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          suggestion.type === "recent"
+                            ? "bg-gray-400"
+                            : suggestion.type === "category"
+                            ? "bg-green-400"
+                            : suggestion.type === "sourceType"
+                            ? "bg-blue-400"
+                            : "bg-purple-400"
+                        }`}
+                      />
+                      <span className="text-sm text-gray-900">
+                        {suggestion.text}
+                      </span>
+                    </div>
+                    {suggestion.count && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        {suggestion.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
+          {/* Advanced Search Filters */}
+          {showSearchFilters && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Advanced Filters
+                </h4>
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Categories Filter */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Categories
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from(
+                      new Set([
+                        ...questionBanks.flatMap(
+                          (bank) => bank.categories || []
+                        ),
+                        ...quizzes.flatMap(
+                          (quiz) =>
+                            quiz.targetRoles?.map((role) =>
+                              typeof role === "string" ? role : role.name
+                            ) || []
+                        ),
+                      ])
+                    )
+                      .slice(0, 6)
+                      .map((category) => (
+                        <button
+                          key={category}
+                          onClick={() => {
+                            const newCategories =
+                              searchFilters.categories.includes(category)
+                                ? searchFilters.categories.filter(
+                                    (c) => c !== category
+                                  )
+                                : [...searchFilters.categories, category];
+                            updateSearchFilter("categories", newCategories);
+                          }}
+                          className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                            searchFilters.categories.includes(category)
+                              ? "bg-blue-100 text-blue-800 border border-blue-300"
+                              : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {category}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Source Types Filter */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Source Types
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {["SOP", "MENU", "MANUAL"].map((sourceType) => (
+                      <button
+                        key={sourceType}
+                        onClick={() => {
+                          const newSourceTypes =
+                            searchFilters.sourceTypes.includes(sourceType)
+                              ? searchFilters.sourceTypes.filter(
+                                  (s) => s !== sourceType
+                                )
+                              : [...searchFilters.sourceTypes, sourceType];
+                          updateSearchFilter("sourceTypes", newSourceTypes);
+                        }}
+                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                          searchFilters.sourceTypes.includes(sourceType)
+                            ? "bg-green-100 text-green-800 border border-green-300"
+                            : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {sourceType}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Quiz Status
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {["active", "inactive"].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          const newStatuses = searchFilters.statuses.includes(
+                            status
+                          )
+                            ? searchFilters.statuses.filter((s) => s !== status)
+                            : [...searchFilters.statuses, status];
+                          updateSearchFilter("statuses", newStatuses);
+                        }}
+                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                          searchFilters.statuses.includes(status)
+                            ? "bg-purple-100 text-purple-800 border border-purple-300"
+                            : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Search Results Summary */}
           {isSearchActive && (
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-slate-600">
-                {searchResults.questionBanks.length +
-                  searchResults.quizzes.length}{" "}
-                items found
-              </span>
-              <span className="text-slate-500">
-                Searching for "{globalSearchTerm}"
-              </span>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600">
+                  {searchResults.questionBanks.length +
+                    searchResults.quizzes.length}{" "}
+                  items found
+                  {isAdvancedSearchMode && (
+                    <span className="ml-1 text-blue-600 font-medium">
+                      (filtered)
+                    </span>
+                  )}
+                </span>
+                <span className="text-slate-500">
+                  Searching for "{globalSearchTerm}"
+                </span>
+              </div>
+
+              {/* Search breakdown */}
+              {(searchResults.questionBanks.length > 0 ||
+                searchResults.quizzes.length > 0) && (
+                <div className="flex items-center space-x-4 text-xs text-slate-500">
+                  {searchResults.questionBanks.length > 0 && (
+                    <span className="flex items-center">
+                      <BookOpenIcon className="h-3 w-3 mr-1" />
+                      {searchResults.questionBanks.length} banks
+                    </span>
+                  )}
+                  {searchResults.quizzes.length > 0 && (
+                    <span className="flex items-center">
+                      <AcademicCapIcon className="h-3 w-3 mr-1" />
+                      {searchResults.quizzes.length} quizzes
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Keyboard shortcuts hint */}
+              {showSearchSuggestions && (
+                <div className="text-xs text-slate-400 flex items-center space-x-2">
+                  <span>↑↓ navigate</span>
+                  <span>•</span>
+                  <span>↵ select</span>
+                  <span>•</span>
+                  <span>esc close</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2114,14 +2696,20 @@ const QuizAndBankManagementPage: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-3 mb-1">
                   <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {bank.name}
+                    <HighlightedText
+                      text={bank.name}
+                      searchTerm={globalSearchTerm}
+                    />
                   </h3>
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getSourceColor(
                       bank.sourceType
                     )}`}
                   >
-                    {bank.sourceType}
+                    <HighlightedText
+                      text={bank.sourceType}
+                      searchTerm={globalSearchTerm}
+                    />
                   </span>
                 </div>
                 <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -2139,18 +2727,29 @@ const QuizAndBankManagementPage: React.FC = () => {
                 </div>
                 {bank.description && (
                   <p className="text-sm text-gray-600 mt-2 line-clamp-1">
-                    {bank.description}
+                    <HighlightedText
+                      text={bank.description}
+                      searchTerm={globalSearchTerm}
+                    />
                   </p>
                 )}
                 {/* Linked content indicators */}
                 {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
                   <div className="mt-2 text-xs text-blue-600">
-                    📄 Linked to: {bank.sourceSopDocumentTitle}
+                    📄 Linked to:{" "}
+                    <HighlightedText
+                      text={bank.sourceSopDocumentTitle}
+                      searchTerm={globalSearchTerm}
+                    />
                   </div>
                 )}
                 {bank.sourceType === "MENU" && bank.sourceMenuName && (
                   <div className="mt-2 text-xs text-emerald-600">
-                    🍽️ Linked to: {bank.sourceMenuName}
+                    🍽️ Linked to:{" "}
+                    <HighlightedText
+                      text={bank.sourceMenuName}
+                      searchTerm={globalSearchTerm}
+                    />
                   </div>
                 )}
               </div>
@@ -2175,55 +2774,6 @@ const QuizAndBankManagementPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-    );
-  };
-
-  // Render Question Bank List
-  const renderQuestionBankList = () => {
-    if (isLoadingBanks) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <LoadingSpinner message="Loading question banks..." />
-        </div>
-      );
-    }
-
-    if (filteredQuestionBanks.length === 0) {
-      const hasSearchOrFilter = questionBankSourceFilter !== "ALL";
-
-      return (
-        <div className="text-center py-12">
-          <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {hasSearchOrFilter
-              ? "No question banks found"
-              : "No question banks yet"}
-          </h3>
-          <p className="text-gray-500 mb-6">
-            {hasSearchOrFilter
-              ? "Try adjusting your search or filter criteria"
-              : "Create your first question bank to get started with quizzes"}
-          </p>
-          {!hasSearchOrFilter && (
-            <Button
-              variant="primary"
-              onClick={() => setIsCreateBankModalOpen(true)}
-              disabled={!restaurantId}
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Create Question Bank
-            </Button>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-3">
-        {filteredQuestionBanks.map((bank) => (
-          <QuestionBankListItem key={bank._id} bank={bank} />
-        ))}
       </div>
     );
   };
