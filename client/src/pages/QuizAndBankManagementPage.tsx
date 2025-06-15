@@ -457,7 +457,6 @@ const QuizAndBankManagementPage: React.FC = () => {
   // === PHASE 3: Enhanced Search Handlers ===
   const handleGlobalSearchChange = (value: string) => {
     setGlobalSearchTerm(value);
-    performGlobalSearch(value);
 
     // Show suggestions when typing (minimum 1 character)
     if (value.trim().length > 0) {
@@ -465,6 +464,7 @@ const QuizAndBankManagementPage: React.FC = () => {
       generateSearchSuggestions();
     } else {
       setShowSearchSuggestions(false);
+      setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
     }
 
     setSelectedSuggestionIndex(-1);
@@ -657,19 +657,33 @@ const QuizAndBankManagementPage: React.FC = () => {
     fetchQuizzesList();
   }, [fetchBanks, fetchQuizzesList]);
 
-  // Update global search when data changes
+  // Debounced search effect - only search after user stops typing for 300ms
+  useEffect(() => {
+    const searchTimer = setTimeout(() => {
+      if (globalSearchTerm.trim()) {
+        performGlobalSearch(globalSearchTerm);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearchTerm]);
+
+  // Update search when data changes
   useEffect(() => {
     if (globalSearchTerm.trim()) {
       performGlobalSearch(globalSearchTerm);
     }
-  }, [questionBanks, quizzes, globalSearchTerm, performGlobalSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionBanks, quizzes]);
 
-  // Initialize search suggestions when data loads
+  // Initialize search suggestions when data loads (but not when generateSearchSuggestions changes to avoid infinite loop)
   useEffect(() => {
     if (questionBanks.length > 0 || quizzes.length > 0) {
       generateSearchSuggestions();
     }
-  }, [questionBanks, quizzes, generateSearchSuggestions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionBanks, quizzes]);
 
   // Load search history from localStorage on mount
   useEffect(() => {
