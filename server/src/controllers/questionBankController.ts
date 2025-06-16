@@ -8,7 +8,10 @@ import {
   CreateQuestionBankFromMenuData,
   CreateQuestionBankFromSopData,
 } from "../services/questionBankService";
-import QuestionModel, { IQuestion } from "../models/QuestionModel"; // Import QuestionModel and IQuestion
+import QuestionModel, {
+  IQuestion,
+  KnowledgeCategory,
+} from "../models/QuestionModel"; // Import QuestionModel and IQuestion
 import QuestionBankModel, { IQuestionBank } from "../models/QuestionBankModel"; // Import QuestionBankModel and IQuestionBank
 import LegacyAiQuestionService, {
   GenerateQuestionsFromSopParams,
@@ -1149,6 +1152,101 @@ export const generateAiQuestionsForSopBank = async (
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// Controller to add AI-generated questions to a question bank with pending_review status
+export const addPendingQuestionsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { bankId } = req.params;
+    const { questions }: { questions: Partial<IQuestion>[] } = req.body;
+
+    if (!req.user || !req.user.restaurantId) {
+      return next(
+        new AppError("User not authenticated or restaurantId missing", 401)
+      );
+    }
+    const restaurantId = req.user.restaurantId as mongoose.Types.ObjectId;
+
+    if (!mongoose.Types.ObjectId.isValid(bankId)) {
+      return next(new AppError("Invalid Question Bank ID format.", 400));
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return next(
+        new AppError("Questions array is required and cannot be empty.", 400)
+      );
+    }
+
+    // Find the question bank
+    const bank = await QuestionBankModel.findOne({
+      _id: bankId,
+      restaurantId,
+    });
+
+    if (!bank) {
+      return next(
+        new AppError(
+          `Question Bank with ID ${bankId} not found for this restaurant.`,
+          404
+        )
+      );
+    }
+
+    // Create and save questions with pending_review status
+    const questionsToSave: mongoose.Document<unknown, {}, IQuestion>[] = [];
+
+    for (const qData of questions) {
+      // Ensure all required fields are present with proper defaults
+      const questionData = {
+        questionText: qData.questionText,
+        questionType: qData.questionType,
+        options: qData.options || [],
+        categories: qData.categories || ["general"],
+        explanation: qData.explanation,
+        status: "pending_review" as const,
+        createdBy: "ai" as const,
+        restaurantId,
+        questionBankId: bankId,
+        // Ensure knowledge category fields are present (required by schema)
+        knowledgeCategory:
+          qData.knowledgeCategory || KnowledgeCategory.FOOD_KNOWLEDGE,
+        knowledgeCategoryAssignedBy: "ai" as const,
+        knowledgeCategoryAssignedAt: new Date(),
+      };
+
+      const newQuestionDocument = new QuestionModel(questionData);
+      questionsToSave.push(newQuestionDocument);
+    }
+
+    // Save all questions
+    await QuestionModel.bulkSave(questionsToSave);
+
+    // Add question IDs to the bank's questions array
+    const newQuestionIds = questionsToSave.map(
+      (q) => q._id as mongoose.Types.ObjectId
+    );
+    bank.questions.push(...newQuestionIds);
+    await bank.save();
+
+    // Fetch the updated bank with populated questions
+    const updatedBank = await QuestionBankModel.findById(bankId)
+      .populate("questions")
+      .populate("sourceMenuId", "name")
+      .populate("sourceSopDocumentId", "title");
+
+    res.status(200).json({
+      status: "success",
+      message: `${questionsToSave.length} questions added to question bank for review.`,
+      data: updatedBank,
+    });
+  } catch (error) {
+    console.error("Error adding pending questions:", error);
     next(error);
   }
 };

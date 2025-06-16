@@ -713,6 +713,23 @@ export const processReviewedAiQuestions = async (
   return response.data.data;
 };
 
+/**
+ * Adds AI-generated questions to a question bank with pending_review status
+ * @param bankId The ID of the question bank
+ * @param questions The questions to add with pending_review status
+ */
+export const addQuestionsAsPendingReview = async (
+  bankId: string,
+  questions: Partial<IQuestion>[]
+): Promise<IQuestionBank> => {
+  const response = await api.post<{
+    status: string;
+    message: string;
+    data: IQuestionBank;
+  }>(`/question-banks/${bankId}/add-pending-questions`, { questions });
+  return response.data.data;
+};
+
 // Staff Endpoints
 
 export const getStaffList = async (

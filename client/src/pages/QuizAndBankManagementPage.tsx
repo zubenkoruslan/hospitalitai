@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -86,11 +86,6 @@ interface SearchSuggestion {
   count?: number;
 }
 
-interface HighlightedText {
-  text: string;
-  isHighlighted: boolean;
-}
-
 const QuizAndBankManagementPage: React.FC = () => {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId;
@@ -106,35 +101,12 @@ const QuizAndBankManagementPage: React.FC = () => {
   >(null);
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
 
-  // Enhanced search state
-  const [globalSearchTerm, setGlobalSearchTerm] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<SearchResults>({
-    sections: [],
-    questionBanks: [],
-    quizzes: [],
-  });
-
-  // === PHASE 3: Enhanced Search State ===
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    categories: [],
-    sourceTypes: [],
-    statuses: [],
-    dateRange: { start: null, end: null },
-  });
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [searchSuggestions, setSearchSuggestions] = useState<
-    SearchSuggestion[]
-  >([]);
-  const [showSearchFilters, setShowSearchFilters] = useState<boolean>(false);
-  const [showSearchSuggestions, setShowSearchSuggestions] =
-    useState<boolean>(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] =
-    useState<number>(-1);
-  const [isAdvancedSearchMode, setIsAdvancedSearchMode] =
-    useState<boolean>(false);
-
-  // Ref for search container to handle click outside
-  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+  // Simple search state (matching working pages)
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<{
+    questionBanks: string[];
+    quizzes: string[];
+  }>({ questionBanks: [], quizzes: [] });
 
   // UI state for expandable sections in navigation
   const [expandedSections, setExpandedSections] = useState<
@@ -185,6 +157,9 @@ const QuizAndBankManagementPage: React.FC = () => {
     null
   );
 
+  // Search input ref for keyboard shortcuts and UX improvements
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // === PHASE 1: Navigation Helper Functions ===
   const handleViewChange = (view: ViewType) => {
     setSelectedView(view);
@@ -212,397 +187,72 @@ const QuizAndBankManagementPage: React.FC = () => {
     }));
   };
 
-  // === PHASE 3: Enhanced Search Utility Functions ===
-  const highlightText = useCallback(
-    (text: string, searchTerm: string): HighlightedText[] => {
-      if (!searchTerm.trim()) {
-        return [{ text, isHighlighted: false }];
-      }
+  // Simple search functionality (matching working pages)
+  const performSearch = (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setSearchResults({ questionBanks: [], quizzes: [] });
+      return;
+    }
 
-      const regex = new RegExp(
-        `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-        "gi"
-      );
-      const parts = text.split(regex);
+    const term = searchTerm.toLowerCase();
+    const matchingQuestionBanks: string[] = [];
+    const matchingQuizzes: string[] = [];
 
-      return parts.map((part, index) => ({
-        text: part,
-        isHighlighted:
-          regex.test(part) && part.toLowerCase() === searchTerm.toLowerCase(),
-      }));
-    },
-    []
-  );
+    // Search in question banks
+    questionBanks.forEach((bank) => {
+      const matches =
+        bank.name.toLowerCase().includes(term) ||
+        bank.description?.toLowerCase().includes(term) ||
+        bank.sourceSopDocumentTitle?.toLowerCase().includes(term) ||
+        bank.sourceMenuName?.toLowerCase().includes(term) ||
+        bank.sourceType.toLowerCase().includes(term) ||
+        bank.categories?.some((cat) => cat.toLowerCase().includes(term));
 
-  const generateSearchSuggestions = useCallback(() => {
-    const suggestions: SearchSuggestion[] = [];
-
-    // Add recent searches
-    searchHistory.slice(0, 3).forEach((term) => {
-      suggestions.push({ text: term, type: "recent" });
-    });
-
-    // Add category suggestions
-    const categories = Array.from(
-      new Set([
-        ...questionBanks.flatMap((bank) => bank.categories || []),
-        ...quizzes.flatMap(
-          (quiz) =>
-            quiz.targetRoles?.map((role) =>
-              typeof role === "string" ? role : role.name
-            ) || []
-        ),
-      ])
-    );
-
-    categories.slice(0, 5).forEach((category) => {
-      if (category && !suggestions.some((s) => s.text === category)) {
-        const count =
-          questionBanks.filter((bank) => bank.categories?.includes(category))
-            .length +
-          quizzes.filter((quiz) =>
-            quiz.targetRoles?.some(
-              (role) =>
-                (typeof role === "string" ? role : role.name) === category
-            )
-          ).length;
-        suggestions.push({ text: category, type: "category", count });
+      if (matches) {
+        matchingQuestionBanks.push(bank._id);
       }
     });
 
-    // Add source type suggestions
-    const sourceTypes = Array.from(
-      new Set(questionBanks.map((bank) => bank.sourceType))
-    );
-    sourceTypes.forEach((sourceType) => {
-      if (!suggestions.some((s) => s.text === sourceType)) {
-        const count = questionBanks.filter(
-          (bank) => bank.sourceType === sourceType
-        ).length;
-        suggestions.push({ text: sourceType, type: "sourceType", count });
+    // Search in quizzes
+    quizzes.forEach((quiz) => {
+      const matches =
+        quiz.title.toLowerCase().includes(term) ||
+        quiz.description?.toLowerCase().includes(term) ||
+        quiz.targetRoles?.some((role) =>
+          (typeof role === "string" ? role : role.name)
+            .toLowerCase()
+            .includes(term)
+        );
+
+      if (matches) {
+        matchingQuizzes.push(quiz._id);
       }
     });
 
-    setSearchSuggestions(suggestions);
-  }, [questionBanks, quizzes, searchHistory]);
-
-  const addToSearchHistory = useCallback((term: string) => {
-    if (!term.trim()) return;
-
-    setSearchHistory((prev) => {
-      const filtered = prev.filter((item) => item !== term);
-      return [term, ...filtered].slice(0, 10); // Keep last 10 searches
+    setSearchResults({
+      questionBanks: matchingQuestionBanks,
+      quizzes: matchingQuizzes,
     });
-  }, []);
-
-  const applyAdvancedFilters = useCallback(
-    (
-      items: (IQuestionBank | ClientIQuiz)[],
-      type: "questionBanks" | "quizzes"
-    ) => {
-      return items.filter((item) => {
-        // Category filter
-        if (searchFilters.categories.length > 0) {
-          if (type === "questionBanks") {
-            const bank = item as IQuestionBank;
-            if (
-              !bank.categories?.some((cat) =>
-                searchFilters.categories.includes(cat)
-              )
-            ) {
-              return false;
-            }
-          } else {
-            const quiz = item as ClientIQuiz;
-            if (
-              !quiz.targetRoles?.some((role) =>
-                searchFilters.categories.includes(
-                  typeof role === "string" ? role : role.name
-                )
-              )
-            ) {
-              return false;
-            }
-          }
-        }
-
-        // Source type filter (only for question banks)
-        if (type === "questionBanks" && searchFilters.sourceTypes.length > 0) {
-          const bank = item as IQuestionBank;
-          if (!searchFilters.sourceTypes.includes(bank.sourceType)) {
-            return false;
-          }
-        }
-
-        // Status filter (only for quizzes)
-        if (type === "quizzes" && searchFilters.statuses.length > 0) {
-          const quiz = item as ClientIQuiz;
-          const status = quiz.isAvailable ? "active" : "inactive";
-          if (!searchFilters.statuses.includes(status)) {
-            return false;
-          }
-        }
-
-        // Date range filter
-        if (searchFilters.dateRange.start || searchFilters.dateRange.end) {
-          const itemDate = new Date(item.createdAt || "");
-          if (
-            searchFilters.dateRange.start &&
-            itemDate < searchFilters.dateRange.start
-          ) {
-            return false;
-          }
-          if (
-            searchFilters.dateRange.end &&
-            itemDate > searchFilters.dateRange.end
-          ) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-    },
-    [searchFilters]
-  );
-
-  // === PHASE 1 & 3: Enhanced Search Implementation ===
-  const performGlobalSearch = useCallback(
-    (searchTerm: string) => {
-      if (!searchTerm.trim()) {
-        setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
-        return;
-      }
-
-      const term = searchTerm.toLowerCase();
-      const matchingSections: ViewType[] = [];
-      let matchingQuestionBanks: string[] = [];
-      let matchingQuizzes: string[] = [];
-
-      // Search in sections
-      if ("overview".includes(term) || "dashboard".includes(term)) {
-        matchingSections.push("overview");
-      }
-      if ("question".includes(term) || "bank".includes(term)) {
-        matchingSections.push("question-banks");
-      }
-      if ("quiz".includes(term) || "test".includes(term)) {
-        matchingSections.push("quizzes");
-      }
-
-      // Enhanced search in question banks
-      let filteredBanks = questionBanks.filter((bank) => {
-        const matches =
-          bank.name.toLowerCase().includes(term) ||
-          bank.description?.toLowerCase().includes(term) ||
-          bank.sourceSopDocumentTitle?.toLowerCase().includes(term) ||
-          bank.sourceMenuName?.toLowerCase().includes(term) ||
-          bank.sourceType.toLowerCase().includes(term) ||
-          bank.categories?.some((cat) => cat.toLowerCase().includes(term));
-
-        return matches;
-      });
-
-      // Apply advanced filters if in advanced mode
-      if (isAdvancedSearchMode) {
-        filteredBanks = applyAdvancedFilters(
-          filteredBanks,
-          "questionBanks"
-        ) as IQuestionBank[];
-      }
-
-      matchingQuestionBanks = filteredBanks.map((bank) => bank._id);
-
-      // Enhanced search in quizzes
-      let filteredQuizzes = quizzes.filter((quiz) => {
-        const matches =
-          quiz.title.toLowerCase().includes(term) ||
-          quiz.description?.toLowerCase().includes(term) ||
-          quiz.targetRoles?.some((role) =>
-            (typeof role === "string" ? role : role.name)
-              .toLowerCase()
-              .includes(term)
-          );
-
-        return matches;
-      });
-
-      // Apply advanced filters if in advanced mode
-      if (isAdvancedSearchMode) {
-        filteredQuizzes = applyAdvancedFilters(
-          filteredQuizzes,
-          "quizzes"
-        ) as ClientIQuiz[];
-      }
-
-      matchingQuizzes = filteredQuizzes.map((quiz) => quiz._id);
-
-      setSearchResults({
-        sections: matchingSections,
-        questionBanks: matchingQuestionBanks,
-        quizzes: matchingQuizzes,
-      });
-
-      // Auto-expand sections with matches
-      if (matchingQuestionBanks.length > 0) {
-        setExpandedSections((prev) => ({ ...prev, "question-banks": true }));
-      }
-      if (matchingQuizzes.length > 0) {
-        setExpandedSections((prev) => ({ ...prev, quizzes: true }));
-      }
-    },
-    [questionBanks, quizzes, isAdvancedSearchMode, applyAdvancedFilters]
-  );
-
-  // === PHASE 3: Enhanced Search Handlers ===
-  const handleGlobalSearchChange = (value: string) => {
-    setGlobalSearchTerm(value);
-
-    // Show suggestions when typing (minimum 1 character)
-    if (value.trim().length > 0) {
-      setShowSearchSuggestions(true);
-      generateSearchSuggestions();
-    } else {
-      setShowSearchSuggestions(false);
-      setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
-    }
-
-    setSelectedSuggestionIndex(-1);
   };
 
-  const handleSearchSubmit = () => {
-    if (globalSearchTerm.trim()) {
-      addToSearchHistory(globalSearchTerm);
-      setShowSearchSuggestions(false);
-    }
+  // Handle search input changes (matching working pages)
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    performSearch(value);
   };
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (showSearchSuggestions && searchSuggestions.length > 0) {
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setSelectedSuggestionIndex((prev) =>
-            prev < searchSuggestions.length - 1 ? prev + 1 : 0
-          );
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          setSelectedSuggestionIndex((prev) =>
-            prev > 0 ? prev - 1 : searchSuggestions.length - 1
-          );
-          break;
-        case "Enter":
-          e.preventDefault();
-          if (selectedSuggestionIndex >= 0) {
-            const suggestion = searchSuggestions[selectedSuggestionIndex];
-            setGlobalSearchTerm(suggestion.text);
-            performGlobalSearch(suggestion.text);
-            addToSearchHistory(suggestion.text);
-          } else {
-            handleSearchSubmit();
-          }
-          setShowSearchSuggestions(false);
-          break;
-        case "Escape":
-          setShowSearchSuggestions(false);
-          setSelectedSuggestionIndex(-1);
-          break;
-      }
-    } else if (e.key === "Enter") {
-      handleSearchSubmit();
-    }
+  // Clear search (matching working pages)
+  const clearSearch = () => {
+    setSearchTerm("");
+    setSearchResults({ questionBanks: [], quizzes: [] });
   };
 
-  const selectSuggestion = (suggestion: SearchSuggestion) => {
-    setGlobalSearchTerm(suggestion.text);
-    performGlobalSearch(suggestion.text);
-    addToSearchHistory(suggestion.text);
-    setShowSearchSuggestions(false);
-  };
-
-  const clearGlobalSearch = () => {
-    setGlobalSearchTerm("");
-    setSearchResults({ sections: [], questionBanks: [], quizzes: [] });
-    setShowSearchSuggestions(false);
-    setSelectedSuggestionIndex(-1);
-  };
-
-  const toggleAdvancedSearch = () => {
-    setIsAdvancedSearchMode(!isAdvancedSearchMode);
-    setShowSearchFilters(!showSearchFilters);
-    if (globalSearchTerm.trim()) {
-      performGlobalSearch(globalSearchTerm);
-    }
-  };
-
-  const updateSearchFilter = (filterType: keyof SearchFilters, value: any) => {
-    setSearchFilters((prev) => ({
-      ...prev,
-      [filterType]: value,
-    }));
-
-    // Re-run search with new filters
-    if (globalSearchTerm.trim()) {
-      performGlobalSearch(globalSearchTerm);
-    }
-  };
-
-  const clearAllFilters = () => {
-    setSearchFilters({
-      categories: [],
-      sourceTypes: [],
-      statuses: [],
-      dateRange: { start: null, end: null },
-    });
-
-    if (globalSearchTerm.trim()) {
-      performGlobalSearch(globalSearchTerm);
-    }
-  };
-
-  const isSearchMatch = (
-    type: "section" | "questionBank" | "quiz",
-    id: string
-  ) => {
-    if (!globalSearchTerm.trim()) return false;
-
-    switch (type) {
-      case "section":
-        return searchResults.sections.includes(id as ViewType);
-      case "questionBank":
-        return searchResults.questionBanks.includes(id);
-      case "quiz":
-        return searchResults.quizzes.includes(id);
-      default:
-        return false;
-    }
-  };
-
-  // === PHASE 3: Highlighted Text Component ===
-  const HighlightedText: React.FC<{
-    text: string;
-    searchTerm: string;
-    className?: string;
-  }> = ({ text, searchTerm, className = "" }) => {
-    const highlightedParts = highlightText(text, searchTerm);
-
-    return (
-      <span className={className}>
-        {highlightedParts.map((part, index) => (
-          <span
-            key={index}
-            className={
-              part.isHighlighted
-                ? "bg-yellow-200 text-yellow-900 font-semibold px-1 rounded"
-                : ""
-            }
-          >
-            {part.text}
-          </span>
-        ))}
-      </span>
-    );
+  // Check if item matches search (matching working pages)
+  const isSearchMatch = (type: "questionBank" | "quiz", id: string) => {
+    if (!searchTerm.trim()) return false;
+    return type === "questionBank"
+      ? searchResults.questionBanks.includes(id)
+      : searchResults.quizzes.includes(id);
   };
 
   // Existing handlers and logic...
@@ -657,74 +307,40 @@ const QuizAndBankManagementPage: React.FC = () => {
     fetchQuizzesList();
   }, [fetchBanks, fetchQuizzesList]);
 
-  // Debounced search effect - only search after user stops typing for 300ms
+  // Enhanced UX: Keyboard shortcuts for search
   useEffect(() => {
-    const searchTimer = setTimeout(() => {
-      if (globalSearchTerm.trim()) {
-        performGlobalSearch(globalSearchTerm);
-      }
-    }, 300);
-
-    return () => clearTimeout(searchTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSearchTerm]);
-
-  // Update search when data changes
-  useEffect(() => {
-    if (globalSearchTerm.trim()) {
-      performGlobalSearch(globalSearchTerm);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionBanks, quizzes]);
-
-  // Initialize search suggestions when data loads (but not when generateSearchSuggestions changes to avoid infinite loop)
-  useEffect(() => {
-    if (questionBanks.length > 0 || quizzes.length > 0) {
-      generateSearchSuggestions();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionBanks, quizzes]);
-
-  // Load search history from localStorage on mount
-  useEffect(() => {
-    const savedHistory = localStorage.getItem("quiz-management-search-history");
-    if (savedHistory) {
-      try {
-        const history = JSON.parse(savedHistory);
-        setSearchHistory(history);
-      } catch (error) {
-        console.warn("Failed to load search history:", error);
-      }
-    }
-  }, []);
-
-  // Save search history to localStorage when it changes
-  useEffect(() => {
-    if (searchHistory.length > 0) {
-      localStorage.setItem(
-        "quiz-management-search-history",
-        JSON.stringify(searchHistory)
-      );
-    }
-  }, [searchHistory]);
-
-  // Handle click outside to close suggestions
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Focus search input when "/" is pressed (like GitHub)
       if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
+        event.key === "/" &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
       ) {
-        setShowSearchSuggestions(false);
-        setSelectedSuggestionIndex(-1);
+        const activeElement = document.activeElement;
+        const isInInput =
+          activeElement?.tagName === "INPUT" ||
+          activeElement?.tagName === "TEXTAREA";
+
+        if (!isInInput) {
+          event.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      }
+
+      // Clear search when Escape is pressed and search is focused
+      if (
+        event.key === "Escape" &&
+        searchInputRef.current === document.activeElement
+      ) {
+        clearSearch();
+        searchInputRef.current?.blur();
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [clearSearch]);
 
   // Dismiss success/error messages
   const dismissMessages = () => {
@@ -921,7 +537,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
   // === PHASE 1: Content Display Component ===
   const ContentDisplay = () => {
-    // Breadcrumb component for better navigation
+    // Enhanced Breadcrumb component for better navigation
     const Breadcrumb = () => {
       const breadcrumbItems = [];
 
@@ -933,14 +549,27 @@ const QuizAndBankManagementPage: React.FC = () => {
           {
             label: "Question Banks",
             onClick: () => setSelectedQuestionBankId(null),
+            icon: BookOpenIcon,
           },
-          { label: bank?.name || "Unknown", onClick: () => {} }
+          {
+            label: bank?.name || "Unknown",
+            onClick: () => {},
+            icon: null,
+          }
         );
       } else if (selectedView === "quizzes" && selectedQuizId) {
         const quiz = quizzes.find((q) => q._id === selectedQuizId);
         breadcrumbItems.push(
-          { label: "Quizzes", onClick: () => setSelectedQuizId(null) },
-          { label: quiz?.title || "Unknown", onClick: () => {} }
+          {
+            label: "Quizzes",
+            onClick: () => setSelectedQuizId(null),
+            icon: AcademicCapIcon,
+          },
+          {
+            label: quiz?.title || "Unknown",
+            onClick: () => {},
+            icon: null,
+          }
         );
       }
 
@@ -948,7 +577,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
       return (
         <nav
-          className="flex items-center space-x-2 text-sm text-slate-600 mb-4"
+          className="flex items-center space-x-1 text-sm"
           aria-label="Breadcrumb"
         >
           <button
@@ -957,22 +586,24 @@ const QuizAndBankManagementPage: React.FC = () => {
               setSelectedQuestionBankId(null);
               setSelectedQuizId(null);
             }}
-            className="hover:text-slate-900 transition-colors duration-200"
+            className="flex items-center space-x-1 px-2 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-white/50 transition-all duration-200"
           >
-            Management Center
+            <HomeIcon className="h-4 w-4" />
+            <span>Management Center</span>
           </button>
           {breadcrumbItems.map((item, index) => (
-            <div key={index} className="flex items-center space-x-2">
+            <div key={index} className="flex items-center space-x-1">
               <ChevronRightIcon className="h-4 w-4 text-slate-400" />
               <button
                 onClick={item.onClick}
-                className={`hover:text-slate-900 transition-colors duration-200 ${
+                className={`flex items-center space-x-1 px-2 py-1 rounded-md transition-all duration-200 ${
                   index === breadcrumbItems.length - 1
-                    ? "text-slate-900 font-medium"
-                    : ""
+                    ? "text-slate-900 font-medium bg-white/70"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
                 }`}
               >
-                {item.label}
+                {item.icon && <item.icon className="h-4 w-4" />}
+                <span className="truncate max-w-[150px]">{item.label}</span>
               </button>
             </div>
           ))}
@@ -980,15 +611,38 @@ const QuizAndBankManagementPage: React.FC = () => {
       );
     };
 
-    // Loading skeleton component
+    // Enhanced loading skeleton component
     const ContentSkeleton = () => (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-slate-200 rounded-lg w-1/3 mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-slate-200 rounded w-full"></div>
-            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+          {/* Header skeleton */}
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="h-12 w-12 bg-slate-200 rounded-xl"></div>
+            <div className="flex-1">
+              <div className="h-6 bg-slate-200 rounded-lg w-1/3 mb-2"></div>
+              <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+            </div>
+          </div>
+
+          {/* Content skeleton */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="border border-slate-200 rounded-xl p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-slate-200 rounded w-full"></div>
+                    <div className="h-3 bg-slate-200 rounded w-2/3"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1029,29 +683,43 @@ const QuizAndBankManagementPage: React.FC = () => {
 
         <div className="flex-1 p-6 overflow-y-auto">
           {filteredQuestionBanks.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No question banks found
+            <div className="text-center py-16">
+              <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 mb-6 shadow-lg">
+                <BookOpenIcon className="h-12 w-12 text-emerald-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                No question banks yet
               </h3>
-              <p className="text-gray-500 mb-6">
-                Create your first question bank to get started
+              <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
+                Question banks are collections of questions that can be used to
+                create quizzes. Start by creating your first question bank from
+                your SOPs or menus.
               </p>
-              <Button
-                variant="primary"
-                onClick={() => setIsCreateBankModalOpen(true)}
-                className="flex items-center gap-2"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Create Question Bank
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  variant="primary"
+                  onClick={() => setIsCreateBankModalOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 shadow-lg hover:shadow-xl transition-shadow"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  Create Question Bank
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => window.open("/help/question-banks", "_blank")}
+                  className="flex items-center gap-2 px-6 py-3"
+                >
+                  <QuestionMarkCircleIcon className="h-5 w-5" />
+                  Learn More
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {filteredQuestionBanks.map((bank) => (
                 <div
                   key={bank._id}
-                  className="bg-white border border-gray-200 rounded-xl hover:border-emerald-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  className="bg-white border border-gray-200 rounded-xl hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100/50 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] group"
                   onClick={() => handleQuestionBankSelect(bank._id)}
                 >
                   <div className="p-6">
@@ -1169,29 +837,42 @@ const QuizAndBankManagementPage: React.FC = () => {
 
         <div className="flex-1 p-6 overflow-y-auto">
           {filteredQuizzes.length === 0 ? (
-            <div className="text-center py-12">
-              <AcademicCapIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No quizzes found
+            <div className="text-center py-16">
+              <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 mb-6 shadow-lg">
+                <AcademicCapIcon className="h-12 w-12 text-indigo-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                No quizzes yet
               </h3>
-              <p className="text-gray-500 mb-6">
-                Generate your first quiz from question banks
+              <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
+                Quizzes test your staff's knowledge based on your question
+                banks. Generate your first quiz to start training your team.
               </p>
-              <Button
-                variant="primary"
-                onClick={() => setIsGenerateQuizModalOpen(true)}
-                className="flex items-center gap-2"
-              >
-                <SparklesIcon className="h-4 w-4" />
-                Generate Quiz
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  variant="primary"
+                  onClick={() => setIsGenerateQuizModalOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 shadow-lg hover:shadow-xl transition-shadow"
+                >
+                  <SparklesIcon className="h-5 w-5" />
+                  Generate Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => window.open("/help/quizzes", "_blank")}
+                  className="flex items-center gap-2 px-6 py-3"
+                >
+                  <QuestionMarkCircleIcon className="h-5 w-5" />
+                  Learn More
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {filteredQuizzes.map((quiz) => (
                 <div
                   key={quiz._id}
-                  className="bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  className="bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50 transition-all duration-300 cursor-pointer transform hover:scale-[1.02] group"
                   onClick={() => handleQuizSelect(quiz._id)}
                 >
                   <div className="p-6">
@@ -1202,10 +883,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 truncate">
-                            <HighlightedText
-                              text={quiz.title}
-                              searchTerm={globalSearchTerm}
-                            />
+                            {quiz.title}
                           </h3>
                           <span
                             className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
@@ -1246,10 +924,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
                     {quiz.description && (
                       <p className="text-sm text-gray-600 mt-3 line-clamp-2">
-                        <HighlightedText
-                          text={quiz.description}
-                          searchTerm={globalSearchTerm}
-                        />
+                        {quiz.description}
                       </p>
                     )}
 
@@ -1326,54 +1001,79 @@ const QuizAndBankManagementPage: React.FC = () => {
 
       return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
-          <Breadcrumb />
+          {/* Enhanced Header with Breadcrumbs and Actions */}
+          <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200 rounded-t-2xl">
+            {/* Breadcrumb Row */}
+            <div className="px-6 pt-4 pb-2">
+              <Breadcrumb />
+            </div>
 
-          <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 p-6 border-b border-emerald-200 rounded-t-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl shadow-sm">
-                  <BookOpenIcon className="h-8 w-8 text-emerald-600" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-emerald-900 mb-2">
-                    {bank.name}
-                  </h1>
-                  <div className="flex items-center space-x-4 text-emerald-700">
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      {bank.sourceType}
-                    </span>
-                    <span>
-                      {Array.isArray(bank.questions)
-                        ? bank.questions.length
-                        : bank.questionCount || 0}{" "}
-                      questions
-                    </span>
-                    <span>•</span>
-                    <span>
-                      {bank.createdAt
-                        ? new Date(bank.createdAt).toLocaleDateString()
-                        : "Unknown date"}
-                    </span>
+            {/* Main Header Content */}
+            <div className="px-6 pb-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <div className="p-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl shadow-sm flex-shrink-0">
+                    <BookOpenIcon className="h-8 w-8 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-3xl font-bold text-emerald-900 mb-2 truncate">
+                      {bank.name}
+                    </h1>
+                    <div className="flex items-center flex-wrap gap-3 text-emerald-700">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        {bank.sourceType}
+                      </span>
+                      <span className="flex items-center text-sm">
+                        <QuestionMarkCircleIcon className="h-4 w-4 mr-1" />
+                        {Array.isArray(bank.questions)
+                          ? bank.questions.length
+                          : bank.questionCount || 0}{" "}
+                        questions
+                      </span>
+                      <span className="flex items-center text-sm">
+                        <ClockIcon className="h-4 w-4 mr-1" />
+                        {bank.createdAt
+                          ? new Date(bank.createdAt).toLocaleDateString()
+                          : "Unknown date"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleManageBankQuestions(bank._id)}
-                  className="flex items-center gap-2"
-                >
-                  <CogIcon className="h-4 w-4" />
-                  Manage Questions
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setBankToDelete(bank)}
-                  className="flex items-center gap-2"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Delete
-                </Button>
+
+                {/* Action Buttons - Responsive Layout */}
+                <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
+                  <div className="hidden lg:flex items-center space-x-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleManageBankQuestions(bank._id)}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <CogIcon className="h-4 w-4" />
+                      Manage
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setBankToDelete(bank)}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+
+                  {/* Mobile Menu Button */}
+                  <div className="lg:hidden">
+                    <Button
+                      variant="secondary"
+                      className="p-2"
+                      onClick={() => {
+                        /* Add mobile menu logic */
+                      }}
+                    >
+                      <CogIcon className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1442,16 +1142,17 @@ const QuizAndBankManagementPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="bg-slate-50 rounded-xl p-6">
-              <h3 className="font-semibold text-slate-900 mb-4">
+            {/* Enhanced Quick Actions */}
+            <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
+              <h3 className="font-semibold text-slate-900 mb-4 flex items-center">
+                <SparklesIcon className="h-5 w-5 mr-2 text-slate-600" />
                 Quick Actions
               </h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <Button
                   variant="primary"
                   onClick={() => handleManageBankQuestions(bank._id)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <CogIcon className="h-4 w-4" />
                   Manage Questions
@@ -1459,7 +1160,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <Button
                   variant="secondary"
                   onClick={() => setIsGenerateQuizModalOpen(true)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <SparklesIcon className="h-4 w-4" />
                   Generate Quiz
@@ -1470,7 +1171,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                     setSelectedQuestionBankId(null);
                     setSelectedView("question-banks");
                   }}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />
                   Back to Banks
@@ -1513,84 +1214,110 @@ const QuizAndBankManagementPage: React.FC = () => {
 
       return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
-          <Breadcrumb />
+          {/* Enhanced Header with Breadcrumbs and Actions */}
+          <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200 rounded-t-2xl">
+            {/* Breadcrumb Row */}
+            <div className="px-6 pt-4 pb-2">
+              <Breadcrumb />
+            </div>
 
-          <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-6 border-b border-indigo-200 rounded-t-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-4 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl shadow-sm">
-                  <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-indigo-900 mb-2">
-                    {quiz.title}
-                  </h1>
-                  <div className="flex items-center space-x-4 text-indigo-700">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-sm font-medium ${
-                        quiz.isAvailable
-                          ? "bg-green-100 text-green-800 border border-green-200"
-                          : "bg-gray-100 text-gray-800 border border-gray-200"
-                      }`}
-                    >
-                      {quiz.isAvailable ? "Active" : "Inactive"}
-                    </span>
-                    <span>
-                      {quiz.totalUniqueQuestionsInSourceSnapshot || 0} questions
-                    </span>
-                    <span>•</span>
-                    <span>
-                      {quiz.createdAt
-                        ? new Date(quiz.createdAt).toLocaleDateString()
-                        : "Unknown date"}
-                    </span>
+            {/* Main Header Content */}
+            <div className="px-6 pb-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <div className="p-4 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl shadow-sm flex-shrink-0">
+                    <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-3xl font-bold text-indigo-900 mb-2 truncate">
+                      {quiz.title}
+                    </h1>
+                    <div className="flex items-center flex-wrap gap-3 text-indigo-700">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          quiz.isAvailable
+                            ? "bg-green-100 text-green-800 border border-green-200"
+                            : "bg-gray-100 text-gray-800 border border-gray-200"
+                        }`}
+                      >
+                        {quiz.isAvailable ? "Active" : "Inactive"}
+                      </span>
+                      <span className="flex items-center text-sm">
+                        <QuestionMarkCircleIcon className="h-4 w-4 mr-1" />
+                        {quiz.totalUniqueQuestionsInSourceSnapshot || 0}{" "}
+                        questions
+                      </span>
+                      <span className="flex items-center text-sm">
+                        <ClockIcon className="h-4 w-4 mr-1" />
+                        {quiz.createdAt
+                          ? new Date(quiz.createdAt).toLocaleDateString()
+                          : "Unknown date"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenEditQuizModal(quiz)}
-                  className="flex items-center gap-2"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                  Edit Quiz
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleViewQuizProgress(quiz._id)}
-                  className="flex items-center gap-2"
-                >
-                  <ChartBarIcon className="h-4 w-4" />
-                  View Progress
-                </Button>
-                {quiz.isAvailable ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleDeactivateQuiz(quiz._id)}
-                    className="flex items-center gap-2"
-                  >
-                    <PauseIcon className="h-4 w-4" />
-                    Deactivate
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    onClick={() => handleActivateQuiz(quiz._id)}
-                    className="flex items-center gap-2"
-                  >
-                    <PlayIcon className="h-4 w-4" />
-                    Activate
-                  </Button>
-                )}
-                <Button
-                  variant="destructive"
-                  onClick={() => setQuizToDelete(quiz)}
-                  className="flex items-center gap-2"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Delete
-                </Button>
+
+                {/* Action Buttons - Responsive Layout */}
+                <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
+                  <div className="hidden lg:flex items-center space-x-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenEditQuizModal(quiz)}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleViewQuizProgress(quiz._id)}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <ChartBarIcon className="h-4 w-4" />
+                      Progress
+                    </Button>
+                    {quiz.isAvailable ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleDeactivateQuiz(quiz._id)}
+                        className="flex items-center gap-2 px-4 py-2"
+                      >
+                        <PauseIcon className="h-4 w-4" />
+                        Deactivate
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        onClick={() => handleActivateQuiz(quiz._id)}
+                        className="flex items-center gap-2 px-4 py-2"
+                      >
+                        <PlayIcon className="h-4 w-4" />
+                        Activate
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      onClick={() => setQuizToDelete(quiz)}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+
+                  {/* Mobile Menu Button */}
+                  <div className="lg:hidden">
+                    <Button
+                      variant="secondary"
+                      className="p-2"
+                      onClick={() => {
+                        /* Add mobile menu logic */
+                      }}
+                    >
+                      <CogIcon className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1669,16 +1396,17 @@ const QuizAndBankManagementPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="bg-slate-50 rounded-xl p-6">
-              <h3 className="font-semibold text-slate-900 mb-4">
+            {/* Enhanced Quick Actions */}
+            <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
+              <h3 className="font-semibold text-slate-900 mb-4 flex items-center">
+                <SparklesIcon className="h-5 w-5 mr-2 text-slate-600" />
                 Quick Actions
               </h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <Button
                   variant="primary"
                   onClick={() => handleOpenEditQuizModal(quiz)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <PencilIcon className="h-4 w-4" />
                   Edit Quiz
@@ -1686,7 +1414,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <Button
                   variant="secondary"
                   onClick={() => handleViewQuizProgress(quiz._id)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <ChartBarIcon className="h-4 w-4" />
                   View Progress
@@ -1695,7 +1423,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                   <Button
                     variant="secondary"
                     onClick={() => handleDeactivateQuiz(quiz._id)}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                   >
                     <PauseIcon className="h-4 w-4" />
                     Deactivate
@@ -1704,7 +1432,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                   <Button
                     variant="primary"
                     onClick={() => handleActivateQuiz(quiz._id)}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                   >
                     <PlayIcon className="h-4 w-4" />
                     Activate
@@ -1716,7 +1444,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                     setSelectedQuizId(null);
                     setSelectedView("quizzes");
                   }}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 justify-center py-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />
                   Back to Quizzes
@@ -1962,10 +1690,10 @@ const QuizAndBankManagementPage: React.FC = () => {
 
   // === PHASE 1: Navigation Panel Component ===
   const NavigationPanel = () => {
-    const isSearchActive = globalSearchTerm.trim() !== "";
+    const isSearchActive = searchTerm.trim() !== "";
 
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col hover:shadow-md transition-shadow duration-300">
         {/* Search Header */}
         <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200 rounded-t-2xl">
           <div className="flex items-center justify-between mb-4">
@@ -1989,214 +1717,6 @@ const QuizAndBankManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Enhanced Global Search Input */}
-          <div className="relative" ref={searchContainerRef}>
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search banks, quizzes, content..."
-              value={globalSearchTerm}
-              onChange={(e) => handleGlobalSearchChange(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              onFocus={() => {
-                if (globalSearchTerm.trim().length > 0) {
-                  setShowSearchSuggestions(true);
-                  generateSearchSuggestions();
-                }
-              }}
-              className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white/80 backdrop-blur-sm"
-              aria-label="Global search"
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-              <button
-                onClick={toggleAdvancedSearch}
-                className={`p-1 rounded-full transition-colors duration-200 ${
-                  isAdvancedSearchMode
-                    ? "text-blue-600 bg-blue-100 hover:bg-blue-200"
-                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                }`}
-                aria-label="Advanced search filters"
-                title="Advanced search"
-              >
-                <FunnelIcon className="h-4 w-4" />
-              </button>
-              {globalSearchTerm && (
-                <button
-                  onClick={clearGlobalSearch}
-                  className="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
-                  aria-label="Clear search"
-                >
-                  <XMarkIcon className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Search Suggestions Dropdown */}
-            {showSearchSuggestions && searchSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                {searchSuggestions.map((suggestion, index) => (
-                  <button
-                    key={`${suggestion.type}-${suggestion.text}`}
-                    onMouseDown={(e) => {
-                      // Prevent the input from losing focus
-                      e.preventDefault();
-                      selectSuggestion(suggestion);
-                    }}
-                    className={`w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between transition-colors duration-150 ${
-                      index === selectedSuggestionIndex
-                        ? "bg-blue-50 border-l-2 border-blue-500"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          suggestion.type === "recent"
-                            ? "bg-gray-400"
-                            : suggestion.type === "category"
-                            ? "bg-green-400"
-                            : suggestion.type === "sourceType"
-                            ? "bg-blue-400"
-                            : "bg-purple-400"
-                        }`}
-                      />
-                      <span className="text-sm text-gray-900">
-                        {suggestion.text}
-                      </span>
-                    </div>
-                    {suggestion.count && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {suggestion.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Advanced Search Filters */}
-          {showSearchFilters && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold text-gray-900">
-                  Advanced Filters
-                </h4>
-                <button
-                  onClick={clearAllFilters}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Clear All
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {/* Categories Filter */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Categories
-                  </label>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from(
-                      new Set([
-                        ...questionBanks.flatMap(
-                          (bank) => bank.categories || []
-                        ),
-                        ...quizzes.flatMap(
-                          (quiz) =>
-                            quiz.targetRoles?.map((role) =>
-                              typeof role === "string" ? role : role.name
-                            ) || []
-                        ),
-                      ])
-                    )
-                      .slice(0, 6)
-                      .map((category) => (
-                        <button
-                          key={category}
-                          onClick={() => {
-                            const newCategories =
-                              searchFilters.categories.includes(category)
-                                ? searchFilters.categories.filter(
-                                    (c) => c !== category
-                                  )
-                                : [...searchFilters.categories, category];
-                            updateSearchFilter("categories", newCategories);
-                          }}
-                          className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                            searchFilters.categories.includes(category)
-                              ? "bg-blue-100 text-blue-800 border border-blue-300"
-                              : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                          }`}
-                        >
-                          {category}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Source Types Filter */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Source Types
-                  </label>
-                  <div className="flex flex-wrap gap-1">
-                    {["SOP", "MENU", "MANUAL"].map((sourceType) => (
-                      <button
-                        key={sourceType}
-                        onClick={() => {
-                          const newSourceTypes =
-                            searchFilters.sourceTypes.includes(sourceType)
-                              ? searchFilters.sourceTypes.filter(
-                                  (s) => s !== sourceType
-                                )
-                              : [...searchFilters.sourceTypes, sourceType];
-                          updateSearchFilter("sourceTypes", newSourceTypes);
-                        }}
-                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                          searchFilters.sourceTypes.includes(sourceType)
-                            ? "bg-green-100 text-green-800 border border-green-300"
-                            : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {sourceType}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Status Filter */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Quiz Status
-                  </label>
-                  <div className="flex flex-wrap gap-1">
-                    {["active", "inactive"].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => {
-                          const newStatuses = searchFilters.statuses.includes(
-                            status
-                          )
-                            ? searchFilters.statuses.filter((s) => s !== status)
-                            : [...searchFilters.statuses, status];
-                          updateSearchFilter("statuses", newStatuses);
-                        }}
-                        className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                          searchFilters.statuses.includes(status)
-                            ? "bg-purple-100 text-purple-800 border border-purple-300"
-                            : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Search Results Summary */}
           {isSearchActive && (
             <div className="mt-3 space-y-2">
@@ -2205,14 +1725,9 @@ const QuizAndBankManagementPage: React.FC = () => {
                   {searchResults.questionBanks.length +
                     searchResults.quizzes.length}{" "}
                   items found
-                  {isAdvancedSearchMode && (
-                    <span className="ml-1 text-blue-600 font-medium">
-                      (filtered)
-                    </span>
-                  )}
                 </span>
                 <span className="text-slate-500">
-                  Searching for "{globalSearchTerm}"
+                  Searching for "{searchTerm}"
                 </span>
               </div>
 
@@ -2234,17 +1749,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                   )}
                 </div>
               )}
-
-              {/* Keyboard shortcuts hint */}
-              {showSearchSuggestions && (
-                <div className="text-xs text-slate-400 flex items-center space-x-2">
-                  <span>↑↓ navigate</span>
-                  <span>•</span>
-                  <span>↵ select</span>
-                  <span>•</span>
-                  <span>esc close</span>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -2255,12 +1759,10 @@ const QuizAndBankManagementPage: React.FC = () => {
           <div>
             <button
               onClick={() => handleViewChange("overview")}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                isSearchMatch("section", "overview")
-                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
-                  : selectedView === "overview"
-                  ? "bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-2 border-blue-300 text-blue-800 shadow-lg"
-                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-300 group relative overflow-hidden transform hover:scale-[1.02] ${
+                selectedView === "overview"
+                  ? "bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-2 border-blue-300 text-blue-800 shadow-lg ring-1 ring-blue-200"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-200/50"
               }`}
             >
               <div className="flex items-center space-x-4">
@@ -2282,9 +1784,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <div className="text-left">
                   <span
                     className={`font-bold text-lg ${
-                      isSearchMatch("section", "overview")
-                        ? "text-yellow-900"
-                        : selectedView === "overview"
+                      selectedView === "overview"
                         ? "text-blue-900"
                         : "text-slate-800 group-hover:text-slate-900"
                     }`}
@@ -2293,9 +1793,7 @@ const QuizAndBankManagementPage: React.FC = () => {
                   </span>
                   <div
                     className={`text-sm mt-1 font-medium ${
-                      isSearchMatch("section", "overview")
-                        ? "text-yellow-700"
-                        : selectedView === "overview"
+                      selectedView === "overview"
                         ? "text-blue-600"
                         : "text-slate-500 group-hover:text-slate-600"
                     }`}
@@ -2314,13 +1812,12 @@ const QuizAndBankManagementPage: React.FC = () => {
                 handleViewChange("question-banks");
                 toggleSectionExpansion("question-banks");
               }}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                isSearchMatch("section", "question-banks") ||
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-300 group relative overflow-hidden transform hover:scale-[1.02] ${
                 searchResults.questionBanks.length > 0
-                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md ring-1 ring-yellow-200"
                   : selectedView === "question-banks"
-                  ? "bg-gradient-to-r from-emerald-50 via-emerald-100 to-emerald-50 border-2 border-emerald-300 text-emerald-800 shadow-lg"
-                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+                  ? "bg-gradient-to-r from-emerald-50 via-emerald-100 to-emerald-50 border-2 border-emerald-300 text-emerald-800 shadow-lg ring-1 ring-emerald-200"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-200/50"
               }`}
             >
               <div className="flex items-center space-x-4">
@@ -2342,7 +1839,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <div className="text-left">
                   <span
                     className={`font-bold text-lg ${
-                      isSearchMatch("section", "question-banks") ||
                       searchResults.questionBanks.length > 0
                         ? "text-yellow-900"
                         : selectedView === "question-banks"
@@ -2354,7 +1850,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                   </span>
                   <div
                     className={`text-sm mt-1 font-medium ${
-                      isSearchMatch("section", "question-banks") ||
                       searchResults.questionBanks.length > 0
                         ? "text-yellow-700"
                         : selectedView === "question-banks"
@@ -2486,13 +1981,12 @@ const QuizAndBankManagementPage: React.FC = () => {
                 handleViewChange("quizzes");
                 toggleSectionExpansion("quizzes");
               }}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                isSearchMatch("section", "quizzes") ||
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-300 group relative overflow-hidden transform hover:scale-[1.02] ${
                 searchResults.quizzes.length > 0
-                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md"
+                  ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900 shadow-md ring-1 ring-yellow-200"
                   : selectedView === "quizzes"
-                  ? "bg-gradient-to-r from-indigo-50 via-indigo-100 to-indigo-50 border-2 border-indigo-300 text-indigo-800 shadow-lg"
-                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-md"
+                  ? "bg-gradient-to-r from-indigo-50 via-indigo-100 to-indigo-50 border-2 border-indigo-300 text-indigo-800 shadow-lg ring-1 ring-indigo-200"
+                  : "hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-100 hover:to-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-200/50"
               }`}
             >
               <div className="flex items-center space-x-4">
@@ -2514,7 +2008,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                 <div className="text-left">
                   <span
                     className={`font-bold text-lg ${
-                      isSearchMatch("section", "quizzes") ||
                       searchResults.quizzes.length > 0
                         ? "text-yellow-900"
                         : selectedView === "quizzes"
@@ -2526,7 +2019,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                   </span>
                   <div
                     className={`text-sm mt-1 font-medium ${
-                      isSearchMatch("section", "quizzes") ||
                       searchResults.quizzes.length > 0
                         ? "text-yellow-700"
                         : selectedView === "quizzes"
@@ -2670,12 +2162,11 @@ const QuizAndBankManagementPage: React.FC = () => {
                   No results found
                 </h3>
                 <p className="text-slate-500 mb-4">
-                  No items match "{globalSearchTerm}". Try a different search
-                  term.
+                  No items match "{searchTerm}". Try a different search term.
                 </p>
                 <Button
                   variant="secondary"
-                  onClick={() => setGlobalSearchTerm("")}
+                  onClick={clearSearch}
                   className="text-sm"
                 >
                   Clear search
@@ -2731,20 +2222,14 @@ const QuizAndBankManagementPage: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-3 mb-1">
                   <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    <HighlightedText
-                      text={bank.name}
-                      searchTerm={globalSearchTerm}
-                    />
+                    {bank.name}
                   </h3>
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getSourceColor(
                       bank.sourceType
                     )}`}
                   >
-                    <HighlightedText
-                      text={bank.sourceType}
-                      searchTerm={globalSearchTerm}
-                    />
+                    {bank.sourceType}
                   </span>
                 </div>
                 <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -2762,29 +2247,18 @@ const QuizAndBankManagementPage: React.FC = () => {
                 </div>
                 {bank.description && (
                   <p className="text-sm text-gray-600 mt-2 line-clamp-1">
-                    <HighlightedText
-                      text={bank.description}
-                      searchTerm={globalSearchTerm}
-                    />
+                    {bank.description}
                   </p>
                 )}
                 {/* Linked content indicators */}
                 {bank.sourceType === "SOP" && bank.sourceSopDocumentTitle && (
                   <div className="mt-2 text-xs text-blue-600">
-                    📄 Linked to:{" "}
-                    <HighlightedText
-                      text={bank.sourceSopDocumentTitle}
-                      searchTerm={globalSearchTerm}
-                    />
+                    📄 Linked to: {bank.sourceSopDocumentTitle}
                   </div>
                 )}
                 {bank.sourceType === "MENU" && bank.sourceMenuName && (
                   <div className="mt-2 text-xs text-emerald-600">
-                    🍽️ Linked to:{" "}
-                    <HighlightedText
-                      text={bank.sourceMenuName}
-                      searchTerm={globalSearchTerm}
-                    />
+                    🍽️ Linked to: {bank.sourceMenuName}
                   </div>
                 )}
               </div>
@@ -2820,7 +2294,7 @@ const QuizAndBankManagementPage: React.FC = () => {
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Header Section */}
+              {/* Simplified Header Section */}
               <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
@@ -2856,75 +2330,6 @@ const QuizAndBankManagementPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8">
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Question Banks
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.totalBanks}
-                        </p>
-                      </div>
-                      <BookOpenIcon className="h-8 w-8 text-blue-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Total Questions
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.totalQuestions}
-                        </p>
-                      </div>
-                      <ListBulletIcon className="h-8 w-8 text-purple-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Total Quizzes
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.totalQuizzes}
-                        </p>
-                      </div>
-                      <AcademicCapIcon className="h-8 w-8 text-indigo-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Active Quizzes
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.activeQuizzes}
-                        </p>
-                      </div>
-                      <PlayIcon className="h-8 w-8 text-green-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Inactive
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.inactiveQuizzes}
-                        </p>
-                      </div>
-                      <PauseIcon className="h-8 w-8 text-orange-400" />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Messages */}
@@ -2943,7 +2348,85 @@ const QuizAndBankManagementPage: React.FC = () => {
               )}
 
               {/* === PHASE 1: Two-Column Layout Implementation === */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-400px)]">
+              {/* Enhanced Global Search Bar */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow duration-200">
+                <div className="max-w-2xl mx-auto">
+                  <div className="relative group">
+                    <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search question banks, quizzes, content... (Press / to focus)"
+                      value={searchTerm}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="w-full pl-12 pr-16 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white shadow-inner"
+                      aria-label="Search quiz and question bank content"
+                      autoComplete="off"
+                    />
+
+                    {/* Search shortcut hint */}
+                    {!searchTerm && (
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2 text-gray-400">
+                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 rounded-md">
+                          /
+                        </kbd>
+                      </div>
+                    )}
+
+                    {/* Clear search button */}
+                    {searchTerm && (
+                      <button
+                        onClick={clearSearch}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all duration-200 group"
+                        aria-label="Clear search (Esc)"
+                        title="Clear search (Esc)"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Enhanced Search Results Summary */}
+                  {searchTerm.trim() && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-center space-x-4 text-sm">
+                        <div className="flex items-center space-x-1">
+                          <BookOpenIcon className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium text-blue-900">
+                            {searchResults.questionBanks.length} banks
+                          </span>
+                        </div>
+                        <div className="w-1 h-1 bg-blue-400 rounded-full"></div>
+                        <div className="flex items-center space-x-1">
+                          <AcademicCapIcon className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium text-blue-900">
+                            {searchResults.quizzes.length} quizzes
+                          </span>
+                        </div>
+                        <div className="text-blue-600">for "{searchTerm}"</div>
+                      </div>
+
+                      {/* No results found */}
+                      {searchResults.questionBanks.length === 0 &&
+                        searchResults.quizzes.length === 0 && (
+                          <div className="mt-2 text-center text-blue-700">
+                            <div className="flex items-center justify-center space-x-2">
+                              <span>No matches found.</span>
+                              <button
+                                onClick={clearSearch}
+                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                              >
+                                Clear search
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-500px)]">
                 {/* Left Navigation Panel */}
                 <div className="lg:col-span-1">
                   <NavigationPanel />

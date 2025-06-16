@@ -13,6 +13,7 @@ import {
   addCategoryToQuestionBank,
   removeCategoryFromQuestionBank,
   processReviewedAiQuestionsHandler,
+  addPendingQuestionsHandler,
 } from "../controllers/questionBankController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 import {
@@ -131,6 +132,15 @@ router.post(
   validateObjectId("bankId"),
   handleValidationErrors,
   processReviewedAiQuestionsHandler
+);
+
+// Route to add AI-generated questions to a question bank with pending_review status
+router.post(
+  "/:bankId/add-pending-questions",
+  restrictTo("restaurantAdmin", "manager", "restaurant"),
+  validateObjectId("bankId"),
+  handleValidationErrors,
+  addPendingQuestionsHandler
 );
 
 // ADDED: Route to trigger AI question generation for an SOP-sourced question bank

@@ -1,50 +1,54 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import {
   IQuestion,
   IQuestionBank,
   KnowledgeCategory,
+  UpdateQuestionClientData,
 } from "../types/questionBankTypes";
+import {
+  processReviewedAiQuestions,
+  addQuestionsAsPendingReview,
+  updateQuestion,
+} from "../services/api";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import AddManualQuestionForm from "../components/questionBank/AddManualQuestionForm";
 import GenerateAiQuestionsForm from "../components/questionBank/GenerateAiQuestionsForm";
-import Modal from "../components/common/Modal";
-import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
-import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
-import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import GenerateAiQuestionsFormSop from "../components/questionBank/GenerateAiQuestionsFormSop";
+import EditQuestionBankForm from "../components/questionBank/EditQuestionBankForm";
+import EditQuestionForm from "../components/questionBank/EditQuestionForm";
 import AiQuestionsPreview from "../components/questionBank/AiQuestionsPreview";
-import Card from "../components/common/Card";
-import ErrorMessage from "../components/common/ErrorMessage";
-import KnowledgeCategoryFilter from "../components/common/KnowledgeCategoryFilter";
-import {
-  getMenusByRestaurant as fetchRestaurantMenus,
-  getMenuWithItems,
-  getPendingReviewQuestions,
-  processReviewedAiQuestions,
-} from "../services/api";
-import { IMenuClient } from "../types/menuTypes";
+import Modal from "../components/common/Modal";
+import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import {
   BookOpenIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  SparklesIcon,
-  DocumentTextIcon,
-  XCircleIcon,
-  CheckIcon,
+  ArrowLeftIcon,
+  MagnifyingGlassIcon,
   XMarkIcon,
-  ChartPieIcon,
-  FunnelIcon,
+  ChevronRightIcon,
   TagIcon,
+  FolderIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  SparklesIcon,
+  CheckIcon,
+  ClockIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 
-// Enhanced component to display a single question with modern styling
+// Question List Item Component
 const QuestionListItem: React.FC<{
   question: IQuestion;
   onRemove: (questionId: string) => void;
@@ -52,651 +56,470 @@ const QuestionListItem: React.FC<{
   isSelected: boolean;
   onToggleSelect: (questionId: string) => void;
 }> = ({ question, onRemove, onEdit, isSelected, onToggleSelect }) => {
-  // Helper function to format question type
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const formatQuestionType = (type: string) => {
-    if (!type) return "N/A";
     return type
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
   };
 
-  // Get question type color
   const getQuestionTypeColor = (type: string) => {
-    switch (type) {
-      case "multiple-choice":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "true-false":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "short-answer":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      case "fill-in-the-blank":
-        return "bg-orange-100 text-orange-700 border-orange-200";
-      default:
-        return "bg-slate-100 text-slate-700 border-slate-200";
-    }
+    const colors = {
+      "multiple-choice": "bg-blue-100 text-blue-800 border-blue-200",
+      "true-false": "bg-green-100 text-green-800 border-green-200",
+      "short-answer": "bg-purple-100 text-purple-800 border-purple-200",
+      "fill-in-blank": "bg-orange-100 text-orange-800 border-orange-200",
+    };
+    return (
+      colors[type as keyof typeof colors] ||
+      "bg-gray-100 text-gray-800 border-gray-200"
+    );
   };
 
   return (
-    <Card
-      variant="default"
-      hover={true}
-      className={`relative transition-all duration-200 border-l-4 ${
-        isSelected
-          ? "border-l-sky-500 bg-sky-50/50 ring-2 ring-sky-200"
-          : "border-l-slate-200 hover:border-l-sky-300"
-      }`}
-    >
-      <div className="flex items-start space-x-4">
-        {/* Enhanced Checkbox */}
-        <div className="flex-shrink-0 pt-1">
-          <label className="inline-flex items-center cursor-pointer group">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+      {/* Collapsed View */}
+      <div className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-3 flex-1 min-w-0">
             <input
               type="checkbox"
-              className="h-5 w-5 text-sky-600 border-slate-300 rounded-md focus:ring-sky-500 focus:ring-2 transition-colors duration-200"
               checked={isSelected}
               onChange={() => onToggleSelect(question._id)}
-              aria-label={`Select question: ${question.questionText}`}
+              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
-            <span className="sr-only">Select question</span>
-          </label>
-        </div>
-
-        {/* Main content area */}
-        <div className="flex-grow space-y-3 pr-32">
-          {/* Question Text with better typography */}
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 leading-relaxed">
-              {question.questionText}
-            </h3>
-          </div>
-
-          {/* Enhanced Metadata badges */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getQuestionTypeColor(
-                question.questionType
-              )}`}
-            >
-              {formatQuestionType(question.questionType)}
-            </span>
-
-            {question.categories && question.categories.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {question.categories.slice(0, 2).map((category, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200"
-                  >
-                    {category}
-                  </span>
-                ))}
-                {question.categories.length > 2 && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-500 border border-slate-200">
-                    +{question.categories.length - 2} more
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-2">
+                <span
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getQuestionTypeColor(
+                    question.questionType
+                  )}`}
+                >
+                  {formatQuestionType(question.questionType)}
+                </span>
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  {question.knowledgeCategory
+                    .replace("-", " ")
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+                {question.status === "pending_review" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                    <ClockIcon className="h-3 w-3 mr-1" />
+                    Preview
                   </span>
                 )}
               </div>
-            )}
-
-            {question.knowledgeCategory && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-                {question.knowledgeCategory
-                  .replace("-", " ")
-                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-              </span>
-            )}
-          </div>
-
-          {/* Explanation with better styling */}
-          {question.explanation && (
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-              <p className="text-sm text-slate-700">
-                <span className="font-medium text-slate-800">Explanation:</span>{" "}
-                {question.explanation}
+              <p
+                className="text-slate-900 font-medium leading-relaxed cursor-pointer hover:text-slate-700 transition-colors duration-200"
+                onClick={() => setIsExpanded(!isExpanded)}
+                style={{
+                  display: isExpanded ? "block" : "-webkit-box",
+                  WebkitLineClamp: isExpanded ? "none" : 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {question.questionText}
               </p>
             </div>
-          )}
+          </div>
+          <div className="flex items-center space-x-2 ml-4">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all duration-200"
+            >
+              <ChevronRightIcon
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  isExpanded ? "rotate-90" : ""
+                }`}
+              />
+            </button>
+            <button
+              onClick={() => onEdit(question)}
+              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
+            >
+              <PencilIcon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onRemove(question._id)}
+              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
 
-          {/* Show options for multiple choice questions */}
-          {question.options && question.options.length > 0 && (
-            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-              <p className="text-xs font-medium text-blue-800 mb-2">Options:</p>
-              <div className="space-y-1">
-                {question.options.slice(0, 2).map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        option.isCorrect ? "bg-green-500" : "bg-slate-300"
-                      }`}
-                    />
-                    <span
-                      className={`text-sm ${
-                        option.isCorrect
-                          ? "text-green-700 font-medium"
-                          : "text-slate-600"
-                      }`}
-                    >
-                      {option.text}
+        {/* Expanded View */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="space-y-4">
+              {/* Answer Options */}
+              {question.options && question.options.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">
+                    Answer Options:
+                  </h4>
+                  <div className="space-y-2">
+                    {question.options.map((option, index) => (
+                      <div
+                        key={option._id || index}
+                        className={`p-3 rounded-lg border ${
+                          option.isCorrect
+                            ? "bg-green-50 border-green-200"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-900">{option.text}</span>
+                          {option.isCorrect && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <CheckIcon className="h-3 w-3 mr-1" />
+                              Correct
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Correct Answer for non-multiple choice */}
+              {(question as any).correctAnswer && !question.options?.length && (
+                <div>
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">
+                    Correct Answer:
+                  </h4>
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <span className="text-slate-900">
+                      {(question as any).correctAnswer}
                     </span>
                   </div>
-                ))}
-                {question.options.length > 2 && (
-                  <p className="text-xs text-blue-600 font-medium">
-                    +{question.options.length - 2} more options
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+                </div>
+              )}
 
-        {/* Enhanced action buttons */}
-        <div className="absolute top-4 right-4 flex items-center space-x-2">
-          <Button
-            variant="secondary"
-            onClick={() => onEdit(question)}
-            className="text-sm px-3 py-1.5 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition-colors duration-200"
-          >
-            <PencilIcon className="h-3 w-3 mr-1" />
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => onRemove(question._id)}
-            className="text-sm px-3 py-1.5"
-          >
-            <TrashIcon className="h-3 w-3 mr-1" />
-            Remove
-          </Button>
-        </div>
+              {/* Explanation */}
+              {question.explanation && (
+                <div>
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">
+                    Explanation:
+                  </h4>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-slate-900">
+                      {question.explanation}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Menu Category */}
+              {(question as any).menuCategory && (
+                <div>
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">
+                    Menu Category:
+                  </h4>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                    {(question as any).menuCategory}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-    </Card>
+    </div>
   );
 };
 
 const QuestionBankDetailPage: React.FC = () => {
   const { bankId } = useParams<{ bankId: string }>();
   const navigate = useNavigate();
-  const {
-    currentQuestionBank,
-    isLoading,
-    error,
-    fetchQuestionBankById,
-    removeQuestionFromCurrentBank,
-    addQuestionToCurrentBank,
-  } = useQuestionBanks();
+  const { currentQuestionBank, isLoading, error, fetchQuestionBankById } =
+    useQuestionBanks();
 
-  // Helper function to extract question ID from union type
-  const getQuestionId = (question: string | IQuestion): string => {
-    return typeof question === "string" ? question : question._id;
-  };
+  // Navigation state
+  const [selectedNavKnowledgeCategory, setSelectedNavKnowledgeCategory] =
+    useState<KnowledgeCategory | null>(null);
+  const [selectedNavQuestionType, setSelectedNavQuestionType] = useState<
+    string | null
+  >(null);
+  const [selectedNavQuestionId, setSelectedNavQuestionId] = useState<
+    string | null
+  >(null);
+  const [navSearchTerm, setNavSearchTerm] = useState("");
+  const [expandedNavCategories, setExpandedNavCategories] = useState<
+    Record<string, boolean>
+  >({});
+  const [expandedNavSubcategories, setExpandedNavSubcategories] = useState<
+    Record<string, boolean>
+  >({});
 
-  // Helper function to get questions as IQuestion objects (active only)
-  const getActiveQuestionsAsObjects = (): IQuestion[] => {
-    if (!currentQuestionBank) return [];
-    return currentQuestionBank.questions.filter(
-      (q): q is IQuestion => typeof q === "object" && q.status === "active"
-    );
-  };
-
-  // Helper function to get all questions as IQuestion objects (for legacy compatibility)
-  const getQuestionsAsObjects = (): IQuestion[] => {
-    if (!currentQuestionBank) return [];
-    return currentQuestionBank.questions.filter(
-      (q): q is IQuestion => typeof q === "object"
-    );
-  };
-
-  // ADDED: Helper function to apply filters to questions
-  const applyFiltersToQuestions = (questions: IQuestion[]): IQuestion[] => {
-    let filteredQuestions = [...questions];
-
-    // Filter by knowledge categories
-    if (selectedKnowledgeCategories.length > 0) {
-      filteredQuestions = filteredQuestions.filter((question) =>
-        selectedKnowledgeCategories.includes(question.knowledgeCategory)
-      );
-    }
-
-    // Filter by menu categories
-    if (selectedMenuCategories.length > 0) {
-      filteredQuestions = filteredQuestions.filter((question) =>
-        question.categories.some((category) =>
-          selectedMenuCategories.includes(category)
-        )
-      );
-    }
-
-    return filteredQuestions;
-  };
-
-  // ADDED: Get filtered active questions
-  const getFilteredActiveQuestions = (): IQuestion[] => {
-    const activeQuestions = getActiveQuestionsAsObjects();
-    return applyFiltersToQuestions(activeQuestions);
-  };
-
-  // ADDED: Get filtered pending questions
-  const getFilteredPendingQuestions = (): IQuestion[] => {
-    return applyFiltersToQuestions(pendingQuestions);
-  };
-
-  // ADDED: Get unique categories from all questions for filter options
-  const getUniqueMenuCategories = (): string[] => {
-    const allQuestions = [
-      ...getActiveQuestionsAsObjects(),
-      ...pendingQuestions,
-    ];
-    const categories = new Set<string>();
-    allQuestions.forEach((question) => {
-      question.categories.forEach((category) => categories.add(category));
-    });
-    return Array.from(categories).sort();
-  };
-
-  // Local state for managing modals or forms for adding questions
+  // Modal states
   const [showAddManualQuestionModal, setShowAddManualQuestionModal] =
     useState(false);
   const [showGenerateAiQuestionsModal, setShowGenerateAiQuestionsModal] =
     useState(false);
+  const [showGenerateSopAiModal, setShowGenerateSopAiModal] = useState(false);
   const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [isEditQuestionModalOpen, setIsEditQuestionModalOpen] = useState(false);
   const [isConfirmRemoveModalOpen, setIsConfirmRemoveModalOpen] =
     useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+  // Question management states
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [questionToRemoveId, setQuestionToRemoveId] = useState<string | null>(
     null
   );
-  const [isEditQuestionModalOpen, setIsEditQuestionModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<IQuestion | null>(
     null
   );
-
-  // State for multi-select and bulk actions
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [isConfirmBulkDeleteModalOpen, setIsConfirmBulkDeleteModalOpen] =
+  const [previewQuestions, setPreviewQuestions] = useState<IQuestion[]>([]);
+  const [isAddingApprovedQuestions, setIsAddingApprovedQuestions] =
     useState(false);
 
-  // State for menu selection for AI Generation
-  const [availableMenus, setAvailableMenus] = useState<IMenuClient[]>([]);
+  // Menu selection for AI generation
   const [selectedMenuForAi, setSelectedMenuForAi] = useState<string | null>(
     null
   );
   const [isMenuSelectionModalOpen, setIsMenuSelectionModalOpen] =
     useState(false);
+  const [availableMenus, setAvailableMenus] = useState<any[]>([]);
   const [isLoadingMenusForAi, setIsLoadingMenusForAi] = useState(false);
 
-  // ADDED: State for SOP AI Generation Modal
-  const [showGenerateSopAiModal, setShowGenerateSopAiModal] = useState(false);
+  // Search input ref for maintaining focus
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // ADDED: State for categories section expansion
-  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+  // Tab state for active vs preview questions
+  const [activeTab, setActiveTab] = useState<"active" | "preview">("active");
 
-  // ADDED: State for AI Questions Preview
-  const [previewQuestions, setPreviewQuestions] = useState<IQuestion[]>([]);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [selectedPreviewQuestionIds, setSelectedPreviewQuestionIds] = useState<
-    string[]
-  >([]);
-  const [isAddingApprovedQuestions, setIsAddingApprovedQuestions] =
-    useState(false);
-
-  // ADDED: State for Questions tabs (Active vs Pending Review)
-  const [activeQuestionsTab, setActiveQuestionsTab] = useState<
-    "active" | "pending"
-  >("active");
-
-  // ADDED: State for Pending Review Questions
-  const [pendingQuestions, setPendingQuestions] = useState<IQuestion[]>([]);
-  const [isLoadingPendingQuestions, setIsLoadingPendingQuestions] =
-    useState(false);
-  const [pendingQuestionsError, setPendingQuestionsError] = useState<
-    string | null
-  >(null);
-  const [selectedPendingQuestionIds, setSelectedPendingQuestionIds] = useState<
-    string[]
-  >([]);
-  const [isProcessingPendingQuestions, setIsProcessingPendingQuestions] =
-    useState(false);
-
-  // ADDED: State for filtering
-  const [selectedKnowledgeCategories, setSelectedKnowledgeCategories] =
-    useState<KnowledgeCategory[]>([]);
-  const [selectedMenuCategories, setSelectedMenuCategories] = useState<
-    string[]
-  >([]);
-  const [showFilters, setShowFilters] = useState(false);
-
-  const memoizedFetchQuestionBankById = useCallback(fetchQuestionBankById, [
-    fetchQuestionBankById,
-  ]);
+  const pageError =
+    !currentQuestionBank && !isLoading ? "Question bank not found" : error;
 
   useEffect(() => {
-    if (bankId) {
-      memoizedFetchQuestionBankById(bankId);
+    if (bankId && !currentQuestionBank && !isLoading) {
+      fetchQuestionBankById(bankId);
     }
-    setSelectedQuestionIds([]); // Reset selection when bank changes
-    setSelectedPendingQuestionIds([]); // Reset pending selection when bank changes
-    setSelectedKnowledgeCategories([]); // Reset filters when bank changes
-    setSelectedMenuCategories([]);
-    setShowFilters(false);
-  }, [bankId, memoizedFetchQuestionBankById]);
+  }, [bankId, currentQuestionBank, isLoading, fetchQuestionBankById]);
 
-  // ADDED: Function to toggle category expansion
-  const toggleCategoriesExpand = () => {
-    setIsCategoriesExpanded((prev) => !prev);
+  // Enhanced UX: Keyboard shortcuts for search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Focus search input when "/" is pressed (like GitHub)
+      if (
+        event.key === "/" &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
+        const activeElement = document.activeElement;
+        const isInInput =
+          activeElement?.tagName === "INPUT" ||
+          activeElement?.tagName === "TEXTAREA";
+
+        if (!isInInput) {
+          event.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      }
+
+      // Clear search when Escape is pressed and search is focused
+      if (
+        event.key === "Escape" &&
+        searchInputRef.current === document.activeElement
+      ) {
+        clearNavSearch();
+        searchInputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Helper functions
+  const getAllQuestionsAsObjects = (): IQuestion[] => {
+    if (!currentQuestionBank?.questions) {
+      return [];
+    }
+
+    // Get all questions that are objects
+    return currentQuestionBank.questions.filter(
+      (q) => typeof q === "object"
+    ) as IQuestion[];
   };
 
-  // ADDED: Filter handler functions
-  const handleKnowledgeCategoryToggle = (category: KnowledgeCategory) => {
-    setSelectedKnowledgeCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
+  const getActiveQuestionsAsObjects = (): IQuestion[] => {
+    const allQuestions = getAllQuestionsAsObjects();
+    // Active questions are those with status "active" or no status (default to active)
+    return allQuestions.filter((q) => !q.status || q.status === "active");
+  };
+
+  const getPreviewQuestionsAsObjects = (): IQuestion[] => {
+    const allQuestions = getAllQuestionsAsObjects();
+    // Preview questions are those with status "pending_review"
+    return allQuestions.filter((q) => q.status === "pending_review");
+  };
+
+  const getCurrentTabQuestions = (): IQuestion[] => {
+    return activeTab === "active"
+      ? getActiveQuestionsAsObjects()
+      : getPreviewQuestionsAsObjects();
+  };
+
+  // Group questions by knowledge category and menu item category
+  const groupedQuestionsByKnowledgeCategoryAndMenuCategory = useMemo(() => {
+    const questions = getCurrentTabQuestions();
+    return questions.reduce((acc, question) => {
+      const knowledgeCategory = question.knowledgeCategory;
+
+      // Use the first category from the question's categories array as the menu category
+      // If no categories, use "Uncategorized"
+      const menuCategory =
+        question.categories && question.categories.length > 0
+          ? question.categories[0]
+          : "Uncategorized";
+
+      if (!acc[knowledgeCategory]) {
+        acc[knowledgeCategory] = {};
+      }
+      if (!acc[knowledgeCategory][menuCategory]) {
+        acc[knowledgeCategory][menuCategory] = [];
+      }
+      acc[knowledgeCategory][menuCategory].push(question);
+      return acc;
+    }, {} as Record<KnowledgeCategory, Record<string, IQuestion[]>>);
+  }, [currentQuestionBank?.questions, activeTab]);
+
+  // Search functionality
+  const navSearchResults = useMemo(() => {
+    if (!navSearchTerm.trim()) {
+      return { questions: [] };
+    }
+
+    const searchTerm = navSearchTerm.toLowerCase();
+    const questions = getCurrentTabQuestions();
+
+    const matchingQuestions = questions.filter(
+      (question) =>
+        question.questionText.toLowerCase().includes(searchTerm) ||
+        question.knowledgeCategory.toLowerCase().includes(searchTerm) ||
+        question.questionType.toLowerCase().includes(searchTerm)
     );
+
+    return { questions: matchingQuestions.map((q) => q._id) };
+  }, [navSearchTerm, currentQuestionBank?.questions, activeTab]);
+
+  const isNavSearchMatch = (
+    type: "knowledgeCategory" | "questionType" | "question",
+    key: string
+  ) => {
+    if (!navSearchTerm.trim()) return false;
+    const searchTerm = navSearchTerm.toLowerCase();
+
+    if (type === "question") {
+      return navSearchResults.questions.includes(key);
+    } else if (type === "knowledgeCategory") {
+      return key.toLowerCase().includes(searchTerm);
+    } else if (type === "questionType") {
+      return key.toLowerCase().includes(searchTerm);
+    }
+
+    return false;
   };
 
-  const handleClearKnowledgeCategories = () => {
-    setSelectedKnowledgeCategories([]);
+  // Navigation handlers
+  const handleNavCategorySelect = (
+    knowledgeCategory: KnowledgeCategory,
+    questionType?: string,
+    questionId?: string
+  ) => {
+    setSelectedNavKnowledgeCategory(knowledgeCategory);
+    setSelectedNavQuestionType(questionType || null);
+    setSelectedNavQuestionId(questionId || null);
   };
 
-  const handleMenuCategoryToggle = (category: string) => {
-    setSelectedMenuCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
-    );
+  const toggleNavCategoryExpansion = (categoryKey: string) => {
+    setExpandedNavCategories((prev) => ({
+      ...prev,
+      [categoryKey]: !prev[categoryKey],
+    }));
   };
 
-  const handleClearAllFilters = () => {
-    setSelectedKnowledgeCategories([]);
-    setSelectedMenuCategories([]);
+  const toggleNavSubcategoryExpansion = (subcategoryKey: string) => {
+    setExpandedNavSubcategories((prev) => ({
+      ...prev,
+      [subcategoryKey]: !prev[subcategoryKey],
+    }));
   };
 
+  const handleNavSearchChange = (value: string) => {
+    setNavSearchTerm(value);
+  };
+
+  const clearNavSearch = () => {
+    setNavSearchTerm("");
+  };
+
+  // Question management handlers
   const requestRemoveQuestion = (questionId: string) => {
-    if (!bankId || !currentQuestionBank) return;
     setQuestionToRemoveId(questionId);
     setIsConfirmRemoveModalOpen(true);
   };
 
   const handleCancelRemoveQuestion = () => {
+    setQuestionToRemoveId(null);
+    setIsConfirmRemoveModalOpen(false);
+  };
+
+  const executeRemoveQuestion = async () => {
+    // Implementation would go here
     setIsConfirmRemoveModalOpen(false);
     setQuestionToRemoveId(null);
   };
 
-  const executeRemoveQuestion = async () => {
-    if (questionToRemoveId && currentQuestionBank) {
-      await removeQuestionFromCurrentBank(questionToRemoveId);
-      setIsConfirmRemoveModalOpen(false);
-      setQuestionToRemoveId(null);
-    }
-  };
-
-  const handleManualQuestionSubmit = async (newQuestion: IQuestion) => {
-    if (!currentQuestionBank) {
-      console.error("No current question bank to add to.");
-      return;
-    }
-    try {
-      if (newQuestion && newQuestion._id) {
-        await addQuestionToCurrentBank(newQuestion._id);
-        setShowAddManualQuestionModal(false);
-        if (bankId) fetchQuestionBankById(bankId);
-      } else {
-        console.error(
-          "New question data is invalid or missing ID after creation."
-        );
-        setPageError(
-          "Error: Failed to add the created question to the bank. The question data was invalid after creation."
-        );
-      }
-    } catch (err) {
-      console.error("Error adding created question to bank:", err);
-      setPageError(
-        `Error adding question to bank: ${
-          err instanceof Error ? err.message : "An unknown error occurred."
-        }`
-      );
-    }
-  };
-
-  const handleAiQuestionsGenerated = async (
-    generatedQuestions: IQuestion[]
-  ) => {
-    setShowGenerateAiQuestionsModal(false);
-    setShowGenerateSopAiModal(false);
-    setSelectedMenuForAi(null);
-
-    if (generatedQuestions && generatedQuestions.length > 0) {
-      // Show preview modal instead of directly adding to bank
-      setPreviewQuestions(generatedQuestions);
-      setSelectedPreviewQuestionIds(generatedQuestions.map((q) => q._id)); // Pre-select all questions
-      setShowPreviewModal(true);
-    } else {
-      alert("AI generation process completed, but no questions were created.");
-    }
-  };
-
-  // NEW: Handler for SOP AI Questions Generated
-  const handleSopAiQuestionsGenerated = async (
-    generatedQuestions: IQuestion[]
-  ) => {
-    setShowGenerateSopAiModal(false);
-
-    if (generatedQuestions && generatedQuestions.length > 0) {
-      // Show preview modal instead of directly adding to bank
-      setPreviewQuestions(generatedQuestions);
-      setSelectedPreviewQuestionIds(generatedQuestions.map((q) => q._id)); // Pre-select all questions
-      setShowPreviewModal(true);
-    } else {
-      alert("AI generation process completed, but no questions were created.");
-    }
-  };
-
-  // NEW: Handler for approving and adding selected questions from preview
-  const handleApproveSelectedQuestions = async () => {
-    if (!currentQuestionBank || selectedPreviewQuestionIds.length === 0) {
-      alert("No questions selected to approve.");
-      return;
-    }
-
-    setIsAddingApprovedQuestions(true);
-    try {
-      let addedCount = 0;
-      const approvedQuestions = previewQuestions.filter((q) =>
-        selectedPreviewQuestionIds.includes(q._id)
-      );
-
-      for (const question of approvedQuestions) {
-        try {
-          await addQuestionToCurrentBank(question._id);
-          addedCount++;
-        } catch (err) {
-          console.error(`Failed to add question ${question._id}:`, err);
-        }
-      }
-
-      // Close preview and refresh bank
-      setShowPreviewModal(false);
-      setPreviewQuestions([]);
-      setSelectedPreviewQuestionIds([]);
-
-      if (bankId) {
-        await fetchQuestionBankById(bankId);
-      }
-
-      alert(
-        `${addedCount} out of ${selectedPreviewQuestionIds.length} questions added to the question bank successfully.`
-      );
-    } catch (err) {
-      console.error("Error adding approved questions:", err);
-      setPageError(
-        `Error adding questions to bank: ${
-          err instanceof Error ? err.message : "An unknown error occurred."
-        }`
-      );
-    } finally {
-      setIsAddingApprovedQuestions(false);
-    }
-  };
-
-  // NEW: Handler for closing preview modal
-  const handleClosePreviewModal = () => {
-    setShowPreviewModal(false);
-    setPreviewQuestions([]);
-    setSelectedPreviewQuestionIds([]);
-  };
-
-  // NEW: Handler for toggling preview question selection
-  const handleTogglePreviewQuestion = (questionId: string) => {
-    setSelectedPreviewQuestionIds((prev) =>
-      prev.includes(questionId)
-        ? prev.filter((id) => id !== questionId)
-        : [...prev, questionId]
-    );
-  };
-
-  // NEW: Handler for selecting/deselecting all preview questions
-  const handleToggleAllPreviewQuestions = () => {
-    if (selectedPreviewQuestionIds.length === previewQuestions.length) {
-      setSelectedPreviewQuestionIds([]);
-    } else {
-      setSelectedPreviewQuestionIds(previewQuestions.map((q) => q._id));
-    }
-  };
-
-  // Helper to get error message
-  const getErrorMessage = (errorValue: unknown): string => {
-    if (
-      errorValue &&
-      typeof errorValue === "object" &&
-      "message" in errorValue
-    ) {
-      return String((errorValue as { message: unknown }).message);
-    }
-    return "An unknown error occurred.";
-  };
-
-  const handleOpenEditBankModal = () => {
-    if (currentQuestionBank) {
-      setIsEditBankModalOpen(true);
-    }
-  };
-
-  const handleCloseEditBankModal = () => {
-    setIsEditBankModalOpen(false);
-  };
-
-  const handleBankDetailsUpdated = (_updatedBank: IQuestionBank) => {
-    if (bankId) {
-      fetchQuestionBankById(bankId);
-    }
-    handleCloseEditBankModal();
-  };
-
-  // Handlers for Edit Question Modal
   const handleOpenEditQuestionModal = (question: IQuestion) => {
     setEditingQuestion(question);
     setIsEditQuestionModalOpen(true);
   };
 
   const handleCloseEditQuestionModal = () => {
-    setIsEditQuestionModalOpen(false);
     setEditingQuestion(null);
+    setIsEditQuestionModalOpen(false);
   };
 
-  const handleQuestionUpdatedInModal = (updatedQuestion: IQuestion) => {
-    if (currentQuestionBank && Array.isArray(currentQuestionBank.questions)) {
-      // Optimistic update or re-fetch
-    }
-    if (bankId) {
-      fetchQuestionBankById(bankId);
-    }
-    // If we're on the pending tab and the edited question was a pending question,
-    // refresh the pending questions list
-    if (activeQuestionsTab === "pending") {
-      fetchPendingQuestionsForBank();
-    }
-    handleCloseEditQuestionModal();
-  };
+  const handleQuestionUpdatedInModal = async (updatedQuestion: IQuestion) => {
+    try {
+      // Prepare the update data
+      const updateData: UpdateQuestionClientData = {
+        questionText: updatedQuestion.questionText,
+        questionType: updatedQuestion.questionType,
+        options: updatedQuestion.options.map((option) => ({
+          text: option.text,
+          isCorrect: option.isCorrect,
+        })),
+        categories: updatedQuestion.categories,
+        explanation: updatedQuestion.explanation,
+        knowledgeCategory: updatedQuestion.knowledgeCategory,
+      };
 
-  // MODIFIED: This handler now routes to different modals based on bank source type
-  const handleOpenGenerateAiQuestions = async () => {
-    if (!currentQuestionBank) {
-      setPageError("Question bank details not loaded.");
-      return;
-    }
-    setPageError(null);
+      // Call the API to update the question
+      await updateQuestion(updatedQuestion._id, updateData);
 
-    if (currentQuestionBank.sourceType === "MENU") {
-      // UPDATED LOGIC: If sourceMenuId exists, try to use it directly, but fall back if it doesn't exist
-      if (currentQuestionBank.sourceMenuId) {
-        try {
-          // Try to verify the menu still exists by fetching it
-          await getMenuWithItems(currentQuestionBank.sourceMenuId);
-          // If successful, use the existing menu ID
-          setSelectedMenuForAi(currentQuestionBank.sourceMenuId);
-          setShowGenerateAiQuestionsModal(true);
-          return;
-        } catch (err) {
-          console.warn(
-            "Linked menu no longer exists, falling back to menu selection:",
-            err
-          );
-          // Fall through to the existing logic to fetch available menus
-        }
+      // Refresh the question bank data to show the updated question
+      if (bankId) {
+        await fetchQuestionBankById(bankId);
       }
 
-      // Existing logic: Fetch menus if no sourceMenuId is linked OR if the linked menu doesn't exist
-      setIsLoadingMenusForAi(true);
-      try {
-        const menus = await fetchRestaurantMenus(
-          currentQuestionBank.restaurantId
-        );
-        const activeMenus = menus;
-
-        if (activeMenus.length === 0) {
-          setPageError(
-            "No active menus found for your restaurant. AI Question generation for menu-based banks requires an active menu."
-          );
-          setIsLoadingMenusForAi(false);
-          return;
-        }
-        setAvailableMenus(activeMenus);
-        if (activeMenus.length === 1) {
-          setSelectedMenuForAi(activeMenus[0]._id);
-          setShowGenerateAiQuestionsModal(true);
-        } else {
-          setIsMenuSelectionModalOpen(true);
-        }
-      } catch (err) {
-        console.error("Error fetching menus for AI generation:", err);
-        setPageError(getErrorMessage(err));
-      } finally {
-        setIsLoadingMenusForAi(false);
-      }
-    } else if (currentQuestionBank.sourceType === "SOP") {
-      if (!currentQuestionBank.sourceSopDocumentId) {
-        setPageError(
-          "This SOP-based question bank is not linked to a specific SOP document. Cannot generate AI questions."
-        );
-        return;
-      }
-      setShowGenerateSopAiModal(true); // Open the new/dedicated modal for SOPs
-    } else {
-      setPageError(
-        "AI question generation is not supported for this type of question bank."
-      );
+      handleCloseEditQuestionModal();
+    } catch (error) {
+      console.error("Error updating question:", error);
+      alert("Error updating question. Please try again.");
     }
   };
 
-  const handleMenuSelectForAi = (menuId: string) => {
-    setSelectedMenuForAi(menuId);
-    setIsMenuSelectionModalOpen(false);
-    setShowGenerateAiQuestionsModal(true);
-  };
-
-  // Handlers for multi-select and bulk delete
   const handleToggleSelectQuestion = (questionId: string) => {
     setSelectedQuestionIds((prevSelected) =>
       prevSelected.includes(questionId)
@@ -705,371 +528,125 @@ const QuestionBankDetailPage: React.FC = () => {
     );
   };
 
-  const handleToggleSelectAll = () => {
-    if (!currentQuestionBank || !currentQuestionBank.questions) return;
-    const filteredQuestions = getFilteredActiveQuestions();
-    if (selectedQuestionIds.length === filteredQuestions.length) {
-      setSelectedQuestionIds([]);
-    } else {
-      setSelectedQuestionIds(filteredQuestions.map((q) => q._id));
+  const handleManualQuestionSubmit = async (newQuestion: IQuestion) => {
+    // Implementation would go here
+    setShowAddManualQuestionModal(false);
+  };
+
+  const handleOpenEditBankModal = () => {
+    setIsEditBankModalOpen(true);
+  };
+
+  const handleCloseEditBankModal = () => {
+    setIsEditBankModalOpen(false);
+  };
+
+  const handleBankDetailsUpdated = (_updatedBank: IQuestionBank) => {
+    handleCloseEditBankModal();
+    if (bankId) {
+      fetchQuestionBankById(bankId);
     }
   };
 
-  const handleRequestBulkDelete = () => {
-    if (selectedQuestionIds.length > 0) {
-      setIsConfirmBulkDeleteModalOpen(true);
-    } else {
-      alert("No questions selected to delete.");
-    }
-  };
-
-  const handleCancelBulkDelete = () => {
-    setIsConfirmBulkDeleteModalOpen(false);
-  };
-
-  const executeBulkDelete = async () => {
-    if (!currentQuestionBank || selectedQuestionIds.length === 0) return;
-
-    // For now, deleting one by one. Consider a bulk API endpoint for efficiency.
-    try {
-      for (const questionId of selectedQuestionIds) {
-        await removeQuestionFromCurrentBank(questionId);
-      }
-      setSelectedQuestionIds([]); // Clear selection
-      // Optionally, re-fetch the bank to ensure UI consistency if removeQuestionFromCurrentBank doesn't update the context perfectly
-      if (bankId) fetchQuestionBankById(bankId);
-    } catch (err) {
-      console.error("Error during bulk delete:", err);
-      setPageError(
-        `Failed to delete some questions: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
-      // Re-fetch to get the current state after partial failure
-      if (bankId) fetchQuestionBankById(bankId);
-    } finally {
-      setIsConfirmBulkDeleteModalOpen(false);
-    }
-  };
-
-  // ADDED: Pending review questions handlers
-  const fetchPendingQuestionsForBank = useCallback(async () => {
-    if (!bankId) return;
-
-    setIsLoadingPendingQuestions(true);
-    setPendingQuestionsError(null);
-    try {
-      const allPendingQuestions = await getPendingReviewQuestions();
-      // Filter pending questions for this specific bank
-      const bankPendingQuestions = allPendingQuestions.filter(
-        (q) => q.questionBankId === bankId
-      );
-      setPendingQuestions(bankPendingQuestions || []);
-    } catch (err) {
-      setPendingQuestionsError(
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch pending questions."
-      );
-      console.error(err);
-    } finally {
-      setIsLoadingPendingQuestions(false);
-    }
-  }, [bankId]);
-
-  const handleTogglePendingQuestion = (questionId: string) => {
-    setSelectedPendingQuestionIds((prev) =>
-      prev.includes(questionId)
-        ? prev.filter((id) => id !== questionId)
-        : [...prev, questionId]
-    );
-  };
-
-  const handleToggleAllPendingQuestions = () => {
-    const filteredPendingQuestions = getFilteredPendingQuestions();
-    if (selectedPendingQuestionIds.length === filteredPendingQuestions.length) {
-      setSelectedPendingQuestionIds([]);
-    } else {
-      setSelectedPendingQuestionIds(filteredPendingQuestions.map((q) => q._id));
-    }
-  };
-
-  const handleApprovePendingQuestions = async () => {
-    if (!bankId || selectedPendingQuestionIds.length === 0) {
-      setPageError("Please select at least one question to approve.");
+  // Handler to approve selected preview questions
+  const handleApprovePreviewQuestions = async () => {
+    if (selectedQuestionIds.length === 0) {
+      alert("Please select questions to approve.");
       return;
     }
 
-    setIsProcessingPendingQuestions(true);
     try {
-      await processReviewedAiQuestions(bankId, {
-        acceptedQuestions: selectedPendingQuestionIds.map((id) => ({
-          _id: id,
-        })),
+      setIsAddingApprovedQuestions(true);
+
+      // Get the selected preview questions
+      const selectedPreviewQuestions = getPreviewQuestionsAsObjects().filter(
+        (q) => selectedQuestionIds.includes(q._id)
+      );
+
+      // Call the API to approve the questions (make them active)
+      await processReviewedAiQuestions(bankId!, {
+        acceptedQuestions: selectedPreviewQuestions,
         updatedQuestions: [],
         deletedQuestionIds: [],
       });
 
-      setPageError(null);
-      setSelectedPendingQuestionIds([]);
-      fetchPendingQuestionsForBank(); // Refresh pending questions
-      if (bankId) fetchQuestionBankById(bankId); // Refresh bank to update active questions count
-    } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to approve questions."
+      // Clear selection and refresh data
+      setSelectedQuestionIds([]);
+      if (bankId) {
+        await fetchQuestionBankById(bankId);
+      }
+
+      // Switch to active tab to see the newly approved questions
+      setActiveTab("active");
+
+      alert(
+        `${selectedPreviewQuestions.length} questions approved and moved to active!`
       );
-      console.error("Error approving questions:", err);
+    } catch (error) {
+      console.error("Error approving preview questions:", error);
+      alert("Error approving questions. Please try again.");
     } finally {
-      setIsProcessingPendingQuestions(false);
+      setIsAddingApprovedQuestions(false);
     }
   };
 
-  const handleRejectPendingQuestions = async () => {
-    if (!bankId || selectedPendingQuestionIds.length === 0) {
-      setPageError("Please select at least one question to reject.");
-      return;
-    }
-
-    setIsProcessingPendingQuestions(true);
-    try {
-      await processReviewedAiQuestions(bankId, {
-        acceptedQuestions: [],
-        updatedQuestions: [],
-        deletedQuestionIds: selectedPendingQuestionIds,
-      });
-
-      setPageError(null);
-      setSelectedPendingQuestionIds([]);
-      fetchPendingQuestionsForBank(); // Refresh pending questions
-    } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to reject questions."
-      );
-      console.error("Error rejecting questions:", err);
-    } finally {
-      setIsProcessingPendingQuestions(false);
-    }
+  // Helper functions for Select All/Deselect All
+  const handleSelectAllPreviewQuestions = () => {
+    const previewQuestions = getPreviewQuestionsAsObjects();
+    const allPreviewQuestionIds = previewQuestions.map((q) => q._id);
+    setSelectedQuestionIds(allPreviewQuestionIds);
   };
 
-  // Fetch pending questions when switching to pending tab
-  useEffect(() => {
-    if (activeQuestionsTab === "pending") {
-      fetchPendingQuestionsForBank();
-    }
-  }, [activeQuestionsTab, fetchPendingQuestionsForBank]);
+  const handleDeselectAllPreviewQuestions = () => {
+    setSelectedQuestionIds([]);
+  };
 
-  // ADDED: Render pending review questions
-  const renderPendingReviewQuestions = () => {
-    if (isLoadingPendingQuestions) {
-      return (
-        <div className="text-center py-12">
-          <LoadingSpinner message="Loading pending questions..." />
-        </div>
-      );
-    }
-
-    if (pendingQuestionsError) {
-      return (
-        <div className="text-center py-12">
-          <ErrorMessage
-            message={pendingQuestionsError}
-            onDismiss={() => setPendingQuestionsError(null)}
-          />
-        </div>
-      );
-    }
-
-    const filteredPendingQuestions = getFilteredPendingQuestions();
-
-    if (filteredPendingQuestions.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 mb-2">
-            {pendingQuestions.length === 0
-              ? "No pending questions"
-              : "No questions match filters"}
-          </h3>
-          <p className="text-slate-500">
-            {pendingQuestions.length === 0
-              ? "All AI-generated questions for this bank have been reviewed and processed."
-              : "Try adjusting your filters to see more questions."}
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6">
-        {/* Header with bulk actions */}
-        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
-          <div className="flex items-center space-x-4">
-            <input
-              type="checkbox"
-              className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              checked={
-                selectedPendingQuestionIds.length ===
-                  filteredPendingQuestions.length &&
-                filteredPendingQuestions.length > 0
-              }
-              onChange={handleToggleAllPendingQuestions}
-              disabled={isProcessingPendingQuestions}
-            />
-            <span className="text-sm font-medium text-slate-700">
-              {selectedPendingQuestionIds.length} of{" "}
-              {filteredPendingQuestions.length} selected
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="primary"
-              onClick={handleApprovePendingQuestions}
-              disabled={
-                selectedPendingQuestionIds.length === 0 ||
-                isProcessingPendingQuestions
-              }
-              className="text-sm"
-            >
-              <CheckIcon className="h-4 w-4 mr-2" />
-              Approve Selected ({selectedPendingQuestionIds.length})
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRejectPendingQuestions}
-              disabled={
-                selectedPendingQuestionIds.length === 0 ||
-                isProcessingPendingQuestions
-              }
-              className="text-sm"
-            >
-              <XMarkIcon className="h-4 w-4 mr-2" />
-              Reject Selected ({selectedPendingQuestionIds.length})
-            </Button>
-          </div>
-        </div>
-
-        {/* Questions list */}
-        <div className="space-y-4">
-          {filteredPendingQuestions.map((question) => (
-            <div
-              key={question._id}
-              className="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow relative"
-            >
-              <div className="flex items-start space-x-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  checked={selectedPendingQuestionIds.includes(question._id)}
-                  onChange={() => handleTogglePendingQuestion(question._id)}
-                  disabled={isProcessingPendingQuestions}
-                />
-                <div className="flex-grow pr-20">
-                  <p className="font-semibold text-gray-800 mb-2">
-                    {question.questionText}
-                  </p>
-                  <div className="text-sm text-gray-600 mb-2 flex flex-wrap gap-4">
-                    <span>
-                      <strong>Type:</strong>{" "}
-                      {question.questionType.replace("-", " ")}
-                    </span>
-                    <span>
-                      <strong>Category:</strong>{" "}
-                      {question.categories?.join(", ") || "N/A"}
-                    </span>
-                    <span>
-                      <strong>Knowledge:</strong>{" "}
-                      {question.knowledgeCategory
-                        .replace("-", " ")
-                        .replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </span>
-                  </div>
-                  {question.options && question.options.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-sm font-medium text-gray-700 mb-1">
-                        Options:
-                      </p>
-                      <ul className="list-disc list-inside pl-4 text-sm text-gray-600">
-                        {question.options.map((opt, index) => (
-                          <li
-                            key={index}
-                            className={
-                              opt.isCorrect
-                                ? "font-semibold text-green-600"
-                                : ""
-                            }
-                          >
-                            {opt.text} {opt.isCorrect ? "(Correct)" : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {question.explanation && (
-                    <p className="text-sm text-gray-600 italic">
-                      <strong>Explanation:</strong> {question.explanation}
-                    </p>
-                  )}
-                </div>
-                {/* Edit button positioned in top-right */}
-                <div className="absolute top-4 right-4">
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleOpenEditQuestionModal(question)}
-                    disabled={isProcessingPendingQuestions}
-                    className="text-xs px-3 py-1.5"
-                  >
-                    <PencilIcon className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+  const getSelectAllButtonState = () => {
+    const previewQuestions = getPreviewQuestionsAsObjects();
+    const allPreviewQuestionIds = previewQuestions.map((q) => q._id);
+    const selectedPreviewQuestions = selectedQuestionIds.filter((id) =>
+      allPreviewQuestionIds.includes(id)
     );
+
+    return {
+      totalPreview: previewQuestions.length,
+      selectedPreview: selectedPreviewQuestions.length,
+      allSelected:
+        selectedPreviewQuestions.length === previewQuestions.length &&
+        previewQuestions.length > 0,
+      someSelected: selectedPreviewQuestions.length > 0,
+    };
   };
 
   if (isLoading && !currentQuestionBank) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-center py-12">
-                <LoadingSpinner message="Loading question bank details..." />
-              </div>
-            </div>
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out pt-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <LoadingSpinner message="Loading question bank..." />
           </div>
         </main>
       </div>
     );
   }
 
-  if (error) {
+  if (pageError) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-                  <div className="p-3 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <BookOpenIcon className="h-8 w-8 text-red-600" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-red-600 mb-4">
-                    Error Loading Question Bank
-                  </h1>
-                  <ErrorMessage message={getErrorMessage(error)} />
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate("/quiz-management")}
-                    className="mt-6"
-                  >
-                    ← Back to Quiz Management
-                  </Button>
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out pt-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-red-900">
+                    Unable to Load Question Bank
+                  </h3>
+                  <p className="text-red-700 mt-1">{String(pageError)}</p>
                 </div>
               </div>
             </div>
@@ -1080,38 +657,775 @@ const QuestionBankDetailPage: React.FC = () => {
   }
 
   if (!currentQuestionBank) {
+    return null;
+  }
+
+  // Table of Contents Component
+  const TableOfContents: React.FC = () => {
+    const knowledgeCategories = Object.keys(
+      groupedQuestionsByKnowledgeCategoryAndMenuCategory
+    ) as KnowledgeCategory[];
+
+    const isSearchActive = navSearchTerm.trim() !== "";
+
+    const shouldShowKnowledgeCategory = (
+      knowledgeCategory: KnowledgeCategory
+    ) => {
+      if (!isSearchActive) return true;
+      return (
+        isNavSearchMatch("knowledgeCategory", knowledgeCategory) ||
+        Object.keys(
+          groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+            knowledgeCategory
+          ] || {}
+        ).some((menuCategory) =>
+          isNavSearchMatch(
+            "questionType",
+            `${knowledgeCategory}-${menuCategory}`
+          )
+        ) ||
+        Object.values(
+          groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+            knowledgeCategory
+          ] || {}
+        ).some((questions: IQuestion[]) =>
+          questions.some((question: IQuestion) =>
+            isNavSearchMatch("question", question._id)
+          )
+        )
+      );
+    };
+
+    const shouldShowMenuCategory = (
+      knowledgeCategory: KnowledgeCategory,
+      menuCategory: string
+    ) => {
+      if (!isSearchActive) return true;
+      const categoryKey = `${knowledgeCategory}-${menuCategory}`;
+      return (
+        isNavSearchMatch("questionType", categoryKey) ||
+        groupedQuestionsByKnowledgeCategoryAndMenuCategory[knowledgeCategory][
+          menuCategory
+        ].some((question: IQuestion) =>
+          isNavSearchMatch("question", question._id)
+        )
+      );
+    };
+
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-                  <div className="p-3 bg-slate-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <BookOpenIcon className="h-8 w-8 text-slate-600" />
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+        {/* Search Header */}
+        <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200 rounded-t-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Questions Navigation
+              </h3>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 min-w-[24px] justify-center">
+                {getCurrentTabQuestions().length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Content */}
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          {knowledgeCategories.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-4">
+                <BookOpenIcon className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">
+                {getCurrentTabQuestions().length === 0
+                  ? "No questions yet"
+                  : "No categorized questions"}
+              </h3>
+              <p className="text-slate-500 mb-4">
+                {getCurrentTabQuestions().length === 0
+                  ? "Add your first question to get started."
+                  : `Found ${
+                      getCurrentTabQuestions().length
+                    } questions but they may not have proper categories.`}
+              </p>
+              <p className="text-slate-400 text-sm">
+                Use the buttons in the header above to add questions.
+              </p>
+            </div>
+          ) : (
+            knowledgeCategories.map((knowledgeCategory, index) => {
+              if (!shouldShowKnowledgeCategory(knowledgeCategory)) return null;
+
+              const menuCategories = Object.keys(
+                groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+                  knowledgeCategory
+                ]
+              );
+              const isExpanded = expandedNavCategories[knowledgeCategory];
+              const isSelected =
+                selectedNavKnowledgeCategory === knowledgeCategory &&
+                !selectedNavQuestionType;
+              const isSearchHighlighted = isNavSearchMatch(
+                "knowledgeCategory",
+                knowledgeCategory
+              );
+
+              const totalQuestions = Object.values(
+                groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+                  knowledgeCategory
+                ]
+              ).reduce(
+                (sum: number, questions: IQuestion[]) => sum + questions.length,
+                0
+              );
+
+              return (
+                <div key={knowledgeCategory}>
+                  {index > 0 && (
+                    <div className="flex items-center my-6">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {/* Knowledge Category Button */}
+                    <button
+                      onClick={() => {
+                        handleNavCategorySelect(knowledgeCategory);
+                        toggleNavCategoryExpansion(knowledgeCategory);
+                      }}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 group ${
+                        isSearchHighlighted
+                          ? "bg-yellow-100 border-2 border-yellow-300 text-yellow-900"
+                          : isSelected
+                          ? "bg-blue-50 border-2 border-blue-300 text-blue-800"
+                          : "hover:bg-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            isSelected ? "bg-blue-100" : "bg-slate-100"
+                          }`}
+                        >
+                          <TagIcon
+                            className={`h-5 w-5 ${
+                              isSelected ? "text-blue-600" : "text-slate-600"
+                            }`}
+                          />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-semibold">
+                            {knowledgeCategory
+                              .replace("-", " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </span>
+                          <div className="text-sm opacity-75">
+                            {menuCategories.length} categories •{" "}
+                            {totalQuestions} questions
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            isSelected
+                              ? "bg-blue-200 text-blue-800"
+                              : "bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {totalQuestions}
+                        </span>
+                        {menuCategories.length > 0 && (
+                          <ChevronRightIcon
+                            className={`h-4 w-4 transition-transform duration-200 ${
+                              isExpanded ? "rotate-90" : ""
+                            }`}
+                          />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Menu Categories */}
+                    {isExpanded && (
+                      <div className="ml-6 space-y-2">
+                        {menuCategories.map((menuCategory) => {
+                          if (
+                            !shouldShowMenuCategory(
+                              knowledgeCategory,
+                              menuCategory
+                            )
+                          )
+                            return null;
+
+                          const categoryQuestions =
+                            groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+                              knowledgeCategory
+                            ][menuCategory];
+                          const categoryKey = `${knowledgeCategory}-${menuCategory}`;
+                          const isCategorySelected =
+                            selectedNavKnowledgeCategory ===
+                              knowledgeCategory &&
+                            selectedNavQuestionType === menuCategory &&
+                            !selectedNavQuestionId;
+                          const isCategoryExpanded =
+                            expandedNavSubcategories[categoryKey];
+
+                          return (
+                            <div key={categoryKey}>
+                              <button
+                                onClick={() => {
+                                  handleNavCategorySelect(
+                                    knowledgeCategory,
+                                    menuCategory
+                                  );
+                                  toggleNavSubcategoryExpansion(categoryKey);
+                                }}
+                                className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                                  isCategorySelected
+                                    ? "bg-blue-50 border border-blue-200 text-blue-800"
+                                    : "hover:bg-slate-50 text-slate-600 border border-slate-200 hover:border-slate-300"
+                                }`}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <div className="p-1.5 bg-slate-100 rounded-md">
+                                    <FolderIcon className="h-4 w-4 text-slate-600" />
+                                  </div>
+                                  <span className="font-medium text-sm">
+                                    {menuCategory
+                                      .split(" ")
+                                      .map(
+                                        (word: string) =>
+                                          word.charAt(0).toUpperCase() +
+                                          word.slice(1)
+                                      )
+                                      .join(" ")}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs px-2 py-1 rounded-full bg-slate-200 text-slate-700 font-medium">
+                                    {categoryQuestions.length}
+                                  </span>
+                                  <ChevronRightIcon
+                                    className={`h-3 w-3 transition-transform duration-200 ${
+                                      isCategoryExpanded ? "rotate-90" : ""
+                                    }`}
+                                  />
+                                </div>
+                              </button>
+
+                              {/* Individual Questions */}
+                              {isCategoryExpanded && (
+                                <div className="ml-6 mt-2 space-y-1">
+                                  {categoryQuestions.map(
+                                    (question: IQuestion) => {
+                                      const isQuestionSelected =
+                                        selectedNavQuestionId === question._id;
+                                      const isQuestionHighlighted =
+                                        isNavSearchMatch(
+                                          "question",
+                                          question._id
+                                        );
+
+                                      return (
+                                        <button
+                                          key={question._id}
+                                          onClick={() =>
+                                            handleNavCategorySelect(
+                                              knowledgeCategory,
+                                              menuCategory,
+                                              question._id
+                                            )
+                                          }
+                                          className={`w-full text-left p-2 rounded-md transition-all duration-200 text-sm ${
+                                            isQuestionHighlighted
+                                              ? "bg-yellow-100 border border-yellow-300 text-yellow-900"
+                                              : isQuestionSelected
+                                              ? "bg-blue-50 border border-blue-200 text-blue-800"
+                                              : "hover:bg-slate-50 text-slate-600 border border-transparent hover:border-slate-200"
+                                          }`}
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <DocumentTextIcon className="h-3 w-3 flex-shrink-0" />
+                                            <span className="truncate">
+                                              {question.questionText.length > 50
+                                                ? `${question.questionText.substring(
+                                                    0,
+                                                    50
+                                                  )}...`
+                                                : question.questionText}
+                                            </span>
+                                          </div>
+                                        </button>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <h1 className="text-2xl font-bold text-slate-700 mb-4">
-                    Question Bank Not Found
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Content Display Component
+  const ContentDisplay: React.FC = () => {
+    if (
+      !selectedNavKnowledgeCategory &&
+      !selectedNavQuestionType &&
+      !selectedNavQuestionId
+    ) {
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center h-full flex flex-col justify-center">
+          <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 mb-6">
+            <BookOpenIcon className="h-10 w-10 text-blue-600" />
+          </div>
+          <h3 className="text-2xl font-semibold text-slate-900 mb-3">
+            {activeTab === "active" ? "Active Questions" : "Preview Questions"}
+          </h3>
+          <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+            {activeTab === "active"
+              ? "Select a knowledge category or question type from the navigation panel to view and manage your active questions, or use the search to find specific questions quickly."
+              : "Preview questions are pending approval. Select a category to review questions before they become active."}
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <Button
+              variant="primary"
+              onClick={() => setShowAddManualQuestionModal(true)}
+              className="flex items-center gap-2 px-6 py-3"
+            >
+              <PlusIcon className="h-5 w-5" />
+              Add New Question
+            </Button>
+            {currentQuestionBank?.sourceType === "MENU" && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowGenerateAiQuestionsModal(true)}
+                className="flex items-center gap-2 px-6 py-3"
+              >
+                <SparklesIcon className="h-5 w-5" />
+                Generate from Menu
+              </Button>
+            )}
+            {currentQuestionBank?.sourceType === "SOP" && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowGenerateSopAiModal(true)}
+                className="flex items-center gap-2 px-6 py-3"
+              >
+                <DocumentTextIcon className="h-5 w-5" />
+                Generate from SOP
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Display individual question
+    if (selectedNavQuestionId) {
+      const selectedQuestion = getCurrentTabQuestions().find(
+        (q) => q._id === selectedNavQuestionId
+      );
+      if (!selectedQuestion) {
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Question not found in {activeTab} questions
+            </h3>
+            <p className="text-slate-600">
+              The selected question could not be found in the {activeTab}{" "}
+              questions. It may be in the{" "}
+              {activeTab === "active" ? "Preview" : "Active"} tab.
+            </p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 border-b border-blue-200 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <DocumentTextIcon className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 mb-1">
+                    Question Details
                   </h1>
-                  <ErrorMessage message="Question bank not found." />
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate("/quiz-management")}
-                    className="mt-6"
-                  >
-                    ← Back to Quiz Management
-                  </Button>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-200 text-blue-800">
+                      {selectedNavKnowledgeCategory!
+                        .replace("-", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-600">
+                      {selectedNavQuestionType}
+                    </span>
+                    {selectedQuestion.status === "pending_review" && (
+                      <>
+                        <span className="text-slate-500">•</span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <ClockIcon className="h-3 w-3 mr-1" />
+                          Preview
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleOpenEditQuestionModal(selectedQuestion)}
+                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                  title="Edit Question"
+                >
+                  <PencilIcon className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => requestRemoveQuestion(selectedQuestion._id)}
+                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                  title="Delete Question"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Expanded Question Content */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="space-y-6">
+              {/* Question Text */}
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">
+                  Question
+                </h3>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-slate-900 leading-relaxed">
+                    {selectedQuestion.questionText}
+                  </p>
+                </div>
+              </div>
+
+              {/* Question Type and Categories */}
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">
+                  Question Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Question Type
+                    </label>
+                    <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                      {selectedQuestion.questionType
+                        .split("-")
+                        .map(
+                          (word) => word.charAt(0).toUpperCase() + word.slice(1)
+                        )
+                        .join(" ")}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Knowledge Category
+                    </label>
+                    <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                      {selectedQuestion.knowledgeCategory
+                        .replace("-", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu Categories */}
+              {selectedQuestion.categories &&
+                selectedQuestion.categories.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-3">
+                      Menu Categories
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedQuestion.categories.map((category, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                        >
+                          {category}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Answer Options */}
+              {selectedQuestion.options &&
+                selectedQuestion.options.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-3">
+                      Answer Options
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedQuestion.options.map((option, index) => (
+                        <div
+                          key={option._id || index}
+                          className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                            option.isCorrect
+                              ? "bg-green-50 border-green-300 shadow-sm"
+                              : "bg-slate-50 border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-slate-300 text-sm font-semibold text-slate-700">
+                                {String.fromCharCode(65 + index)}
+                              </span>
+                              <span className="text-slate-900 font-medium">
+                                {option.text}
+                              </span>
+                            </div>
+                            {option.isCorrect && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+                                <CheckIcon className="h-4 w-4 mr-1" />
+                                Correct Answer
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Explanation */}
+              {selectedQuestion.explanation && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-3">
+                    Explanation
+                  </h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <InformationCircleIcon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-slate-900 leading-relaxed">
+                        {selectedQuestion.explanation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Selection Checkbox */}
+              <div className="pt-4 border-t border-slate-200">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedQuestionIds.includes(selectedQuestion._id)}
+                    onChange={() =>
+                      handleToggleSelectQuestion(selectedQuestion._id)
+                    }
+                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    Select this question for batch operations
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Display questions by menu category
+    if (selectedNavQuestionType) {
+      const categoryQuestions =
+        groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+          selectedNavKnowledgeCategory!
+        ]?.[selectedNavQuestionType] || [];
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-6 border-b border-amber-200 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-amber-100 rounded-xl">
+                  <FolderIcon className="h-6 w-6 text-amber-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 mb-1">
+                    {selectedNavQuestionType
+                      .split(" ")
+                      .map(
+                        (word) => word.charAt(0).toUpperCase() + word.slice(1)
+                      )
+                      .join(" ")}
+                  </h1>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-200 text-amber-800">
+                      {selectedNavKnowledgeCategory!
+                        .replace("-", " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-600">
+                      {categoryQuestions.length}{" "}
+                      {categoryQuestions.length === 1
+                        ? "question"
+                        : "questions"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </main>
-      </div>
-    );
-  }
 
-  // Main content rendering if bank is loaded
+          {/* Questions List */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {categoryQuestions.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-slate-100 mb-6">
+                  <FolderIcon className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                  No {activeTab} questions in this category
+                </h3>
+                <p className="text-slate-600 mb-6 max-w-sm mx-auto">
+                  {activeTab === "active"
+                    ? "This menu category has no active questions. Add your first question to get started."
+                    : "This menu category has no preview questions. Generate AI questions or check the Active tab for existing questions."}
+                </p>
+                {activeTab === "active" && (
+                  <p className="text-slate-400 text-sm">
+                    Use the buttons in the header above to add questions.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {categoryQuestions.map((question) => (
+                  <QuestionListItem
+                    key={question._id}
+                    question={question}
+                    onRemove={requestRemoveQuestion}
+                    onEdit={handleOpenEditQuestionModal}
+                    isSelected={selectedQuestionIds.includes(question._id)}
+                    onToggleSelect={handleToggleSelectQuestion}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Display knowledge category overview
+    if (selectedNavKnowledgeCategory) {
+      const categoryQuestions = Object.values(
+        groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+          selectedNavKnowledgeCategory
+        ] || {}
+      ).flat();
+      const menuCategories = Object.keys(
+        groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+          selectedNavKnowledgeCategory
+        ] || {}
+      );
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <TagIcon className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">
+                    {selectedNavKnowledgeCategory
+                      .replace("-", " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase())}{" "}
+                    Questions
+                  </h2>
+                  <p className="text-slate-600">
+                    {categoryQuestions.length} total questions •{" "}
+                    {menuCategories.length} menu categories
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="grid gap-4">
+              {menuCategories.map((menuCategory) => {
+                const categoryQuestions =
+                  groupedQuestionsByKnowledgeCategoryAndMenuCategory[
+                    selectedNavKnowledgeCategory!
+                  ][menuCategory];
+                if (categoryQuestions.length === 0) return null;
+
+                return (
+                  <div
+                    key={menuCategory}
+                    className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                    onClick={() =>
+                      handleNavCategorySelect(
+                        selectedNavKnowledgeCategory!,
+                        menuCategory
+                      )
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <FolderIcon className="h-5 w-5 text-slate-500" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">
+                            {menuCategory
+                              .split(" ")
+                              .map(
+                                (word: string) =>
+                                  word.charAt(0).toUpperCase() + word.slice(1)
+                              )
+                              .join(" ")}
+                          </h3>
+                          <p className="text-sm text-slate-600">
+                            {categoryQuestions.length} question
+                            {categoryQuestions.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -1119,746 +1433,416 @@ const QuestionBankDetailPage: React.FC = () => {
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Enhanced Header Section */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-8 border border-slate-200 shadow-sm">
-                {/* Background decoration */}
-                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-gradient-to-br from-blue-100/50 to-indigo-100/50 rounded-full blur-3xl"></div>
-
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg">
-                        <BookOpenIcon className="h-8 w-8 text-white" />
-                      </div>
-                      <div>
-                        <h1 className="text-3xl font-bold text-slate-900 mb-1">
-                          {currentQuestionBank.name}
-                        </h1>
-                        <p className="text-slate-600 text-lg">
-                          Manage questions in this question bank
-                        </p>
-                      </div>
+              {/* Header Section */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-emerald-600 rounded-xl shadow-lg">
+                      <BookOpenIcon className="h-8 w-8 text-white" />
                     </div>
+                    <div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <button
+                          onClick={() => navigate("/quiz-management")}
+                          className="flex items-center text-slate-300 hover:text-white transition-colors duration-200 text-sm font-medium"
+                        >
+                          <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                          Quiz Management
+                        </button>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-300 text-sm">
+                          Question Bank Details
+                        </span>
+                      </div>
+                      <h1 className="text-3xl font-bold text-white">
+                        {currentQuestionBank.name}
+                      </h1>
+                      {currentQuestionBank.description && (
+                        <p className="text-slate-300 mt-2 font-medium">
+                          {currentQuestionBank.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
                     <Button
-                      variant="secondary"
-                      onClick={handleOpenEditBankModal}
-                      className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-200"
+                      variant="white"
+                      onClick={() => setShowAddManualQuestionModal(true)}
+                      className="!bg-emerald-700 !hover:bg-emerald-600 !text-white !border-emerald-600 shadow-lg"
                     >
-                      <PencilIcon className="h-4 w-4" />
-                      <span>Edit Details</span>
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Add Manual Question
+                    </Button>
+                    <Button
+                      variant="white"
+                      onClick={() => {
+                        if (currentQuestionBank.sourceType === "SOP") {
+                          setShowGenerateSopAiModal(true);
+                        } else {
+                          setShowGenerateAiQuestionsModal(true);
+                        }
+                      }}
+                      className="!bg-purple-700 !hover:bg-purple-600 !text-white !border-purple-600 shadow-lg"
+                    >
+                      <SparklesIcon className="h-5 w-5 mr-2" />
+                      Generate AI Questions
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={handleOpenEditBankModal}
+                      className="shadow-lg"
+                    >
+                      <PencilIcon className="h-5 w-5 mr-2" />
+                      Edit Details
                     </Button>
                   </div>
+                </div>
+              </div>
 
-                  {/* Enhanced Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <Card
-                      variant="elevated"
-                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-green-100 rounded-xl">
-                          <CheckIcon className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-700 mb-1">
-                            Active Questions
-                          </h3>
-                          <p className="text-3xl font-bold text-slate-900">
-                            {getActiveQuestionsAsObjects().length}
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
+              {/* Enhanced Global Search Bar */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow duration-200">
+                <div className="max-w-2xl mx-auto">
+                  <div className="relative group">
+                    <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search questions, categories, types... (Press / to focus)"
+                      value={navSearchTerm}
+                      onChange={(e) => handleNavSearchChange(e.target.value)}
+                      className="w-full pl-12 pr-16 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white shadow-inner"
+                      aria-label="Search questions, categories, and types"
+                      autoComplete="off"
+                    />
 
-                    <Card
-                      variant="elevated"
-                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-blue-100 rounded-xl">
-                          <DocumentTextIcon className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div className="flex-grow">
-                          <h3 className="text-sm font-medium text-slate-700 mb-1">
-                            Source Type
-                          </h3>
-                          <div className="flex items-center space-x-2">
-                            {currentQuestionBank.sourceType === "MENU" && (
-                              <>
-                                <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200">
-                                  Menu
-                                </span>
-                                {currentQuestionBank.sourceMenuName && (
-                                  <span className="text-sm text-slate-600 truncate">
-                                    {currentQuestionBank.sourceMenuName}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {currentQuestionBank.sourceType === "SOP" && (
-                              <>
-                                <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-100 text-blue-700 rounded-full border border-blue-200">
-                                  SOP
-                                </span>
-                                {currentQuestionBank.sourceSopDocumentTitle && (
-                                  <span className="text-sm text-slate-600 truncate">
-                                    {currentQuestionBank.sourceSopDocumentTitle}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {currentQuestionBank.sourceType === "MANUAL" && (
-                              <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-purple-100 text-purple-700 rounded-full border border-purple-200">
-                                Manual
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                    {/* Search shortcut hint */}
+                    {!navSearchTerm && (
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2 text-gray-400">
+                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 rounded-md">
+                          /
+                        </kbd>
                       </div>
-                    </Card>
+                    )}
 
-                    <Card
-                      variant="elevated"
-                      className="bg-white/80 backdrop-blur-sm border-0 shadow-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-purple-100 rounded-xl">
-                          <ChartPieIcon className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-700 mb-1">
-                            Categories
-                          </h3>
-                          <div className="flex flex-wrap gap-1">
-                            {currentQuestionBank.categories &&
-                            currentQuestionBank.categories.length > 0 ? (
-                              <>
-                                {currentQuestionBank.categories
-                                  .slice(0, 2)
-                                  .map((cat) => (
-                                    <span
-                                      key={cat}
-                                      className="inline-flex items-center px-2 py-1 text-xs font-medium bg-sky-100 text-sky-700 rounded-full border border-sky-200"
-                                    >
-                                      {cat}
-                                    </span>
-                                  ))}
-                                {currentQuestionBank.categories.length > 2 && (
-                                  <span className="text-xs text-slate-500 font-medium">
-                                    +{currentQuestionBank.categories.length - 2}{" "}
-                                    more
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-sm text-slate-500 italic">
-                                None
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
+                    {/* Clear search button */}
+                    {navSearchTerm && (
+                      <button
+                        onClick={clearNavSearch}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all duration-200 group"
+                        aria-label="Clear search (Esc)"
+                        title="Clear search (Esc)"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Enhanced Description */}
-                  {currentQuestionBank.description && (
-                    <Card
-                      variant="outlined"
-                      className="bg-white/60 backdrop-blur-sm border-slate-200"
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className="p-2 bg-slate-100 rounded-lg flex-shrink-0">
-                          <DocumentTextIcon className="h-5 w-5 text-slate-600" />
+                  {/* Enhanced Search Results Summary */}
+                  {navSearchTerm.trim() && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-center space-x-4 text-sm">
+                        <div className="flex items-center space-x-1">
+                          <BookOpenIcon className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium text-blue-900">
+                            {navSearchResults.questions.length} questions
+                          </span>
                         </div>
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-800 mb-2">
-                            Description
-                          </h3>
-                          <p className="text-slate-600 leading-relaxed">
-                            {currentQuestionBank.description}
-                          </p>
+                        <div className="text-blue-600">
+                          for "{navSearchTerm}"
                         </div>
                       </div>
-                    </Card>
+
+                      {/* No results found */}
+                      {navSearchResults.questions.length === 0 && (
+                        <div className="mt-2 text-center text-blue-700">
+                          <div className="flex items-center justify-center space-x-2">
+                            <span>No matches found.</span>
+                            <button
+                              onClick={clearNavSearch}
+                              className="text-blue-600 hover:text-blue-800 underline font-medium"
+                            >
+                              Clear search
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Error Messages */}
-              {pageError && (
-                <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
-                      <XCircleIcon className="h-6 w-6 text-red-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-red-900">
-                        Unable to Load Question Bank
-                      </h3>
-                      <p className="text-red-700 mt-1">{pageError}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Enhanced Manage Questions Section */}
-              <Card variant="elevated" size="lg" className="border-0 shadow-lg">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
-                    <PlusIcon className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Manage Questions
-                    </h2>
-                    <p className="text-slate-600">
-                      Add questions manually or generate with AI
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  className={`grid grid-cols-1 gap-4 ${
-                    currentQuestionBank.sourceType === "MANUAL"
-                      ? "lg:grid-cols-1"
-                      : "lg:grid-cols-2"
-                  }`}
-                >
-                  <Card
-                    variant="outlined"
-                    clickable={true}
-                    onClick={() => setShowAddManualQuestionModal(true)}
-                    className="border-emerald-200 hover:border-emerald-300 hover:bg-emerald-50/50 cursor-pointer group"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-emerald-100 group-hover:bg-emerald-200 rounded-xl transition-colors duration-200">
-                        <PlusIcon className="h-6 w-6 text-emerald-600" />
-                      </div>
-                      <div className="flex-grow">
-                        <h3 className="font-semibold text-slate-900 mb-1">
-                          Add Manual Question
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          Create custom questions with full control over content
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Show Generate from Menu button only for MENU source type */}
-                  {currentQuestionBank.sourceType === "MENU" && (
-                    <Card
-                      variant="outlined"
-                      clickable={true}
-                      onClick={handleOpenGenerateAiQuestions}
-                      className="border-blue-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer group"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="p-3 bg-blue-100 group-hover:bg-blue-200 rounded-xl transition-colors duration-200">
-                          <SparklesIcon className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div className="flex-grow">
-                          <h3 className="font-semibold text-slate-900 mb-1">
-                            Generate from Menu
-                          </h3>
-                          <p className="text-sm text-slate-600">
-                            AI-powered questions based on your menu items
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Show Generate from SOP button only for SOP source type */}
-                  {currentQuestionBank.sourceType === "SOP" && (
-                    <Card
-                      variant="outlined"
-                      clickable={true}
-                      onClick={() => setShowGenerateSopAiModal(true)}
-                      className="border-purple-200 hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer group"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="p-3 bg-purple-100 group-hover:bg-purple-200 rounded-xl transition-colors duration-200">
-                          <DocumentTextIcon className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <div className="flex-grow">
-                          <h3 className="font-semibold text-slate-900 mb-1">
-                            Generate from SOP
-                          </h3>
-                          <p className="text-sm text-slate-600">
-                            AI-powered questions based on your SOP document
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-              </Card>
-
-              {/* Enhanced Bulk Actions */}
-              {selectedQuestionIds.length > 0 && (
-                <Card
-                  variant="outlined"
-                  className="border-red-200 bg-red-50/50 backdrop-blur-sm"
-                >
+              {/* Tabs for Active vs Preview Questions */}
+              <div className="mb-6">
+                <div className="border-b border-gray-200">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-red-100 rounded-xl">
-                        <TrashIcon className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {selectedQuestionIds.length} question
-                          {selectedQuestionIds.length > 1 ? "s" : ""} selected
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          You can perform bulk actions on selected questions
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="secondary"
-                        onClick={() => setSelectedQuestionIds([])}
-                        className="bg-white hover:bg-slate-50 border-slate-300"
-                      >
-                        Clear Selection
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setIsConfirmBulkDeleteModalOpen(true)}
-                        className="shadow-lg"
-                      >
-                        <TrashIcon className="h-4 w-4 mr-2" />
-                        Delete Selected
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Questions List */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Questions Management
-                    </h2>
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="secondary"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="text-sm flex items-center space-x-2"
-                      >
-                        <FunnelIcon className="h-4 w-4" />
-                        <span>Filters</span>
-                        {(selectedKnowledgeCategories.length > 0 ||
-                          selectedMenuCategories.length > 0) && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {selectedKnowledgeCategories.length +
-                              selectedMenuCategories.length}
-                          </span>
-                        )}
-                      </Button>
-                      {activeQuestionsTab === "active" &&
-                        getActiveQuestionsAsObjects().length > 0 && (
-                          <Button
-                            variant="secondary"
-                            onClick={handleToggleSelectAll}
-                            className="text-sm"
-                          >
-                            {selectedQuestionIds.length ===
-                            getFilteredActiveQuestions().length
-                              ? "Deselect All"
-                              : "Select All"}
-                          </Button>
-                        )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter Panel */}
-                {showFilters && (
-                  <div className="bg-slate-50 border-b border-slate-200 p-6">
-                    <div className="space-y-6">
-                      {/* Knowledge Category Filter */}
-                      <div>
-                        <KnowledgeCategoryFilter
-                          selectedCategories={selectedKnowledgeCategories}
-                          onCategoryToggle={handleKnowledgeCategoryToggle}
-                          onClearAll={handleClearKnowledgeCategories}
-                          allowMultiple={true}
-                          showClearAll={true}
-                        />
-                      </div>
-
-                      {/* Menu Category Filter */}
-                      {getUniqueMenuCategories().length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-medium text-gray-700">
-                              Filter by Menu Category
-                            </h3>
-                            {selectedMenuCategories.length > 0 && (
-                              <button
-                                onClick={() => setSelectedMenuCategories([])}
-                                className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
-                              >
-                                Clear all
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {getUniqueMenuCategories().map((category) => (
-                              <button
-                                key={category}
-                                onClick={() =>
-                                  handleMenuCategoryToggle(category)
-                                }
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-200 ${
-                                  selectedMenuCategories.includes(category)
-                                    ? "bg-blue-100 text-blue-700 border-blue-200"
-                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                                }`}
-                              >
-                                {category}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Clear All Filters */}
-                      {(selectedKnowledgeCategories.length > 0 ||
-                        selectedMenuCategories.length > 0) && (
-                        <div className="flex justify-end">
-                          <Button
-                            variant="secondary"
-                            onClick={handleClearAllFilters}
-                            className="text-sm"
-                          >
-                            Clear All Filters
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="p-6">
-                  {/* Tabs */}
-                  <div className="border-b border-slate-200 mb-6">
-                    <nav className="-mb-px flex space-x-8">
+                    <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                       <button
-                        onClick={() => setActiveQuestionsTab("active")}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                          activeQuestionsTab === "active"
+                        onClick={() => setActiveTab("active")}
+                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === "active"
                             ? "border-blue-500 text-blue-600"
-                            : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                         }`}
                       >
-                        Active Questions ({getFilteredActiveQuestions().length}
-                        {(selectedKnowledgeCategories.length > 0 ||
-                          selectedMenuCategories.length > 0) &&
-                          getFilteredActiveQuestions().length !==
-                            getActiveQuestionsAsObjects().length &&
-                          ` of ${getActiveQuestionsAsObjects().length}`}
-                        )
+                        Active Questions
+                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          {getActiveQuestionsAsObjects().length}
+                        </span>
                       </button>
                       <button
-                        onClick={() => setActiveQuestionsTab("pending")}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                          activeQuestionsTab === "pending"
-                            ? "border-amber-500 text-amber-600"
-                            : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                        onClick={() => setActiveTab("preview")}
+                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === "preview"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                         }`}
                       >
-                        Pending Review
-                        {getFilteredPendingQuestions().length > 0 && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                            {getFilteredPendingQuestions().length}
-                            {(selectedKnowledgeCategories.length > 0 ||
-                              selectedMenuCategories.length > 0) &&
-                              getFilteredPendingQuestions().length !==
-                                pendingQuestions.length &&
-                              ` of ${pendingQuestions.length}`}
-                          </span>
-                        )}
+                        Preview Questions
+                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          {getPreviewQuestionsAsObjects().length}
+                        </span>
                       </button>
                     </nav>
-                  </div>
 
-                  {/* Tab Content */}
-                  {activeQuestionsTab === "active" && (
-                    <>
-                      {getFilteredActiveQuestions().length === 0 ? (
-                        <div className="text-center py-16">
-                          <div className="relative">
-                            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-                              <BookOpenIcon className="h-12 w-12 text-slate-500" />
-                            </div>
-                            <div className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg transform translate-x-8 -translate-y-2">
-                              <PlusIcon className="h-3 w-3 text-white" />
-                            </div>
-                          </div>
-                          <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                            No active questions yet
-                          </h3>
-                          <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
-                            Get started by adding your first question to this
-                            bank. You can create questions manually or generate
-                            them with AI.
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <Button
-                              variant="primary"
-                              onClick={() =>
-                                setShowAddManualQuestionModal(true)
-                              }
-                              className="flex items-center space-x-2 shadow-lg"
-                            >
-                              <PlusIcon className="h-4 w-4" />
-                              <span>Add First Question</span>
-                            </Button>
-                            {(currentQuestionBank.sourceType === "MENU" ||
-                              currentQuestionBank.sourceType === "SOP") && (
-                              <Button
-                                variant="secondary"
-                                onClick={
-                                  currentQuestionBank.sourceType === "MENU"
-                                    ? handleOpenGenerateAiQuestions
-                                    : () => setShowGenerateSopAiModal(true)
-                                }
-                                className="flex items-center space-x-2"
-                              >
-                                <SparklesIcon className="h-4 w-4" />
-                                <span>Generate with AI</span>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {getFilteredActiveQuestions().map((question) => (
-                            <QuestionListItem
-                              key={question._id}
-                              question={question}
-                              onRemove={requestRemoveQuestion}
-                              onEdit={handleOpenEditQuestionModal}
-                              isSelected={selectedQuestionIds.includes(
-                                question._id
+                    {/* Preview Tab Controls */}
+                    {activeTab === "preview" && (
+                      <div className="flex items-center gap-3">
+                        {/* Select All/Deselect All Buttons */}
+                        {(() => {
+                          const selectState = getSelectAllButtonState();
+                          return selectState.totalPreview > 0 ? (
+                            <div className="flex items-center gap-2">
+                              {!selectState.allSelected ? (
+                                <button
+                                  onClick={handleSelectAllPreviewQuestions}
+                                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-2 text-sm"
+                                >
+                                  <CheckIcon className="h-4 w-4" />
+                                  Select All ({selectState.totalPreview})
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={handleDeselectAllPreviewQuestions}
+                                  className="bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-md hover:shadow-lg flex items-center gap-2 text-sm"
+                                >
+                                  <XMarkIcon className="h-4 w-4" />
+                                  Deselect All
+                                </button>
                               )}
-                              onToggleSelect={handleToggleSelectQuestion}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
+                            </div>
+                          ) : null;
+                        })()}
 
-                  {activeQuestionsTab === "pending" &&
-                    renderPendingReviewQuestions()}
+                        {/* Approve Selected Questions Button - Only show with selected questions */}
+                        {selectedQuestionIds.length > 0 && (
+                          <button
+                            onClick={handleApprovePreviewQuestions}
+                            disabled={isAddingApprovedQuestions}
+                            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center gap-2 text-sm"
+                          >
+                            <CheckIcon className="h-4 w-4" />
+                            {isAddingApprovedQuestions
+                              ? "Approving..."
+                              : `Approve ${
+                                  selectedQuestionIds.length
+                                } Question${
+                                  selectedQuestionIds.length === 1 ? "" : "s"
+                                }`}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Two-column layout: Table of Contents and Content Display */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-400px)]">
+                {/* Table of Contents - Left Column */}
+                <div className="lg:col-span-1">
+                  <TableOfContents />
+                </div>
+
+                {/* Content Display - Right Column */}
+                <div className="lg:col-span-2">
+                  <ContentDisplay />
                 </div>
               </div>
             </div>
-
-            {/* Modals */}
-            {showAddManualQuestionModal && bankId && (
-              <Modal
-                isOpen={showAddManualQuestionModal}
-                onClose={() => setShowAddManualQuestionModal(false)}
-                title="Add New Manual Question"
-              >
-                <AddManualQuestionForm
-                  onQuestionAdded={handleManualQuestionSubmit}
-                  onCloseRequest={() => setShowAddManualQuestionModal(false)}
-                  initialBankCategories={currentQuestionBank.categories}
-                  questionBankId={bankId}
-                />
-              </Modal>
-            )}
-
-            {showGenerateAiQuestionsModal &&
-              currentQuestionBank &&
-              selectedMenuForAi && (
-                <Modal
-                  isOpen={showGenerateAiQuestionsModal}
-                  onClose={() => {
-                    setShowGenerateAiQuestionsModal(false);
-                    setSelectedMenuForAi(null);
-                  }}
-                  title="Generate AI Questions for this Bank"
-                >
-                  <GenerateAiQuestionsForm
-                    bankId={currentQuestionBank._id}
-                    menuId={selectedMenuForAi}
-                    onAiQuestionsGenerated={handleAiQuestionsGenerated}
-                    onCloseRequest={() => {
-                      setShowGenerateAiQuestionsModal(false);
-                      setSelectedMenuForAi(null);
-                    }}
-                    initialCategories={
-                      currentQuestionBank.sourceType === "MENU"
-                        ? currentQuestionBank.categories
-                        : undefined
-                    }
-                  />
-                </Modal>
-              )}
-
-            {isMenuSelectionModalOpen && (
-              <Modal
-                isOpen={isMenuSelectionModalOpen}
-                onClose={() => setIsMenuSelectionModalOpen(false)}
-                title="Select Menu for AI Question Generation"
-                size="md"
-              >
-                <div className="p-4">
-                  <p className="text-sm text-gray-700 mb-4">
-                    Multiple active menus found. Please select which menu to use
-                    as context for AI question generation.
-                  </p>
-                  {availableMenus.length === 0 && !isLoadingMenusForAi && (
-                    <p className="text-sm text-gray-500">
-                      No active menus available.
-                    </p>
-                  )}
-                  {isLoadingMenusForAi && (
-                    <LoadingSpinner message="Loading menus..." />
-                  )}
-                  <ul className="space-y-2 max-h-60 overflow-y-auto">
-                    {availableMenus.map((menu) => (
-                      <li key={menu._id}>
-                        <Button
-                          variant="secondary"
-                          className="w-full text-left justify-start"
-                          onClick={() => handleMenuSelectForAi(menu._id)}
-                        >
-                          {menu.name}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-6 flex justify-end">
-                    <Button
-                      variant="primary"
-                      onClick={() => setIsMenuSelectionModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
-            )}
-
-            {isEditBankModalOpen && currentQuestionBank && (
-              <Modal
-                isOpen={isEditBankModalOpen}
-                onClose={handleCloseEditBankModal}
-                title={`Edit Bank: ${currentQuestionBank.name}`}
-              >
-                <EditQuestionBankForm
-                  bankToEdit={currentQuestionBank}
-                  onBankUpdated={handleBankDetailsUpdated}
-                  onCancel={handleCloseEditBankModal}
-                />
-              </Modal>
-            )}
-
-            {isConfirmRemoveModalOpen && questionToRemoveId && (
-              <Modal
-                isOpen={isConfirmRemoveModalOpen}
-                onClose={handleCancelRemoveQuestion}
-                title="Confirm Question Removal"
-                size="sm"
-              >
-                <ConfirmationModalContent
-                  message="Are you sure you want to remove this question from the bank? This action cannot be undone."
-                  onConfirm={executeRemoveQuestion}
-                  onCancel={handleCancelRemoveQuestion}
-                  confirmText="Remove Question"
-                  confirmButtonVariant="destructive"
-                />
-              </Modal>
-            )}
-
-            {isEditQuestionModalOpen && editingQuestion && (
-              <Modal
-                isOpen={isEditQuestionModalOpen}
-                onClose={handleCloseEditQuestionModal}
-                title="Edit Question"
-              >
-                <EditQuestionForm
-                  questionToEdit={editingQuestion}
-                  onQuestionUpdated={handleQuestionUpdatedInModal}
-                  onClose={handleCloseEditQuestionModal}
-                />
-              </Modal>
-            )}
-
-            {/* Confirmation Modal for Bulk Delete */}
-            {isConfirmBulkDeleteModalOpen && (
-              <Modal
-                isOpen={isConfirmBulkDeleteModalOpen}
-                onClose={handleCancelBulkDelete}
-                title="Confirm Bulk Delete"
-                size="sm"
-              >
-                <ConfirmationModalContent
-                  message={`Are you sure you want to delete ${selectedQuestionIds.length} selected question(s) from this bank? This action cannot be undone.`}
-                  onConfirm={executeBulkDelete}
-                  onCancel={handleCancelBulkDelete}
-                  confirmText={`Delete ${selectedQuestionIds.length} Question(s)`}
-                  confirmButtonVariant="destructive"
-                />
-              </Modal>
-            )}
-
-            {/* ADDED: Modal for SOP AI Question Generation */}
-            {showGenerateSopAiModal &&
-              currentQuestionBank &&
-              currentQuestionBank.sourceType === "SOP" &&
-              currentQuestionBank.sourceSopDocumentId && (
-                <Modal
-                  isOpen={showGenerateSopAiModal}
-                  onClose={() => setShowGenerateSopAiModal(false)}
-                  title={`Generate AI Questions from SOP: ${
-                    currentQuestionBank.sourceSopDocumentTitle || "SOP Document"
-                  }`}
-                >
-                  <GenerateAiQuestionsFormSop
-                    bankId={currentQuestionBank._id}
-                    bankName={currentQuestionBank.name}
-                    sopDocumentId={currentQuestionBank.sourceSopDocumentId}
-                    sopDocumentTitle={
-                      currentQuestionBank.sourceSopDocumentTitle
-                    }
-                    existingBankCategories={currentQuestionBank.categories}
-                    onQuestionsGenerated={handleSopAiQuestionsGenerated}
-                    onCloseRequest={() => setShowGenerateSopAiModal(false)}
-                  />
-                </Modal>
-              )}
-
-            {showPreviewModal && (
-              <Modal
-                isOpen={showPreviewModal}
-                onClose={handleClosePreviewModal}
-                title="AI Questions Preview"
-                size="xl"
-              >
-                <AiQuestionsPreview
-                  questions={previewQuestions}
-                  onApprove={handleApproveSelectedQuestions}
-                  onCancel={handleClosePreviewModal}
-                  isLoading={isAddingApprovedQuestions}
-                />
-              </Modal>
-            )}
           </div>
         </div>
       </main>
+
+      {/* Modals */}
+      {showAddManualQuestionModal && currentQuestionBank && (
+        <Modal
+          isOpen={showAddManualQuestionModal}
+          onClose={() => setShowAddManualQuestionModal(false)}
+          title="Add New Manual Question"
+        >
+          <AddManualQuestionForm
+            onQuestionAdded={handleManualQuestionSubmit}
+            onCloseRequest={() => setShowAddManualQuestionModal(false)}
+            initialBankCategories={currentQuestionBank.categories}
+            questionBankId={bankId!}
+          />
+        </Modal>
+      )}
+
+      {isEditBankModalOpen && currentQuestionBank && (
+        <Modal
+          isOpen={isEditBankModalOpen}
+          onClose={handleCloseEditBankModal}
+          title={`Edit Bank: ${currentQuestionBank.name}`}
+        >
+          <EditQuestionBankForm
+            bankToEdit={currentQuestionBank}
+            onBankUpdated={handleBankDetailsUpdated}
+            onCancel={handleCloseEditBankModal}
+          />
+        </Modal>
+      )}
+
+      {isConfirmRemoveModalOpen && questionToRemoveId && (
+        <Modal
+          isOpen={isConfirmRemoveModalOpen}
+          onClose={handleCancelRemoveQuestion}
+          title="Confirm Question Removal"
+          size="sm"
+        >
+          <ConfirmationModalContent
+            message="Are you sure you want to remove this question from the bank? This action cannot be undone."
+            onConfirm={executeRemoveQuestion}
+            onCancel={handleCancelRemoveQuestion}
+            confirmText="Remove Question"
+            confirmButtonVariant="destructive"
+          />
+        </Modal>
+      )}
+
+      {isEditQuestionModalOpen && editingQuestion && (
+        <Modal
+          isOpen={isEditQuestionModalOpen}
+          onClose={handleCloseEditQuestionModal}
+          title="Edit Question"
+        >
+          <EditQuestionForm
+            questionToEdit={editingQuestion}
+            onQuestionUpdated={handleQuestionUpdatedInModal}
+            onClose={handleCloseEditQuestionModal}
+          />
+        </Modal>
+      )}
+
+      {showGenerateAiQuestionsModal && currentQuestionBank && (
+        <Modal
+          isOpen={showGenerateAiQuestionsModal}
+          onClose={() => setShowGenerateAiQuestionsModal(false)}
+          title="Generate AI Questions"
+        >
+          <GenerateAiQuestionsForm
+            bankId={bankId!}
+            menuId={currentQuestionBank.sourceMenuId || ""}
+            onAiQuestionsGenerated={(questions: IQuestion[]) => {
+              setPreviewQuestions(questions);
+              setShowGenerateAiQuestionsModal(false);
+              setShowPreviewModal(true);
+              // Switch to preview tab to show the new questions
+              setActiveTab("preview");
+            }}
+            onCloseRequest={() => setShowGenerateAiQuestionsModal(false)}
+            initialCategories={currentQuestionBank.categories}
+          />
+        </Modal>
+      )}
+
+      {showGenerateSopAiModal && currentQuestionBank && (
+        <Modal
+          isOpen={showGenerateSopAiModal}
+          onClose={() => setShowGenerateSopAiModal(false)}
+          title="Generate SOP AI Questions"
+        >
+          <GenerateAiQuestionsFormSop
+            bankId={bankId!}
+            bankName={currentQuestionBank.name}
+            sopDocumentId={currentQuestionBank.sourceSopDocumentId || ""}
+            sopDocumentTitle={currentQuestionBank.sourceSopDocumentTitle}
+            existingBankCategories={currentQuestionBank.categories}
+            onQuestionsGenerated={(questions: IQuestion[]) => {
+              setPreviewQuestions(questions);
+              setShowGenerateSopAiModal(false);
+              setShowPreviewModal(true);
+              // Switch to preview tab to show the new questions
+              setActiveTab("preview");
+            }}
+            onCloseRequest={() => setShowGenerateSopAiModal(false)}
+          />
+        </Modal>
+      )}
+
+      {showPreviewModal && (
+        <Modal
+          isOpen={showPreviewModal}
+          onClose={() => setShowPreviewModal(false)}
+          title="Preview Generated Questions"
+          size="lg"
+        >
+          <AiQuestionsPreview
+            questions={previewQuestions}
+            onApprove={async (approvedQuestionIds) => {
+              setIsAddingApprovedQuestions(true);
+              try {
+                console.log(
+                  "Adding questions to preview:",
+                  approvedQuestionIds
+                );
+                console.log(
+                  "Preview questions available:",
+                  previewQuestions.length
+                );
+
+                // Filter the preview questions to get only the approved ones
+                const approvedQuestions = previewQuestions.filter((q) =>
+                  approvedQuestionIds.includes(q._id)
+                );
+
+                console.log(
+                  "Filtered approved questions:",
+                  approvedQuestions.length
+                );
+
+                // Call the new API to add questions with pending_review status
+                const result = await addQuestionsAsPendingReview(
+                  bankId!,
+                  approvedQuestions
+                );
+
+                console.log("API result:", result);
+
+                setShowPreviewModal(false);
+                setPreviewQuestions([]);
+                // Refresh the question bank data to show the new preview questions
+                if (bankId) {
+                  await fetchQuestionBankById(bankId);
+                }
+                // Switch to preview tab to see the newly added questions
+                setActiveTab("preview");
+              } catch (error) {
+                console.error("Error adding questions to preview:", error);
+                // You might want to show a toast notification here
+                alert("Error adding questions to preview. Please try again.");
+              } finally {
+                setIsAddingApprovedQuestions(false);
+              }
+            }}
+            onCancel={() => {
+              setShowPreviewModal(false);
+              setPreviewQuestions([]);
+            }}
+            isLoading={isAddingApprovedQuestions}
+          />
+        </Modal>
+      )}
     </div>
   );
 };
