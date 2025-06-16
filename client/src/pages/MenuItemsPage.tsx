@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { /* Link, */ useParams, useNavigate } from "react-router-dom"; // Removed Link
 import { useAuth } from "../context/AuthContext";
+import { useMenuViews } from "../hooks/useMenuViews";
+import MenuNavigationTabs from "../components/menu/MenuNavigationTabs";
+import MenuViewContainer from "../components/menu/MenuViewContainer";
 import {
   createMenuItem,
   updateMenuItem,
@@ -112,6 +115,22 @@ const MenuItemsPage: React.FC = () => {
   const { menuDetails, items, loading, error, fetchData, clearError } =
     useMenuData(menuId);
 
+  // NEW: Replace complex state with simple view management
+  const {
+    currentView,
+    selectedCategory,
+    searchTerm,
+    filters,
+    sortBy,
+    handleViewChange,
+    handleCategoryFilter,
+    handleSearchChange,
+    handleClearSearch,
+    handleFiltersChange,
+    handleSortChange,
+    setSortBy,
+  } = useMenuViews("dashboard");
+
   // Remove state managed by the hook
   // const [menuDetails, setMenuDetails] = useState<Menu | null>(null); // Handled by hook
   // const [items, setItems] = useState<MenuItem[]>([]); // Handled by hook
@@ -133,135 +152,31 @@ const MenuItemsPage: React.FC = () => {
     useState<boolean>(false);
   const [menuDetailsError, setMenuDetailsError] = useState<string | null>(null);
 
-  // State for managing expanded categories
-  const [expandedCategories, setExpandedCategories] = useState<
-    Record<string, boolean>
-  >({});
+  // NEW: Simple expandable cards state for mobile
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
-  // State for managing expanded subcategories (individual categories)
-  const [expandedSubcategories, setExpandedSubcategories] = useState<
-    Record<string, boolean>
-  >({});
-
-  // State for deleting categories
+  // Keep only essential state for modal management
   const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] =
     useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
-  // Table of contents selection state
-  const [selectedItemType, setSelectedItemType] = useState<
-    "food" | "beverage" | "wine" | null
-  >(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null
-  );
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-
-  // Enhanced search functionality
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<{
-    itemTypes: ("food" | "beverage" | "wine")[];
-    categories: string[];
-    items: string[];
-  }>({ itemTypes: [], categories: [], items: [] });
-
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
 
-  // Enhanced search functionality
-  const performSearch = (searchTerm: string) => {
-    if (!items || !searchTerm.trim()) {
-      setSearchResults({ itemTypes: [], categories: [], items: [] });
-      return;
-    }
-
-    const term = searchTerm.toLowerCase();
-    const matchingItemTypes: ("food" | "beverage" | "wine")[] = [];
-    const matchingCategories: string[] = [];
-    const matchingItems: string[] = [];
-
-    // Search through item types
-    if ("food".includes(term)) matchingItemTypes.push("food");
-    if ("beverage".includes(term) || "drink".includes(term))
-      matchingItemTypes.push("beverage");
-    if ("wine".includes(term)) matchingItemTypes.push("wine");
-
-    // Search through categories and items
-    Object.entries(groupedItemsByTypeAndCategory).forEach(
-      ([itemType, categories]) => {
-        Object.entries(categories).forEach(([category, categoryItems]) => {
-          const categoryKey = `${itemType}-${category}`;
-
-          // Check category name
-          const categoryMatches = category.toLowerCase().includes(term);
-          if (categoryMatches) {
-            matchingCategories.push(categoryKey);
-            // Auto-expand parent item type if category matches
-            setExpandedCategories((prev) => ({ ...prev, [itemType]: true }));
-          }
-
-          // Check items in this category
-          categoryItems.forEach((item) => {
-            const itemMatches =
-              item.name.toLowerCase().includes(term) ||
-              item.description?.toLowerCase().includes(term) ||
-              item.category?.toLowerCase().includes(term) ||
-              item.ingredients?.some((ingredient) =>
-                ingredient.toLowerCase().includes(term)
-              );
-
-            if (itemMatches) {
-              matchingItems.push(item._id);
-              // Auto-expand parent category and item type if item matches
-              if (!matchingCategories.includes(categoryKey)) {
-                setExpandedCategories((prev) => ({
-                  ...prev,
-                  [itemType]: true,
-                }));
-                setExpandedSubcategories((prev) => ({
-                  ...prev,
-                  [categoryKey]: true,
-                }));
-              }
-            }
-          });
-        });
+  // NEW: Handle card expansion for mobile
+  const toggleCardExpansion = useCallback((cardId: string) => {
+    setExpandedCards((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
       }
-    );
-
-    setSearchResults({
-      itemTypes: matchingItemTypes,
-      categories: matchingCategories,
-      items: matchingItems,
+      return newSet;
     });
-  };
+  }, []);
 
-  // Handle search input changes
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    performSearch(value);
-  };
-
-  // Clear search
-  const clearSearch = () => {
-    setSearchTerm("");
-    setSearchResults({ itemTypes: [], categories: [], items: [] });
-  };
-
-  // Check if item matches search
-  const isSearchMatch = (
-    type: "itemType" | "category" | "item",
-    key: string
-  ) => {
-    if (!searchTerm.trim()) return false;
-    return type === "itemType"
-      ? searchResults.itemTypes.includes(key as "food" | "beverage" | "wine")
-      : type === "category"
-      ? searchResults.categories.includes(key)
-      : searchResults.items.includes(key);
-  };
-
-  // Statistics
+  // Updated stats calculation (keep existing logic)
   const stats = useMemo(() => {
     const currentItems = items || [];
     const foodItems = currentItems.filter((item) => item.itemType === "food");
@@ -275,9 +190,8 @@ const MenuItemsPage: React.FC = () => {
       foodCount: foodItems.length,
       beverageCount: beverageItems.length,
       wineCount: wineItems.length,
-      hasSearchResults: searchTerm.trim() !== "",
     };
-  }, [items, searchTerm]);
+  }, [items]);
 
   // New: Memoize unique food, beverage, and wine categories separately
   const uniqueFoodCategories = useMemo(() => {
@@ -2008,16 +1922,37 @@ const MenuItemsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Two-column layout: Table of Contents and Content Display */}
-              {!loading && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-400px)]">
-                  {/* Table of Contents - Left Column */}
-                  <div className="lg:col-span-1">{renderTableOfContents()}</div>
+              {/* NEW: Tab Navigation */}
+              <div className="sticky top-0 z-50 bg-gray-50 pb-6">
+                <MenuNavigationTabs
+                  currentView={currentView}
+                  onViewChange={handleViewChange}
+                  stats={stats}
+                />
+              </div>
 
-                  {/* Content Display - Right Column */}
-                  <div className="lg:col-span-2">
-                    <ContentDisplay />
-                  </div>
+              {/* Content */}
+              {!loading && (
+                <div className="mt-6">
+                  <MenuViewContainer
+                    currentView={currentView}
+                    items={items || []}
+                    selectedCategory={selectedCategory}
+                    onCategoryChange={handleCategoryFilter}
+                    onItemEdit={openEditModal}
+                    onItemDelete={openDeleteModal}
+                    onAddItem={openAddModal}
+                    onViewChange={handleViewChange}
+                    expandedCards={expandedCards}
+                    onToggleCardExpansion={toggleCardExpansion}
+                    searchTerm={searchTerm}
+                    onSearchChange={handleSearchChange}
+                    onClearSearch={handleClearSearch}
+                    filters={filters}
+                    onFiltersChange={handleFiltersChange}
+                    sortBy={sortBy}
+                    onSortChange={handleSortChange}
+                  />
                 </div>
               )}
             </div>
