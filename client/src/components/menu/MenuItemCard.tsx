@@ -126,11 +126,11 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
             <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-200 text-gray-600">
               +{item.ingredients.length - 3} more
             </span>
-                  )}
+          )}
+        </div>
       </div>
-    </motion.div>
-  );
-};
+    );
+  };
 
   const renderWineDetails = () => {
     if (item.itemType !== "wine") return null;
@@ -278,7 +278,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
