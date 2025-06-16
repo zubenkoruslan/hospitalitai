@@ -1,4 +1,5 @@
 import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -8,6 +9,15 @@ import {
   BeakerIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
+import {
+  cardAnimations,
+  chevronAnimation,
+  buttonAnimation,
+  badgeAnimation,
+  priceAnimation,
+} from "../../utils/animations";
+import LazyImage from "../common/LazyImage";
+import { usePerformanceMonitor } from "../../hooks/usePerformanceMonitor";
 import { MenuItem } from "../../types/menuItemTypes";
 
 interface MenuItemCardProps {
@@ -28,6 +38,9 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   variant = "desktop",
 }) => {
   const isMobile = variant === "mobile";
+
+  // Performance monitoring for this component
+  const { measureRender } = usePerformanceMonitor("MenuItemCard");
 
   // Get item type icon and color
   const getItemTypeConfig = () => {
@@ -113,11 +126,11 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
             <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-200 text-gray-600">
               +{item.ingredients.length - 3} more
             </span>
-          )}
-        </div>
+                  )}
       </div>
-    );
-  };
+    </motion.div>
+  );
+};
 
   const renderWineDetails = () => {
     if (item.itemType !== "wine") return null;
@@ -188,10 +201,17 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   const shouldShowExpandedContent = !isMobile || isExpanded;
 
   return (
-    <div
-      className={`bg-white rounded-xl border border-gray-200 transition-all duration-200 ${
-        isMobile ? "cursor-pointer hover:shadow-md" : "hover:shadow-lg"
-      } ${isExpanded ? "shadow-md" : "hover:border-gray-300"}`}
+    <motion.div
+      layout
+      variants={cardAnimations}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      whileHover={isMobile ? "hover" : undefined}
+      whileTap={isMobile ? "tap" : undefined}
+      className={`bg-white rounded-xl border border-gray-200 ${
+        isMobile ? "cursor-pointer" : ""
+      } ${isExpanded ? "shadow-md" : ""}`}
       onClick={handleCardClick}
     >
       <div className="p-4">

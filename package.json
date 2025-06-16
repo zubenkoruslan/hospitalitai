@@ -39,6 +39,7 @@
     "axios": "^1.9.0",
     "date-fns": "^4.1.0",
     "express-async-handler": "^1.2.0",
+    "framer-motion": "^12.18.1",
     "fs-extra": "^11.3.0",
     "jwt-decode": "^4.0.0",
     "mammoth": "^1.9.0",
