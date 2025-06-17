@@ -1388,7 +1388,7 @@ const MenuItemsPage: React.FC = () => {
                   <Icon className="h-8 w-8 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                  <h1 className="text-xl lg:text-2xl font-bold text-white">
                     {selectedItem.name}
                   </h1>
                   <div className="flex items-center space-x-3 text-sm">
@@ -1954,109 +1954,50 @@ const MenuItemsPage: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
               {/* Header Section */}
-              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-amber-600 rounded-xl shadow-lg">
-                      <DocumentTextIcon className="h-8 w-8 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-3 mb-2">
-                        <button
-                          onClick={() => navigate("/menu")}
-                          className="flex items-center text-slate-300 hover:text-white transition-colors duration-200 text-sm"
-                        >
-                          <ArrowLeftIcon className="h-4 w-4 mr-1" />
-                          Back to Menus
-                        </button>
-                        <span className="text-slate-500">•</span>
-                        <span className="text-slate-300 text-sm">
-                          Menu Items
-                        </span>
+              {/* Page Header */}
+              <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+                <div className="flex flex-col gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                        <DocumentTextIcon className="h-5 w-5 text-white" />
                       </div>
-                      <h1 className="text-3xl font-bold text-white">
-                        {menuDetails.name}
-                      </h1>
-                      {menuDetails.description && (
-                        <p className="text-slate-300 mt-2 font-medium">
-                          {menuDetails.description}
-                        </p>
-                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <button
+                            onClick={() => navigate("/menu")}
+                            className="flex items-center text-muted-gray hover:text-primary transition-colors duration-200 text-sm"
+                          >
+                            <ArrowLeftIcon className="h-4 w-4 mr-1" />
+                            Back to Menus
+                          </button>
+                          <span className="text-muted-gray">•</span>
+                          <span className="text-muted-gray text-sm">
+                            Menu Items
+                          </span>
+                        </div>
+                        <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                          {menuDetails.name}
+                        </h1>
+                      </div>
                     </div>
+                    {menuDetails.description && (
+                      <p className="text-muted-gray text-sm mb-3">
+                        {menuDetails.description}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <Button
-                      variant="secondary"
-                      onClick={openMenuDetailsModal}
-                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 shadow-lg"
-                    >
-                      <PencilIcon className="h-5 w-5 mr-2" />
-                      Edit Menu
-                    </Button>
-                    <Button
-                      variant="primary"
-                      onClick={openAddModal}
-                      className="shadow-lg"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-2" />
-                      Add Item
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Total Items
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.totalItems}
-                        </p>
-                      </div>
-                      <ClipboardDocumentListIcon className="h-8 w-8 text-blue-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Food Items
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.foodCount}
-                        </p>
-                      </div>
-                      <CakeIcon className="h-8 w-8 text-green-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Beverages
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.beverageCount}
-                        </p>
-                      </div>
-                      <BeakerIcon className="h-8 w-8 text-purple-400" />
-                    </div>
-                  </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Wines
-                        </p>
-                        <p className="text-2xl font-bold text-white">
-                          {stats.wineCount}
-                        </p>
-                      </div>
-                      <SparklesIcon className="h-8 w-8 text-amber-400" />
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="flex">
+                    <button
+                      onClick={openMenuDetailsModal}
+                      className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-medium rounded-lg hover:from-gray-700 hover:to-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                    >
+                      <PencilIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className="hidden sm:inline">Edit Menu</span>
+                      <span className="sm:hidden">Edit</span>
+                    </button>
                   </div>
                 </div>
               </div>

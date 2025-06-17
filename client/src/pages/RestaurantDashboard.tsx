@@ -49,6 +49,8 @@ import {
   BeakerIcon,
   GlobeAltIcon,
   Cog6ToothIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
 // Helper function to check if a quiz is completed regardless of capitalization
@@ -92,10 +94,25 @@ const RestaurantDashboard: React.FC = () => {
   const [categoriesChartData, setCategoriesChartData] =
     useState<ChartData<"doughnut"> | null>(null);
 
+  // Mobile expandable state
+  const [expandedSections, setExpandedSections] = useState({
+    quickActions: false,
+    recentNotifications: false,
+    knowledgeCategories: false,
+  });
+
   // Keep other state
 
   // State for menu upload modal
   const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
+
+  // Toggle expanded section on mobile
+  const toggleExpandedSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
 
   // Memoize calculations based on staffData from the hook
   const overallAveragePerformance = useMemo(() => {
@@ -567,16 +584,47 @@ const RestaurantDashboard: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                    <div className="mt-4 flex items-center text-purple-600 text-sm font-medium group-hover:text-purple-700">
+                      <span>View Analytics</span>
+                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                    </div>
                   </div>
                 </div>
               </Link>
             </div>
 
             {/* Enhanced Action Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Quick Actions */}
+            <div className="space-y-8 mb-8">
+              {/* Quick Actions - Mobile expandable */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                {/* Mobile Header */}
+                <div
+                  className="lg:hidden cursor-pointer"
+                  onClick={() => toggleExpandedSection("quickActions")}
+                >
+                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-blue-600 rounded-lg">
+                          <ClockIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Quick Actions
+                        </h2>
+                      </div>
+                      <div className="transform transition-transform duration-200">
+                        {expandedSections.quickActions ? (
+                          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop Header */}
+                <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                   <div className="flex items-center space-x-2">
                     <div className="p-1.5 bg-blue-600 rounded-lg">
                       <ClockIcon className="h-4 w-4 text-white" />
@@ -589,7 +637,13 @@ const RestaurantDashboard: React.FC = () => {
                     Streamline your workflow
                   </p>
                 </div>
-                <div className="p-6 space-y-4">
+
+                {/* Content - Expandable on mobile, always visible on desktop */}
+                <div
+                  className={`${
+                    expandedSections.quickActions ? "block" : "hidden"
+                  } lg:block p-6 space-y-4`}
+                >
                   <button
                     onClick={() => navigate("/upload")}
                     className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
@@ -614,9 +668,338 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Enhanced Recent Notifications */}
+              {/* Knowledge Categories Performance - Always visible on all devices */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                {/* Universal Header */}
                 <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        categoriesLoading
+                          ? "bg-slate-400"
+                          : categoriesError
+                          ? "bg-red-500"
+                          : "bg-purple-600"
+                      }`}
+                    >
+                      <ChartBarIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">
+                        Knowledge Categories Performance
+                      </h2>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Average scores across the four knowledge areas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content - Always visible */}
+                <div className="p-6">
+                  {categoriesLoading ? (
+                    <div className="animate-pulse">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto"></div>
+                        <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto"></div>
+                        <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto"></div>
+                        <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto"></div>
+                      </div>
+                    </div>
+                  ) : categoriesError ? (
+                    <div className="text-center py-12">
+                      <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                        <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+                      </div>
+                      <h3 className="text-sm font-medium text-slate-900 mb-2">
+                        Analytics Unavailable
+                      </h3>
+                      <p className="text-sm text-red-600 mb-1">
+                        {categoriesError}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Please try refreshing the page or check back later
+                      </p>
+                    </div>
+                  ) : categoriesChartData &&
+                    categoriesData &&
+                    categoriesData.length > 0 ? (
+                    <>
+                      {/* Four Horizontal Circular Charts */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        {categoriesData.map((cat, index) => {
+                          const categoryConfig = {
+                            "food-knowledge": {
+                              label: "Food Knowledge",
+                              color: "rgba(34, 197, 94, 0.8)",
+                              bgColor: "bg-green-50",
+                              borderColor: "border-green-200",
+                              icon: CakeIcon,
+                              iconColor: "text-green-600",
+                            },
+                            "beverage-knowledge": {
+                              label: "Beverage Knowledge",
+                              color: "rgba(59, 130, 246, 0.8)",
+                              bgColor: "bg-blue-50",
+                              borderColor: "border-blue-200",
+                              icon: BeakerIcon,
+                              iconColor: "text-blue-600",
+                            },
+                            "wine-knowledge": {
+                              label: "Wine Knowledge",
+                              color: "rgba(147, 51, 234, 0.8)",
+                              bgColor: "bg-purple-50",
+                              borderColor: "border-purple-200",
+                              icon: GlobeAltIcon,
+                              iconColor: "text-purple-600",
+                            },
+                            "procedures-knowledge": {
+                              label: "Procedures Knowledge",
+                              color: "rgba(249, 115, 22, 0.8)",
+                              bgColor: "bg-orange-50",
+                              borderColor: "border-orange-200",
+                              icon: Cog6ToothIcon,
+                              iconColor: "text-orange-600",
+                            },
+                          };
+
+                          const config = categoryConfig[
+                            cat.category as keyof typeof categoryConfig
+                          ] || {
+                            label: cat.category,
+                            color: "rgba(75, 192, 192, 0.8)",
+                            bgColor: "bg-gray-50",
+                            borderColor: "border-gray-200",
+                            icon: ChartBarIcon,
+                            iconColor: "text-gray-600",
+                          };
+
+                          const score =
+                            Math.round(cat.averageAccuracy * 10) / 10;
+                          const IconComponent = config.icon;
+
+                          // Performance status
+                          const getPerformanceStatus = (score: number) => {
+                            if (score >= 85)
+                              return {
+                                label: "Excellent",
+                                color: "text-green-600",
+                                bgColor: "bg-green-100",
+                              };
+                            if (score >= 70)
+                              return {
+                                label: "Good",
+                                color: "text-blue-600",
+                                bgColor: "bg-blue-100",
+                              };
+                            if (score >= 50)
+                              return {
+                                label: "Fair",
+                                color: "text-yellow-600",
+                                bgColor: "bg-yellow-100",
+                              };
+                            return {
+                              label: "Needs Improvement",
+                              color: "text-red-600",
+                              bgColor: "bg-red-100",
+                            };
+                          };
+
+                          const status = getPerformanceStatus(score);
+
+                          const chartData = {
+                            labels: [config.label, "Remaining"],
+                            datasets: [
+                              {
+                                data: [score, 100 - score],
+                                backgroundColor: [
+                                  config.color,
+                                  "rgba(226, 232, 240, 0.3)",
+                                ],
+                                borderColor: [
+                                  config.color.replace("0.8", "1"),
+                                  "rgba(226, 232, 240, 0.5)",
+                                ],
+                                borderWidth: 3,
+                                cutout: "75%",
+                                borderRadius: 4,
+                              },
+                            ],
+                          };
+
+                          const singleChartOptions: ChartOptions<"doughnut"> = {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            devicePixelRatio: window.devicePixelRatio || 2,
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: { enabled: false },
+                            },
+                            animation: {
+                              animateRotate: true,
+                              duration: 1200,
+                              easing: "easeOutQuart",
+                            },
+                            elements: {
+                              arc: {
+                                borderWidth: 3,
+                                hoverBorderWidth: 4,
+                                borderAlign: "inner",
+                              },
+                            },
+                            layout: {
+                              padding: 0,
+                            },
+                          };
+
+                          return (
+                            <Link
+                              to="/staff-results"
+                              key={cat.category}
+                              className="group block"
+                            >
+                              <div
+                                className={`${config.bgColor} ${config.borderColor} border-2 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:-translate-y-1 cursor-pointer`}
+                              >
+                                {/* Icon and Status */}
+                                <div className="flex items-center justify-between mb-4">
+                                  <div
+                                    className={`p-2 bg-white rounded-lg border ${config.borderColor} shadow-sm`}
+                                  >
+                                    <IconComponent
+                                      className={`h-5 w-5 ${config.iconColor}`}
+                                    />
+                                  </div>
+                                  <span
+                                    className={`px-2 py-1 text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}
+                                  >
+                                    {status.label}
+                                  </span>
+                                </div>
+
+                                {/* Chart */}
+                                <div className="w-32 h-32 mx-auto relative mb-4">
+                                  <Doughnut
+                                    data={chartData}
+                                    options={singleChartOptions}
+                                  />
+                                  {/* Center text overlay */}
+                                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="text-center">
+                                      <div className="text-2xl font-bold text-slate-900 group-hover:scale-110 transition-transform duration-300">
+                                        {score}%
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Category Info */}
+                                <div className="text-center">
+                                  <h4 className="font-semibold text-slate-900 text-sm mb-2 group-hover:text-slate-700 transition-colors">
+                                    {config.label}
+                                  </h4>
+                                  <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
+                                    <span className="flex items-center">
+                                      <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                                      {cat.totalQuestions} answered
+                                    </span>
+                                    <span className="flex items-center">
+                                      <UsersIcon className="h-3 w-3 mr-1" />
+                                      {cat.totalStaffParticipating} staff
+                                    </span>
+                                  </div>
+
+                                  {/* View Details Indicator */}
+                                  <div className="mt-3 flex items-center justify-center text-xs text-slate-400 group-hover:text-blue-600 transition-colors">
+                                    <span>View Details</span>
+                                    <ArrowRightIcon className="ml-1 h-3 w-3 transform group-hover:translate-x-1 transition-transform" />
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                        <ChartBarIcon className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">
+                        Analytics Coming Soon
+                      </h3>
+                      <p className="text-sm text-slate-500 mb-4 max-w-sm mx-auto">
+                        Knowledge category performance will appear here once
+                        your staff begin taking quizzes. Create quizzes and
+                        assign them to staff to see detailed analytics.
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2 mb-6">
+                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                          Food Knowledge
+                        </span>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                          Beverage Knowledge
+                        </span>
+                        <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                          Wine Knowledge
+                        </span>
+                        <span className="px-3 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
+                          Procedures Knowledge
+                        </span>
+                      </div>
+                      <Button
+                        variant="primary"
+                        onClick={() =>
+                          (window.location.href = "/quiz-management")
+                        }
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Create Your First Quiz
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Recent Notifications - Mobile expandable, positioned after Knowledge Categories */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                {/* Mobile Header */}
+                <div
+                  className="lg:hidden cursor-pointer"
+                  onClick={() => toggleExpandedSection("recentNotifications")}
+                >
+                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-orange-500 rounded-lg">
+                          <BellIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Recent Notifications
+                        </h2>
+                        {recentNotifications.length > 0 && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full ml-2">
+                            {
+                              recentNotifications.filter((n) => !n.isRead)
+                                .length
+                            }
+                          </span>
+                        )}
+                      </div>
+                      <div className="transform transition-transform duration-200">
+                        {expandedSections.recentNotifications ? (
+                          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop Header */}
+                <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="p-1.5 bg-orange-500 rounded-lg">
@@ -637,7 +1020,13 @@ const RestaurantDashboard: React.FC = () => {
                     Stay updated with your team
                   </p>
                 </div>
-                <div className="p-6">
+
+                {/* Content - Expandable on mobile, always visible on desktop */}
+                <div
+                  className={`${
+                    expandedSections.recentNotifications ? "block" : "hidden"
+                  } lg:block p-6`}
+                >
                   {recentNotifications.length > 0 ? (
                     <div className="space-y-3">
                       {recentNotifications.map((notification, index) => (
@@ -731,337 +1120,6 @@ const RestaurantDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Enhanced Knowledge Categories Performance Chart */}
-            {categoriesLoading ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-purple-600 rounded-lg">
-                      <ChartBarIcon className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Knowledge Categories Performance
-                    </h2>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="animate-pulse">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="w-80 h-80 bg-slate-200 rounded-full mx-auto"></div>
-                      <div className="space-y-4">
-                        <div className="h-20 bg-slate-200 rounded-xl"></div>
-                        <div className="h-20 bg-slate-200 rounded-xl"></div>
-                        <div className="h-20 bg-slate-200 rounded-xl"></div>
-                        <div className="h-16 bg-slate-200 rounded-xl"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : categoriesError ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-red-500 rounded-lg">
-                      <ExclamationTriangleIcon className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Knowledge Categories Performance
-                    </h2>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="text-center py-12">
-                    <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                      <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
-                    </div>
-                    <h3 className="text-sm font-medium text-slate-900 mb-2">
-                      Analytics Unavailable
-                    </h3>
-                    <p className="text-sm text-red-600 mb-1">
-                      {categoriesError}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Please try refreshing the page or check back later
-                    </p>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="mt-4 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200"
-                    >
-                      Refresh Page
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : categoriesChartData &&
-              categoriesData &&
-              categoriesData.length > 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-purple-600 rounded-lg">
-                      <ChartBarIcon className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-slate-900">
-                        Knowledge Categories Performance
-                      </h2>
-                      <p className="text-sm text-slate-600 mt-1">
-                        Average scores across the four knowledge areas
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  {/* Four Horizontal Circular Charts */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {categoriesData.map((cat, index) => {
-                      const categoryConfig = {
-                        "food-knowledge": {
-                          label: "Food Knowledge",
-                          color: "rgba(34, 197, 94, 0.8)",
-                          bgColor: "bg-green-50",
-                          borderColor: "border-green-200",
-                          icon: CakeIcon,
-                          iconColor: "text-green-600",
-                        },
-                        "beverage-knowledge": {
-                          label: "Beverage Knowledge",
-                          color: "rgba(59, 130, 246, 0.8)",
-                          bgColor: "bg-blue-50",
-                          borderColor: "border-blue-200",
-                          icon: BeakerIcon,
-                          iconColor: "text-blue-600",
-                        },
-                        "wine-knowledge": {
-                          label: "Wine Knowledge",
-                          color: "rgba(147, 51, 234, 0.8)",
-                          bgColor: "bg-purple-50",
-                          borderColor: "border-purple-200",
-                          icon: GlobeAltIcon,
-                          iconColor: "text-purple-600",
-                        },
-                        "procedures-knowledge": {
-                          label: "Procedures Knowledge",
-                          color: "rgba(249, 115, 22, 0.8)",
-                          bgColor: "bg-orange-50",
-                          borderColor: "border-orange-200",
-                          icon: Cog6ToothIcon,
-                          iconColor: "text-orange-600",
-                        },
-                      };
-
-                      const config = categoryConfig[
-                        cat.category as keyof typeof categoryConfig
-                      ] || {
-                        label: cat.category,
-                        color: "rgba(75, 192, 192, 0.8)",
-                        bgColor: "bg-gray-50",
-                        borderColor: "border-gray-200",
-                        icon: ChartBarIcon,
-                        iconColor: "text-gray-600",
-                      };
-
-                      const score = Math.round(cat.averageAccuracy * 10) / 10;
-                      const IconComponent = config.icon;
-
-                      // Performance status
-                      const getPerformanceStatus = (score: number) => {
-                        if (score >= 85)
-                          return {
-                            label: "Excellent",
-                            color: "text-green-600",
-                            bgColor: "bg-green-100",
-                          };
-                        if (score >= 70)
-                          return {
-                            label: "Good",
-                            color: "text-blue-600",
-                            bgColor: "bg-blue-100",
-                          };
-                        if (score >= 50)
-                          return {
-                            label: "Fair",
-                            color: "text-yellow-600",
-                            bgColor: "bg-yellow-100",
-                          };
-                        return {
-                          label: "Needs Improvement",
-                          color: "text-red-600",
-                          bgColor: "bg-red-100",
-                        };
-                      };
-
-                      const status = getPerformanceStatus(score);
-
-                      const chartData = {
-                        labels: [config.label, "Remaining"],
-                        datasets: [
-                          {
-                            data: [score, 100 - score],
-                            backgroundColor: [
-                              config.color,
-                              "rgba(226, 232, 240, 0.3)",
-                            ],
-                            borderColor: [
-                              config.color.replace("0.8", "1"),
-                              "rgba(226, 232, 240, 0.5)",
-                            ],
-                            borderWidth: 3,
-                            cutout: "75%",
-                            borderRadius: 4,
-                          },
-                        ],
-                      };
-
-                      const singleChartOptions: ChartOptions<"doughnut"> = {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        devicePixelRatio: window.devicePixelRatio || 2,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: { enabled: false },
-                        },
-                        animation: {
-                          animateRotate: true,
-                          duration: 1200,
-                          easing: "easeOutQuart",
-                        },
-                        elements: {
-                          arc: {
-                            borderWidth: 3,
-                            hoverBorderWidth: 4,
-                            borderAlign: "inner",
-                          },
-                        },
-                        layout: {
-                          padding: 0,
-                        },
-                      };
-
-                      return (
-                        <Link
-                          to="/staff-results"
-                          key={cat.category}
-                          className="group block"
-                        >
-                          <div
-                            className={`${config.bgColor} ${config.borderColor} border-2 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:-translate-y-1 cursor-pointer`}
-                          >
-                            {/* Icon and Status */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div
-                                className={`p-2 bg-white rounded-lg border ${config.borderColor} shadow-sm`}
-                              >
-                                <IconComponent
-                                  className={`h-5 w-5 ${config.iconColor}`}
-                                />
-                              </div>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}
-                              >
-                                {status.label}
-                              </span>
-                            </div>
-
-                            {/* Chart */}
-                            <div className="w-32 h-32 mx-auto relative mb-4">
-                              <Doughnut
-                                data={chartData}
-                                options={singleChartOptions}
-                              />
-                              {/* Center text overlay */}
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-slate-900 group-hover:scale-110 transition-transform duration-300">
-                                    {score}%
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Category Info */}
-                            <div className="text-center">
-                              <h4 className="font-semibold text-slate-900 text-sm mb-2 group-hover:text-slate-700 transition-colors">
-                                {config.label}
-                              </h4>
-                              <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
-                                <span className="flex items-center">
-                                  <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
-                                  {cat.totalQuestions} answered
-                                </span>
-                                <span className="flex items-center">
-                                  <UsersIcon className="h-3 w-3 mr-1" />
-                                  {cat.totalStaffParticipating} staff
-                                </span>
-                              </div>
-
-                              {/* View Details Indicator */}
-                              <div className="mt-3 flex items-center justify-center text-xs text-slate-400 group-hover:text-blue-600 transition-colors">
-                                <span>View Details</span>
-                                <ArrowRightIcon className="ml-1 h-3 w-3 transform group-hover:translate-x-1 transition-transform" />
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-slate-400 rounded-lg">
-                      <ChartBarIcon className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Knowledge Categories Performance
-                    </h2>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="text-center py-16">
-                    <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                      <ChartBarIcon className="h-10 w-10 text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">
-                      Analytics Coming Soon
-                    </h3>
-                    <p className="text-sm text-slate-500 mb-4 max-w-sm mx-auto">
-                      Knowledge category performance will appear here once your
-                      staff begin taking quizzes. Create quizzes and assign them
-                      to staff to see detailed analytics.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-2 mb-6">
-                      <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                        Food Knowledge
-                      </span>
-                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                        Beverage Knowledge
-                      </span>
-                      <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                        Wine Knowledge
-                      </span>
-                      <span className="px-3 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                        Procedures Knowledge
-                      </span>
-                    </div>
-                    <Button
-                      variant="primary"
-                      onClick={() =>
-                        (window.location.href = "/quiz-management")
-                      }
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Create Your First Quiz
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>

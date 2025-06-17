@@ -4,9 +4,6 @@ import {
   CakeIcon,
   BeakerIcon,
   SparklesIcon,
-  CurrencyDollarIcon,
-  ExclamationTriangleIcon,
-  DocumentTextIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
@@ -57,20 +54,24 @@ const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       className={`
-        relative overflow-hidden rounded-xl border ${borderColor} bg-white p-6 shadow-sm transition-all duration-200
+        relative overflow-hidden rounded-xl border ${borderColor} bg-white p-4 lg:p-6 shadow-sm transition-all duration-200
         ${onClick ? "cursor-pointer hover:shadow-md hover:scale-[1.02]" : ""}
       `}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <div className="flex items-center space-x-3">
-            <div className={`p-3 rounded-lg ${bgColor}`}>
-              <Icon className={`h-6 w-6 ${color}`} />
+          <div className="flex items-center space-x-2 lg:space-x-3">
+            <div className={`p-2 lg:p-3 rounded-lg ${bgColor}`}>
+              <Icon className={`h-5 w-5 lg:h-6 lg:w-6 ${color}`} />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">{title}</p>
-              <p className="text-2xl font-bold text-gray-900">{value}</p>
+              <p className="text-xs lg:text-sm font-medium text-gray-600">
+                {title}
+              </p>
+              <p className="text-xl lg:text-2xl font-bold text-gray-900">
+                {value}
+              </p>
               {subtitle && (
                 <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
               )}
@@ -107,40 +108,13 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
   stats,
   onNavigateToType,
 }) => {
-  const {
-    totalItems,
-    foodCount,
-    beverageCount,
-    wineCount,
-    averagePrice,
-    priceRange,
-    itemsWithoutPrices,
-    itemsWithoutDescriptions,
-    recentlyAdded,
-  } = stats;
-
-  // Calculate completion percentages
-  const priceCompletionRate =
-    totalItems > 0
-      ? Math.round(((totalItems - itemsWithoutPrices) / totalItems) * 100)
-      : 100;
-
-  const descriptionCompletionRate =
-    totalItems > 0
-      ? Math.round(((totalItems - itemsWithoutDescriptions) / totalItems) * 100)
-      : 100;
-
-  // Format price range
-  const formatPrice = (price: number) => `$${price.toFixed(2)}`;
-  const priceRangeText =
-    priceRange[0] !== Infinity
-      ? `${formatPrice(priceRange[0])} - ${formatPrice(priceRange[1])}`
-      : "No prices set";
+  const { totalItems, foodCount, beverageCount, wineCount, recentlyAdded } =
+    stats;
 
   return (
     <div className="space-y-6">
-      {/* Main Statistics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Main Statistics Grid - 2x2 on mobile, 1 row on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {/* Total Items */}
         <StatCard
           title="Total Items"
@@ -200,118 +174,6 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           }
         />
       </div>
-
-      {/* Price Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Average Price */}
-        <StatCard
-          title="Average Price"
-          value={averagePrice > 0 ? formatPrice(averagePrice) : "N/A"}
-          icon={CurrencyDollarIcon}
-          color="text-green-600"
-          bgColor="bg-green-100"
-          borderColor="border-green-200"
-          subtitle={`Range: ${priceRangeText}`}
-        />
-
-        {/* Price Completion */}
-        <StatCard
-          title="Price Completion"
-          value={`${priceCompletionRate}%`}
-          icon={CurrencyDollarIcon}
-          color={
-            priceCompletionRate >= 90
-              ? "text-green-600"
-              : priceCompletionRate >= 70
-              ? "text-yellow-600"
-              : "text-red-600"
-          }
-          bgColor={
-            priceCompletionRate >= 90
-              ? "bg-green-100"
-              : priceCompletionRate >= 70
-              ? "bg-yellow-100"
-              : "bg-red-100"
-          }
-          borderColor={
-            priceCompletionRate >= 90
-              ? "border-green-200"
-              : priceCompletionRate >= 70
-              ? "border-yellow-200"
-              : "border-red-200"
-          }
-          subtitle={
-            itemsWithoutPrices > 0
-              ? `${itemsWithoutPrices} items missing prices`
-              : "All items have prices"
-          }
-        />
-
-        {/* Description Completion */}
-        <StatCard
-          title="Description Completion"
-          value={`${descriptionCompletionRate}%`}
-          icon={DocumentTextIcon}
-          color={
-            descriptionCompletionRate >= 90
-              ? "text-green-600"
-              : descriptionCompletionRate >= 70
-              ? "text-yellow-600"
-              : "text-red-600"
-          }
-          bgColor={
-            descriptionCompletionRate >= 90
-              ? "bg-green-100"
-              : descriptionCompletionRate >= 70
-              ? "bg-yellow-100"
-              : "bg-red-100"
-          }
-          borderColor={
-            descriptionCompletionRate >= 90
-              ? "border-green-200"
-              : descriptionCompletionRate >= 70
-              ? "border-yellow-200"
-              : "border-red-200"
-          }
-          subtitle={
-            itemsWithoutDescriptions > 0
-              ? `${itemsWithoutDescriptions} items missing descriptions`
-              : "All items have descriptions"
-          }
-        />
-      </div>
-
-      {/* Health Alerts */}
-      {(itemsWithoutPrices > 0 || itemsWithoutDescriptions > 0) && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <div className="flex items-start space-x-3">
-            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">
-                Menu Completion Recommendations
-              </h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <ul className="space-y-1">
-                  {itemsWithoutPrices > 0 && (
-                    <li>
-                      • Add prices to {itemsWithoutPrices} item
-                      {itemsWithoutPrices > 1 ? "s" : ""} to improve menu
-                      completeness
-                    </li>
-                  )}
-                  {itemsWithoutDescriptions > 0 && (
-                    <li>
-                      • Add descriptions to {itemsWithoutDescriptions} item
-                      {itemsWithoutDescriptions > 1 ? "s" : ""} to help
-                      customers make informed choices
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

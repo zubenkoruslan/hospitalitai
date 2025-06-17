@@ -199,16 +199,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     const priceCompleteness = Math.round(
       ((totalItems - dashboardStats.itemsWithoutPrices) / totalItems) * 100
     );
-    const categoryCompleteness =
-      Object.keys(dashboardStats.categoryCounts).length > 0 ? 100 : 0;
-    const imageCompleteness = 0; // Would need to check actual image data
+    const categoryCompleteness = 100; // Assuming all items have categories
 
     const overallScore = Math.round(
-      (descriptionCompleteness +
-        priceCompleteness +
-        categoryCompleteness +
-        imageCompleteness) /
-        4
+      (descriptionCompleteness + priceCompleteness + categoryCompleteness) / 3
     );
 
     const recommendations = [];
@@ -224,24 +218,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         `Add prices to ${dashboardStats.itemsWithoutPrices} items`
       );
     }
-    if (imageCompleteness < 50) {
-      recommendations.push(
-        "Consider adding images to showcase your menu items"
-      );
+    if (descriptionCompleteness < 50) {
+      warnings.push("Many items are missing descriptions");
     }
-    if (Object.keys(dashboardStats.categoryCounts).length < 3) {
-      recommendations.push("Organize items into more specific categories");
-    }
-
     if (priceCompleteness < 50) {
-      warnings.push(
-        "Many items are missing prices - this affects customer experience"
-      );
-    }
-    if (descriptionCompleteness < 30) {
-      warnings.push(
-        "Most items lack descriptions - customers need more information"
-      );
+      warnings.push("Many items are missing prices");
     }
 
     return {
@@ -250,69 +231,51 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         descriptions: descriptionCompleteness,
         prices: priceCompleteness,
         categories: categoryCompleteness,
-        images: imageCompleteness,
+        images: 0, // Not implemented yet
       },
       recommendations,
       warnings,
     };
-  }, [dashboardStats, items.length]);
+  }, [items, dashboardStats]);
 
   const handleNavigateToType = (type: "food" | "beverage" | "wine") => {
-    const viewMap = {
-      food: "food" as MenuView,
-      beverage: "beverages" as MenuView,
-      wine: "wines" as MenuView,
-    };
-    onViewChange(viewMap[type]);
+    onViewChange(`${type}-items` as MenuView);
   };
 
   const handleAddItemWithType = (itemType: "food" | "beverage" | "wine") => {
-    // Store the desired item type for the modal to pick up
-    localStorage.setItem("pendingItemType", itemType);
+    // Store the item type for the modal
+    sessionStorage.setItem("pendingItemType", itemType);
     onAddItem();
   };
 
-  // Add handler
   const handleExportMenuClick = () => {
-    if (menuId) {
-      setIsExportModalOpen(true);
-    } else {
-      onExportMenu(); // Fallback to parent handler
-    }
+    setIsExportModalOpen(true);
   };
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Dashboard Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Statistics & Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Dashboard Statistics */}
-          <DashboardStats
-            stats={dashboardStats}
-            onNavigateToType={handleNavigateToType}
-          />
+      {/* Dashboard Stats - Always visible, 2x2 on mobile, 1 row on desktop */}
+      <DashboardStats
+        stats={dashboardStats}
+        onNavigateToType={handleNavigateToType}
+      />
 
-          {/* Menu Health and Recent Activity - Side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Menu Health Dashboard */}
-            <MenuHealthDashboard
-              health={menuHealthMetrics}
-              onViewDetails={() => console.log("View health details clicked")}
-            />
+      {/* Desktop Layout - Two columns */}
+      <div className="hidden lg:grid lg:grid-cols-4 lg:gap-6">
+        {/* Left Column - Main Content (3/4 width) */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Menu Health and Recent Activity - Side by Side */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Menu Health */}
+            <MenuHealthDashboard health={menuHealthMetrics} />
 
-            {/* Recent Activity Feed */}
-            <RecentActivityFeed
-              activities={recentActivities}
-              maxItems={6}
-              onViewAll={() => console.log("View all activity clicked")}
-            />
+            {/* Recent Activity */}
+            <RecentActivityFeed activities={recentActivities} />
           </div>
         </div>
 
-        {/* Right Column - Actions & Secondary Content */}
-        <div className="space-y-6">
-          {/* Quick Actions - Enhanced with specific item type handlers */}
+        {/* Right Column - Quick Actions Sidebar (1/4 width) */}
+        <div className="lg:col-span-1">
           <QuickActions
             onAddFood={() => handleAddItemWithType("food")}
             onAddBeverage={() => handleAddItemWithType("beverage")}
@@ -323,7 +286,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Add modal to JSX (before closing div) */}
+      {/* Mobile Layout - Stacked */}
+      <div className="lg:hidden space-y-6">
+        {/* Quick Actions - First on mobile */}
+        <QuickActions
+          onAddFood={() => handleAddItemWithType("food")}
+          onAddBeverage={() => handleAddItemWithType("beverage")}
+          onAddWine={() => handleAddItemWithType("wine")}
+          onBulkImport={onImportMenu}
+          onExportMenu={handleExportMenuClick}
+        />
+
+        {/* Menu Health - Second on mobile */}
+        <MenuHealthDashboard health={menuHealthMetrics} />
+
+        {/* Recent Activity - Third on mobile */}
+        <RecentActivityFeed activities={recentActivities} />
+      </div>
+
+      {/* Export Modal */}
       {isExportModalOpen && menuId && (
         <ExportMenuModal
           isOpen={isExportModalOpen}

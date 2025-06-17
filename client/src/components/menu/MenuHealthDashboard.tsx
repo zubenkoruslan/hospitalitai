@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -8,6 +8,7 @@ import {
   DocumentTextIcon,
   PhotoIcon,
   TagIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
 interface MenuHealthMetrics {
@@ -84,6 +85,7 @@ const MenuHealthDashboard: React.FC<MenuHealthDashboardProps> = ({
   onViewDetails,
 }) => {
   const { overallScore, completeness, recommendations, warnings } = health;
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const getOverallScoreColor = (score: number) => {
     if (score >= 90)
@@ -119,171 +121,146 @@ const MenuHealthDashboard: React.FC<MenuHealthDashboardProps> = ({
   const scoreColors = getOverallScoreColor(overallScore);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Mobile Expandable Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full lg:hidden bg-white p-4 flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <ClipboardDocumentListIcon className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-semibold text-gray-900">Menu Health</h3>
+            <p className="text-sm text-gray-500">
+              {overallScore}% - {getScoreLabel(overallScore)}
+            </p>
+          </div>
+        </div>
+        <div
+          className={`transform transition-transform duration-200 ${
+            isExpanded ? "rotate-90" : ""
+          }`}
+        >
+          <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+        </div>
+      </button>
+
+      {/* Desktop Header (always visible) */}
+      <div className="hidden lg:flex items-center justify-between p-6 pb-4">
         <h2 className="text-lg font-semibold text-gray-900">Menu Health</h2>
         <ClipboardDocumentListIcon className="h-5 w-5 text-gray-400" />
       </div>
 
-      {/* Overall Score */}
+      {/* Content */}
       <div
-        className={`p-4 rounded-xl ${scoreColors.bg} ${scoreColors.border} border mb-6`}
+        className={`${
+          !isExpanded ? "hidden lg:block" : ""
+        } px-4 pb-4 lg:px-6 lg:pb-6 lg:pt-0`}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-600">Overall Score</p>
-            <p className={`text-2xl font-bold ${scoreColors.text}`}>
-              {overallScore}%
-            </p>
-            <p className={`text-sm ${scoreColors.text} font-medium`}>
-              {getScoreLabel(overallScore)}
-            </p>
-          </div>
-          <div className="relative">
-            <div
-              className={`w-16 h-16 rounded-full border-4 ${scoreColors.ring} flex items-center justify-center`}
-            >
-              <div
-                className={`w-12 h-12 rounded-full ${scoreColors.bg} flex items-center justify-center`}
-              >
-                {overallScore >= 90 ? (
-                  <CheckCircleIcon className={`h-6 w-6 ${scoreColors.text}`} />
-                ) : overallScore >= 70 ? (
-                  <ExclamationTriangleIcon
-                    className={`h-6 w-6 ${scoreColors.text}`}
-                  />
-                ) : (
-                  <InformationCircleIcon
-                    className={`h-6 w-6 ${scoreColors.text}`}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Completeness Breakdown */}
-      <div className="space-y-1 mb-6">
-        <h3 className="text-sm font-medium text-gray-800 mb-3">
-          Completeness Breakdown
-        </h3>
-
-        <ScoreBar
-          label="Descriptions"
-          score={completeness.descriptions}
-          icon={DocumentTextIcon}
-          color="text-blue-600"
-        />
-
-        <ScoreBar
-          label="Prices"
-          score={completeness.prices}
-          icon={CurrencyDollarIcon}
-          color="text-green-600"
-        />
-
-        <ScoreBar
-          label="Categories"
-          score={completeness.categories}
-          icon={TagIcon}
-          color="text-purple-600"
-        />
-
-        <ScoreBar
-          label="Images"
-          score={completeness.images}
-          icon={PhotoIcon}
-          color="text-gray-600"
-        />
-      </div>
-
-      {/* Warnings */}
-      {warnings.length > 0 && (
-        <div className="mb-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="flex items-start space-x-2">
-              <ExclamationTriangleIcon className="h-4 w-4 text-red-600 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-red-800">
-                  Urgent Issues
-                </h4>
-                <ul className="mt-1 space-y-1">
-                  {warnings.slice(0, 3).map((warning, index) => (
-                    <li key={index} className="text-xs text-red-700">
-                      • {warning}
-                    </li>
-                  ))}
-                  {warnings.length > 3 && (
-                    <li className="text-xs text-red-600 font-medium">
-                      +{warnings.length - 3} more issues
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recommendations */}
-      {recommendations.length > 0 && (
-        <div className="mb-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-start space-x-2">
-              <InformationCircleIcon className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-blue-800">
-                  Recommendations
-                </h4>
-                <ul className="mt-1 space-y-1">
-                  {recommendations.slice(0, 3).map((recommendation, index) => (
-                    <li key={index} className="text-xs text-blue-700">
-                      • {recommendation}
-                    </li>
-                  ))}
-                  {recommendations.length > 3 && (
-                    <li className="text-xs text-blue-600 font-medium">
-                      +{recommendations.length - 3} more suggestions
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Action Button */}
-      {onViewDetails && (
-        <button
-          onClick={onViewDetails}
-          className="w-full py-2 px-3 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors duration-150"
+        {/* Overall Score */}
+        <div
+          className={`p-4 rounded-xl ${scoreColors.bg} ${scoreColors.border} border mb-6`}
         >
-          View Detailed Health Report
-        </button>
-      )}
-
-      {/* Quick Stats */}
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div>
-            <p className="text-xs text-gray-500">Critical Issues</p>
-            <p
-              className={`text-sm font-medium ${
-                warnings.length > 0 ? "text-red-600" : "text-green-600"
-              }`}
-            >
-              {warnings.length}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Improvements</p>
-            <p className="text-sm font-medium text-blue-600">
-              {recommendations.length}
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Overall Score</p>
+              <p className={`text-2xl font-bold ${scoreColors.text}`}>
+                {overallScore}%
+              </p>
+              <p className={`text-sm ${scoreColors.text} font-medium`}>
+                {getScoreLabel(overallScore)}
+              </p>
+            </div>
+            <div className="relative">
+              <div
+                className={`w-16 h-16 rounded-full border-4 ${scoreColors.ring} flex items-center justify-center`}
+              >
+                <div
+                  className={`w-12 h-12 rounded-full ${scoreColors.bg} flex items-center justify-center`}
+                >
+                  {overallScore >= 90 ? (
+                    <CheckCircleIcon
+                      className={`h-6 w-6 ${scoreColors.text}`}
+                    />
+                  ) : overallScore >= 70 ? (
+                    <ExclamationTriangleIcon
+                      className={`h-6 w-6 ${scoreColors.text}`}
+                    />
+                  ) : (
+                    <InformationCircleIcon
+                      className={`h-6 w-6 ${scoreColors.text}`}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Completeness Breakdown */}
+        <div className="space-y-1 mb-6">
+          <h3 className="text-sm font-medium text-gray-800 mb-3">
+            Completeness Breakdown
+          </h3>
+
+          <ScoreBar
+            label="Descriptions"
+            score={completeness.descriptions}
+            icon={DocumentTextIcon}
+            color="text-blue-600"
+          />
+
+          <ScoreBar
+            label="Prices"
+            score={completeness.prices}
+            icon={CurrencyDollarIcon}
+            color="text-green-600"
+          />
+
+          <ScoreBar
+            label="Categories"
+            score={completeness.categories}
+            icon={TagIcon}
+            color="text-purple-600"
+          />
+
+          <ScoreBar
+            label="Images"
+            score={completeness.images}
+            icon={PhotoIcon}
+            color="text-gray-600"
+          />
+        </div>
+
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h4 className="text-sm font-medium text-blue-800 mb-2">
+              💡 Recommendations
+            </h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              {recommendations.map((rec, index) => (
+                <li key={index}>• {rec}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {warnings.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-red-800 mb-2">
+              ⚠️ Issues to Address
+            </h4>
+            <ul className="text-sm text-red-700 space-y-1">
+              {warnings.map((warning, index) => (
+                <li key={index}>• {warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

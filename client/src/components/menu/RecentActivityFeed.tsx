@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   PlusIcon,
   PencilIcon,
@@ -8,6 +8,7 @@ import {
   BeakerIcon,
   SparklesIcon,
   DocumentArrowUpIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
 interface ActivityItem {
@@ -32,6 +33,8 @@ const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
   maxItems = 8,
   onViewAll,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Sort activities by timestamp (most recent first) and limit
   const sortedActivities = activities
     .sort(
@@ -161,27 +164,85 @@ const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
 
   if (sortedActivities.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Mobile Expandable Header */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full lg:hidden bg-white p-4 flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <ClockIcon className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">Recent Activity</h3>
+              <p className="text-sm text-gray-500">No recent activity</p>
+            </div>
+          </div>
+          <div
+            className={`transform transition-transform duration-200 ${
+              isExpanded ? "rotate-90" : ""
+            }`}
+          >
+            <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+          </div>
+        </button>
+
+        {/* Desktop Header (always visible) */}
+        <div className="hidden lg:flex items-center justify-between p-6 pb-4">
           <h2 className="text-lg font-semibold text-gray-900">
             Recent Activity
           </h2>
           <ClockIcon className="h-5 w-5 text-gray-400" />
         </div>
-        <div className="text-center py-8">
-          <ClockIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No recent activity</p>
-          <p className="text-gray-400 text-xs mt-1">
-            Menu changes will appear here
-          </p>
+
+        {/* Content */}
+        <div
+          className={`${
+            !isExpanded ? "hidden lg:block" : ""
+          } px-4 pb-4 lg:px-6 lg:pb-6 lg:pt-0`}
+        >
+          <div className="text-center py-8">
+            <ClockIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No recent activity</p>
+            <p className="text-gray-400 text-xs mt-1">
+              Menu changes will appear here
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Mobile Expandable Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full lg:hidden bg-white p-4 flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <ClockIcon className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-semibold text-gray-900">Recent Activity</h3>
+            <p className="text-sm text-gray-500">
+              {sortedActivities.length} recent changes
+            </p>
+          </div>
+        </div>
+        <div
+          className={`transform transition-transform duration-200 ${
+            isExpanded ? "rotate-90" : ""
+          }`}
+        >
+          <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+        </div>
+      </button>
+
+      {/* Desktop Header (always visible) */}
+      <div className="hidden lg:flex items-center justify-between p-6 pb-4">
         <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
         <div className="flex items-center space-x-2">
           <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -189,100 +250,82 @@ const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3">
-        {sortedActivities.map((activity) => {
-          const ActivityIcon = getActivityIcon(activity.type);
-          const ItemTypeIcon = getItemTypeIcon(activity.itemType);
-          const colors = getActivityColor(activity.type);
-          const itemTypeColor = getItemTypeColor(activity.itemType);
+      {/* Content */}
+      <div
+        className={`${
+          !isExpanded ? "hidden lg:block" : ""
+        } px-4 pb-4 lg:px-6 lg:pb-6 lg:pt-0`}
+      >
+        <div className="space-y-3">
+          {sortedActivities.map((activity) => {
+            const ActivityIcon = getActivityIcon(activity.type);
+            const ItemTypeIcon = getItemTypeIcon(activity.itemType);
+            const colors = getActivityColor(activity.type);
+            const itemTypeColor = getItemTypeColor(activity.itemType);
 
-          return (
-            <div
-              key={activity.id}
-              className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150"
-            >
-              {/* Activity Type Icon */}
+            return (
               <div
-                className={`p-2 rounded-lg ${colors.bg} ${colors.border} border`}
+                key={activity.id}
+                className="group flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150"
               >
-                <ActivityIcon className={`h-4 w-4 ${colors.icon}`} />
-              </div>
+                {/* Activity Icon */}
+                <div
+                  className={`flex-shrink-0 p-2 rounded-lg ${colors.bg} ${colors.border} border`}
+                >
+                  <ActivityIcon className={`h-4 w-4 ${colors.icon}`} />
+                </div>
 
-              {/* Activity Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      {activity.itemType !== "multiple" && (
-                        <ItemTypeIcon className={`h-4 w-4 ${itemTypeColor}`} />
-                      )}
-                      <p className="text-sm text-gray-900 font-medium">
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 group-hover:text-gray-700 leading-5">
                         {getActivityDescription(activity)}
                       </p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <ItemTypeIcon
+                          className={`h-3 w-3 ${itemTypeColor} flex-shrink-0`}
+                        />
+                        <p className="text-xs text-gray-500 capitalize">
+                          {activity.itemType === "multiple"
+                            ? "Multiple items"
+                            : activity.itemType}
+                        </p>
+                        {activity.user && (
+                          <>
+                            <span className="text-xs text-gray-300">•</span>
+                            <p className="text-xs text-gray-500">
+                              by {activity.user}
+                            </p>
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    {activity.user && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        by {activity.user}
+                    {/* Timestamp */}
+                    <div className="flex-shrink-0 ml-2">
+                      <p className="text-xs text-gray-400">
+                        {formatTimeAgo(activity.timestamp)}
                       </p>
-                    )}
+                    </div>
                   </div>
-
-                  <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                    {formatTimeAgo(activity.timestamp)}
-                  </span>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {activities.length > maxItems && onViewAll && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <button
-            onClick={onViewAll}
-            className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-150"
-          >
-            View all activity ({activities.length} items)
-          </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* Activity Summary */}
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-xs text-gray-500">Today</p>
-            <p className="text-sm font-medium text-gray-900">
-              {
-                activities.filter((a) => {
-                  const today = new Date();
-                  const activityDate = new Date(a.timestamp);
-                  return activityDate.toDateString() === today.toDateString();
-                }).length
-              }
-            </p>
+        {/* View All Button */}
+        {onViewAll && sortedActivities.length >= maxItems && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <button
+              onClick={onViewAll}
+              className="w-full py-2 px-3 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+            >
+              View All Activity
+            </button>
           </div>
-          <div>
-            <p className="text-xs text-gray-500">This Week</p>
-            <p className="text-sm font-medium text-gray-900">
-              {
-                activities.filter((a) => {
-                  const weekAgo = new Date();
-                  weekAgo.setDate(weekAgo.getDate() - 7);
-                  return new Date(a.timestamp) > weekAgo;
-                }).length
-              }
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Total</p>
-            <p className="text-sm font-medium text-gray-900">
-              {activities.length}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
