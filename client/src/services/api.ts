@@ -2167,3 +2167,29 @@ export const getQuizAnalytics = async (
   const response = await api.get(`/analytics/quiz/${quizId}`);
   return response.data;
 };
+
+// ===== MENU EXPORT API METHODS =====
+
+export interface ExportMenuOptions {
+  format: "csv" | "excel" | "json" | "word";
+  includeImages: boolean;
+  includeMetadata: boolean;
+  includePricing: boolean;
+  includeDescriptions: boolean;
+  includeFoodItems: boolean;
+  includeBeverageItems: boolean;
+  includeWineItems: boolean;
+}
+
+/**
+ * Export menu in the specified format
+ */
+export const exportMenu = async (
+  menuId: string,
+  options: ExportMenuOptions
+): Promise<Blob> => {
+  const response = await api.post(`/menus/${menuId}/export`, options, {
+    responseType: "blob", // Important for file downloads
+  });
+  return response.data;
+};

@@ -1,22 +1,34 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { MenuItem } from "../../types/menuItemTypes";
 import { MenuView } from "../../hooks/useMenuViews";
 import DashboardStats from "./DashboardStats";
 import QuickActions from "./QuickActions";
 import RecentActivityFeed from "./RecentActivityFeed";
 import MenuHealthDashboard from "./MenuHealthDashboard";
+import ExportMenuModal from "./ExportMenuModal";
 
 interface DashboardViewProps {
   items: MenuItem[];
   onViewChange: (view: MenuView) => void;
   onAddItem: () => void;
+  onImportMenu: () => void;
+  onExportMenu: () => void;
+  // Add these new props
+  menuId?: string;
+  menuName?: string;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
   items,
   onViewChange,
   onAddItem,
+  onImportMenu,
+  onExportMenu,
+  menuId,
+  menuName,
 }) => {
+  // Add state
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   // Calculate comprehensive stats with memoization for performance
   const dashboardStats = useMemo(() => {
     const foodItems = items.filter((item) => item.itemType === "food");
@@ -254,6 +266,21 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     onViewChange(viewMap[type]);
   };
 
+  const handleAddItemWithType = (itemType: "food" | "beverage" | "wine") => {
+    // Store the desired item type for the modal to pick up
+    localStorage.setItem("pendingItemType", itemType);
+    onAddItem();
+  };
+
+  // Add handler
+  const handleExportMenuClick = () => {
+    if (menuId) {
+      setIsExportModalOpen(true);
+    } else {
+      onExportMenu(); // Fallback to parent handler
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Enhanced Dashboard Layout */}
@@ -266,70 +293,46 @@ const DashboardView: React.FC<DashboardViewProps> = ({
             onNavigateToType={handleNavigateToType}
           />
 
-          {/* Category Distribution Placeholder */}
-          {Object.keys(dashboardStats.categoryCounts).length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Category Distribution
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(dashboardStats.categoryCounts)
-                  .sort(([, a], [, b]) => b - a)
-                  .slice(0, 5)
-                  .map(([category, count]) => (
-                    <div
-                      key={category}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm text-gray-700 capitalize">
-                        {category}
-                      </span>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="h-2 bg-blue-500 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${(count / items.length) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 w-6 text-right">
-                          {count}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
+          {/* Menu Health and Recent Activity - Side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Menu Health Dashboard */}
+            <MenuHealthDashboard
+              health={menuHealthMetrics}
+              onViewDetails={() => console.log("View health details clicked")}
+            />
+
+            {/* Recent Activity Feed */}
+            <RecentActivityFeed
+              activities={recentActivities}
+              maxItems={6}
+              onViewAll={() => console.log("View all activity clicked")}
+            />
+          </div>
         </div>
 
         {/* Right Column - Actions & Secondary Content */}
         <div className="space-y-6">
-          {/* Quick Actions */}
+          {/* Quick Actions - Enhanced with specific item type handlers */}
           <QuickActions
-            onAddFood={() => onAddItem()}
-            onAddBeverage={() => onAddItem()}
-            onAddWine={() => onAddItem()}
-            onBulkImport={() => console.log("Bulk import clicked")}
-            onExportMenu={() => console.log("Export menu clicked")}
+            onAddFood={() => handleAddItemWithType("food")}
+            onAddBeverage={() => handleAddItemWithType("beverage")}
+            onAddWine={() => handleAddItemWithType("wine")}
+            onBulkImport={onImportMenu}
+            onExportMenu={handleExportMenuClick}
             onAnalytics={() => console.log("Analytics clicked")}
-          />
-
-          {/* Menu Health Dashboard */}
-          <MenuHealthDashboard
-            health={menuHealthMetrics}
-            onViewDetails={() => console.log("View health details clicked")}
-          />
-
-          {/* Recent Activity Feed */}
-          <RecentActivityFeed
-            activities={recentActivities}
-            maxItems={6}
-            onViewAll={() => console.log("View all activity clicked")}
           />
         </div>
       </div>
+
+      {/* Add modal to JSX (before closing div) */}
+      {isExportModalOpen && menuId && (
+        <ExportMenuModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          menuId={menuId}
+          menuName={menuName || "Menu"}
+        />
+      )}
     </div>
   );
 };

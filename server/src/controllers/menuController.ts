@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { MenuCrudService } from "../services/MenuCrudService";
 import MenuItem from "../models/MenuItem";
 import { Types } from "mongoose";
+import { MenuExportService } from "../services/MenuExportService";
+import Menu from "../models/Menu";
 
 // Create local type alias for the authenticated request with user info
 type AuthenticatedRequest = Request & {
@@ -230,6 +232,101 @@ export const deleteCategoryAndReassignItems = async (
     console.error("Error deleting category and reassigning items:", error);
     res.status(error.statusCode || 500).json({
       message: error.message || "Error deleting category and reassigning items",
+    });
+  }
+};
+
+/**
+ * Export menu in various formats
+ */
+export const exportMenu = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { menuId } = req.params;
+    const {
+      format,
+      includeImages = false,
+      includeMetadata = true,
+      includePricing = true,
+      includeDescriptions = true,
+      includeFoodItems = true,
+      includeBeverageItems = true,
+      includeWineItems = true,
+    } = req.body;
+
+    // Validate format
+    const validFormats = ["csv", "excel", "json", "word"];
+    if (!validFormats.includes(format)) {
+      res.status(400).json({ message: "Invalid export format" });
+      return;
+    }
+
+    const menu = await Menu.findById(menuId).lean();
+
+    if (!menu) {
+      res.status(404).json({ message: "Menu not found" });
+      return;
+    }
+
+    // Check if menu belongs to user's restaurant
+    if (menu.restaurantId.toString() !== req.user!.restaurantId!.toString()) {
+      res.status(403).json({ message: "Access denied" });
+      return;
+    }
+
+    // Fetch menu items separately
+    const items = await MenuItem.find({ menuId }).lean();
+
+    // Create menu object with items for export
+    const menuWithItems = {
+      ...menu,
+      items,
+    };
+
+    const exportService = new MenuExportService();
+    const exportData = await exportService.exportMenu(menuWithItems, {
+      format,
+      includeImages,
+      includeMetadata,
+      includePricing,
+      includeDescriptions,
+      includeFoodItems,
+      includeBeverageItems,
+      includeWineItems,
+    });
+
+    const contentTypes: Record<string, string> = {
+      csv: "text/csv",
+      excel:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      json: "application/json",
+      word: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+
+    const extensions: Record<string, string> = {
+      csv: "csv",
+      excel: "xlsx",
+      json: "json",
+      word: "docx",
+    };
+
+    res.setHeader("Content-Type", contentTypes[format]);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${menuWithItems.name.replace(
+        /[^a-z0-9]/gi,
+        "_"
+      )}_export.${extensions[format]}"`
+    );
+
+    res.send(exportData);
+  } catch (error: any) {
+    console.error("Export error:", error);
+    res.status(500).json({
+      message: "Export failed",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };

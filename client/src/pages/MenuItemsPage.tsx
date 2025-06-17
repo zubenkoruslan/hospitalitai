@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { /* Link, */ useParams, useNavigate } from "react-router-dom"; // Removed Link
 import { useAuth } from "../context/AuthContext";
-import { useMenuViews } from "../hooks/useMenuViews";
+import { useMenuViews, MenuView } from "../hooks/useMenuViews";
 import MenuNavigationTabs from "../components/menu/MenuNavigationTabs";
 import MenuViewContainer from "../components/menu/MenuViewContainer";
 import {
@@ -162,7 +162,69 @@ const MenuItemsPage: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
+  // Add missing state for table of contents search functionality
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({
+    food: false,
+    beverage: false,
+    wine: false,
+  });
+  const [searchResults, setSearchResults] = useState<{
+    categories: string[];
+    items: string[];
+  }>({
+    categories: [],
+    items: [],
+  });
+
+  // Add state for tracking selected items in navigation (for table of contents only)
+  const [selectedItemType, setSelectedItemType] = useState<
+    "food" | "beverage" | "wine" | null
+  >(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null
+  );
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
   const restaurantId = useMemo(() => user?.restaurantId, [user]);
+
+  // Add missing search utility functions
+  const clearSearch = useCallback(() => {
+    handleClearSearch();
+    setSearchResults({ categories: [], items: [] });
+    setSelectedItemType(null);
+    setSelectedCategoryId(null);
+    setSelectedItemId(null);
+  }, [handleClearSearch]);
+
+  const isSearchMatch = useCallback(
+    (type: "itemType" | "category" | "item", key: string) => {
+      if (!searchTerm.trim()) return false;
+
+      if (type === "itemType") {
+        return key.toLowerCase().includes(searchTerm.toLowerCase());
+      } else if (type === "category") {
+        return key.toLowerCase().includes(searchTerm.toLowerCase());
+      } else if (type === "item") {
+        const item = items?.find((item) => item._id === key);
+        if (!item) return false;
+
+        const searchTermLower = searchTerm.toLowerCase();
+        return (
+          item.name.toLowerCase().includes(searchTermLower) ||
+          item.description?.toLowerCase().includes(searchTermLower) ||
+          item.category?.toLowerCase().includes(searchTermLower) ||
+          item.ingredients?.some((ing) =>
+            ing.toLowerCase().includes(searchTermLower)
+          )
+        );
+      }
+
+      return false;
+    },
+    [searchTerm, items]
+  );
 
   // NEW: Handle card expansion for mobile
   const toggleCardExpansion = useCallback((cardId: string) => {
@@ -301,12 +363,72 @@ const MenuItemsPage: React.FC = () => {
           await updateMenuItem(currentItemId, submittedFormData); // Pass submittedFormData directly
           console.log("[MenuItemsPage] Menu item updated successfully");
           setSuccessMessage("Menu item updated successfully.");
+
+          // Navigate to the appropriate item type tab after updating an item
+          const itemType = submittedFormData.itemType as
+            | "food"
+            | "beverage"
+            | "wine";
+
+          // Use the proper view system to navigate
+          const targetView: MenuView =
+            itemType === "beverage"
+              ? "beverages"
+              : itemType === "wine"
+              ? "wines"
+              : "food";
+          console.log(
+            "[MenuItemsPage] Navigating to view:",
+            targetView,
+            "for itemType:",
+            itemType
+          );
+          handleViewChange(targetView);
+
+          // Also set category filter if available
+          if (submittedFormData.category) {
+            console.log(
+              "[MenuItemsPage] Setting category filter:",
+              toTitleCase(submittedFormData.category)
+            );
+            handleCategoryFilter(toTitleCase(submittedFormData.category));
+          }
         } else {
           console.log("[MenuItemsPage] Attempting to create new menu item");
           // createMenuItem expects MenuItemFormData
           await createMenuItem(submittedFormData); // Pass submittedFormData directly
           console.log("[MenuItemsPage] Menu item created successfully");
           setSuccessMessage("Menu item added successfully.");
+
+          // Navigate to the appropriate item type tab after creating a new item
+          const itemType = submittedFormData.itemType as
+            | "food"
+            | "beverage"
+            | "wine";
+
+          // Use the proper view system to navigate
+          const targetView: MenuView =
+            itemType === "beverage"
+              ? "beverages"
+              : itemType === "wine"
+              ? "wines"
+              : "food";
+          console.log(
+            "[MenuItemsPage] Navigating to view:",
+            targetView,
+            "for itemType:",
+            itemType
+          );
+          handleViewChange(targetView);
+
+          // Also set category filter if available
+          if (submittedFormData.category) {
+            console.log(
+              "[MenuItemsPage] Setting category filter:",
+              toTitleCase(submittedFormData.category)
+            );
+            handleCategoryFilter(toTitleCase(submittedFormData.category));
+          }
         }
         fetchData();
         closeModal();
@@ -339,7 +461,15 @@ const MenuItemsPage: React.FC = () => {
         setIsSubmittingItem(false);
       }
     },
-    [menuId, restaurantId, fetchData, closeModal, user] // Add user to dependencies
+    [
+      menuId,
+      restaurantId,
+      fetchData,
+      closeModal,
+      user,
+      handleViewChange,
+      handleCategoryFilter,
+    ] // Add navigation functions to dependencies
   );
 
   // --- Delete Confirmation ---
@@ -510,6 +640,15 @@ const MenuItemsPage: React.FC = () => {
     },
     [fetchData]
   );
+
+  // --- Import/Export Handlers ---
+  const handleImportMenu = useCallback(() => {
+    navigate("/upload");
+  }, [navigate]);
+
+  const handleExportMenu = useCallback(() => {
+    console.log("Export menu clicked - handled by DashboardView");
+  }, []);
 
   // --- Table of Contents Component ---
   const renderTableOfContents = () => {
@@ -813,7 +952,7 @@ const MenuItemsPage: React.FC = () => {
                                   setSelectedCategoryId(categoryKey);
                                   setSelectedItemId(null);
                                   // Toggle subcategory expansion
-                                  setExpandedSubcategories((prev) => ({
+                                  setExpandedCategories((prev) => ({
                                     ...prev,
                                     [categoryKey]: !prev[categoryKey],
                                   }));
@@ -825,9 +964,7 @@ const MenuItemsPage: React.FC = () => {
                                     ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-amber-800 shadow-md"
                                     : "hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100 text-slate-700 border-2 border-transparent hover:border-slate-300"
                                 } text-sm`}
-                                aria-expanded={
-                                  expandedSubcategories[categoryKey]
-                                }
+                                aria-expanded={expandedCategories[categoryKey]}
                                 aria-controls={`${categoryKey}-items`}
                               >
                                 {/* Category indicator line */}
@@ -899,7 +1036,7 @@ const MenuItemsPage: React.FC = () => {
                                   >
                                     <ChevronRightIcon
                                       className={`h-4 w-4 transition-transform duration-200 ${
-                                        expandedSubcategories[categoryKey]
+                                        expandedCategories[categoryKey]
                                           ? "rotate-90"
                                           : ""
                                       } ${
@@ -916,7 +1053,7 @@ const MenuItemsPage: React.FC = () => {
                               <div
                                 id={`${categoryKey}-items`}
                                 className={`ml-8 overflow-hidden transition-all duration-300 ease-in-out ${
-                                  expandedSubcategories[categoryKey] ||
+                                  expandedCategories[categoryKey] ||
                                   (isSearchActive &&
                                     searchResults.items.some((itemId) =>
                                       categoryItems.some(
@@ -1078,7 +1215,7 @@ const MenuItemsPage: React.FC = () => {
                 </p>
                 <Button
                   variant="secondary"
-                  onClick={() => setSearchTerm("")}
+                  onClick={clearSearch}
                   className="text-sm"
                 >
                   Clear search
@@ -1981,6 +2118,10 @@ const MenuItemsPage: React.FC = () => {
                     sortBy={sortBy}
                     onSortChange={handleSortChange}
                     onBulkDelete={handleBulkDelete}
+                    onImportMenu={handleImportMenu}
+                    onExportMenu={handleExportMenu}
+                    menuId={menuId}
+                    menuName={menuDetails?.name}
                   />
                 </div>
               )}
@@ -1999,6 +2140,10 @@ const MenuItemsPage: React.FC = () => {
                 restaurantId={restaurantId ?? ""}
                 itemType={
                   currentItem?.itemType ?? // Use existing item's type when editing
+                  (localStorage.getItem("pendingItemType") as
+                    | "food"
+                    | "beverage"
+                    | "wine") ?? // Check localStorage first for new items
                   (selectedItemType === "beverage"
                     ? "beverage"
                     : selectedItemType === "wine"
@@ -2011,6 +2156,10 @@ const MenuItemsPage: React.FC = () => {
                     : currentItem?.itemType === "food"
                     ? uniqueFoodCategories
                     : currentItem?.itemType === "wine"
+                    ? uniqueWineCategories
+                    : localStorage.getItem("pendingItemType") === "beverage" // Check localStorage for new items
+                    ? uniqueBeverageCategories
+                    : localStorage.getItem("pendingItemType") === "wine"
                     ? uniqueWineCategories
                     : selectedItemType === "beverage" // Fallback to selectedItemType for new items
                     ? uniqueBeverageCategories

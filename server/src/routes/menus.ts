@@ -7,6 +7,7 @@ import {
   deleteMenu,
   updateMenuActivationStatus,
   deleteCategoryAndReassignItems,
+  exportMenu,
 } from "../controllers/menuController";
 import { protect, restrictTo } from "../middleware/authMiddleware";
 
@@ -95,6 +96,23 @@ router.patch(
   body("isActive").isBoolean().withMessage("isActive must be a boolean."), // Validate isActive in body
   handleValidationErrors,
   updateMenuActivationStatus
+);
+
+// Route to export menu
+router.post(
+  "/:menuId/export",
+  protect,
+  restrictTo("restaurant"),
+  validateMenuIdParam,
+  body("format")
+    .isIn(["csv", "excel", "json", "word"])
+    .withMessage("Invalid export format"),
+  body("includeImages").optional().isBoolean(),
+  body("includeMetadata").optional().isBoolean(),
+  body("includePricing").optional().isBoolean(),
+  body("includeDescriptions").optional().isBoolean(),
+  handleValidationErrors,
+  exportMenu
 );
 
 export default router;

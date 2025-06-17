@@ -29,6 +29,10 @@ interface MenuViewContainerProps {
 
   // Bulk operations props
   onBulkDelete?: (itemIds: string[]) => void;
+  onImportMenu?: () => void;
+  onExportMenu?: () => void;
+  menuId?: string;
+  menuName?: string;
 }
 
 const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
@@ -50,6 +54,10 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
   sortBy,
   onSortChange,
   onBulkDelete,
+  onImportMenu,
+  onExportMenu,
+  menuId,
+  menuName,
 }) => {
   // Filter items based on current view
   const filteredItems = useMemo(() => {
@@ -71,6 +79,10 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
           items={items}
           onViewChange={onViewChange}
           onAddItem={onAddItem}
+          onImportMenu={onImportMenu || (() => {})}
+          onExportMenu={onExportMenu || (() => {})}
+          menuId={menuId}
+          menuName={menuName}
         />
       );
 

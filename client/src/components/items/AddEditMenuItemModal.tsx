@@ -176,6 +176,19 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     return Array.from(suggestions).sort();
   }, [itemType, availableCategories, currentItem, isEditMode]);
 
+  // Add useEffect to handle pending item type
+  useEffect(() => {
+    const pendingItemType = localStorage.getItem("pendingItemType");
+    if (pendingItemType && !currentItem) {
+      // Set the item type from localStorage for new items
+      setFormData((prev) => ({
+        ...prev,
+        itemType: pendingItemType as "food" | "beverage" | "wine",
+      }));
+      localStorage.removeItem("pendingItemType");
+    }
+  }, [currentItem]);
+
   useEffect(() => {
     // console.log("[Modal useEffect] Running. isEditMode:", isEditMode, "currentItem:", !!currentItem, "isOpen:", isOpen);
     if (isOpen) {
