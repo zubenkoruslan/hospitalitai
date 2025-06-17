@@ -29,22 +29,73 @@ const DashboardView: React.FC<DashboardViewProps> = ({
       return acc;
     }, {} as Record<string, number>);
 
-    // Price analytics
-    const itemsWithPrices = items.filter(
-      (item) => item.price && item.price > 0
-    );
-    const prices = itemsWithPrices.map((item) => item.price!);
+    // Price analytics - Handle both regular prices and wine serving options
+    const itemsWithPrices = items.filter((item) => {
+      // Regular price
+      if (item.price && item.price > 0) {
+        return true;
+      }
+      // Wine serving options
+      if (
+        item.itemType === "wine" &&
+        item.servingOptions &&
+        item.servingOptions.length > 0
+      ) {
+        return item.servingOptions.some(
+          (option) => option.price && option.price > 0
+        );
+      }
+      return false;
+    });
+
+    // For average price calculation, collect all prices (including serving options)
+    const allPrices: number[] = [];
+    items.forEach((item) => {
+      if (item.price && item.price > 0) {
+        allPrices.push(item.price);
+      }
+      if (
+        item.itemType === "wine" &&
+        item.servingOptions &&
+        item.servingOptions.length > 0
+      ) {
+        item.servingOptions.forEach((option) => {
+          if (option.price && option.price > 0) {
+            allPrices.push(option.price);
+          }
+        });
+      }
+    });
+
     const averagePrice =
-      prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+      allPrices.length > 0
+        ? allPrices.reduce((a, b) => a + b, 0) / allPrices.length
+        : 0;
     const priceRange: [number, number] =
-      prices.length > 0
-        ? [Math.min(...prices), Math.max(...prices)]
+      allPrices.length > 0
+        ? [Math.min(...allPrices), Math.max(...allPrices)]
         : [Infinity, -Infinity];
 
-    // Completeness metrics
-    const itemsWithoutPrices = items.filter(
-      (item) => !item.price || item.price <= 0
-    ).length;
+    // Completeness metrics - Fixed to handle wine serving options
+    const itemsWithoutPrices = items.filter((item) => {
+      // Check if item has regular price
+      if (item.price && item.price > 0) {
+        return false;
+      }
+      // Check if wine has serving options with prices
+      if (
+        item.itemType === "wine" &&
+        item.servingOptions &&
+        item.servingOptions.length > 0
+      ) {
+        const hasValidServingPrice = item.servingOptions.some(
+          (option) => option.price && option.price > 0
+        );
+        return !hasValidServingPrice;
+      }
+      // Item has no price information
+      return true;
+    }).length;
     const itemsWithoutDescriptions = items.filter(
       (item) => !item.description || item.description.trim() === ""
     ).length;

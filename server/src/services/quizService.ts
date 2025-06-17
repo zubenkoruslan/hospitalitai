@@ -2068,23 +2068,19 @@ export class QuizService {
     restaurantId: Types.ObjectId
   ): Promise<number> {
     try {
-      console.log(
-        `🔄 [QuizService] Updating quiz snapshots for question banks: ${questionBankIds.map(
-          (id) => id.toString()
-        )}`
-      );
-
       // Find all quizzes that source from these question banks
+      // Include quizzes with sourceType "QUESTION_BANKS" OR undefined (legacy quizzes)
       const affectedQuizzes = await QuizModel.find({
         restaurantId,
         sourceQuestionBankIds: { $in: questionBankIds },
-        sourceType: "QUESTION_BANKS",
+        $or: [
+          { sourceType: "QUESTION_BANKS" },
+          { sourceType: { $exists: false } }, // undefined/null sourceType
+          { sourceType: null },
+        ],
       });
 
       if (affectedQuizzes.length === 0) {
-        console.log(
-          `📊 [QuizService] No quizzes found using these question banks`
-        );
         return 0;
       }
 
@@ -2104,38 +2100,34 @@ export class QuizService {
 
           if (newSnapshotCount !== oldSnapshotCount) {
             // Update the quiz with the new snapshot count
+            // Also set sourceType to "QUESTION_BANKS" if it's undefined (legacy fix)
+            const updateFields: any = {
+              totalUniqueQuestionsInSourceSnapshot: newSnapshotCount,
+            };
+
+            if (!quiz.sourceType) {
+              updateFields.sourceType = "QUESTION_BANKS";
+            }
+
             await QuizModel.findByIdAndUpdate(quiz._id, {
-              $set: {
-                totalUniqueQuestionsInSourceSnapshot: newSnapshotCount,
-              },
+              $set: updateFields,
             });
 
-            console.log(
-              `✅ [QuizService] Updated quiz "${quiz.title}" snapshot: ${oldSnapshotCount} → ${newSnapshotCount} questions`
-            );
             updatedCount++;
-          } else {
-            console.log(
-              `ℹ️ [QuizService] Quiz "${quiz.title}" snapshot unchanged: ${newSnapshotCount} questions`
-            );
           }
         } catch (quizError) {
           console.error(
-            `❌ [QuizService] Failed to update snapshot for quiz "${quiz.title}":`,
+            `Failed to update snapshot for quiz "${quiz.title}":`,
             quizError
           );
           // Continue with other quizzes even if one fails
         }
       }
 
-      console.log(
-        `🎯 [QuizService] Updated ${updatedCount}/${affectedQuizzes.length} quiz snapshots`
-      );
-
       return updatedCount;
     } catch (error) {
       console.error(
-        `❌ [QuizService] Failed to update quiz snapshots for question banks:`,
+        `Failed to update quiz snapshots for question banks:`,
         error
       );
       // Don't throw error as this is a background update operation

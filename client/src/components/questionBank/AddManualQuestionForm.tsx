@@ -93,7 +93,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         ]);
       }
     }
-  }, [questionType, options]);
+  }, [questionType]);
 
   useEffect(() => {
     if (initialBankCategories && initialBankCategories.length > 0) {

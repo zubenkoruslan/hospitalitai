@@ -38,6 +38,7 @@ export interface ItemUpdateData {
   isVegan?: boolean;
   // Wine-specific fields
   wineStyle?: string;
+  wineColor?: string;
   producer?: string;
   grapeVariety?: string[];
   vintage?: number;
@@ -84,8 +85,8 @@ class ItemService {
       isActive,
     } = data;
 
-    // Normalize category to lowercase from input data
-    const normalizedCategory = category.toLowerCase();
+    // Normalize category by trimming whitespace only (preserve case)
+    const normalizedCategory = category.trim();
 
     // --- Validation within Service ---
     if (!name || !menuId || !itemType || !normalizedCategory) {
@@ -326,7 +327,7 @@ class ItemService {
       preparedUpdate.itemType = updateData.itemType;
     }
     if (updateData.category !== undefined)
-      preparedUpdate.category = updateData.category.toLowerCase().trim();
+      preparedUpdate.category = updateData.category.trim();
     if (updateData.isGlutenFree !== undefined)
       preparedUpdate.isGlutenFree = Boolean(updateData.isGlutenFree);
     if (updateData.isDairyFree !== undefined)
@@ -339,6 +340,9 @@ class ItemService {
     // Handle wine-specific fields
     if (updateData.wineStyle !== undefined) {
       preparedUpdate.wineStyle = updateData.wineStyle?.trim() || null;
+    }
+    if (updateData.wineColor !== undefined) {
+      preparedUpdate.wineColor = updateData.wineColor?.trim() || null;
     }
     if (updateData.producer !== undefined) {
       preparedUpdate.producer = updateData.producer?.trim() || null;
@@ -466,6 +470,64 @@ class ItemService {
         throw new AppError("Invalid item ID format.", 400);
       }
       throw new AppError("Failed to delete menu item.", 500);
+    }
+  }
+
+  /**
+   * Deletes multiple menu items by their IDs if they belong to the given restaurant.
+   *
+   * @param itemIds - Array of item IDs to delete.
+   * @param restaurantId - The ID of the restaurant that should own the items.
+   * @returns A promise resolving to deletion results.
+   * @throws {AppError} If validation fails or deletion encounters errors.
+   */
+  static async bulkDeleteItems(
+    itemIds: (string | Types.ObjectId)[],
+    restaurantId: Types.ObjectId
+  ): Promise<{
+    message: string;
+    deletedCount: number;
+    failedCount: number;
+    errors?: string[];
+  }> {
+    if (!itemIds || itemIds.length === 0) {
+      throw new AppError("No item IDs provided for bulk deletion", 400);
+    }
+
+    const itemObjectIds = itemIds.map((id) =>
+      typeof id === "string" ? new Types.ObjectId(id) : id
+    );
+
+    try {
+      const deletionResult = await MenuItem.deleteMany({
+        _id: { $in: itemObjectIds },
+        restaurantId: restaurantId,
+      });
+
+      const deletedCount = deletionResult.deletedCount || 0;
+      const failedCount = itemIds.length - deletedCount;
+
+      let message = `Successfully deleted ${deletedCount} menu item${
+        deletedCount !== 1 ? "s" : ""
+      }`;
+      if (failedCount > 0) {
+        message += ` (${failedCount} item${
+          failedCount !== 1 ? "s" : ""
+        } not found or access denied)`;
+      }
+
+      return {
+        message,
+        deletedCount,
+        failedCount,
+        ...(failedCount > 0 && {
+          errors: [`${failedCount} items could not be deleted`],
+        }),
+      };
+    } catch (error: any) {
+      console.error("Error in bulk delete menu items:", error);
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to delete menu items.", 500);
     }
   }
 

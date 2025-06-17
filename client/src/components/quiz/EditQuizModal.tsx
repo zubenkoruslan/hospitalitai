@@ -18,6 +18,7 @@ interface EditQuizModalProps {
   onClose: () => void;
   onQuizUpdated: (updatedQuiz: ClientIQuiz) => void;
   initialQuizData: ClientIQuiz | null;
+  questionBanks?: IQuestionBank[]; // Optional prop to pass fresh question bank data
 }
 
 const EditQuizModal: React.FC<EditQuizModalProps> = ({
@@ -25,6 +26,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
   onClose,
   onQuizUpdated,
   initialQuizData,
+  questionBanks: propQuestionBanks,
 }) => {
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -70,17 +72,34 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
     }
   }, [initialQuizData]);
 
-  // Effect to fetch available question banks and roles when the modal is open
+  // Effect to set question banks and fetch roles when the modal is open
   useEffect(() => {
     if (isOpen) {
       const fetchInitialData = async () => {
+        console.log(
+          "📊 EditQuizModal: Opening with propQuestionBanks:",
+          propQuestionBanks?.length || "none"
+        );
+
+        // Always fetch fresh question banks to ensure current counts
+        // This is critical because propQuestionBanks might be stale if parent refresh is still in progress
         setIsLoadingBanks(true);
         setFetchBanksError(null);
+
         try {
+          console.log("📊 EditQuizModal: Fetching fresh question banks...");
           const banks = await getQuestionBanks();
+          console.log(
+            "📊 EditQuizModal: Received banks:",
+            banks?.map((b) => `${b.name}: ${b.questionCount} questions`) ||
+              "none"
+          );
           setAvailableBanks(banks || []);
         } catch (err) {
-          console.error("Failed to fetch question banks for edit modal:", err);
+          console.error(
+            "❌ EditQuizModal: Failed to fetch question banks:",
+            err
+          );
           setFetchBanksError(
             "Failed to load question banks. Please try again later."
           );

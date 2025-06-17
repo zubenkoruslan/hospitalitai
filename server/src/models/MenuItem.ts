@@ -10,6 +10,18 @@ export const WINE_STYLES = [
   "fortified",
   "other",
 ] as const;
+
+export const WINE_COLORS = [
+  "red",
+  "white",
+  "rosé",
+  "orange",
+  "sparkling",
+  "champagne",
+  "cava",
+  "crémant",
+  "other",
+] as const;
 // REMOVE FoodCategory, BeverageCategory types and constants
 // export const FOOD_CATEGORIES = [
 //   "appetizer",
@@ -28,6 +40,7 @@ export const WINE_STYLES = [
 
 export type ItemType = (typeof ITEM_TYPES)[number];
 export type WineStyleType = (typeof WINE_STYLES)[number];
+export type WineColorType = (typeof WINE_COLORS)[number];
 // export type FoodCategory = (typeof FOOD_CATEGORIES)[number];
 // export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
 // export type ItemCategory = FoodCategory | BeverageCategory; // Will just be string now
@@ -79,6 +92,7 @@ export interface IMenuItem extends Document {
 
   // Wine-specific fields
   wineStyle?: WineStyleType;
+  wineColor?: WineColorType; // Color classification: red, white, rosé, orange, sparkling
   producer?: string;
   grapeVariety?: string[];
   vintage?: number;
@@ -119,6 +133,7 @@ export interface ILeanMenuItem {
   temperature?: string;
 
   wineStyle?: WineStyleType;
+  wineColor?: WineColorType;
   producer?: string;
   grapeVariety?: string[];
   vintage?: number;
@@ -272,6 +287,12 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       enum: WINE_STYLES,
       trim: true,
       index: true, // Index for filtering by wine style
+    },
+    wineColor: {
+      type: String,
+      enum: WINE_COLORS,
+      trim: true,
+      index: true, // Index for filtering by wine color
     },
     producer: {
       type: String,

@@ -836,6 +836,19 @@ export const validateUpdateItemBody: ValidationChain[] = [
   body("wineStyle", "Wine style must be a valid option")
     .optional()
     .isIn(["still", "sparkling", "champagne", "dessert", "fortified", "other"]),
+  body("wineColor", "Wine color must be a valid option")
+    .optional()
+    .isIn([
+      "red",
+      "white",
+      "rosé",
+      "orange",
+      "sparkling",
+      "champagne",
+      "cava",
+      "crémant",
+      "other",
+    ]),
   body("producer", "Producer must be a string").optional().isString().trim(),
   body("grapeVariety", "Grape variety must be an array of strings")
     .optional()

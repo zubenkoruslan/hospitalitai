@@ -621,10 +621,6 @@ export const updateQuizSnapshots = async (
   try {
     const restaurantId = new Types.ObjectId(req.user?.restaurantId);
 
-    console.log(
-      `🔄 [QuizController] Manual snapshot update requested for restaurant: ${restaurantId}`
-    );
-
     // Find all quizzes that source from question banks
     const quizzes = await QuizModel.find({
       restaurantId,
@@ -633,10 +629,47 @@ export const updateQuizSnapshots = async (
     });
 
     if (quizzes.length === 0) {
+      // Try a more lenient search to see if there are quizzes with question banks but different sourceType
+      const quizzesWithBanks = await QuizModel.find({
+        restaurantId,
+        sourceQuestionBankIds: { $exists: true, $ne: [] },
+      }).lean();
+
+      if (quizzesWithBanks.length > 0) {
+        // Get all unique question bank IDs
+        const allBankIds = [
+          ...new Set(
+            quizzesWithBanks.flatMap((quiz) =>
+              quiz.sourceQuestionBankIds.map((id: Types.ObjectId) =>
+                id.toString()
+              )
+            )
+          ),
+        ].map((id: string) => new Types.ObjectId(id));
+
+        // Update snapshots for all question banks
+        const updatedCount =
+          await QuizService.updateQuizSnapshotsForQuestionBanks(
+            allBankIds,
+            restaurantId
+          );
+
+        res.status(200).json({
+          status: "success",
+          message: `Successfully updated quiz snapshots`,
+          data: {
+            updatedCount,
+            totalQuizzes: quizzesWithBanks.length,
+            questionBanksProcessed: allBankIds.length,
+          },
+        });
+        return;
+      }
+
       res.status(200).json({
         status: "success",
         message: "No quizzes found that need snapshot updates",
-        data: { updatedCount: 0, totalQuizzes: 0 },
+        data: { updatedCount: 0, totalQuizzes: 0, questionBanksProcessed: 0 },
       });
       return;
     }
@@ -655,8 +688,6 @@ export const updateQuizSnapshots = async (
       allBankIds,
       restaurantId
     );
-
-    console.log(`✅ [QuizController] Updated ${updatedCount} quiz snapshots`);
 
     res.status(200).json({
       status: "success",

@@ -26,6 +26,9 @@ interface MenuViewContainerProps {
   onFiltersChange: (filters: FilterOptions) => void;
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
+
+  // Bulk operations props
+  onBulkDelete?: (itemIds: string[]) => void;
 }
 
 const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
@@ -46,6 +49,7 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
   onFiltersChange,
   sortBy,
   onSortChange,
+  onBulkDelete,
 }) => {
   // Filter items based on current view
   const filteredItems = useMemo(() => {
@@ -90,6 +94,7 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
           onFiltersChange={onFiltersChange}
           sortBy={sortBy}
           onSortChange={onSortChange}
+          onBulkDelete={onBulkDelete}
         />
       );
 
@@ -113,6 +118,7 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
           onFiltersChange={onFiltersChange}
           sortBy={sortBy}
           onSortChange={onSortChange}
+          onBulkDelete={onBulkDelete}
         />
       );
 
@@ -136,6 +142,7 @@ const MenuViewContainer: React.FC<MenuViewContainerProps> = ({
           onFiltersChange={onFiltersChange}
           sortBy={sortBy}
           onSortChange={onSortChange}
+          onBulkDelete={onBulkDelete}
         />
       );
 

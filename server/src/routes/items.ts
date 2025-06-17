@@ -111,6 +111,42 @@ router.put(
 );
 
 /**
+ * @route   DELETE /api/items/bulk
+ * @desc    Delete multiple menu items
+ * @access  Private (Restaurant Role)
+ */
+router.delete(
+  "/bulk",
+  restrictTo("restaurant"),
+  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const { itemIds } = req.body;
+    const restaurantId = req.user?.restaurantId as mongoose.Types.ObjectId;
+
+    if (!restaurantId) {
+      return next(new AppError("Restaurant ID not found for user", 400));
+    }
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return next(new AppError("Item IDs array is required", 400));
+    }
+
+    // Validate each item ID
+    for (const itemId of itemIds) {
+      if (!mongoose.Types.ObjectId.isValid(itemId)) {
+        return next(new AppError(`Invalid item ID: ${itemId}`, 400));
+      }
+    }
+
+    try {
+      const result = await ItemService.bulkDeleteItems(itemIds, restaurantId);
+      res.status(200).json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+);
+
+/**
  * @route   DELETE /api/items/:itemId
  * @desc    Delete a menu item
  * @access  Private (Restaurant Role)

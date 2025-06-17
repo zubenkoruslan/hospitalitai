@@ -913,6 +913,160 @@ function calculateOverallCompletionTimeStats(analytics: any[]) {
   };
 }
 
+/**
+ * Get specific quiz analytics including completion rates, average scores, and staff participation
+ */
+export const getQuizSpecificAnalytics = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { quizId } = req.params;
+    const user = req.user;
+
+    if (!quizId || !Types.ObjectId.isValid(quizId)) {
+      res.status(400).json({
+        success: false,
+        message: "Valid quiz ID is required",
+      });
+      return;
+    }
+
+    if (!user?.restaurantId) {
+      res.status(401).json({
+        success: false,
+        message: "Restaurant access required",
+      });
+      return;
+    }
+
+    const restaurantId = new Types.ObjectId(user.restaurantId);
+    const quizObjectId = new Types.ObjectId(quizId);
+
+    // Get quiz basic info
+    const quiz = await QuizAttemptModel.findOne({ quizId: quizObjectId })
+      .populate("quizId", "title")
+      .select("quizId")
+      .lean();
+
+    if (!quiz) {
+      res.status(404).json({
+        success: false,
+        message: "Quiz not found or no attempts recorded",
+      });
+      return;
+    }
+
+    // Get all staff in the restaurant for completion rate calculation
+    const allStaff = await UserModel.find({
+      restaurantId: restaurantId,
+      role: "staff",
+    })
+      .select("_id name")
+      .lean();
+
+    // Get quiz attempts for this specific quiz
+    const quizAttempts = await QuizAttemptModel.find({
+      quizId: quizObjectId,
+      restaurantId: restaurantId,
+    })
+      .populate("staffUserId", "name")
+      .select(
+        "staffUserId score questionsPresented durationInSeconds attemptDate"
+      )
+      .lean();
+
+    // Calculate analytics
+    const totalStaff = allStaff.length;
+    const uniqueParticipants = new Set(
+      quizAttempts.map((a) => a.staffUserId.toString())
+    ).size;
+    const completionRate =
+      totalStaff > 0 ? (uniqueParticipants / totalStaff) * 100 : 0;
+
+    // Calculate average score
+    const validScores = quizAttempts.filter(
+      (a) =>
+        a.score !== undefined &&
+        a.questionsPresented &&
+        a.questionsPresented.length > 0
+    );
+
+    const averageScore =
+      validScores.length > 0
+        ? validScores.reduce((sum, attempt) => {
+            const percentage =
+              (attempt.score / attempt.questionsPresented.length) * 100;
+            return sum + percentage;
+          }, 0) / validScores.length
+        : 0;
+
+    // Calculate average completion time
+    const validTimes = quizAttempts.filter(
+      (a) => a.durationInSeconds && a.durationInSeconds > 0
+    );
+    const averageCompletionTime =
+      validTimes.length > 0
+        ? validTimes.reduce((sum, a) => sum + (a.durationInSeconds || 0), 0) /
+          validTimes.length
+        : 0;
+
+    // Get top performers
+    const topPerformers = validScores
+      .map((attempt) => ({
+        name: (attempt.staffUserId as any).name || "Unknown",
+        score:
+          Math.round(
+            (attempt.score / attempt.questionsPresented.length) * 1000
+          ) / 10,
+        completedAt: attempt.attemptDate,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    // Get recent activity (last 5 attempts)
+    const recentActivity = quizAttempts
+      .sort(
+        (a, b) =>
+          new Date(b.attemptDate).getTime() - new Date(a.attemptDate).getTime()
+      )
+      .slice(0, 5)
+      .map((attempt) => ({
+        staffName: (attempt.staffUserId as any).name || "Unknown",
+        score:
+          Math.round(
+            (attempt.score / attempt.questionsPresented.length) * 1000
+          ) / 10,
+        completedAt: attempt.attemptDate,
+        totalQuestions: attempt.questionsPresented.length,
+      }));
+
+    const analytics = {
+      quizTitle: (quiz.quizId as any).title || "Untitled Quiz",
+      totalAttempts: quizAttempts.length,
+      uniqueParticipants,
+      totalStaff,
+      completionRate: Math.round(completionRate * 10) / 10,
+      averageScore: Math.round(averageScore * 10) / 10,
+      averageCompletionTime: Math.round(averageCompletionTime),
+      topPerformers,
+      recentActivity,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: analytics,
+    });
+  } catch (error) {
+    console.error("Error fetching quiz analytics:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch quiz analytics",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
 export const resetAnalytics = async (
   req: AuthenticatedRequest,
   res: Response

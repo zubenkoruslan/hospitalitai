@@ -115,13 +115,14 @@ QuestionBankSchema.methods.updateQuestionCountAndCategories = async function (
   this: IQuestionBank
 ) {
   if (this.questions && this.questions.length > 0) {
-    // Fetch only active questions to count and aggregate categories from
+    // Use the actual questions array length for the count
+    this.questionCount = this.questions.length;
+
+    // Fetch questions to aggregate categories from
     const activeQuestions = await QuestionModel.find({
       _id: { $in: this.questions },
       // status: 'active', // Uncomment if QuestionModel has a status and only active should be counted
     }).lean();
-
-    this.questionCount = activeQuestions.length;
 
     const categoriesSet = new Set<string>();
     activeQuestions.forEach((questionDoc) => {
@@ -135,6 +136,9 @@ QuestionBankSchema.methods.updateQuestionCountAndCategories = async function (
     this.questionCount = 0;
     this.categories = [];
   }
+  console.log(
+    `🔢 Updating question count and categories for bank ${this._id}: ${this.questionCount} questions, ${this.categories.length} categories`
+  );
   // This method modifies the document. The caller is responsible for saving.
 };
 
@@ -143,11 +147,8 @@ QuestionBankSchema.methods.updateQuestionCountAndCategories = async function (
 QuestionBankSchema.methods.updateQuestionCount = async function (
   this: IQuestionBank
 ) {
-  const count = await mongoose
-    .model("Question")
-    .countDocuments({ questionBankId: this._id });
-  this.questionCount = count;
-  // Potentially re-aggregate categories here too if they are dynamic based on questions
+  // Count based on the actual questions array length, not a separate query
+  this.questionCount = this.questions ? this.questions.length : 0;
   await this.save();
 };
 

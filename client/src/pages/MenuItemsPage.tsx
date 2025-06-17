@@ -8,6 +8,7 @@ import {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  bulkDeleteMenuItems,
   updateMenu,
   deleteMenuCategory,
 } from "../services/api";
@@ -482,6 +483,33 @@ const MenuItemsPage: React.FC = () => {
       setIsDeletingCategory(false);
     }
   }, [categoryToDelete, menuId, fetchData, closeDeleteCategoryModal]);
+
+  // --- Bulk Delete Handler ---
+  const handleBulkDelete = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0) return;
+
+      const confirmed = window.confirm(
+        `Are you sure you want to delete ${itemIds.length} item${
+          itemIds.length !== 1 ? "s" : ""
+        }? This action cannot be undone.`
+      );
+
+      if (!confirmed) return;
+
+      try {
+        const result = await bulkDeleteMenuItems(itemIds);
+        setSuccessMessage(result.message);
+        fetchData(); // Refresh the data
+      } catch (err: any) {
+        console.error(formatApiError(err, "bulk deleting menu items"));
+        setSuccessMessage(
+          `Error: ${formatApiError(err, "bulk deleting menu items")}`
+        );
+      }
+    },
+    [fetchData]
+  );
 
   // --- Table of Contents Component ---
   const renderTableOfContents = () => {
@@ -1952,6 +1980,7 @@ const MenuItemsPage: React.FC = () => {
                     onFiltersChange={handleFiltersChange}
                     sortBy={sortBy}
                     onSortChange={handleSortChange}
+                    onBulkDelete={handleBulkDelete}
                   />
                 </div>
               )}

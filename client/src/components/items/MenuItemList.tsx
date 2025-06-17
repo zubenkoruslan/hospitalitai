@@ -6,12 +6,19 @@ interface MenuItemListProps {
   items: MenuItem[];
   onEdit: (item: MenuItem) => void;
   onDelete: (item: MenuItem) => void;
+  // Bulk selection props
+  selectedItems?: Set<string>;
+  onToggleSelect?: (itemId: string) => void;
+  bulkMode?: boolean;
 }
 
 const MenuItemList: React.FC<MenuItemListProps> = ({
   items,
   onEdit,
   onDelete,
+  selectedItems = new Set(),
+  onToggleSelect,
+  bulkMode = false,
 }) => {
   if (!items) {
     // Parent should handle loading/error state, but return null if no items prop
@@ -31,8 +38,28 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
       {items.map((item) => (
         <div
           key={item._id}
-          className="bg-white border border-gray-200 shadow-sm rounded-lg p-3 flex flex-col justify-between h-full hover:shadow-lg transition-shadow duration-200"
+          className={`bg-white border border-gray-200 shadow-sm rounded-lg p-3 flex flex-col justify-between h-full hover:shadow-lg transition-all duration-200 ${
+            bulkMode && selectedItems.has(item._id)
+              ? "ring-2 ring-blue-500 border-blue-300"
+              : ""
+          }`}
         >
+          {/* Bulk Selection Checkbox */}
+          {bulkMode && onToggleSelect && (
+            <div className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                checked={selectedItems.has(item._id)}
+                onChange={() => onToggleSelect(item._id)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2"
+                onClick={(e) => e.stopPropagation()} // Prevent event bubbling
+              />
+              <span className="text-sm text-gray-600">
+                {selectedItems.has(item._id) ? "Selected" : "Select"}
+              </span>
+            </div>
+          )}
+
           <div className="flex-grow mb-2">
             <h3
               className="text-md font-semibold text-gray-700 mb-1 truncate"
@@ -62,7 +89,14 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
                     >
                       <span className="text-gray-700">{option.size}</span>
                       <span className="font-bold text-green-700">
-                        ${option.price.toFixed(2)}
+                        $
+                        {(() => {
+                          const price =
+                            typeof option.price === "number"
+                              ? option.price
+                              : parseFloat(String(option.price));
+                          return !isNaN(price) ? price.toFixed(2) : "0.00";
+                        })()}
                       </span>
                     </div>
                   ))}
@@ -71,7 +105,15 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
             ) : (
               <div className="flex items-center text-xs mb-1">
                 <span className="text-lg font-bold text-green-700">
-                  ${item.price?.toFixed(2) ?? "N/A"}
+                  $
+                  {(() => {
+                    if (!item.price) return "N/A";
+                    const price =
+                      typeof item.price === "number"
+                        ? item.price
+                        : parseFloat(String(item.price));
+                    return !isNaN(price) ? price.toFixed(2) : "N/A";
+                  })()}
                 </span>
               </div>
             )}
@@ -274,22 +316,24 @@ const MenuItemList: React.FC<MenuItemListProps> = ({
             )}
           </div>
 
-          <div className="flex-shrink-0 flex flex-row space-x-2 justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => onEdit(item)}
-              className="text-xs px-2 py-1"
-            >
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => onDelete(item)}
-              className="text-xs px-2 py-1"
-            >
-              Delete
-            </Button>
-          </div>
+          {!bulkMode && (
+            <div className="flex-shrink-0 flex flex-row space-x-2 justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => onEdit(item)}
+                className="text-xs px-2 py-1"
+              >
+                Edit
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => onDelete(item)}
+                className="text-xs px-2 py-1"
+              >
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
       ))}
     </div>

@@ -33,6 +33,7 @@ export interface CleanMenuItem {
   region?: string;
   grapeVariety?: string[];
   wineStyle?: string;
+  wineColor?: string;
   servingOptions?: Array<{
     size: string;
     price: number;
@@ -663,17 +664,24 @@ export class CleanMenuParserService {
     // Count wine-related indicators
     let wineIndicators = 0;
 
-    // Look for wine sections
+    // Look for wine sections - Enhanced rosé detection
     const wineSections = [
       "wine list",
       "wines",
       "red wines",
       "white wines",
       "sparkling wines",
+      "rosé wines",
+      "rose wines",
+      "rosé",
+      "rose",
       "champagne",
       "prosecco",
       "by the glass",
       "by the bottle",
+      "provence",
+      "côtes de provence",
+      "cotes de provence",
     ];
 
     wineSections.forEach((section) => {
@@ -688,7 +696,7 @@ export class CleanMenuParserService {
       wineIndicators += Math.min(vintageMatches.length / 2, 20); // Cap at 20
     }
 
-    // Count wine regions/producers
+    // Count wine regions/producers - Enhanced with rosé regions
     const wineTerms = [
       "bordeaux",
       "burgundy",
@@ -714,6 +722,16 @@ export class CleanMenuParserService {
       "chablis",
       "muscadet",
       "vouvray",
+      "provence",
+      "côtes de provence",
+      "cotes de provence",
+      "languedoc",
+      "roussillon",
+      "bandol",
+      "cassis",
+      "tavel",
+      "chiaretto",
+      "rosato",
     ];
 
     wineTerms.forEach((term) => {
@@ -1414,6 +1432,7 @@ WINE SPECIFICS:
 - Extract vintage year if present (e.g., "2018 Chardonnay" → vintage: 2018)
 - Extract producer/winery names
 - Extract regions/countries
+- Identify wine color/type: "red", "white", "rosé", "orange", "sparkling" based on wine name, description, or section
 - Look for serving options with different prices (glass vs bottle vs half-bottle)
 - Extract serving sizes like: "125ml", "175ml", "250ml", "Glass", "Bottle", "Half Bottle", "Magnum"
 - Common patterns: "£8.50/£32.00" = Glass £8.50, Bottle £32.00
@@ -1422,6 +1441,24 @@ WINE SPECIFICS:
 - Include wines from all sections: by-the-glass, by-the-bottle, red wines, white wines, sparkling, dessert wines
 - If you see 30+ wines listed, make sure to extract all 30+ (never stop at 20 or 25)
 - Scan the entire document thoroughly - wine lists often span multiple pages or sections
+- Wine color identification patterns:
+  * Red wines: Cabernet, Merlot, Pinot Noir, Shiraz, Syrah, Sangiovese, Tempranillo, Grenache, Zinfandel, Malbec, Nebbiolo, Barbera, Chianti, Bordeaux (red), Burgundy (red), Barolo, Brunello, Rioja (red)
+  * White wines: Chardonnay, Sauvignon Blanc, Riesling, Pinot Grigio, Pinot Gris, Gewürztraminer, Viognier, Albariño, Verdejo, Grüner Veltliner, Chablis, Sancerre, Muscadet, Vouvray, Bordeaux (white), Burgundy (white)
+  * Rosé wines: Rosé, Rosado, Pink wines, Provence rosé, Chiaretto, Rosato, wines from "ROSE" sections, wines from "ROSÉ" sections, wines labeled as pink or blush wines
+  * Sparkling wines: Champagne, Prosecco, Cava, Crémant, Franciacorta, sparkling wine
+  * Orange wines: Orange wine, amber wine, skin-contact white wines
+
+ROSÉ WINE DETECTION (CRITICAL):
+- Pay SPECIAL ATTENTION to sections labeled "ROSE", "ROSÉ", "ROSÉ WINE", "PINK WINES", "BLUSH WINES"
+- Extract ALL wines from rosé sections regardless of naming variations
+- Look for wines with "Rosé", "Rosado", "Rosato", "Chiaretto" in their names
+- Include wines from Provence, Côtes de Provence regions (typically rosé)
+- Extract wines with complex pricing (multiple prices per wine indicate different serving sizes)
+- For rosé wines with multiple prices, create serving options: first price = glass, second = carafe/half bottle, third = bottle, etc.
+- Examples of rosé patterns:
+  * "2022 MiP CLASSIC ROSÉ, Côtes de Provence, France £9.50 £12.50 £36"
+  * "2023 PROVENCE ROSÉ, Whispering Angel, Provence, France £11.50 £15.50 £45"
+  * "2022 Chiaretto Rosato Gorgo Di Bricolo, Veneto, Italy £11.50 £42"
 
 FOOD SPECIFICS:
 - Extract dietary markers: (V) = Vegetarian, (VG) = Vegan, (GF) = Gluten-Free, (DF) = Dairy-Free
@@ -1465,6 +1502,7 @@ Return ONLY a JSON object. Extract ALL menu items found:
       "region": "string or null",
       "grapeVariety": [],
       "wineStyle": "string or null",
+      "wineColor": "string or null",
       "servingOptions": [{"size": "Glass", "price": 12.50}, {"size": "Bottle", "price": 48.00}],
       "isVegetarian": false,
       "isVegan": false,
@@ -1686,6 +1724,77 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
    * Clean individual menu item
    */
   private cleanMenuItem(item: CleanMenuItem): CleanMenuItem {
+    // Convert price to number if it's a string
+    let cleanPrice: number | undefined = undefined;
+    if (item.price !== undefined && item.price !== null) {
+      if (typeof item.price === "number") {
+        cleanPrice = item.price;
+      } else {
+        const parsed = parseFloat(String(item.price));
+        if (!isNaN(parsed)) {
+          cleanPrice = parsed;
+        }
+      }
+    }
+
+    // Convert vintage to number if it's a string
+    let cleanVintage: number | undefined = undefined;
+    if (item.vintage !== undefined && item.vintage !== null) {
+      if (typeof item.vintage === "number") {
+        cleanVintage = item.vintage;
+      } else {
+        const parsed = parseInt(String(item.vintage), 10);
+        if (!isNaN(parsed)) {
+          cleanVintage = parsed;
+        }
+      }
+    }
+
+    // Map wine style to valid enum value for wine items
+    let cleanWineStyle: string | undefined = undefined;
+    let cleanWineColor: string | undefined = undefined;
+    if (item.itemType === "wine") {
+      if (item.wineStyle) {
+        cleanWineStyle = this.mapWineStyleToEnum(item.wineStyle);
+        console.log(
+          `🍷 Mapped wine style: "${item.wineStyle}" → "${cleanWineStyle}"`
+        );
+      }
+      if (item.wineColor) {
+        cleanWineColor = this.mapWineColorToEnum(item.wineColor);
+        console.log(
+          `🍷 Mapped wine color: "${item.wineColor}" → "${cleanWineColor}"`
+        );
+      }
+
+      // Enhanced rosé detection based on wine name and region if color not detected
+      if (!cleanWineColor || cleanWineColor === "other") {
+        const wineName = item.name.toLowerCase();
+        const wineRegion = (item.region || "").toLowerCase();
+        const wineCategory = (item.category || "").toLowerCase();
+
+        // Check if this appears to be a rosé wine based on name patterns
+        if (
+          wineName.includes("rosé") ||
+          wineName.includes("rose") ||
+          wineName.includes("rosado") ||
+          wineName.includes("rosato") ||
+          wineName.includes("chiaretto") ||
+          wineName.includes("pink") ||
+          wineRegion.includes("provence") ||
+          wineRegion.includes("côtes de provence") ||
+          wineRegion.includes("cotes de provence") ||
+          wineCategory.includes("rosé") ||
+          wineCategory.includes("rose")
+        ) {
+          cleanWineColor = "rosé";
+          console.log(
+            `🍷 Enhanced rosé detection: "${item.name}" → rosé (based on name/region/category)`
+          );
+        }
+      }
+    }
+
     return {
       ...item,
       name: item.name.trim(),
@@ -1693,6 +1802,10 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
       category: item.category.trim(),
       producer: item.producer?.trim(),
       region: item.region?.trim(),
+      wineStyle: cleanWineStyle || item.wineStyle, // Use mapped value for wines
+      wineColor: cleanWineColor || item.wineColor, // Use mapped value for wines
+      price: cleanPrice,
+      vintage: cleanVintage,
       // Ensure confidence is between 0-100
       confidence: Math.max(0, Math.min(100, item.confidence || 50)),
       // Clean arrays
@@ -2050,5 +2163,169 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
         processingNotes: updatedNotes,
       };
     }
+  }
+
+  /**
+   * Map AI-generated wine color to valid enum values
+   */
+  private mapWineColorToEnum(wineColor: string | undefined): string {
+    if (!wineColor) return "other";
+
+    const color = wineColor.toLowerCase().trim();
+
+    // Red wines
+    if (
+      color.includes("red") ||
+      color.includes("rouge") ||
+      color.includes("tinto") ||
+      color.includes("rosso")
+    ) {
+      return "red";
+    }
+
+    // White wines
+    if (
+      color.includes("white") ||
+      color.includes("blanc") ||
+      color.includes("blanco") ||
+      color.includes("bianco") ||
+      color.includes("weiss") ||
+      color.includes("branco")
+    ) {
+      return "white";
+    }
+
+    // Rosé wines - Enhanced detection
+    if (
+      color.includes("rosé") ||
+      color.includes("rose") ||
+      color.includes("rosado") ||
+      color.includes("rosato") ||
+      color.includes("chiaretto") ||
+      color.includes("pink") ||
+      color.includes("blush") ||
+      color.includes("provence") || // Many Provence wines are rosé
+      color.includes("côtes de provence") ||
+      color.includes("cotes de provence")
+    ) {
+      return "rosé";
+    }
+
+    // Sparkling wines
+    if (
+      color.includes("sparkling") ||
+      color.includes("champagne") ||
+      color.includes("prosecco") ||
+      color.includes("cava") ||
+      color.includes("cremant") ||
+      color.includes("crémant") ||
+      color.includes("franciacorta") ||
+      color.includes("spumante") ||
+      color.includes("pétillant") ||
+      color.includes("petillant")
+    ) {
+      return "sparkling";
+    }
+
+    // Orange wines
+    if (
+      color.includes("orange") ||
+      color.includes("amber") ||
+      color.includes("skin contact") ||
+      color.includes("skin-contact")
+    ) {
+      return "orange";
+    }
+
+    // Default to other if we can't determine
+    return "other";
+  }
+
+  /**
+   * Map AI-generated wine style to valid enum values
+   */
+  private mapWineStyleToEnum(wineStyle: string | undefined): string {
+    if (!wineStyle) return "still";
+
+    const style = wineStyle.toLowerCase().trim();
+
+    // Sparkling wines
+    if (
+      style.includes("sparkling") ||
+      style.includes("prosecco") ||
+      style.includes("cava") ||
+      style.includes("cremant") ||
+      style.includes("franciacorta") ||
+      style.includes("petillant") ||
+      style.includes("pétillant")
+    ) {
+      return "sparkling";
+    }
+
+    // Champagne
+    if (style.includes("champagne")) {
+      return "champagne";
+    }
+
+    // Dessert wines
+    if (
+      style.includes("dessert") ||
+      style.includes("sweet") ||
+      style.includes("ice wine") ||
+      style.includes("icewine") ||
+      style.includes("late harvest") ||
+      style.includes("noble rot") ||
+      style.includes("botrytis") ||
+      style.includes("aszú") ||
+      style.includes("aszu") ||
+      style.includes("moscato") ||
+      style.includes("moscatel") ||
+      style.includes("sauternes") ||
+      style.includes("beerenauslese") ||
+      style.includes("trockenbeerenauslese") ||
+      style.includes("eiswein") ||
+      style.includes("vin doux") ||
+      style.includes("passito") ||
+      style.includes("vendange tardive")
+    ) {
+      return "dessert";
+    }
+
+    // Fortified wines
+    if (
+      style.includes("fortified") ||
+      style.includes("port") ||
+      style.includes("porto") ||
+      style.includes("sherry") ||
+      style.includes("madeira") ||
+      style.includes("marsala") ||
+      style.includes("vermouth") ||
+      style.includes("commandaria") ||
+      style.includes("vin doux naturel") ||
+      style.includes("mistelle") ||
+      style.includes("vintage port") ||
+      style.includes("tawny port") ||
+      style.includes("ruby port") ||
+      style.includes("late bottled vintage") ||
+      style.includes("lbv") ||
+      style.includes("crusted port") ||
+      style.includes("white port") ||
+      style.includes("fino") ||
+      style.includes("manzanilla") ||
+      style.includes("amontillado") ||
+      style.includes("oloroso") ||
+      style.includes("palo cortado") ||
+      style.includes("pedro ximenez") ||
+      style.includes("cream sherry") ||
+      style.includes("bual") ||
+      style.includes("verdelho") ||
+      style.includes("sercial") ||
+      style.includes("malmsey")
+    ) {
+      return "fortified";
+    }
+
+    // Default to still wine for everything else
+    return "still";
   }
 }

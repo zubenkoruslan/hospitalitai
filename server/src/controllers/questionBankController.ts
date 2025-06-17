@@ -1143,6 +1143,28 @@ export const generateAiQuestionsForSopBank = async (
         }
       );
 
+    // CRITICAL FIX: Add the question IDs to the bank's questions array
+    if (pendingQuestions.length > 0) {
+      const newQuestionIds = pendingQuestions.map(
+        (q: IQuestion) => q._id as mongoose.Types.ObjectId
+      );
+
+      console.log(
+        `[SOP-Generation] Adding ${newQuestionIds.length} question IDs to bank ${bankId}`
+      );
+      bank.questions.push(...newQuestionIds);
+      await bank.save();
+
+      // Update the denormalized question count
+      if (typeof bank.updateQuestionCount === "function") {
+        await bank.updateQuestionCount();
+      }
+
+      console.log(
+        `[SOP-Generation] Bank ${bankId} now has ${bank.questions.length} total questions`
+      );
+    }
+
     res.status(200).json({
       status: "success",
       message: `${pendingQuestions.length} questions generated from SOP and saved as pending review.`,

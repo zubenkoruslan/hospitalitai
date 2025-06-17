@@ -189,6 +189,40 @@ export const sortItems = (
       // In the future, this could be based on quiz question frequency
       return sortedItems.sort((a, b) => a.name.localeCompare(b.name));
 
+    case "wine-color-asc":
+      return sortedItems.sort((a, b) => {
+        // Only apply to wine items
+        if (a.itemType !== "wine" && b.itemType !== "wine") {
+          return a.name.localeCompare(b.name);
+        }
+        if (a.itemType !== "wine") return 1;
+        if (b.itemType !== "wine") return -1;
+
+        const colorA = a.wineColor || "other";
+        const colorB = b.wineColor || "other";
+        if (colorA === colorB) {
+          return a.name.localeCompare(b.name);
+        }
+        return colorA.localeCompare(colorB);
+      });
+
+    case "wine-color-desc":
+      return sortedItems.sort((a, b) => {
+        // Only apply to wine items
+        if (a.itemType !== "wine" && b.itemType !== "wine") {
+          return b.name.localeCompare(a.name);
+        }
+        if (a.itemType !== "wine") return 1;
+        if (b.itemType !== "wine") return -1;
+
+        const colorA = a.wineColor || "other";
+        const colorB = b.wineColor || "other";
+        if (colorA === colorB) {
+          return b.name.localeCompare(a.name);
+        }
+        return colorB.localeCompare(colorA);
+      });
+
     default:
       return sortedItems;
   }

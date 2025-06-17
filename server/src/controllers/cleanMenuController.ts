@@ -101,6 +101,170 @@ export class CleanMenuController {
   }
 
   /**
+   * Map AI-generated wine color to valid enum values
+   */
+  private mapWineColorToEnum(wineColor: string | undefined): string {
+    if (!wineColor) return "other";
+
+    const color = wineColor.toLowerCase().trim();
+
+    // Red wines
+    if (
+      color.includes("red") ||
+      color.includes("rouge") ||
+      color.includes("tinto") ||
+      color.includes("rosso")
+    ) {
+      return "red";
+    }
+
+    // White wines
+    if (
+      color.includes("white") ||
+      color.includes("blanc") ||
+      color.includes("blanco") ||
+      color.includes("bianco") ||
+      color.includes("weiss") ||
+      color.includes("branco")
+    ) {
+      return "white";
+    }
+
+    // Rosé wines - Enhanced detection
+    if (
+      color.includes("rosé") ||
+      color.includes("rose") ||
+      color.includes("rosado") ||
+      color.includes("rosato") ||
+      color.includes("chiaretto") ||
+      color.includes("pink") ||
+      color.includes("blush") ||
+      color.includes("provence") || // Many Provence wines are rosé
+      color.includes("côtes de provence") ||
+      color.includes("cotes de provence")
+    ) {
+      return "rosé";
+    }
+
+    // Sparkling wines
+    if (
+      color.includes("sparkling") ||
+      color.includes("champagne") ||
+      color.includes("prosecco") ||
+      color.includes("cava") ||
+      color.includes("cremant") ||
+      color.includes("crémant") ||
+      color.includes("franciacorta") ||
+      color.includes("spumante") ||
+      color.includes("pétillant") ||
+      color.includes("petillant")
+    ) {
+      return "sparkling";
+    }
+
+    // Orange wines
+    if (
+      color.includes("orange") ||
+      color.includes("amber") ||
+      color.includes("skin contact") ||
+      color.includes("skin-contact")
+    ) {
+      return "orange";
+    }
+
+    // Default to other if we can't determine
+    return "other";
+  }
+
+  /**
+   * Map AI-generated wine style to valid enum values
+   */
+  private mapWineStyleToEnum(wineStyle: string | undefined): string {
+    if (!wineStyle) return "still";
+
+    const style = wineStyle.toLowerCase().trim();
+
+    // Sparkling wines
+    if (
+      style.includes("sparkling") ||
+      style.includes("prosecco") ||
+      style.includes("cava") ||
+      style.includes("cremant") ||
+      style.includes("franciacorta") ||
+      style.includes("petillant") ||
+      style.includes("pétillant")
+    ) {
+      return "sparkling";
+    }
+
+    // Champagne
+    if (style.includes("champagne")) {
+      return "champagne";
+    }
+
+    // Dessert wines
+    if (
+      style.includes("dessert") ||
+      style.includes("sweet") ||
+      style.includes("ice wine") ||
+      style.includes("icewine") ||
+      style.includes("late harvest") ||
+      style.includes("noble rot") ||
+      style.includes("botrytis") ||
+      style.includes("aszú") ||
+      style.includes("aszu") ||
+      style.includes("moscato") ||
+      style.includes("moscatel") ||
+      style.includes("sauternes") ||
+      style.includes("beerenauslese") ||
+      style.includes("trockenbeerenauslese") ||
+      style.includes("eiswein") ||
+      style.includes("vin doux") ||
+      style.includes("passito") ||
+      style.includes("vendange tardive")
+    ) {
+      return "dessert";
+    }
+
+    // Fortified wines
+    if (
+      style.includes("fortified") ||
+      style.includes("port") ||
+      style.includes("porto") ||
+      style.includes("sherry") ||
+      style.includes("madeira") ||
+      style.includes("marsala") ||
+      style.includes("vermouth") ||
+      style.includes("commandaria") ||
+      style.includes("vin doux naturel") ||
+      style.includes("mistelle") ||
+      style.includes("vintage port") ||
+      style.includes("tawny port") ||
+      style.includes("ruby port") ||
+      style.includes("late bottled vintage") ||
+      style.includes("lbv") ||
+      style.includes("crusted port") ||
+      style.includes("white port") ||
+      style.includes("fino") ||
+      style.includes("manzanilla") ||
+      style.includes("amontillado") ||
+      style.includes("oloroso") ||
+      style.includes("palo cortado") ||
+      style.includes("pedro ximenez") ||
+      style.includes("cream sherry") ||
+      style.includes("bual") ||
+      style.includes("verdelho") ||
+      style.includes("sercial") ||
+      style.includes("malmsey")
+    ) {
+      return "fortified";
+    }
+
+    // Default to still wine for everything else
+    return "still";
+  }
+
+  /**
    * Upload and parse menu file
    */
   uploadMenu = async (req: MenuUploadRequest, res: Response): Promise<void> => {
@@ -306,7 +470,13 @@ export class CleanMenuController {
           restaurantId,
           name: item.name?.trim() || `Item ${index + 1}`, // Required field - use fallback if missing
           description: item.description?.trim() || undefined, // Now mapping description
-          price: typeof item.price === "number" ? item.price : null,
+          price: (() => {
+            if (item.price === null || item.price === undefined)
+              return undefined;
+            if (typeof item.price === "number") return item.price;
+            const parsed = parseFloat(String(item.price));
+            return !isNaN(parsed) ? parsed : undefined;
+          })(),
           itemType: item.itemType || "food", // Required field - default to food if missing
           category: item.category?.trim() || "other", // Required field - default to other if missing
           ingredients: Array.isArray(item.ingredients) ? item.ingredients : [],
@@ -342,7 +512,24 @@ export class CleanMenuController {
 
           // Wine-specific fields
           ...(item.itemType === "wine" && {
-            wineStyle: item.wineStyle || "still", // Default to still wine
+            wineStyle: (() => {
+              const mappedStyle = this.mapWineStyleToEnum(item.wineStyle);
+              if (item.wineStyle && item.wineStyle !== mappedStyle) {
+                console.log(
+                  `🍷 Wine style mapping: "${item.wineStyle}" → "${mappedStyle}"`
+                );
+              }
+              return mappedStyle;
+            })(), // Map AI-generated style to valid enum
+            wineColor: (() => {
+              const mappedColor = this.mapWineColorToEnum(item.wineColor);
+              if (item.wineColor && item.wineColor !== mappedColor) {
+                console.log(
+                  `🍷 Wine color mapping: "${item.wineColor}" → "${mappedColor}"`
+                );
+              }
+              return mappedColor;
+            })(), // Map AI-generated color to valid enum
             producer: item.producer?.trim() || undefined,
             grapeVariety: Array.isArray(item.grapeVariety)
               ? item.grapeVariety
@@ -359,6 +546,19 @@ export class CleanMenuController {
         console.log(
           `📝 Converted item: ${menuItem.name} (${menuItem.category}, ${menuItem.itemType})`
         );
+
+        // Extra logging for wine items
+        if (menuItem.itemType === "wine") {
+          console.log(`🍷 Wine details:`, {
+            wineStyle: menuItem.wineStyle,
+            wineColor: menuItem.wineColor,
+            producer: menuItem.producer,
+            vintage: menuItem.vintage,
+            region: menuItem.region,
+            grapeVariety: menuItem.grapeVariety,
+            price: menuItem.price,
+          });
+        }
         return menuItem;
       });
   }
@@ -386,6 +586,14 @@ export class CleanMenuController {
           itemType: itemData.itemType,
           price: itemData.price,
         });
+
+        // Extra logging for wine items before creation
+        if (itemData.itemType === "wine") {
+          console.log(
+            `🍷 Creating wine item with full data:`,
+            JSON.stringify(itemData, null, 2)
+          );
+        }
 
         await MenuItem.create(itemData);
         successCount++;

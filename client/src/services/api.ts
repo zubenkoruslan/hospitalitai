@@ -635,6 +635,32 @@ export const deleteQuiz = async (quizId: string): Promise<void> => {
   await api.delete(`/quizzes/${quizId}`);
 };
 
+/**
+ * Manually update quiz snapshots when question banks have changed
+ */
+export const updateQuizSnapshots = async (): Promise<{
+  message: string;
+  data: {
+    updatedCount: number;
+    totalQuizzes: number;
+    questionBanksProcessed: number;
+  };
+}> => {
+  const response = await api.post<{
+    status: string;
+    message: string;
+    data: {
+      updatedCount: number;
+      totalQuizzes: number;
+      questionBanksProcessed: number;
+    };
+  }>("/quizzes/update-snapshots");
+  return {
+    message: response.data.message,
+    data: response.data.data,
+  };
+};
+
 // Types and services for Quiz Taking Page
 
 // Quiz Taking Page services
@@ -811,6 +837,11 @@ const transformMenuItemFormData = (
       backendData.wineStyle = formData.wineStyle.trim() || undefined;
     }
 
+    // Handle wine color
+    if (formData.wineColor !== undefined) {
+      backendData.wineColor = formData.wineColor.trim() || undefined;
+    }
+
     // Handle grape variety (comma-separated string to array)
     if (formData.grapeVariety !== undefined) {
       backendData.grapeVariety = formData.grapeVariety
@@ -860,6 +891,7 @@ const transformMenuItemFormData = (
   } else {
     // For non-wine items, exclude all wine-specific fields from the request
     delete backendData.wineStyle;
+    delete backendData.wineColor;
     delete backendData.producer;
     delete backendData.grapeVariety;
     delete backendData.vintage;
@@ -909,6 +941,25 @@ export const deleteMenuItem = async (
   itemId: string
 ): Promise<{ message: string }> => {
   const response = await api.delete<{ message: string }>(`/items/${itemId}`);
+  return response.data;
+};
+
+export const bulkDeleteMenuItems = async (
+  itemIds: string[]
+): Promise<{
+  message: string;
+  deletedCount: number;
+  failedCount: number;
+  errors?: string[];
+}> => {
+  const response = await api.delete<{
+    message: string;
+    deletedCount: number;
+    failedCount: number;
+    errors?: string[];
+  }>("/items/bulk", {
+    data: { itemIds },
+  });
   return response.data;
 };
 
@@ -1440,14 +1491,20 @@ export const generateMoreAiQuestionsForSopBank = async (
     questionTypes: QuestionType[]; // Should be restricted to 'true-false' and 'multiple-choice-single'
   }
 ): Promise<{
-  questions: IQuestion[];
+  status: string;
   message: string;
-  pendingReviewQuestionIds?: string[];
+  data: {
+    questionBankId: string;
+    pendingReviewQuestionIds: string[];
+  };
 }> => {
   const response = await api.post<{
-    questions: IQuestion[];
+    status: string;
     message: string;
-    pendingReviewQuestionIds?: string[];
+    data: {
+      questionBankId: string;
+      pendingReviewQuestionIds: string[];
+    };
   }>(`/question-banks/${bankId}/generate-sop-questions`, params);
   return response.data;
 };
@@ -1962,6 +2019,7 @@ export interface CleanMenuItem {
   producer?: string;
   region?: string;
   grapeVariety?: string[];
+  wineColor?: string;
   servingOptions?: Array<{ size: string; price: number }>;
   // Food-specific fields
   ingredients?: string[];
@@ -2077,5 +2135,35 @@ export const resetAnalytics = async (
   options: ResetAnalyticsOptions = {}
 ): Promise<ResetAnalyticsResult> => {
   const response = await api.post("/analytics/reset", options);
+  return response.data;
+};
+
+// Get analytics for a specific quiz
+export const getQuizAnalytics = async (
+  quizId: string
+): Promise<{
+  success: boolean;
+  data: {
+    quizTitle: string;
+    totalAttempts: number;
+    uniqueParticipants: number;
+    totalStaff: number;
+    completionRate: number;
+    averageScore: number;
+    averageCompletionTime: number;
+    topPerformers: Array<{
+      name: string;
+      score: number;
+      completedAt: Date;
+    }>;
+    recentActivity: Array<{
+      staffName: string;
+      score: number;
+      completedAt: Date;
+      totalQuestions: number;
+    }>;
+  };
+}> => {
+  const response = await api.get(`/analytics/quiz/${quizId}`);
   return response.data;
 };

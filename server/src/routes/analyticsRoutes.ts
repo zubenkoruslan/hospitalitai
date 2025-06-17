@@ -11,6 +11,7 @@ import UserKnowledgeAnalyticsModel from "../models/UserKnowledgeAnalytics";
 import {
   getEnhancedRestaurantAnalytics,
   getIndividualStaffAnalytics,
+  getQuizSpecificAnalytics,
   resetAnalytics,
 } from "../controllers/analyticsController";
 
@@ -851,6 +852,12 @@ router.get(
     }
   }
 );
+
+/**
+ * GET /api/analytics/quiz/:quizId
+ * Get specific quiz analytics including completion rates, average scores, and staff participation
+ */
+router.get("/quiz/:quizId", protect, getQuizSpecificAnalytics);
 
 /**
  * GET /api/analytics/restaurant/enhanced

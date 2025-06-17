@@ -52,6 +52,7 @@ interface CleanMenuItem {
   producer?: string;
   region?: string;
   grapeVariety?: string[];
+  wineColor?: string;
   servingOptions?: ServingOption[];
   // Food-specific fields
   ingredients?: string[];
@@ -850,6 +851,31 @@ const CleanMenuUploadPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700">
+                      Variety Type
+                    </label>
+                    <select
+                      value={editItem.wineColor || ""}
+                      onChange={(e) =>
+                        handleFieldChange("wineColor", e.target.value)
+                      }
+                      className="w-full p-2 border border-gray-300 rounded text-sm"
+                    >
+                      <option value="">Select type...</option>
+                      <option value="red">Red Wine</option>
+                      <option value="white">White Wine</option>
+                      <option value="rosé">Rosé Wine</option>
+                      <option value="sparkling">Sparkling Wine</option>
+                      <option value="champagne">Champagne</option>
+                      <option value="cava">Cava</option>
+                      <option value="crémant">Crémant</option>
+                      <option value="orange">Orange Wine</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">
                       Producer
                     </label>
                     <input
@@ -861,7 +887,7 @@ const CleanMenuUploadPage: React.FC = () => {
                       className="w-full p-2 border border-gray-300 rounded text-sm"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <label className="block text-xs font-medium text-gray-700">
                       Region
                     </label>
@@ -1361,7 +1387,14 @@ const CleanMenuUploadPage: React.FC = () => {
                   </span>
                   {item.price && (
                     <span className="px-3 py-1.5 bg-gradient-to-r from-accent-100 to-accent-200 text-accent-800 rounded-full text-sm font-semibold">
-                      £{item.price.toFixed(2)}
+                      £
+                      {(() => {
+                        const price =
+                          typeof item.price === "number"
+                            ? item.price
+                            : parseFloat(String(item.price));
+                        return !isNaN(price) ? price.toFixed(2) : "0.00";
+                      })()}
                     </span>
                   )}
                 </div>

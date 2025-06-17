@@ -20,12 +20,14 @@ interface GenerateQuizFromBanksModalProps {
   isOpen: boolean;
   onClose: () => void;
   onQuizGenerated: (newQuiz: ClientIQuiz) => void;
+  questionBanks?: IQuestionBank[]; // Optional prop to pass fresh question bank data
 }
 
 const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
   isOpen,
   onClose,
   onQuizGenerated,
+  questionBanks: propQuestionBanks,
 }) => {
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -56,19 +58,35 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const fetchInitialData = async () => {
+        console.log(
+          "📊 GenerateQuizModal: Opening with propQuestionBanks:",
+          propQuestionBanks?.length || "none"
+        );
+
+        // Always fetch fresh question banks to ensure current counts
+        // This is critical because propQuestionBanks might be stale if parent refresh is still in progress
         setIsLoadingBanks(true);
         setFetchError(null);
-        setError(null); // Clear form error too
+        setError(null);
 
         try {
+          console.log("📊 GenerateQuizModal: Fetching fresh question banks...");
           const banks = await getQuestionBanks();
-          setAvailableBanks(banks || []); // Ensure banks is not undefined
+          console.log(
+            "📊 GenerateQuizModal: Received banks:",
+            banks?.map((b) => `${b.name}: ${b.questionCount} questions`) ||
+              "none"
+          );
+          setAvailableBanks(banks || []);
         } catch (err) {
-          console.error("Failed to fetch question banks:", err);
+          console.error(
+            "❌ GenerateQuizModal: Failed to fetch question banks:",
+            err
+          );
           setFetchError(
             "Failed to load question banks. Please try again later."
           );
-          setAvailableBanks([]); // Ensure it's an empty array on error
+          setAvailableBanks([]);
         }
         setIsLoadingBanks(false);
 
@@ -104,7 +122,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       setIsLoadingBanks(false);
       setIsLoadingRoles(false); // Reset loading roles
     }
-  }, [isOpen, user?.restaurantId]);
+  }, [isOpen, user?.restaurantId, propQuestionBanks]);
 
   const handleBankSelectionChange = (bankId: string) => {
     setSelectedBankIds((prevSelected) =>
@@ -416,8 +434,7 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
                               : "text-slate-600"
                           }`}
                         >
-                          ({bank.questions?.length || bank.questionCount || 0}{" "}
-                          questions)
+                          ({bank.questionCount || 0} questions)
                         </span>
                         {bank.sourceType === "SOP" &&
                           bank.sourceSopDocumentTitle && (

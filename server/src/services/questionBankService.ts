@@ -347,21 +347,29 @@ export const addQuestionToBankService = async (
 
     await bank.save();
 
-    // 6. Update quiz snapshots asynchronously (don't await to avoid blocking the response)
-    setImmediate(async () => {
-      try {
-        const { QuizService } = await import("./quizService");
-        await QuizService.updateQuizSnapshotsForQuestionBanks(
-          [new mongoose.Types.ObjectId(bankId)],
-          restaurantId
-        );
-      } catch (error) {
-        console.error(
-          "Failed to update quiz snapshots after adding question to bank:",
-          error
-        );
-      }
-    });
+    // 6. Update the denormalized question count
+    if (typeof bank.updateQuestionCount === "function") {
+      await bank.updateQuestionCount();
+    } else {
+      // Fallback: manually update count
+      bank.questionCount = bank.questions.length;
+      await bank.save();
+    }
+
+    // 7. Update quiz snapshots immediately (synchronously)
+    try {
+      const { QuizService } = await import("./quizService");
+      await QuizService.updateQuizSnapshotsForQuestionBanks(
+        [new mongoose.Types.ObjectId(bankId)],
+        restaurantId
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update quiz snapshots after adding question to bank:",
+        error
+      );
+      // Don't throw as this is not critical for the main operation
+    }
 
     return bank.populate("questions"); // Populate questions before returning
   } catch (error) {
@@ -393,28 +401,66 @@ export const removeQuestionFromBankService = async (
     const objectQuestionId = new mongoose.Types.ObjectId(questionId);
 
     // Find the bank and ensure it belongs to the restaurant, then update it
-    // Using findOneAndUpdate with $pull operator ensures atomicity for the find and update part.
+    // Using findOneAndUpdate with $pull to remove the question ID atomically
     const updatedBank = await QuestionBankModel.findOneAndUpdate(
-      { _id: bankId, restaurantId: restaurantId }, // Query to find the correct bank
-      { $pull: { questions: objectQuestionId } }, // Operation to remove the questionId from the array
-      { new: true } // Options: return the modified document
-    ).populate("questions"); // Populate questions to return the updated list
+      {
+        _id: bankId,
+        restaurantId: restaurantId,
+        questions: objectQuestionId, // Ensure the question exists in the array
+      },
+      {
+        $pull: { questions: objectQuestionId },
+      },
+      {
+        new: true, // Return the updated document
+        runValidators: true,
+      }
+    );
 
     if (!updatedBank) {
-      // This implies bank not found for that restaurant.
+      // This could mean:
+      // 1. Bank not found
+      // 2. Bank doesn't belong to restaurant
+      // 3. Question was not in the bank's questions array
       throw new AppError(
-        `Question bank not found with ID: ${bankId} for this restaurant.`,
+        `Question bank not found with ID: ${bankId} for this restaurant, or question ${questionId} was not in the bank.`,
         404
       );
     }
 
-    return updatedBank;
+    // Update the denormalized question count
+    if (typeof updatedBank.updateQuestionCount === "function") {
+      await updatedBank.updateQuestionCount();
+    } else {
+      // Fallback: manually update count
+      updatedBank.questionCount = updatedBank.questions.length;
+      await updatedBank.save();
+    }
+
+    // Update quiz snapshots immediately (synchronously)
+    try {
+      const { QuizService } = await import("./quizService");
+      await QuizService.updateQuizSnapshotsForQuestionBanks(
+        [new mongoose.Types.ObjectId(bankId)],
+        restaurantId
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update quiz snapshots after removing question from bank:",
+        error
+      );
+      // Don't throw as this is not critical for the main operation
+    }
+
+    return updatedBank.populate("questions"); // Populate before returning
   } catch (error) {
-    console.error("Error removing question ID from bank in service:", error);
+    console.error("Error removing question from bank in service:", error);
     if (error instanceof AppError) {
       throw error;
     }
-    // No specific mongoose.Error.ValidationError expected for $pull usually unless schema on array itself is violated.
+    if (error instanceof mongoose.Error.ValidationError) {
+      throw new AppError(`Validation Error: ${error.message}`, 400);
+    }
     throw new AppError("Failed to remove question from bank.", 500);
   }
 };

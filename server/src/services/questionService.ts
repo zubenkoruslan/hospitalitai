@@ -124,10 +124,27 @@ export const createQuestionService = async (
     const newQuestion = new QuestionModel(questionDataWithDefaults);
     const savedQuestion = await newQuestion.save();
 
+    // CRITICAL FIX: Add the question to the specified question bank
+    if (data.questionBankId) {
+      // Import addQuestionToBankService dynamically to avoid circular dependencies
+      const { addQuestionToBankService } = await import(
+        "./questionBankService"
+      );
+
+      try {
+        await addQuestionToBankService(
+          data.questionBankId.toString(),
+          data.restaurantId,
+          savedQuestion._id.toString()
+        );
+      } catch (bankError) {
+        console.error(`Failed to add question to bank:`, bankError);
+        // Don't throw here - question was created successfully, bank linking failed
+        // Log the error but return the created question
+      }
+    }
+
     // Invalidate analytics cache since a new question affects question distribution
-    console.log(
-      `[Question Create] New question created, invalidating analytics cache`
-    );
     await KnowledgeAnalyticsService.invalidateAnalyticsCache(data.restaurantId);
 
     return savedQuestion;

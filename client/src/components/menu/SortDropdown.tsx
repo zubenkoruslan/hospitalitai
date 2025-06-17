@@ -7,6 +7,7 @@ import {
   ClockIcon,
   FolderIcon,
   FireIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 
 export type SortOption =
@@ -17,7 +18,9 @@ export type SortOption =
   | "category-asc"
   | "category-desc"
   | "recent"
-  | "popular";
+  | "popular"
+  | "wine-color-asc"
+  | "wine-color-desc";
 
 interface SortConfig {
   value: SortOption;
@@ -30,9 +33,10 @@ interface SortDropdownProps {
   currentSort: SortOption;
   onSortChange: (sort: SortOption) => void;
   disabled?: boolean;
+  itemType?: "food" | "beverage" | "wine"; // Add itemType to conditionally show wine-specific sorts
 }
 
-const sortOptions: SortConfig[] = [
+const baseSortOptions: SortConfig[] = [
   {
     value: "name-asc",
     label: "Name (A-Z)",
@@ -77,13 +81,35 @@ const sortOptions: SortConfig[] = [
   },
 ];
 
+const wineSortOptions: SortConfig[] = [
+  {
+    value: "wine-color-asc",
+    label: "Variety Type (A-Z)",
+    icon: SparklesIcon,
+    description: "Red, Rosé, White, etc.",
+  },
+  {
+    value: "wine-color-desc",
+    label: "Variety Type (Z-A)",
+    icon: SparklesIcon,
+    description: "White, Rosé, Red, etc.",
+  },
+];
+
 const SortDropdown: React.FC<SortDropdownProps> = ({
   currentSort,
   onSortChange,
   disabled = false,
+  itemType,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get appropriate sort options based on item type
+  const sortOptions =
+    itemType === "wine"
+      ? [...baseSortOptions, ...wineSortOptions]
+      : baseSortOptions;
 
   const currentSortConfig =
     sortOptions.find((option) => option.value === currentSort) ||

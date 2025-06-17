@@ -44,6 +44,7 @@ const baseInitialFormData = {
 
   // Wine-specific fields
   wineStyle: "",
+  wineColor: "",
   producer: "",
   grapeVariety: "",
   vintage: "",
@@ -183,7 +184,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
       if (isEditMode && currentItem) {
         try {
-          const categoryToSet = toTitleCase(currentItem.category || "");
+          const categoryToSet = currentItem.category || "";
           setFormData({
             ...baseInitialFormData,
             menuId: menuId,
@@ -217,6 +218,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
             // Wine-specific fields
             wineStyle: currentItem.wineStyle || "",
+            wineColor: currentItem.wineColor || "",
             producer: currentItem.producer || "",
             grapeVariety: currentItem.grapeVariety?.join(", ") || "",
             vintage: currentItem.vintage?.toString() || "",
@@ -270,14 +272,12 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
 
           setFormError(null);
 
-          // If the current item's category (after title-casing) isn't in the availableCategories prop (also title-cased for comparison),
+          // If the current item's category isn't in the availableCategories prop,
           // add it to tempCategories so it appears in the dropdown. This ensures the current category is selectable.
-          const titleCasedAvailableCategories = availableCategories
-            ? availableCategories.map((cat) => toTitleCase(cat))
-            : [];
           if (
             categoryToSet &&
-            !titleCasedAvailableCategories.includes(categoryToSet)
+            availableCategories &&
+            !availableCategories.includes(categoryToSet)
           ) {
             // This updates tempCategories. It's okay if availableCategories changes and this runs again,
             // as setTempCategories will handle duplicates if any.
@@ -811,6 +811,36 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
                       <option value="champagne">Champagne</option>
                       <option value="dessert">Dessert</option>
                       <option value="fortified">Fortified</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Wine Color - Variety Type */}
+                  <div>
+                    <label
+                      htmlFor="wineColor"
+                      className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                      Variety Type{" "}
+                      <span className="text-sm text-slate-500">(optional)</span>
+                    </label>
+                    <select
+                      id="wineColor"
+                      name="wineColor"
+                      value={formData.wineColor}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out disabled:bg-slate-50"
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Select variety type...</option>
+                      <option value="red">Red Wine</option>
+                      <option value="white">White Wine</option>
+                      <option value="rosé">Rosé Wine</option>
+                      <option value="sparkling">Sparkling Wine</option>
+                      <option value="champagne">Champagne</option>
+                      <option value="cava">Cava</option>
+                      <option value="crémant">Crémant</option>
+                      <option value="orange">Orange Wine</option>
                       <option value="other">Other</option>
                     </select>
                   </div>

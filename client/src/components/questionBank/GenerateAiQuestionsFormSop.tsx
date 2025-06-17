@@ -88,6 +88,7 @@ const GenerateAiQuestionsFormSop: React.FC<GenerateAiQuestionsFormSopProps> = ({
           )}) sent for AI generation and will be available for review.`
       );
 
+      // Signal successful generation with empty array since questions are saved directly
       onQuestionsGenerated([]);
     } catch (err: any) {
       console.error("Error generating AI questions for SOP bank:", err);
@@ -140,7 +141,11 @@ const GenerateAiQuestionsFormSop: React.FC<GenerateAiQuestionsFormSopProps> = ({
           min="1"
           max="20"
           value={targetQuestionCount}
-          onChange={(e) => setTargetQuestionCount(parseInt(e.target.value, 10))}
+          onChange={(e) => {
+            const value = e.target.value;
+            const parsedValue = parseInt(value, 10);
+            setTargetQuestionCount(isNaN(parsedValue) ? 1 : parsedValue);
+          }}
           className={commonInputClass}
           disabled={isLoading}
         />
