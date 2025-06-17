@@ -3,7 +3,6 @@ import {
   PlusIcon,
   ArrowUpTrayIcon,
   DocumentArrowDownIcon,
-  ChartBarIcon,
   CakeIcon,
   BeakerIcon,
   SparklesIcon,
@@ -15,7 +14,6 @@ interface QuickActionsProps {
   onAddWine: () => void;
   onBulkImport: () => void;
   onExportMenu: () => void;
-  onAnalytics: () => void;
 }
 
 interface ActionButtonProps {
@@ -78,7 +76,6 @@ const QuickActions: React.FC<QuickActionsProps> = ({
   onAddWine,
   onBulkImport,
   onExportMenu,
-  onAnalytics,
 }) => {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -154,19 +151,6 @@ const QuickActions: React.FC<QuickActionsProps> = ({
               borderColor="border-blue-300"
             />
           </div>
-        </div>
-
-        {/* Analytics Section */}
-        <div className="border-t border-gray-200 pt-4">
-          <ActionButton
-            title="View Analytics"
-            description="Menu performance insights"
-            icon={ChartBarIcon}
-            onClick={onAnalytics}
-            color="text-amber-600"
-            bgColor="bg-amber-100"
-            borderColor="border-amber-200"
-          />
         </div>
       </div>
     </div>

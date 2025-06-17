@@ -567,10 +567,6 @@ const RestaurantDashboard: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-purple-600 text-sm font-medium group-hover:text-purple-700">
-                      <span>View Analytics</span>
-                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
-                    </div>
                   </div>
                 </div>
               </Link>
@@ -611,18 +607,6 @@ const RestaurantDashboard: React.FC = () => {
                   >
                     <PlusIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
                     <span>Create New Quiz</span>
-                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </div>
-                  </Link>
-
-                  {/* Additional action */}
-                  <Link
-                    to="/staff-results"
-                    className="w-full group flex items-center justify-center space-x-3 px-6 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-all duration-200 border border-slate-200"
-                  >
-                    <TrophyIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                    <span>View Analytics</span>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <ArrowRightIcon className="h-4 w-4" />
                     </div>
@@ -1101,13 +1085,6 @@ const RestaurantDashboard: React.FC = () => {
               >
                 <PlusIcon className="h-4 w-4" />
                 <span>Create Quiz</span>
-              </Link>
-              <Link
-                to="/staff-results"
-                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors duration-150"
-              >
-                <TrophyIcon className="h-4 w-4" />
-                <span>View Analytics</span>
               </Link>
             </div>
           </div>

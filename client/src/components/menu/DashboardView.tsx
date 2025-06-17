@@ -319,7 +319,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({
             onAddWine={() => handleAddItemWithType("wine")}
             onBulkImport={onImportMenu}
             onExportMenu={handleExportMenuClick}
-            onAnalytics={() => console.log("Analytics clicked")}
           />
         </div>
       </div>
