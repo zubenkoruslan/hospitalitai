@@ -640,8 +640,8 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
   // Mobile expandable sections state
   const [expandedMobileSections, setExpandedMobileSections] = useState({
-    topPerformers: false,
-    staffNeedingSupport: false,
+    topPerformers: true,
+    staffNeedingSupport: true,
     scoreDistribution: false,
     staffPerformance: false,
     categoryChampions: false,
@@ -966,12 +966,15 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
                     {/* Participation Rate Card */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-indigo-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                      <div className="absolute inset-0 bg-gradient-to-br from-teal-50 to-teal-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
                       <div className="relative z-10">
                         <div className="flex items-center space-x-2 lg:space-x-4">
-                          <div className="p-2 lg:p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                            <ChartPieIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          <div
+                            className="p-2 lg:p-3 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300"
+                            style={{ backgroundColor: "#0d9488" }}
+                          >
+                            <UserGroupIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
@@ -1264,7 +1267,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <div className="p-1.5 bg-purple-600 rounded-lg">
+                            <div className="p-1.5 bg-blue-600 rounded-lg">
                               <ChartBarIcon className="h-4 w-4 text-white" />
                             </div>
                             <h2 className="text-xl font-semibold text-slate-900">
@@ -1286,7 +1289,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
                     <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <div className="p-1.5 bg-purple-600 rounded-lg">
+                          <div className="p-1.5 bg-blue-600 rounded-lg">
                             <ChartBarIcon className="h-4 w-4 text-white" />
                           </div>
                           <h2 className="text-xl font-semibold text-slate-900">
@@ -1413,7 +1416,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <div className="p-1.5 bg-indigo-600 rounded-lg">
+                            <div className="p-1.5 bg-purple-600 rounded-lg">
                               <UsersIcon className="h-4 w-4 text-white" />
                             </div>
                             <div>
@@ -1439,7 +1442,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
                     {/* Desktop Header */}
                     <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                       <div className="flex items-center space-x-2">
-                        <div className="p-1.5 bg-indigo-600 rounded-lg">
+                        <div className="p-1.5 bg-purple-600 rounded-lg">
                           <UsersIcon className="h-4 w-4 text-white" />
                         </div>
                         <div>

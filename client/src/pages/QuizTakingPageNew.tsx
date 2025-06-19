@@ -25,7 +25,7 @@ const getLocalStorageKey = (quizId: string | undefined) => {
   return `${LOCAL_STORAGE_QUIZ_ANSWERS_PREFIX}${quizId}`;
 };
 
-const QuizTakingPage: React.FC = () => {
+const QuizTakingPageNew: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -404,4 +404,4 @@ const QuizTakingPage: React.FC = () => {
   );
 };
 
-export default QuizTakingPage;
+export default QuizTakingPageNew;

@@ -50,7 +50,7 @@ interface StaffQuizDisplayItem extends ClientIQuiz {
   progress?: ClientStaffQuizProgressWithAttempts | null;
 }
 
-const StaffDashboard: React.FC = () => {
+const StaffDashboardNew: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -282,4 +282,4 @@ const StaffDashboard: React.FC = () => {
   );
 };
 
-export default StaffDashboard;
+export default StaffDashboardNew;
