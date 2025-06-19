@@ -374,10 +374,28 @@ const QuizTakingPage: React.FC = () => {
           <ViewIncorrectAnswersModal
             isOpen={showIncorrectAnswersModal}
             onClose={() => setShowIncorrectAnswersModal(false)}
-            incorrectQuestions={submissionResult.questions.filter(
-              (q) => !q.isCorrect
-            )}
-            quizTitle={quizTitle}
+            attemptDetails={{
+              _id: submissionResult.attemptId,
+              quizId: quizId || "",
+              quizTitle: quizTitle,
+              staffUserId: user?._id || "",
+              score: submissionResult.score,
+              totalQuestions: submissionResult.totalQuestionsAttempted,
+              attemptDate: new Date().toISOString(),
+              incorrectQuestions: submissionResult.questions
+                .filter((q) => !q.isCorrect)
+                .map((q) => ({
+                  questionText: q.questionText || "Question",
+                  userAnswer: Array.isArray(q.answerGiven)
+                    ? q.answerGiven.join(", ")
+                    : q.answerGiven?.toString() || "No answer",
+                  correctAnswer:
+                    q.correctAnswer?.text ||
+                    q.correctAnswer?.texts?.join(", ") ||
+                    "Unknown",
+                  explanation: q.explanation,
+                })),
+            }}
           />
         )}
       </>
