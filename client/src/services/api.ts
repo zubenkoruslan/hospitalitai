@@ -1372,10 +1372,10 @@ export const addSopCategory = async (
   categoryData: NewSopCategoryData
 ): Promise<ISopDocument> => {
   const response = await api.post<{
-    message: string;
-    document: ISopDocument;
+    status: string;
+    data: ISopDocument;
   }>(`/sop-documents/${documentId}/categories`, categoryData);
-  return response.data.document;
+  return response.data.data;
 };
 
 /**
@@ -1389,10 +1389,10 @@ export const deleteSopCategory = async (
   categoryId: string
 ): Promise<ISopDocument> => {
   const response = await api.delete<{
-    message: string;
-    document: ISopDocument;
+    status: string;
+    data: ISopDocument;
   }>(`/sop-documents/${documentId}/categories/${categoryId}`);
-  return response.data.document;
+  return response.data.data;
 };
 
 /**
@@ -1416,11 +1416,11 @@ export const updateSopCategory = async (
   categoryId: string,
   categoryData: UpdateSopCategoryData
 ): Promise<ISopDocument> => {
-  const response = await api.patch<{
-    message: string;
-    document: ISopDocument;
+  const response = await api.put<{
+    status: string;
+    data: ISopDocument;
   }>(`/sop-documents/${documentId}/categories/${categoryId}`, categoryData);
-  return response.data.document;
+  return response.data.data;
 };
 
 /**
@@ -1433,11 +1433,11 @@ export const updateSopDocumentDescription = async (
   documentId: string,
   description: string
 ): Promise<ISopDocument> => {
-  const response = await api.patch<{
-    message: string;
-    document: ISopDocument;
-  }>(`/sop-documents/${documentId}`, { description });
-  return response.data.document;
+  const response = await api.put<{
+    status: string;
+    data: ISopDocument;
+  }>(`/sop-documents/${documentId}/description`, { description });
+  return response.data.data;
 };
 
 /**
@@ -1450,11 +1450,11 @@ export const updateSopDocumentTitle = async (
   documentId: string,
   title: string
 ): Promise<ISopDocument> => {
-  const response = await api.patch<{
-    message: string;
-    document: ISopDocument;
-  }>(`/sop-documents/${documentId}`, { title });
-  return response.data.document;
+  const response = await api.put<{
+    status: string;
+    data: ISopDocument;
+  }>(`/sop-documents/${documentId}/title`, { title });
+  return response.data.data;
 };
 
 // ADDED: Function to generate questions from selected SOP categories

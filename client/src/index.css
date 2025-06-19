@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply font-sans bg-background text-text;
+    @apply font-sans bg-background-primary text-text-primary;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

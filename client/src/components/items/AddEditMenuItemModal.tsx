@@ -306,10 +306,20 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         }
       } else if (!isEditMode) {
         // Reset for add mode
+        // Check if there's a pending category from localStorage
+        const pendingCategory = localStorage.getItem("pendingItemCategory");
+        const categoryToUse = pendingCategory || "";
+
+        // Clear the pending category after using it
+        if (pendingCategory) {
+          localStorage.removeItem("pendingItemCategory");
+        }
+
         setFormData({
           ...baseInitialFormData,
           menuId: menuId,
           itemType: itemType, // Use itemType from prop
+          category: categoryToUse, // Pre-populate with pending category
         });
         setServingOptionsArray([]);
         setIsBasicInfoExpanded(true);
@@ -510,41 +520,12 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
     onSubmit(dataToSubmit, currentItem?._id || null);
   };
 
-  const footer = (
-    <>
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={onClose}
-        disabled={isSubmitting}
-      >
-        Cancel
-      </Button>
-      <Button
-        type="submit"
-        variant="primary"
-        disabled={isSubmitting || !!formError}
-        className="ml-3"
-        form="add-edit-item-form"
-      >
-        {isSubmitting
-          ? isEditMode
-            ? "Saving..."
-            : "Adding..."
-          : isEditMode
-          ? "Save Changes"
-          : "Add Item"}
-      </Button>
-    </>
-  );
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? "Edit Menu Item" : "Add New Menu Item"}
-      size="2xl"
-      footerContent={footer}
+      size="xl"
     >
       {formError && <ErrorMessage message={formError} />}
       <form
@@ -1454,6 +1435,27 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
         </div>
       </form>
 
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-3 pt-6 border-t border-slate-200">
+        <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitting || !!formError}
+          form="add-edit-item-form"
+        >
+          {isSubmitting
+            ? isEditMode
+              ? "Saving..."
+              : "Adding..."
+            : isEditMode
+            ? "Save Changes"
+            : "Add Item"}
+        </Button>
+      </div>
+
       {/* Sub-Modal for Adding New Category */}
       {isNewCategoryInputModalOpen && (
         <Modal
@@ -1461,23 +1463,6 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
           onClose={() => setIsNewCategoryInputModalOpen(false)}
           title="Add New Category"
           size="sm" // Smaller modal for simple input
-          footerContent={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setIsNewCategoryInputModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSaveNewCategory}
-                className="ml-3"
-              >
-                Save Category
-              </Button>
-            </>
-          }
         >
           <div className="space-y-4">
             <div>
@@ -1497,6 +1482,17 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
                 required
                 className="mt-1 block w-full default-input-styles"
               />
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => setIsNewCategoryInputModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSaveNewCategory}>
+                Save Category
+              </Button>
             </div>
           </div>
         </Modal>

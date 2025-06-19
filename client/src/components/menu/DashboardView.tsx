@@ -239,7 +239,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   }, [items, dashboardStats]);
 
   const handleNavigateToType = (type: "food" | "beverage" | "wine") => {
-    onViewChange(`${type}-items` as MenuView);
+    // Map the item types to the correct MenuView names
+    const viewMap: Record<"food" | "beverage" | "wine", MenuView> = {
+      food: "food",
+      beverage: "beverages",
+      wine: "wines",
+    };
+    onViewChange(viewMap[type]);
   };
 
   const handleAddItemWithType = (itemType: "food" | "beverage" | "wine") => {

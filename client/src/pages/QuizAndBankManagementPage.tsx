@@ -39,6 +39,7 @@ import { ClientIQuiz, UpdateQuizClientData } from "../types/quizTypes";
 import { IQuestionBank } from "../types/questionBankTypes";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import Modal from "../components/common/Modal";
+import Typography from "../components/common/Typography";
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuizModal from "../components/quiz/EditQuizModal";
 import GenerateQuizFromBanksModal from "../components/quiz/GenerateQuizFromBanksModal";
@@ -941,8 +942,8 @@ const QuizAndBankManagementPage: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Enhanced Header with gradient background - Fixed z-index for mobile */}
-            <div className="sticky top-0 z-50 bg-gradient-to-br from-background via-slate-50 to-slate-100 pb-6">
+            {/* Enhanced Header with gradient background */}
+            <div className="bg-gradient-to-br from-background via-slate-50 to-slate-100">
               {/* Page Header */}
               <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
                 <div className="flex flex-col gap-4">

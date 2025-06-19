@@ -49,18 +49,39 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     }
   }, [isOpen, mode, initialData]);
 
+  // Helper function to clean up content by removing excessive duplication
+  const cleanContent = (content: string): string => {
+    if (!content || content.trim().length === 0) return content;
+
+    // Split by periods and remove consecutive duplicates
+    const sentences = content.split(".");
+    const cleanedSentences: string[] = [];
+
+    for (const sentence of sentences) {
+      const trimmedSentence = sentence.trim();
+      if (
+        trimmedSentence &&
+        trimmedSentence !== cleanedSentences[cleanedSentences.length - 1]
+      ) {
+        cleanedSentences.push(trimmedSentence);
+      }
+    }
+
+    return cleanedSentences.join(". ").trim();
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Category name is required.");
       return;
     }
-    // Content can be empty, so no validation needed for content itself unless rules change.
 
     setIsSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ name: name.trim(), content: content.trim() });
+      const cleanedContent = cleanContent(content.trim());
+      await onSubmit({ name: name.trim(), content: cleanedContent });
       // onClose(); // Caller should handle closing on successful submission
     } catch (submissionError: any) {
       console.error("Error submitting category form:", submissionError);
@@ -83,36 +104,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={getModalTitle()}
-      size="lg"
-      footerContent={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition ease-in-out duration-150 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit" // Will trigger form's onSubmit
-            form="category-form" // Link to the form element
-            disabled={isSubmitting || !name.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150 disabled:opacity-50 disabled:bg-indigo-400"
-          >
-            {isSubmitting
-              ? "Saving..."
-              : mode === "edit"
-              ? "Save Changes"
-              : "Add Category"}
-          </button>
-        </>
-      }
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size="lg">
       <form id="category-form" onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
@@ -157,6 +149,29 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             This content will be displayed under the category. You can use line
             breaks.
           </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !name.trim()}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-blue-400"
+          >
+            {isSubmitting
+              ? "Saving..."
+              : mode === "edit"
+              ? "Save Changes"
+              : "Add Category"}
+          </button>
         </div>
       </form>
     </Modal>

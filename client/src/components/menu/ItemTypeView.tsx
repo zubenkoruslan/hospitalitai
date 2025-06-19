@@ -6,7 +6,7 @@ import SmartSearchBar from "./SmartSearchBar";
 import SortDropdown, { SortOption } from "./SortDropdown";
 import BulkActionsBar from "../items/BulkActionsBar";
 import Button from "../common/Button";
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, FolderIcon, PlusIcon } from "@heroicons/react/24/outline";
 import {
   searchItems,
   sortItems,
@@ -96,6 +96,30 @@ const ItemTypeView: React.FC<ItemTypeViewProps> = ({
 
   // Keep legacy filteredItems for backward compatibility
   const filteredItems = processedItems;
+
+  // Group items by category
+  const itemsByCategory = useMemo(() => {
+    const grouped = filteredItems.reduce((acc, item) => {
+      const category = item.category || "Uncategorized";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(item);
+      return acc;
+    }, {} as Record<string, MenuItem[]>);
+
+    // Sort categories alphabetically, but put "Uncategorized" at the end
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+      if (a === "Uncategorized") return 1;
+      if (b === "Uncategorized") return -1;
+      return a.localeCompare(b);
+    });
+
+    return sortedCategories.map((category) => ({
+      category,
+      items: grouped[category],
+    }));
+  }, [filteredItems]);
 
   // Bulk operation handlers
   const handleToggleSelect = (itemId: string) => {
@@ -245,22 +269,60 @@ const ItemTypeView: React.FC<ItemTypeViewProps> = ({
         </div>
       )}
 
-      {/* Enhanced Items Grid with Expandable Cards */}
+      {/* Enhanced Items List Grouped by Category */}
       {filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map((item) => (
-            <MenuItemCard
-              key={item._id}
-              item={item}
-              isExpanded={expandedCards.has(item._id)}
-              onToggleExpansion={onToggleCardExpansion}
-              onEdit={onItemEdit}
-              onDelete={onItemDelete}
-              variant={isMobile ? "mobile" : "desktop"}
-              bulkMode={bulkMode}
-              isSelected={selectedItems.has(item._id)}
-              onToggleSelect={handleToggleSelect}
-            />
+        <div className="space-y-6">
+          {itemsByCategory.map(({ category, items }) => (
+            <div key={category} className="space-y-3">
+              {/* Category Header */}
+              <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <FolderIcon className="h-5 w-5 text-gray-500" />
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {category}
+                    </h3>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                    {items.length} {items.length === 1 ? "item" : "items"}
+                  </span>
+                </div>
+
+                {/* Category-specific add button */}
+                <button
+                  onClick={() => {
+                    // Set category context for new item
+                    localStorage.setItem(
+                      "pendingItemCategory",
+                      category !== "Uncategorized" ? category : ""
+                    );
+                    onAddItem();
+                  }}
+                  className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors border border-blue-200"
+                >
+                  <PlusIcon className="h-3 w-3" />
+                  Add to {category}
+                </button>
+              </div>
+
+              {/* Items in this category */}
+              <div className="space-y-2">
+                {items.map((item) => (
+                  <MenuItemCard
+                    key={item._id}
+                    item={item}
+                    isExpanded={expandedCards.has(item._id)}
+                    onToggleExpansion={onToggleCardExpansion}
+                    onEdit={onItemEdit}
+                    onDelete={onItemDelete}
+                    variant="mobile"
+                    bulkMode={bulkMode}
+                    isSelected={selectedItems.has(item._id)}
+                    onToggleSelect={handleToggleSelect}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       ) : (

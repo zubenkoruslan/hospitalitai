@@ -297,6 +297,20 @@ const SopDocumentDetailPage: React.FC = () => {
     openCategoryModal("edit", categoryToEdit);
   };
 
+  // New handler that can handle both categories and subcategories
+  const handleTriggerEdit = (
+    category: ISopCategory,
+    subCategory?: ISopCategory
+  ) => {
+    if (subCategory) {
+      // Editing a subcategory - pass the subcategory as the item to edit
+      openCategoryModal("edit", subCategory);
+    } else {
+      // Editing a top-level category
+      openCategoryModal("edit", category);
+    }
+  };
+
   const handleDeleteCategory = async (categoryToDelete: ISopCategory) => {
     if (!document || !categoryToDelete._id) return;
     const categoryId = categoryToDelete._id;
@@ -317,6 +331,54 @@ const SopDocumentDetailPage: React.FC = () => {
         console.error("Failed to delete category:", apiError);
         alert(
           `Error deleting category: ${apiError.message || "Please try again."}`
+        );
+      }
+    }
+  };
+
+  // New handler that can handle both categories and subcategories
+  const handleTriggerDelete = async (
+    category: ISopCategory,
+    subCategory?: ISopCategory
+  ) => {
+    const itemToDelete = subCategory || category;
+    const itemType = subCategory ? "subcategory" : "category";
+    const itemName = itemToDelete.name;
+
+    if (!document || !itemToDelete._id) return;
+
+    const confirmMessage = subCategory
+      ? `Are you sure you want to delete subcategory "${itemName}"?`
+      : `Are you sure you want to delete category "${itemName}" and all its subcategories?`;
+
+    if (window.confirm(confirmMessage)) {
+      if (
+        isCategoryModalOpen &&
+        currentCategoryForModal?._id === itemToDelete._id
+      ) {
+        closeCategoryModal();
+      }
+      console.log(`Attempting to delete ${itemType}:`, itemToDelete._id);
+      try {
+        const updatedDoc = await deleteSopCategory(
+          document._id,
+          itemToDelete._id
+        );
+        setDocument(updatedDoc);
+
+        // Clear selection if we deleted the currently selected item
+        if (subCategory && selectedSubCategoryId === itemToDelete._id) {
+          setSelectedSubCategoryId(null);
+        } else if (!subCategory && selectedCategoryId === itemToDelete._id) {
+          setSelectedCategoryId(null);
+          setSelectedSubCategoryId(null);
+        }
+      } catch (apiError: any) {
+        console.error(`Failed to delete ${itemType}:`, apiError);
+        alert(
+          `Error deleting ${itemType}: ${
+            apiError.message || "Please try again."
+          }`
         );
       }
     }
@@ -452,40 +514,30 @@ const SopDocumentDetailPage: React.FC = () => {
     const displayItem = isSubCategory ? subCategory : category;
 
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-white rounded-lg border border-gray-200">
         {/* Header */}
-        <div className="p-6 border-b border-slate-200">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
-                <div
-                  className={`p-2 rounded-xl shadow-md ${
-                    isSubCategory
-                      ? "bg-gradient-to-br from-accent to-accent-600"
-                      : "bg-gradient-to-br from-primary to-primary-600"
-                  }`}
-                >
+                <div className="p-2 bg-gray-100 rounded-lg">
                   {isSubCategory ? (
-                    <DocumentTextIcon className="h-5 w-5 text-white" />
+                    <DocumentTextIcon className="h-5 w-5 text-gray-600" />
                   ) : (
-                    <FolderIcon className="h-5 w-5 text-white" />
+                    <FolderIcon className="h-5 w-5 text-gray-600" />
                   )}
                 </div>
                 <div>
-                  <h2 className="text-xl font-medium text-dark-slate">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     {displayItem.name}
                   </h2>
                   {isSubCategory && (
-                    <p className="text-sm text-muted-gray">
-                      in {category.name}
-                    </p>
+                    <p className="text-sm text-gray-500">in {category.name}</p>
                   )}
                 </div>
               </div>
               {displayItem.description && (
-                <p className="text-muted-gray font-light leading-relaxed">
-                  {displayItem.description}
-                </p>
+                <p className="text-gray-600">{displayItem.description}</p>
               )}
             </div>
 
@@ -494,19 +546,19 @@ const SopDocumentDetailPage: React.FC = () => {
                 onClick={() =>
                   onEdit(category, isSubCategory ? subCategory : undefined)
                 }
-                className="flex items-center text-sm font-medium text-secondary hover:text-secondary-700 bg-secondary-50 hover:bg-secondary-100 px-3 py-2 rounded-2xl transition-all duration-200 border border-secondary-200 shadow-sm hover:shadow-md"
+                className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
               >
-                <PencilIcon className="h-4 w-4 mr-1" />
+                <PencilIcon className="h-3 w-3 mr-1" />
                 Edit
               </button>
 
               {!isSubCategory && (
                 <button
                   onClick={() => onAddSubCategory(category)}
-                  className="flex items-center text-sm font-medium text-accent hover:text-accent-700 bg-accent-50 hover:bg-accent-100 px-3 py-2 rounded-2xl transition-all duration-200 border border-accent-200 shadow-sm hover:shadow-md"
+                  className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
                 >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Subcategory
+                  <PlusIcon className="h-3 w-3 mr-1" />
+                  Add Sub
                 </button>
               )}
 
@@ -514,9 +566,9 @@ const SopDocumentDetailPage: React.FC = () => {
                 onClick={() =>
                   onDelete(category, isSubCategory ? subCategory : undefined)
                 }
-                className="flex items-center text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-2xl transition-all duration-200 border border-red-200 shadow-sm hover:shadow-md"
+                className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100"
               >
-                <TrashIcon className="h-4 w-4 mr-1" />
+                <TrashIcon className="h-3 w-3 mr-1" />
                 Delete
               </button>
             </div>
@@ -524,11 +576,11 @@ const SopDocumentDetailPage: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4">
           {displayItem.content ? (
-            <div className="prose prose-slate max-w-none">
+            <div className="prose prose-gray max-w-none">
               <div
-                className="text-dark-slate leading-relaxed"
+                className="text-gray-700"
                 dangerouslySetInnerHTML={{
                   __html: searchTerm
                     ? displayItem.content.replace(
@@ -540,14 +592,12 @@ const SopDocumentDetailPage: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="text-center py-12">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-slate-100 mb-4">
-                <DocumentTextIcon className="h-6 w-6 text-muted-gray" />
+            <div className="text-center py-8">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 mb-3">
+                <DocumentTextIcon className="h-6 w-6 text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium text-dark-slate mb-2">
-                No content yet
-              </h3>
-              <p className="text-muted-gray mb-4">
+              <h3 className="font-medium text-gray-900 mb-2">No content yet</h3>
+              <p className="text-gray-500 mb-4 text-sm">
                 This {isSubCategory ? "subcategory" : "category"} doesn't have
                 any content yet.
               </p>
@@ -555,9 +605,9 @@ const SopDocumentDetailPage: React.FC = () => {
                 onClick={() =>
                   onEdit(category, isSubCategory ? subCategory : undefined)
                 }
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-primary to-primary-600 text-white text-sm font-medium rounded-2xl hover:from-primary-600 hover:to-primary-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
               >
-                <PencilIcon className="h-4 w-4 mr-2" />
+                <PencilIcon className="h-4 w-4 mr-1" />
                 Add Content
               </button>
             </div>
@@ -568,11 +618,9 @@ const SopDocumentDetailPage: React.FC = () => {
         {!isSubCategory &&
           category.subCategories &&
           category.subCategories.length > 0 && (
-            <div className="border-t border-slate-200 p-6">
-              <h3 className="text-lg font-medium text-dark-slate mb-4">
-                Subcategories
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
+            <div className="border-t border-gray-200 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Subcategories</h3>
+              <div className="grid md:grid-cols-2 gap-3">
                 {category.subCategories.map((subcat: any, subIndex: number) => {
                   const subcatKey =
                     subcat._id || `subcat-${category._id}-${subIndex}`;
@@ -582,18 +630,18 @@ const SopDocumentDetailPage: React.FC = () => {
                       onClick={() =>
                         handleCategorySelect(selectedCategoryId!, subcatKey)
                       }
-                      className="text-left p-4 rounded-xl border border-slate-200 hover:border-accent-200 hover:bg-accent-50 transition-all duration-200"
+                      className="text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50"
                     >
-                      <div className="flex items-start space-x-3">
-                        <div className="p-2 bg-accent-100 rounded-lg">
-                          <DocumentTextIcon className="h-4 w-4 text-accent-600" />
+                      <div className="flex items-start space-x-2">
+                        <div className="p-1.5 bg-blue-100 rounded">
+                          <DocumentTextIcon className="h-3 w-3 text-blue-600" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-medium text-dark-slate text-sm">
+                          <h4 className="font-medium text-gray-900 text-sm">
                             {subcat.name}
                           </h4>
                           {subcat.description && (
-                            <p className="text-xs text-muted-gray mt-1 line-clamp-2">
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                               {subcat.description}
                             </p>
                           )}
@@ -686,16 +734,14 @@ const SopDocumentDetailPage: React.FC = () => {
         <div className="p-6 sm:p-8">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Header Section - Matching HomePage style */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-white via-primary-50 to-accent-50 rounded-3xl p-8 sm:p-12 border border-primary/20 shadow-xl backdrop-blur-sm">
-                {/* Background decoration */}
-                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full blur-3xl"></div>
-
-                <div className="relative">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+              {/* Enhanced Header with gradient background */}
+              <div className="bg-gradient-to-br from-background via-slate-50 to-slate-100">
+                {/* Page Header */}
+                <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+                  <div className="flex flex-col gap-4">
                     <div className="flex-1">
                       {/* Breadcrumb */}
-                      <div className="flex items-center space-x-3 mb-6">
+                      <div className="flex items-center space-x-3 mb-4">
                         <button
                           onClick={() => navigate("/sop-management")}
                           className="flex items-center text-muted-gray hover:text-dark-slate transition-colors duration-200 text-sm font-medium"
@@ -709,21 +755,23 @@ const SopDocumentDetailPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Title and Description */}
-                      <div className="mb-8">
-                        <h1 className="text-4xl sm:text-5xl font-light text-dark-slate mb-4 tracking-tight leading-tight">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                          <DocumentTextIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                           {document.title}
                         </h1>
-                        {document.description && (
-                          <p className="text-xl text-muted-gray font-light leading-relaxed max-w-3xl">
-                            {document.description}
-                          </p>
-                        )}
                       </div>
+                      {document.description && (
+                        <p className="text-muted-gray text-sm mb-3">
+                          {document.description}
+                        </p>
+                      )}
                     </div>
 
-                    {/* Action Button */}
-                    <div className="flex-shrink-0">
+                    {/* Action Buttons - Stack on mobile */}
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         onClick={() => {
                           if (isEditingTitle || isEditingDescription) {
@@ -735,87 +783,99 @@ const SopDocumentDetailPage: React.FC = () => {
                             setIsEditingTitle(true);
                           }
                         }}
-                        className="bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-2xl font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center gap-2"
+                        className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
                       >
-                        <PencilIcon className="h-4 w-4" />
-                        Edit Details
+                        <PencilIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                        <span className="hidden sm:inline">Edit Details</span>
+                        <span className="sm:hidden">Edit</span>
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status and Statistics Cards - Matching HomePage style */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-muted-gray text-sm font-medium">
-                          Status
-                        </p>
-                        <p className="text-lg font-bold text-dark-slate capitalize">
-                          {document.status.replace("_", " ")}
-                        </p>
-                      </div>
-                      {document.status === "processed" ? (
-                        <CheckCircleIcon className="h-8 w-8 text-primary" />
-                      ) : document.status === "processing_error" ? (
-                        <ExclamationTriangleIcon className="h-8 w-8 text-secondary" />
-                      ) : document.status === "archived" ? (
-                        <ArchiveBoxIcon className="h-8 w-8 text-muted-gray" />
-                      ) : (
-                        <ClockIcon className="h-8 w-8 text-accent" />
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-muted-gray text-sm font-medium">
-                          Categories
-                        </p>
-                        <p className="text-lg font-bold text-dark-slate">
-                          {document.categories?.length || 0}
-                        </p>
-                      </div>
-                      <ListBulletIcon className="h-8 w-8 text-primary" />
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-muted-gray text-sm font-medium">
-                          File Type
-                        </p>
-                        <p className="text-lg font-bold text-dark-slate">
-                          {(document.fileType || "PDF").toUpperCase()}
-                        </p>
-                      </div>
-                      <DocumentTextIcon className="h-8 w-8 text-accent" />
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-muted-gray text-sm font-medium">
-                          Uploaded
-                        </p>
-                        <p className="text-lg font-bold text-dark-slate">
-                          {document.uploadedAt
-                            ? format(new Date(document.uploadedAt), "MMM yyyy")
-                            : "N/A"}
-                        </p>
-                      </div>
-                      <ClockIcon className="h-8 w-8 text-secondary" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Main Content - Matching HomePage style */}
-              <div className="bg-white shadow-xl rounded-3xl overflow-hidden border border-slate-200">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+                <div className="bg-white rounded-lg border border-slate-200 p-3 lg:p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      {document.status === "processed" ? (
+                        <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                      ) : document.status === "processing_error" ? (
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                      ) : document.status === "archived" ? (
+                        <ArchiveBoxIcon className="h-5 w-5 text-gray-600" />
+                      ) : (
+                        <ClockIcon className="h-5 w-5 text-blue-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-500 truncate">
+                        Status
+                      </p>
+                      <p className="text-xl font-semibold text-gray-900 capitalize">
+                        {document.status.replace("_", " ")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg border border-slate-200 p-3 lg:p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <ListBulletIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-500 truncate">
+                        Categories
+                      </p>
+                      <p className="text-xl font-semibold text-gray-900">
+                        {document.categories?.length || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg border border-slate-200 p-3 lg:p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <DocumentTextIcon className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-500 truncate">
+                        File Type
+                      </p>
+                      <p className="text-xl font-semibold text-gray-900">
+                        {(document.fileType || "PDF").toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg border border-slate-200 p-3 lg:p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <ClockIcon className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-500 truncate">
+                        Uploaded
+                      </p>
+                      <p className="text-xl font-semibold text-gray-900">
+                        {document.uploadedAt
+                          ? format(new Date(document.uploadedAt), "MMM yyyy")
+                          : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="bg-white rounded-lg border border-slate-200">
                 {/* Edit Forms Section */}
                 {(isEditingTitle || isEditingDescription) && (
-                  <div className="p-6 md:p-8 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+                  <div className="p-6 border-b border-slate-200">
                     {isEditingTitle && (
                       <div className="mb-6">
                         <label className="block text-sm font-medium text-dark-slate mb-3">
@@ -830,7 +890,7 @@ const SopDocumentDetailPage: React.FC = () => {
                             e.key === "Enter" && handleSaveTitle()
                           }
                           autoFocus
-                          className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-primary text-lg font-medium transition-all duration-200"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Enter document title..."
                         />
                         <p className="text-xs text-muted-gray mt-2">
@@ -855,7 +915,7 @@ const SopDocumentDetailPage: React.FC = () => {
                           }
                           autoFocus
                           rows={4}
-                          className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-primary resize-none transition-all duration-200"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                           placeholder="Enter document description..."
                         />
                         <p className="text-xs text-muted-gray mt-2">
@@ -868,14 +928,14 @@ const SopDocumentDetailPage: React.FC = () => {
 
                 {document.errorMessage &&
                   document.status === "processing_error" && (
-                    <div className="m-6 md:m-8 p-6 bg-gradient-to-r from-secondary-50 to-secondary-100 border border-secondary-200 rounded-2xl">
+                    <div className="m-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                       <div className="flex items-start space-x-3">
-                        <ExclamationTriangleIcon className="h-6 w-6 text-secondary flex-shrink-0 mt-0.5" />
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                         <div>
-                          <h3 className="text-lg font-semibold text-secondary mb-2">
+                          <h3 className="text-sm font-semibold text-red-800 mb-1">
                             Processing Error
                           </h3>
-                          <p className="text-secondary-700">
+                          <p className="text-red-700 text-sm">
                             {document.errorMessage}
                           </p>
                         </div>
@@ -883,21 +943,20 @@ const SopDocumentDetailPage: React.FC = () => {
                     </div>
                   )}
 
-                {/* Enhanced Content Display Section - Matching HomePage style */}
-                <div className="p-6 md:p-8">
+                {/* Content Display Section */}
+                <div className="p-6">
                   {/* Header with Search and Actions */}
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-primary to-primary-600 rounded-2xl shadow-lg">
-                        <BookOpenIcon className="h-6 w-6 text-white" />
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <BookOpenIcon className="h-5 w-5 text-gray-600" />
                       </div>
                       <div>
-                        <h2 className="text-3xl font-light text-dark-slate tracking-tight">
+                        <h2 className="text-xl font-semibold text-gray-900">
                           Document Content
                         </h2>
-                        <p className="text-muted-gray mt-1 font-light">
-                          {document.categories?.length || 0} categories found •
-                          AI-extracted and organized content
+                        <p className="text-gray-500 text-sm">
+                          {document.categories?.length || 0} categories found
                         </p>
                       </div>
                     </div>
@@ -906,22 +965,22 @@ const SopDocumentDetailPage: React.FC = () => {
                       {document.categories &&
                         document.categories.length > 0 && (
                           <>
-                            {/* Enhanced Search */}
+                            {/* Search */}
                             <div className="relative">
-                              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-gray" />
+                              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                               <input
                                 type="text"
-                                placeholder="Search categories and content..."
+                                placeholder="Search categories..."
                                 value={contentSearchTerm}
                                 onChange={(e) =>
                                   handleSearchChange(e.target.value)
                                 }
-                                className="pl-9 pr-10 py-2 text-sm border border-slate-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-primary w-80 transition-all duration-200"
+                                className="pl-9 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-64"
                               />
                               {contentSearchTerm && (
                                 <button
                                   onClick={clearSearch}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-gray hover:text-dark-slate transition-colors"
+                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 hover:text-gray-600"
                                   title="Clear search"
                                 >
                                   <XMarkIcon className="h-4 w-4" />
@@ -929,10 +988,10 @@ const SopDocumentDetailPage: React.FC = () => {
                               )}
                             </div>
                             {contentSearchTerm && (
-                              <div className="text-xs text-muted-gray bg-slate-50 px-3 py-1 rounded-lg border">
+                              <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border">
                                 {searchResults.categories.length +
                                   searchResults.subcategories.length}{" "}
-                                matches found
+                                matches
                               </div>
                             )}
                           </>
@@ -940,25 +999,25 @@ const SopDocumentDetailPage: React.FC = () => {
 
                       <button
                         onClick={handleAddTopLevelCategory}
-                        className="flex items-center text-sm font-medium text-primary hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-4 py-2 rounded-2xl transition-all duration-200 border border-primary-200 shadow-sm hover:shadow-md"
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                       >
-                        <PlusIcon className="h-4 w-4 mr-2" />
+                        <PlusIcon className="h-4 w-4 mr-1" />
                         Add Category
                       </button>
                     </div>
                   </div>
 
                   {document.categories && document.categories.length > 0 ? (
-                    <div className="grid lg:grid-cols-3 gap-8">
-                      {/* Table of Contents - Always Visible */}
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      {/* Table of Contents */}
                       <div className="lg:col-span-1">
-                        <div className="bg-gradient-to-r from-slate-50 to-white rounded-2xl p-6 border border-slate-200 shadow-sm sticky top-8">
-                          <div className="flex items-center space-x-3 mb-6">
-                            <div className="p-2 bg-gradient-to-br from-accent to-accent-600 rounded-xl shadow-md">
-                              <ListBulletIcon className="h-5 w-5 text-white" />
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center space-x-2 mb-4">
+                            <div className="p-1.5 bg-gray-200 rounded-lg">
+                              <ListBulletIcon className="h-4 w-4 text-gray-600" />
                             </div>
-                            <h3 className="text-lg font-medium text-dark-slate">
-                              Table of Contents
+                            <h3 className="font-medium text-gray-900">
+                              Contents
                             </h3>
                           </div>
 
@@ -1007,12 +1066,12 @@ const SopDocumentDetailPage: React.FC = () => {
                               return (
                                 <div key={categoryKey} className="space-y-1">
                                   <div
-                                    className={`rounded-xl border transition-all duration-200 ${
+                                    className={`rounded-md border ${
                                       isSearchHighlighted
-                                        ? "bg-yellow-50 border-yellow-200 shadow-sm"
+                                        ? "bg-yellow-50 border-yellow-200"
                                         : isSelected
-                                        ? "bg-primary-50 border-primary-200"
-                                        : "bg-white border-slate-200 hover:border-slate-300"
+                                        ? "bg-blue-50 border-blue-200"
+                                        : "bg-white border-gray-200 hover:border-gray-300"
                                     }`}
                                   >
                                     <div className="flex items-center">
@@ -1022,7 +1081,7 @@ const SopDocumentDetailPage: React.FC = () => {
                                           onClick={() =>
                                             toggleCategoryExpansion(categoryKey)
                                           }
-                                          className="p-2 text-muted-gray hover:text-dark-slate transition-colors"
+                                          className="p-2 text-gray-400 hover:text-gray-600"
                                           title={
                                             isExpanded ? "Collapse" : "Expand"
                                           }
@@ -1040,19 +1099,19 @@ const SopDocumentDetailPage: React.FC = () => {
                                         onClick={() =>
                                           handleCategorySelect(categoryKey)
                                         }
-                                        className={`flex-1 text-left p-3 ${
-                                          !hasSubcategories ? "pl-3" : "pl-1"
-                                        } transition-all duration-200 ${
+                                        className={`flex-1 text-left p-2 ${
+                                          !hasSubcategories ? "pl-2" : "pl-1"
+                                        } ${
                                           isSelected
-                                            ? "text-primary-700 font-medium"
-                                            : "text-dark-slate hover:text-primary"
+                                            ? "text-blue-700 font-medium"
+                                            : "text-gray-700 hover:text-blue-600"
                                         }`}
                                       >
                                         <div className="font-medium text-sm">
                                           {category.name}
                                         </div>
                                         {hasSubcategories && (
-                                          <div className="text-xs text-muted-gray mt-1">
+                                          <div className="text-xs text-gray-500 mt-1">
                                             {category.subCategories?.length}{" "}
                                             subcategories
                                           </div>
@@ -1092,12 +1151,12 @@ const SopDocumentDetailPage: React.FC = () => {
                                                   subcatKey
                                                 )
                                               }
-                                              className={`w-full text-left p-2 rounded-lg text-xs transition-colors border ${
+                                              className={`w-full text-left p-2 rounded text-xs border ${
                                                 isSubSearchHighlighted
                                                   ? "bg-yellow-50 border-yellow-200 text-yellow-800 font-medium"
                                                   : isSubSelected
-                                                  ? "bg-accent-50 border-accent-200 text-accent-700 font-medium"
-                                                  : "border-transparent text-muted-gray hover:text-dark-slate hover:bg-slate-50"
+                                                  ? "bg-blue-50 border-blue-200 text-blue-700 font-medium"
+                                                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                                               }`}
                                             >
                                               • {subcat.name}
@@ -1125,35 +1184,35 @@ const SopDocumentDetailPage: React.FC = () => {
                               }
                             }
                             searchTerm={contentSearchTerm}
-                            onEdit={handleTriggerEditCategory}
-                            onDelete={handleDeleteCategory}
+                            onEdit={handleTriggerEdit}
+                            onDelete={handleTriggerDelete}
                             onAddSubCategory={handleTriggerAddSubCategory}
                           />
                         ) : (
-                          <div className="bg-white rounded-2xl p-12 border border-slate-200 shadow-sm text-center">
-                            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-primary-50 to-accent-50 mb-6 border border-primary-200">
-                              <BookOpenIcon className="h-8 w-8 text-primary" />
+                          <div className="bg-white rounded-lg p-8 border border-gray-200 text-center">
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 mb-4">
+                              <BookOpenIcon className="h-6 w-6 text-gray-400" />
                             </div>
-                            <h3 className="text-xl font-light text-dark-slate mb-3 tracking-tight">
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
                               Select a category to view content
                             </h3>
-                            <p className="text-muted-gray font-light leading-relaxed">
-                              Choose a category or subcategory from the table of
-                              contents to display its content here.
+                            <p className="text-gray-500 text-sm">
+                              Choose a category or subcategory from the contents
+                              to display its information here.
                             </p>
                           </div>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-20 px-8">
-                      <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-primary-50 to-accent-50 mb-8 border border-primary-200">
-                        <BookOpenIcon className="h-12 w-12 text-primary" />
+                    <div className="text-center py-12 px-6">
+                      <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-6">
+                        <BookOpenIcon className="h-8 w-8 text-gray-400" />
                       </div>
-                      <h3 className="text-2xl font-light text-dark-slate mb-4 tracking-tight">
+                      <h3 className="text-xl font-medium text-gray-900 mb-3">
                         No content extracted yet
                       </h3>
-                      <p className="text-muted-gray mb-8 max-w-md mx-auto font-light leading-relaxed">
+                      <p className="text-gray-500 mb-6 max-w-md mx-auto">
                         {document.status === "processed"
                           ? "This document has been processed but no structured content was found. You can manually add categories to organize the content."
                           : "This document is being processed. Once complete, the extracted content and categories will appear here."}
@@ -1161,8 +1220,8 @@ const SopDocumentDetailPage: React.FC = () => {
                       {(document.status === "pending_upload" ||
                         document.status === "pending_processing" ||
                         document.status === "processing") && (
-                        <div className="flex items-center justify-center space-x-3 text-primary mb-8">
-                          <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+                        <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
+                          <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                           <span className="text-sm font-medium">
                             Processing in progress...
                           </span>
@@ -1170,9 +1229,9 @@ const SopDocumentDetailPage: React.FC = () => {
                       )}
                       <button
                         onClick={handleAddTopLevelCategory}
-                        className="inline-flex items-center bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-2xl font-medium transition-all duration-200 ease-out transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
                       >
-                        <PlusIcon className="h-4 w-4 mr-2" />
+                        <PlusIcon className="h-4 w-4 mr-1" />
                         Add First Category
                       </button>
                     </div>
@@ -1183,10 +1242,10 @@ const SopDocumentDetailPage: React.FC = () => {
                   document.status === "pending_processing" ||
                   document.status === "processing") &&
                   document.categories.length === 0 && (
-                    <div className="p-6 md:p-8 mt-0 border-t border-slate-200">
-                      <div className="p-6 bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200 rounded-2xl flex items-center shadow-sm">
-                        <div className="animate-spin h-5 w-5 mr-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                        <span className="text-primary-700 font-medium">
+                    <div className="p-6 border-t border-gray-200">
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
+                        <div className="animate-spin h-4 w-4 mr-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                        <span className="text-blue-700 text-sm font-medium">
                           This document is currently being processed. Categories
                           will appear once complete.
                         </span>

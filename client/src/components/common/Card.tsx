@@ -1,4 +1,10 @@
 import React from "react";
+import {
+  colorTokens,
+  spacing,
+  typography,
+  borderRadius,
+} from "../../design-system";
 
 interface CardProps {
   children: React.ReactNode;
@@ -16,6 +22,7 @@ interface CardProps {
   hover?: boolean; // Enable hover effects
   clickable?: boolean; // Make card appear clickable
   onClick?: () => void; // Click handler for clickable cards
+  testId?: string;
 }
 
 const Card: React.FC<CardProps> = ({
@@ -28,63 +35,81 @@ const Card: React.FC<CardProps> = ({
   hover = false,
   clickable = false,
   onClick,
+  testId,
 }) => {
-  // Base classes for all cards
-  const baseClasses =
-    "rounded-2xl transition-all duration-300 ease-out backdrop-blur-sm";
+  // Base classes optimized for design system
+  const baseClasses = `
+    ${borderRadius["2xl"]} transition-all duration-300 ease-out
+    backdrop-blur-sm focus:outline-none
+  `;
 
-  // Variant-based styling with brand colors
+  // Variant-based styling using design tokens
   const variantClasses = {
-    default:
-      "bg-white/80 border border-slate-200/50 shadow-lg hover:shadow-xl hover:shadow-slate-200/20",
-    elevated:
-      "bg-white shadow-xl hover:shadow-2xl border border-slate-100/50 hover:border-slate-200/50",
-    outlined:
-      "bg-white/60 border-2 border-slate-300/50 hover:border-primary/30 shadow-md hover:shadow-lg",
-    gradient:
-      "bg-gradient-to-br from-white via-slate-50/50 to-white border border-slate-200/50 shadow-lg hover:shadow-xl",
-    primary:
-      "bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 shadow-lg hover:shadow-primary/10 hover:shadow-xl",
-    accent:
-      "bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 shadow-lg hover:shadow-accent/10 hover:shadow-xl",
+    default: `
+      bg-background-tertiary border border-border-primary
+      hover:shadow-lg hover:border-border-secondary
+      shadow-md
+    `,
+    elevated: `
+      bg-background-tertiary shadow-lg hover:shadow-xl
+      border border-border-primary/50 hover:border-border-secondary/50
+    `,
+    outlined: `
+      bg-background-tertiary/60 border-2 border-border-primary
+      hover:border-primary-300 shadow-sm hover:shadow-md
+    `,
+    gradient: `
+      bg-gradient-to-br from-background-tertiary via-background-secondary/50 to-background-tertiary
+      border border-border-primary/50 shadow-md hover:shadow-lg
+    `,
+    primary: `
+      bg-gradient-to-br from-primary-50 to-primary-100
+      border border-primary-200 shadow-md hover:shadow-lg hover:shadow-primary-500/10
+    `,
+    accent: `
+      bg-gradient-to-br from-accent-50 to-accent-100
+      border border-accent-200 shadow-md hover:shadow-lg hover:shadow-accent-500/10
+    `,
   };
 
-  // Size-based padding
+  // Size-based padding (20% smaller)
   const sizeClasses = {
-    sm: "p-4",
-    md: "p-6",
-    lg: "p-8",
+    sm: `p-3`, // Using spacing[3] = 0.6rem
+    md: `p-4`, // Using spacing[4] = 0.8rem
+    lg: `p-6`, // Using spacing[6] = 1.2rem
   };
 
   // Hover effect classes
   const hoverClasses = hover
-    ? "transform hover:scale-[1.02] hover:-translate-y-2 hover:shadow-2xl"
+    ? "transform hover:scale-[1.02] hover:-translate-y-1 hover:shadow-xl"
     : "";
 
   // Clickable classes
   const clickableClasses = clickable
-    ? "cursor-pointer group hover:shadow-2xl transform hover:scale-[1.01] hover:-translate-y-1 active:scale-[0.99] transition-all duration-200"
+    ? `cursor-pointer group hover:shadow-xl transform hover:scale-[1.01] 
+       hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200
+       focus-ring`
     : "";
 
-  // Title styling based on variant and size
+  // Title styling based on variant and size (20% smaller)
   const getTitleClasses = (variant: string, size: string) => {
-    const baseTitleClasses = "font-semibold mb-4 tracking-tight";
+    const baseTitleClasses = "font-semibold mb-3 tracking-tight";
 
     const sizeMap = {
-      sm: "text-base",
-      md: "text-lg",
-      lg: "text-xl",
+      sm: typography.fontSize.sm[0], // 0.7rem
+      md: typography.fontSize.base[0], // 0.8rem
+      lg: typography.fontSize.lg[0], // 0.9rem
     };
 
     const colorMap = {
-      default: "text-dark-slate",
-      elevated: "text-dark-slate",
-      outlined: "text-dark-slate",
-      gradient: "text-dark-slate",
+      default: "text-text-primary",
+      elevated: "text-text-primary",
+      outlined: "text-text-primary",
+      gradient: "text-text-primary",
       primary:
-        "bg-gradient-to-r from-primary to-primary-600 bg-clip-text text-transparent",
+        "bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent",
       accent:
-        "bg-gradient-to-r from-accent to-accent-600 bg-clip-text text-transparent",
+        "bg-gradient-to-r from-accent-600 to-accent-700 bg-clip-text text-transparent",
     };
 
     return `${baseTitleClasses} ${sizeMap[size as keyof typeof sizeMap]} ${
@@ -108,7 +133,7 @@ const Card: React.FC<CardProps> = ({
 
   return (
     <CardComponent
-      data-testid={dataTestId}
+      data-testid={dataTestId || testId}
       className={cardClasses}
       onClick={clickable ? onClick : undefined}
       type={clickable ? "button" : undefined}
@@ -128,21 +153,21 @@ const Card: React.FC<CardProps> = ({
       {title && (
         <div className="mb-0">
           <h3 className={getTitleClasses(variant, size)}>{title}</h3>
-          {/* Elegant divider with gradient */}
-          <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent mb-4"></div>
+          {/* Elegant divider with design system colors */}
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-border-secondary to-transparent mb-3"></div>
         </div>
       )}
 
       <div className="relative">{children}</div>
 
-      {/* Enhanced focus ring for accessibility */}
+      {/* Enhanced focus ring for accessibility using design tokens */}
       {clickable && (
-        <div className="absolute inset-0 rounded-2xl ring-2 ring-primary/50 ring-opacity-0 focus-within:ring-opacity-100 transition-all duration-300 pointer-events-none" />
+        <div className="absolute inset-0 rounded-2xl ring-2 ring-primary-500/50 ring-opacity-0 focus-within:ring-opacity-100 transition-all duration-300 pointer-events-none" />
       )}
 
       {/* Subtle shine effect on hover for clickable cards */}
       {clickable && (
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-background-tertiary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       )}
     </CardComponent>
   );

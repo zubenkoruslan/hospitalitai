@@ -1,4 +1,10 @@
 import React from "react";
+import {
+  colorTokens,
+  spacing,
+  touchTargets,
+  typography,
+} from "../../design-system";
 
 type ButtonVariant =
   | "primary"
@@ -24,6 +30,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   icon?: React.ReactNode;
   iconPosition?: "left" | "right";
+  testId?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -38,43 +45,57 @@ const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
   icon,
   iconPosition = "left",
+  testId,
   ...props
 }) => {
-  // Base styles for all buttons with modern Apple-inspired design
+  // Base styles optimized for design system
   const baseStyles =
-    "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98] backdrop-blur-sm";
+    "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 ease-out focus:outline-none focus-ring disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.96] touch-target";
 
-  // Size-based styles
+  // Size-based styles (20% smaller than standard)
   const sizeStyles = {
-    sm: "px-3 py-2 text-xs gap-1.5 min-h-[32px]",
-    md: "px-4 py-2.5 text-sm gap-2 min-h-[40px]",
-    lg: "px-6 py-3 text-base gap-2.5 min-h-[48px]",
+    sm: `px-3 py-1.5 ${typography.fontSize.xs[0]} gap-1.5 min-h-[${touchTargets.minimum}]`,
+    md: `px-4 py-2 ${typography.fontSize.sm[0]} gap-2 min-h-[${touchTargets.comfortable}]`,
+    lg: `px-6 py-2.5 ${typography.fontSize.base[0]} gap-2.5 min-h-[${touchTargets.large}]`,
   };
 
-  // Variant-specific styles with brand colors
+  // Variant-specific styles using design tokens
   const variantStyles = {
-    primary:
-      "bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-lg hover:shadow-xl hover:shadow-primary/25 focus:ring-primary/50 border border-primary/20",
-    secondary:
-      "bg-gradient-to-r from-muted-gray to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white shadow-lg hover:shadow-xl hover:shadow-slate/25 focus:ring-slate-500/50 border border-slate/20",
-    accent:
-      "bg-gradient-to-r from-accent to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white shadow-lg hover:shadow-xl hover:shadow-accent/25 focus:ring-accent/50 border border-accent/20",
-    success:
-      "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl hover:shadow-green/25 focus:ring-green-500/50 border border-green/20",
-    destructive:
-      "bg-gradient-to-r from-secondary to-secondary-600 hover:from-secondary-600 hover:to-secondary-700 text-white shadow-lg hover:shadow-xl hover:shadow-secondary/25 focus:ring-secondary/50 border border-secondary/20",
-    white:
-      "bg-white/90 hover:bg-white text-dark-slate shadow-lg hover:shadow-xl border border-slate-200/50 hover:border-slate-300/50 focus:ring-primary/50",
-    ghost:
-      "bg-transparent hover:bg-slate-100/50 text-muted-gray hover:text-dark-slate focus:ring-primary/50 border border-transparent hover:border-slate-200/50",
-    gradient:
-      "bg-gradient-to-r from-primary via-accent to-secondary hover:from-primary-600 hover:via-accent-600 hover:to-secondary-600 text-white shadow-lg hover:shadow-xl focus:ring-primary/50 border border-white/20",
+    primary: `bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-text-inverse 
+              shadow-md hover:shadow-lg hover:shadow-primary-500/25 
+              border border-primary-500 hover:border-primary-600`,
+
+    secondary: `bg-text-secondary hover:bg-text-primary text-text-inverse 
+                shadow-md hover:shadow-lg hover:shadow-gray-500/25 
+                border border-text-secondary hover:border-text-primary`,
+
+    accent: `bg-accent-500 hover:bg-accent-600 active:bg-accent-700 text-text-inverse 
+             shadow-md hover:shadow-lg hover:shadow-accent-500/25 
+             border border-accent-500 hover:border-accent-600`,
+
+    success: `bg-success-500 hover:bg-success-600 active:bg-success-700 text-text-inverse 
+              shadow-md hover:shadow-lg hover:shadow-success-500/25 
+              border border-success-500 hover:border-success-600`,
+
+    destructive: `bg-error-500 hover:bg-error-600 active:bg-error-700 text-text-inverse 
+                  shadow-md hover:shadow-lg hover:shadow-error-500/25 
+                  border border-error-500 hover:border-error-600`,
+
+    white: `bg-background-tertiary hover:bg-background-secondary text-text-primary 
+            shadow-md hover:shadow-lg border border-border-primary hover:border-border-secondary`,
+
+    ghost: `bg-transparent hover:bg-background-secondary text-text-secondary hover:text-text-primary 
+            border border-transparent hover:border-border-primary`,
+
+    gradient: `bg-gradient-to-r from-primary-500 via-accent-500 to-secondary-500 
+               hover:from-primary-600 hover:via-accent-600 hover:to-secondary-600 
+               text-text-inverse shadow-md hover:shadow-lg border border-white/20`,
   };
 
   // Full width style
   const widthStyle = fullWidth ? "w-full" : "";
 
-  // Hover transform styles
+  // Hover transform styles (optimized for design system)
   const transformStyles = "hover:scale-[1.02] hover:-translate-y-0.5";
 
   // Loading spinner color based on variant
@@ -82,9 +103,9 @@ const Button: React.FC<ButtonProps> = ({
     switch (variant) {
       case "white":
       case "ghost":
-        return "text-dark-slate";
+        return "text-text-primary";
       default:
-        return "text-white";
+        return "text-text-inverse";
     }
   };
 
@@ -112,6 +133,7 @@ const Button: React.FC<ButtonProps> = ({
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <circle
               className="opacity-25"
@@ -136,11 +158,15 @@ const Button: React.FC<ButtonProps> = ({
       return (
         <>
           {iconPosition === "left" && (
-            <span className="flex-shrink-0">{icon}</span>
+            <span className="flex-shrink-0" aria-hidden="true">
+              {icon}
+            </span>
           )}
           {children}
           {iconPosition === "right" && (
-            <span className="flex-shrink-0">{icon}</span>
+            <span className="flex-shrink-0" aria-hidden="true">
+              {icon}
+            </span>
           )}
         </>
       );
@@ -155,6 +181,9 @@ const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled || isLoading}
       className={combinedClassName}
+      data-testid={testId}
+      aria-busy={isLoading}
+      aria-disabled={disabled || isLoading}
       {...props}
     >
       {buttonContent()}

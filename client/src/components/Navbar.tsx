@@ -235,7 +235,7 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav
       ref={navRef}
-      className={`bg-gradient-to-b from-background to-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
+      className={`bg-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
         isExpanded ? "w-64" : "w-16"
       }`}
       role="navigation"

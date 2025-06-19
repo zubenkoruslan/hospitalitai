@@ -406,7 +406,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   };
 
   const handleCardClick = () => {
-    if (isMobile && onToggleExpansion) {
+    if (onToggleExpansion) {
       onToggleExpansion(item._id);
     }
   };
@@ -451,7 +451,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     }
 
     return (
-      <span className="text-lg font-bold text-gray-900">
+      <span className="text-base font-bold text-gray-900">
         ${price.toFixed(2)}
       </span>
     );
@@ -465,7 +465,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
 
     return (
       <span
-        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color} ${categoryConfig.borderColor} border`}
+        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color} ${categoryConfig.borderColor} border`}
       >
         {item.category}
       </span>
@@ -559,7 +559,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
               </span>
               <div className="flex flex-wrap gap-1">
                 {item.ingredients
-                  .slice(0, isMobile && !isExpanded ? 3 : undefined)
+                  .slice(0, !isExpanded ? 3 : undefined)
                   .map((ingredient, index) => (
                     <span
                       key={index}
@@ -568,7 +568,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                       {ingredient}
                     </span>
                   ))}
-                {isMobile && !isExpanded && item.ingredients.length > 3 && (
+                {!isExpanded && item.ingredients.length > 3 && (
                   <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-200 text-gray-600 font-medium">
                     +{item.ingredients.length - 3} more
                   </span>
@@ -755,17 +755,17 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   };
 
   const renderActionButtons = () => {
-    const showActions = (!isMobile || isExpanded) && !bulkMode;
+    const showActions = isExpanded && !bulkMode;
     if (!showActions) return null;
 
     return (
-      <div className="flex gap-2 pt-4 border-t border-gray-200 mt-auto">
+      <div className="flex gap-2 pt-4 mt-4">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onEdit(item);
           }}
-          className="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+          className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-150 flex items-center gap-2 font-medium"
         >
           <PencilIcon className="h-4 w-4" />
           Edit
@@ -775,7 +775,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
             e.stopPropagation();
             onDelete(item);
           }}
-          className="px-3 py-2 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors flex items-center gap-1"
+          className="px-4 py-2 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors duration-150 flex items-center gap-2 font-medium"
         >
           <TrashIcon className="h-4 w-4" />
           Delete
@@ -784,20 +784,18 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     );
   };
 
-  const shouldShowExpandedContent = !isMobile || isExpanded;
+  const shouldShowExpandedContent = isExpanded;
 
   return (
     <motion.div
-      layout
       variants={cardAnimations}
       initial="initial"
       animate="animate"
       exit="exit"
-      whileHover={isMobile ? "hover" : undefined}
-      whileTap={isMobile ? "tap" : undefined}
-      className={`bg-white rounded-xl border border-gray-200 flex flex-col h-full transition-all ${
-        isMobile ? "cursor-pointer" : ""
-      } ${isExpanded ? "shadow-md" : ""} ${
+      whileTap="tap"
+      className={`bg-white rounded-lg border border-gray-200 transition-all duration-150 cursor-pointer hover:shadow-sm hover:border-gray-300 ${
+        isExpanded ? "shadow-md border-blue-200 bg-blue-50/30" : "shadow-sm"
+      } ${
         bulkMode && isSelected
           ? "ring-2 ring-blue-500 border-blue-300 shadow-md"
           : ""
@@ -811,95 +809,101 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
           : handleCardClick
       }
     >
-      <div className="p-4 flex flex-col flex-grow">
-        {/* Bulk Selection Checkbox */}
-        {bulkMode && onToggleSelect && (
-          <div className="flex items-center mb-3">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
-                e.stopPropagation();
-                onToggleSelect(item._id);
-              }}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <span className="text-sm text-gray-600">
-              {isSelected ? "Selected" : "Select"}
-            </span>
-          </div>
-        )}
+      <div className="p-4">
+        {/* Collapsed View - Horizontal Layout */}
+        <div className="flex items-center justify-between">
+          {/* Left Section - Icon, Name, Category */}
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
+            {/* Bulk Selection Checkbox */}
+            {bulkMode && onToggleSelect && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect(item._id);
+                }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
 
-        {/* Header Section - Consistent across all card types */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start space-x-3 flex-1 min-w-0">
             {/* Item Type Icon */}
             <div className={`p-2 rounded-lg ${bgColor} flex-shrink-0`}>
-              <ItemIcon className={`h-5 w-5 ${color}`} />
+              <ItemIcon className={`h-4 w-4 ${color}`} />
             </div>
 
             {/* Item Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-900 text-lg leading-tight mb-1">
-                {item.name}
-              </h3>
-              <div className="flex items-center gap-2">
-                {renderCategoryBadge()}
+              <div className="flex items-center space-x-2 mb-1">
+                <h3 className="font-semibold text-gray-900 text-base leading-tight truncate">
+                  {item.name}
+                </h3>
               </div>
-            </div>
-          </div>
-
-          {/* Price Section - Right aligned */}
-          <div className="flex-shrink-0 ml-4 text-right">{renderPrice()}</div>
-
-          {/* Mobile Expand/Collapse Icon */}
-          {isMobile && onToggleExpansion && (
-            <div className="flex-shrink-0 ml-2">
-              {isExpanded ? (
-                <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-              ) : (
-                <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+              {!isExpanded && item.description && (
+                <p className="text-gray-600 text-sm line-clamp-1">
+                  {item.description}
+                </p>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Right Section - Price and Expand Icon */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
+            {/* Price */}
+            <div className="text-right">{renderPrice()}</div>
+
+            {/* Expand/Collapse Icon */}
+            {onToggleExpansion && (
+              <div className="flex-shrink-0">
+                {isExpanded ? (
+                  <ChevronDownIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors duration-150" />
+                ) : (
+                  <ChevronRightIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors duration-150" />
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Description Section */}
-        {item.description && (
-          <div className="mb-4">
-            <p
-              className={`text-gray-600 text-sm leading-relaxed ${
-                isMobile && !isExpanded ? "line-clamp-2" : ""
-              }`}
-            >
-              {item.description}
-            </p>
-          </div>
-        )}
-
-        {/* Dietary Badges - Always visible for quick reference (not shown for wine items) */}
-        {item.itemType !== "wine" && renderDietaryBadges() && (
-          <div className="mb-4">
-            <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
-              Dietary:
-            </div>
-            {renderDietaryBadges()}
-          </div>
-        )}
-
         {/* Expanded Content */}
-        {shouldShowExpandedContent && (
-          <div className="flex-grow flex flex-col">
-            <div className="flex-grow">
-              {/* Enhanced Details Section - Type-specific content */}
-              {renderEnhancedDetails()}
-            </div>
+        <AnimatePresence>
+          {shouldShowExpandedContent && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                {/* Full Description */}
+                {item.description && (
+                  <div className="mb-4">
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                )}
 
-            {/* Action Buttons - Always at bottom */}
-            {renderActionButtons()}
-          </div>
-        )}
+                {/* Dietary Badges - Compact horizontal layout */}
+                {item.itemType !== "wine" && renderDietaryBadges() && (
+                  <div className="mb-4">
+                    <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
+                      Dietary:
+                    </div>
+                    {renderDietaryBadges()}
+                  </div>
+                )}
+
+                {/* Enhanced Details Section - Type-specific content */}
+                {renderEnhancedDetails()}
+
+                {/* Action Buttons - Horizontal layout */}
+                {renderActionButtons()}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

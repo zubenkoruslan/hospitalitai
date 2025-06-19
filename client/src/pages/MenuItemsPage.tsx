@@ -17,6 +17,7 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button"; // Import Button
+import Typography from "../components/common/Typography";
 import {
   TrashIcon,
   PlusIcon,
@@ -254,6 +255,36 @@ const MenuItemsPage: React.FC = () => {
       beverageCount: beverageItems.length,
       wineCount: wineItems.length,
     };
+  }, [items]);
+
+  // Calculate menu health percentage
+  const menuHealthPercentage = useMemo(() => {
+    const totalItems = items?.length || 0;
+    if (totalItems === 0) {
+      return 100; // Perfect health for empty menus
+    }
+
+    const itemsWithoutDescriptions =
+      items?.filter(
+        (item) => !item.description || item.description.trim() === ""
+      ).length || 0;
+    const itemsWithoutPrices =
+      items?.filter((item) => !item.price || item.price <= 0).length || 0;
+
+    const descriptionCompleteness = Math.round(
+      ((totalItems - itemsWithoutDescriptions) / totalItems) * 100
+    );
+    const priceCompleteness = Math.round(
+      ((totalItems - itemsWithoutPrices) / totalItems) * 100
+    );
+    const categoryCompleteness = 100; // Assuming all items have categories
+
+    // Calculate overall health score
+    const overallHealth = Math.round(
+      (descriptionCompleteness + priceCompleteness + categoryCompleteness) / 3
+    );
+
+    return overallHealth;
   }, [items]);
 
   // New: Memoize unique food, beverage, and wine categories separately
@@ -1982,10 +2013,52 @@ const MenuItemsPage: React.FC = () => {
                       </div>
                     </div>
                     {menuDetails.description && (
-                      <p className="text-muted-gray text-sm mb-3">
+                      <p className="text-muted-gray text-sm mb-1">
                         {menuDetails.description}
                       </p>
                     )}
+                    <div className="flex items-center space-x-4 mt-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-muted-gray">
+                          Menu Health:
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-300 ${
+                                menuHealthPercentage >= 90
+                                  ? "bg-green-500"
+                                  : menuHealthPercentage >= 70
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                              }`}
+                              style={{
+                                width: `${Math.min(
+                                  menuHealthPercentage,
+                                  100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <span
+                            className={`text-sm font-semibold ${
+                              menuHealthPercentage >= 90
+                                ? "text-green-600"
+                                : menuHealthPercentage >= 70
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {menuHealthPercentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-gray">•</div>
+                      <div className="text-sm text-muted-gray">
+                        {stats.totalItems}{" "}
+                        {stats.totalItems === 1 ? "item" : "items"}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Action Buttons */}
@@ -2029,7 +2102,7 @@ const MenuItemsPage: React.FC = () => {
               )}
 
               {/* NEW: Tab Navigation */}
-              <div className="sticky top-0 z-50 bg-gray-50 pb-6">
+              <div className="sticky top-0 z-30 bg-gray-50 pb-6">
                 <MenuNavigationTabs
                   currentView={currentView}
                   onViewChange={handleViewChange}

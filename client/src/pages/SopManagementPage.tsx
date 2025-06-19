@@ -210,87 +210,120 @@ const SopManagementPage: React.FC = () => {
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Header Section */}
-              <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white border border-slate-700 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                      <DocumentTextIcon className="h-8 w-8 text-white" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-bold text-white">
-                        SOP & Policy Management
-                      </h1>
-                      <p className="text-slate-300 mt-2 font-medium">
-                        Upload and manage your standard operating procedures
+              {/* Enhanced Header with gradient background */}
+              <div className="bg-gradient-to-br from-background via-slate-50 to-slate-100">
+                {/* Page Header */}
+                <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                          <DocumentTextIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                          SOP & Policy Management
+                        </h1>
+                      </div>
+                      <p className="text-muted-gray text-sm mb-3">
+                        Upload and manage your standard operating procedures for
+                        staff training and compliance.
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Button
-                      variant="primary"
-                      onClick={() => setIsUploadModalOpen(true)}
-                      disabled={isUploading}
-                      className="shadow-lg"
-                    >
-                      <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                      Upload Document
-                    </Button>
+
+                    {/* Action Buttons - Stack on mobile */}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => setIsUploadModalOpen(true)}
+                        disabled={isUploading}
+                        className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        <ArrowUpTrayIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                        <span className="hidden sm:inline">
+                          Upload Document
+                        </span>
+                        <span className="sm:hidden">Upload</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
+              {/* Enhanced Stats Cards with animations */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  {/* Gradient overlay on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-3">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ListBulletIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Total Documents
                         </p>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {stats.totalDocuments}
                         </p>
                       </div>
-                      <ListBulletIcon className="h-8 w-8 text-blue-400" />
                     </div>
                   </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
+                </div>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <CheckCircleIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Processed
                         </p>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {stats.processedDocuments}
                         </p>
                       </div>
-                      <CheckCircleIcon className="h-8 w-8 text-green-400" />
                     </div>
                   </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
+                </div>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50 to-amber-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ClockIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Processing
                         </p>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {stats.processingDocuments}
                         </p>
                       </div>
-                      <ClockIcon className="h-8 w-8 text-amber-400" />
                     </div>
                   </div>
-                  <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-4 border border-slate-600 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-300 text-sm font-medium">
+                </div>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-red-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ExclamationTriangleIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Errors
                         </p>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {stats.errorDocuments}
                         </p>
                       </div>
-                      <ExclamationTriangleIcon className="h-8 w-8 text-red-400" />
                     </div>
                   </div>
                 </div>

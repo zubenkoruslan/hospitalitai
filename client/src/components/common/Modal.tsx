@@ -1,189 +1,211 @@
-import React, { ReactNode, useEffect, useRef, memo } from "react";
+import React, { useEffect, useRef } from "react";
+import {
+  colorTokens,
+  spacing,
+  typography,
+  borderRadius,
+} from "../../design-system";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: ReactNode;
-  children: ReactNode;
-  footerContent?: ReactNode;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl"; // Add more sizes as needed
+  children: React.ReactNode;
+  title?: string;
+  size?: "sm" | "md" | "lg" | "xl" | "full";
+  variant?: "default" | "primary" | "accent" | "destructive";
+  showCloseButton?: boolean;
+  closeOnOverlayClick?: boolean;
+  closeOnEscape?: boolean;
+  testId?: string;
+  className?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
-  title,
   children,
-  footerContent,
-  size = "md", // Default size
+  title,
+  size = "md",
+  variant = "default",
+  showCloseButton = true,
+  closeOnOverlayClick = true,
+  closeOnEscape = true,
+  testId,
+  className = "",
 }) => {
-  const modalRef = useRef<HTMLDivElement>(null); // Ref for the modal content
-  const prevIsOpenRef = useRef<boolean>(); // Ref to track previous isOpen state
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Handle Escape key press for closing the modal
+  // Size-based styles (20% smaller)
+  const sizeClasses = {
+    sm: "max-w-sm", // ~20% smaller than standard
+    md: "max-w-md", // ~20% smaller than standard
+    lg: "max-w-lg", // ~20% smaller than standard
+    xl: "max-w-2xl", // ~20% smaller than standard
+    full: "max-w-[95vw] max-h-[95vh]",
+  };
+
+  // Variant-based styling using design tokens
+  const variantClasses = {
+    default: `
+      bg-background-tertiary border border-border-primary
+      shadow-xl
+    `,
+    primary: `
+      bg-gradient-to-br from-primary-50 to-primary-100
+      border border-primary-200 shadow-xl
+    `,
+    accent: `
+      bg-gradient-to-br from-accent-50 to-accent-100
+      border border-accent-200 shadow-xl
+    `,
+    destructive: `
+      bg-gradient-to-br from-error-50 to-error-100
+      border border-error-200 shadow-xl
+    `,
+  };
+
+  // Title styling based on variant (20% smaller)
+  const getTitleClasses = (variant: string) => {
+    const baseTitleClasses = `font-semibold ${typography.fontSize.lg[0]} mb-3 tracking-tight`;
+
+    const colorMap = {
+      default: "text-text-primary",
+      primary: "text-primary-700",
+      accent: "text-accent-700",
+      destructive: "text-error-700",
+    };
+
+    return `${baseTitleClasses} ${colorMap[variant as keyof typeof colorMap]}`;
+  };
+
+  // Close button styling based on variant
+  const getCloseButtonClasses = (variant: string) => {
+    const baseClasses = `
+      absolute top-3 right-3 p-1.5 rounded-lg transition-all duration-200
+      hover:scale-110 active:scale-95 focus:outline-none focus-ring
+    `;
+
+    const colorMap = {
+      default:
+        "text-text-secondary hover:text-text-primary hover:bg-background-secondary",
+      primary: "text-primary-600 hover:text-primary-700 hover:bg-primary-100",
+      accent: "text-accent-600 hover:text-accent-700 hover:bg-accent-100",
+      destructive: "text-error-600 hover:text-error-700 hover:bg-error-100",
+    };
+
+    return `${baseClasses} ${colorMap[variant as keyof typeof colorMap]}`;
+  };
+
+  // Modal content classes
+  const modalClasses = `
+    ${borderRadius["2xl"]} p-5 w-full mx-4 my-8 relative
+    transform transition-all duration-300 ease-out
+    ${sizeClasses[size]}
+    ${variantClasses[variant]}
+    ${className}
+  `
+    .trim()
+    .replace(/\s+/g, " ");
+
+  // Handle escape key
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (closeOnEscape && event.key === "Escape") {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      // Only focus if the modal just opened
-      if (!prevIsOpenRef.current && modalRef.current) {
-        modalRef.current.focus();
-      }
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
     }
+  }, [isOpen, closeOnEscape, onClose]);
 
-    // Update previous isOpen state *after* checking it
-    prevIsOpenRef.current = isOpen;
+  // Focus management
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement;
+      modalRef.current?.focus();
+    } else if (previousActiveElement.current) {
+      previousActiveElement.current.focus();
+    }
+  }, [isOpen]);
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "unset";
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const sizeClasses = {
-    sm: "max-w-sm",
-    md: "max-w-lg",
-    lg: "max-w-xl",
-    xl: "max-w-3xl",
-    "2xl": "max-w-5xl",
-  };
-
-  // Stop propagation prevents closing modal when clicking inside the modal content
-  const handleContentClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Stop propagation for keys that might trigger overlay actions if they bubble
-    // e.g., if overlay has onKeyDown for Enter/Space to close.
-    // This ensures that pressing Enter/Space inside the modal content area
-    // doesn't inadvertently close the modal if those keys are also handled by the overlay.
-    if (e.key === "Enter" || e.key === " ") {
-      e.stopPropagation();
-    }
-    // Add other specific key stopPropagation if needed, e.g. Escape, Tab (though Tab is usually for focus)
-  };
-
-  const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      onClose();
-    }
-  };
-
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-fade-in-short"
-      onClick={onClose} // Close on overlay click
-      onKeyDown={handleOverlayKeyDown} // Handle Enter/Space for overlay
-      role="button" // Overlay acts as a clickable area to close
-      tabIndex={0} // Make overlay focusable for keydown
-      aria-label="Close modal" // Accessible name for the overlay acting as a close button
+      className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
+      data-testid={testId}
     >
-      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
+      {/* Overlay */}
       <div
-        ref={modalRef} // Assign ref
-        role="dialog" // The actual dialog content
+        className="absolute inset-0 bg-text-primary/60 backdrop-blur-sm"
+        onClick={closeOnOverlayClick ? onClose : undefined}
+        aria-hidden="true"
+      />
+
+      {/* Modal */}
+      <div
+        ref={modalRef}
+        className={modalClasses}
+        role="dialog"
         aria-modal="true"
-        aria-labelledby={
-          typeof title === "string" && title ? "modal-title" : undefined
-        }
-        tabIndex={-1} // Make the modal content focusable for programmatic focus
-        className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast`}
-        onClick={handleContentClick} // Prevent closing when clicking modal content
-        onKeyDown={handleContentKeyDown} // Added to satisfy click-events-have-key-events
+        aria-labelledby={title ? "modal-title" : undefined}
+        tabIndex={-1}
+        style={{ animation: "slide-up 0.3s ease-out forwards" }}
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b border-slate-200">
-          {title ? (
-            typeof title === "string" ? (
-              <h2
-                id="modal-title"
-                className="text-xl font-semibold text-slate-700"
-              >
+        {(title || showCloseButton) && (
+          <div className="flex items-start justify-between mb-4">
+            {title && (
+              <h2 id="modal-title" className={getTitleClasses(variant)}>
                 {title}
               </h2>
-            ) : (
-              <div className="text-xl font-semibold text-slate-700">
-                {title}
-              </div>
-            )
-          ) : (
-            <div /> // Empty div to keep space for close button
-          )}
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full p-1.5 transition-colors duration-150 ease-in-out"
-            aria-label="Close modal"
-          >
-            <svg
-              className="h-6 w-6"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+            )}
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto flex-1 text-slate-600">
-          {children}
-        </div>
-
-        {/* Footer */}
-        {footerContent && (
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-3">
-            {footerContent}
+            {showCloseButton && (
+              <button
+                onClick={onClose}
+                className={getCloseButtonClasses(variant)}
+                aria-label="Close modal"
+                type="button"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         )}
+
+        {/* Content */}
+        <div className="relative max-h-[70vh] overflow-y-auto">{children}</div>
       </div>
-      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
     </div>
   );
 };
 
-export default memo(Modal);
-
-// Add animation styles if not already globally defined
-// Consider moving these to a global CSS file if used elsewhere
-// For now, keeping it here for simplicity if Modal is the primary user of these animations
-const modalStyles = `
-  @keyframes fadeInShort {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  .animate-fade-in-short {
-    animation: fadeInShort 0.2s ease-out forwards;
-  }
-  @keyframes slideUpFast {
-    from { opacity: 0.8; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-slide-up-fast {
-    animation: slideUpFast 0.2s ease-out forwards;
-  }
-`;
-
-// Inject styles into the head - This is a common pattern for component-specific global styles
-// but might be better handled by your global CSS setup or a CSS-in-JS solution.
-// For now, keeping it here for simplicity if Modal is the primary user of these animations
-if (typeof window !== "undefined") {
-  const styleSheet = document.createElement("style");
-  styleSheet.type = "text/css";
-  styleSheet.innerText = modalStyles;
-  document.head.appendChild(styleSheet);
-}
+export default Modal;

@@ -36,6 +36,7 @@ import {
   ExclamationTriangleIcon,
   HomeIcon,
   InformationCircleIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
 // Enhanced interfaces for comprehensive analytics
@@ -637,6 +638,17 @@ const RestaurantStaffResultsPage: React.FC = () => {
   const [showDistributionChart, setShowDistributionChart] =
     useState<boolean>(true);
 
+  // Mobile expandable sections state
+  const [expandedMobileSections, setExpandedMobileSections] = useState({
+    topPerformers: false,
+    staffNeedingSupport: false,
+    scoreDistribution: false,
+    staffPerformance: false,
+    categoryChampions: false,
+    questionDistribution: false,
+    completionTimes: false,
+  });
+
   // KPI State (moved from StaffManagement.tsx)
   const [totalStaff, setTotalStaff] = useState<number | null>(null);
   const [avgQuizScore, setAvgQuizScore] = useState<number | null>(null);
@@ -663,6 +675,17 @@ const RestaurantStaffResultsPage: React.FC = () => {
     setFilters({ name: "", role: "" });
     setSelectedPerformanceCategory(null); // Also reset category filter
   }, []);
+
+  // Toggle mobile section expansion
+  const toggleMobileSection = useCallback(
+    (section: keyof typeof expandedMobileSections) => {
+      setExpandedMobileSections((prev) => ({
+        ...prev,
+        [section]: !prev[section],
+      }));
+    },
+    []
+  );
 
   // Apply filters and sorting to staff data
   const filteredAndSortedStaff = useMemo(() => {
@@ -783,79 +806,74 @@ const RestaurantStaffResultsPage: React.FC = () => {
   }, [staffData, calculateAndSetKPIs]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-8">
-              {/* Enhanced Header with Analytics Overview */}
-              <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 rounded-2xl p-8 text-white shadow-xl">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold mb-2 text-white">
-                      Comprehensive Staff Analytics
-                    </h1>
-                    <p className="text-slate-200 mb-4">
-                      Track staff performance, leaderboards, knowledge
-                      analytics, and training progress
-                    </p>
-                    <div className="flex items-center gap-6 text-sm text-slate-300">
-                      {analytics && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                              <UserGroupIcon className="h-4 w-4 text-blue-300" />
-                            </div>
-                            <span>
-                              {analytics.participationMetrics.activeStaff} of{" "}
-                              {analytics.participationMetrics.totalStaff} staff
-                              active
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-green-500/20 rounded-lg">
-                              <ClockIcon className="h-4 w-4 text-green-300" />
-                            </div>
-                            <span>
-                              Avg completion:{" "}
-                              {formatCompletionTimeDetailed(
-                                analytics.completionTimeStats
-                                  .averageCompletionTime
-                              )}
-                            </span>
-                          </div>
-                        </>
-                      )}
+              {/* Enhanced Header matching RestaurantDashboard */}
+              <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+                <div className="flex flex-col gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                        <PresentationChartLineIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        Comprehensive Staff Analytics
+                      </h1>
                     </div>
+                    <p className="text-muted-gray text-sm mb-3">
+                      Track staff performance, leaderboards, knowledge
+                      analytics, and training progress across your restaurant.
+                    </p>
+
+                    {/* Stats Preview */}
+                    {analytics && (
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 bg-blue-100 rounded">
+                            <UserGroupIcon className="h-3 w-3 text-blue-600" />
+                          </div>
+                          <span>
+                            {analytics.participationMetrics.activeStaff} of{" "}
+                            {analytics.participationMetrics.totalStaff} staff
+                            active
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 bg-green-100 rounded">
+                            <ClockIcon className="h-3 w-3 text-green-600" />
+                          </div>
+                          <span>
+                            Avg completion:{" "}
+                            {formatCompletionTimeDetailed(
+                              analytics.completionTimeStats
+                                .averageCompletionTime
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-4">
+
+                  {/* Time Period Selector */}
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-slate-300">
+                      <span className="text-sm font-medium text-slate-600">
                         Time Period:
                       </span>
                       <select
                         value={selectedTimePeriod}
                         onChange={(e) => setSelectedTimePeriod(e.target.value)}
-                        className="bg-slate-600/50 border border-slate-500/50 rounded-xl px-4 py-2.5 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 hover:bg-slate-600/70"
-                        style={{ color: "white" }}
+                        className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 hover:border-slate-400"
                       >
-                        <option value="7d" style={{ color: "black" }}>
-                          Last 7 days
-                        </option>
-                        <option value="30d" style={{ color: "black" }}>
-                          Last 30 days
-                        </option>
-                        <option value="90d" style={{ color: "black" }}>
-                          Last 90 days
-                        </option>
-                        <option value="all" style={{ color: "black" }}>
-                          All Time
-                        </option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="90d">Last 90 days</option>
+                        <option value="all">All Time</option>
                       </select>
-                    </div>
-                    <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border border-white/10">
-                      <PresentationChartLineIcon className="h-8 w-8 text-blue-300" />
                     </div>
                   </div>
                 </div>
@@ -863,108 +881,133 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
               {/* Loading and Error States */}
               {loading && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12">
+                <div className="bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-6 lg:p-8 border border-primary/10 shadow-md backdrop-blur-sm">
                   <div className="text-center">
-                    <LoadingSpinner message="Loading staff results and leaderboards..." />
+                    <LoadingSpinner message="Loading comprehensive staff analytics..." />
                   </div>
                 </div>
               )}
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-6 shadow-sm">
                   <ErrorMessage message={error} />
                 </div>
               )}
 
               {!loading && !error && (
                 <>
-                  {/* Enhanced Key Metrics */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 rounded-xl">
-                          <UsersIcon className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            Total Staff
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {analytics?.totalStaff || totalStaff || 0}
-                          </p>
+                  {/* Enhanced Key Metrics with animations - matching RestaurantDashboard */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-5 mb-8">
+                    {/* Total Staff Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 lg:space-x-4">
+                          <div className="p-2 lg:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <UsersIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                              Total Staff
+                            </p>
+                            <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                              {analytics?.totalStaff || totalStaff || 0}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-green-100 rounded-xl">
-                          <AcademicCapIcon className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            Questions Answered
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {analytics?.totalQuestionsAnswered || 0}
-                          </p>
+                    {/* Questions Answered Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 lg:space-x-4">
+                          <div className="p-2 lg:p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <AcademicCapIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                              Questions Answered
+                            </p>
+                            <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                              {analytics?.totalQuestionsAnswered || 0}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 rounded-xl">
-                          <TrophyIcon className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            Overall Average Score
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {analytics?.overallAverageScore?.toFixed(1) ||
-                              avgQuizScore?.toFixed(1) ||
-                              0}
-                            %
-                          </p>
+                    {/* Overall Average Score Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 lg:space-x-4">
+                          <div className="p-2 lg:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <TrophyIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                              Avg. Score
+                            </p>
+                            <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                              {analytics?.overallAverageScore?.toFixed(1) ||
+                                avgQuizScore?.toFixed(1) ||
+                                0}
+                              %
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-indigo-100 rounded-xl">
-                          <ChartPieIcon className="h-6 w-6 text-indigo-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            Participation Rate
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {analytics
-                              ? Math.round(
-                                  analytics.participationMetrics
-                                    .participationRate
-                                )
-                              : 0}
-                            %
-                          </p>
+                    {/* Participation Rate Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-indigo-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 lg:space-x-4">
+                          <div className="p-2 lg:p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <ChartPieIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                              Participation
+                            </p>
+                            <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                              {analytics
+                                ? Math.round(
+                                    analytics.participationMetrics
+                                      .participationRate
+                                  )
+                                : 0}
+                              %
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-orange-100 rounded-xl">
-                          <ExclamationTriangleIcon className="h-6 w-6 text-orange-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            Need Support
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {analytics?.staffNeedingSupport?.length || 0}
-                          </p>
+                    {/* Need Support Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 lg:space-x-4">
+                          <div className="p-2 lg:p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                            <ExclamationTriangleIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                              Need Support
+                            </p>
+                            <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                              {analytics?.staffNeedingSupport?.length || 0}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -974,14 +1017,56 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   {analytics && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Top Performers from Analytics */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-green-50 px-6 py-4 border-b border-green-200">
-                          <h3 className="text-lg font-semibold text-green-900 flex items-center gap-2">
-                            <TrophyIcon className="h-5 w-5" />
-                            Top Performers
-                          </h3>
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                        {/* Mobile Header with Toggle */}
+                        <div
+                          className="lg:hidden cursor-pointer"
+                          onClick={() => toggleMobileSection("topPerformers")}
+                        >
+                          <div className="bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 border-b border-green-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-green-600 rounded-lg">
+                                  <TrophyIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-green-900">
+                                  Top Performers
+                                </h3>
+                                <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded-full">
+                                  {analytics.topPerformers.length}
+                                </span>
+                              </div>
+                              <ChevronRightIcon
+                                className={`h-5 w-5 text-green-600 transform transition-transform duration-200 ${
+                                  expandedMobileSections.topPerformers
+                                    ? "rotate-90"
+                                    : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-6">
+
+                        {/* Desktop Header */}
+                        <div className="hidden lg:block bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 border-b border-green-200">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-green-600 rounded-lg">
+                              <TrophyIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-green-900">
+                              Top Performers
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Content - Expandable on mobile, always visible on desktop */}
+                        <div
+                          className={`${
+                            expandedMobileSections.topPerformers
+                              ? "block"
+                              : "hidden"
+                          } lg:block p-6`}
+                        >
                           {analytics.topPerformers.length > 0 ? (
                             <div className="space-y-4">
                               {analytics.topPerformers.map(
@@ -1051,14 +1136,58 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       </div>
 
                       {/* Staff Needing Support */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-orange-50 px-6 py-4 border-b border-orange-200">
-                          <h3 className="text-lg font-semibold text-orange-900 flex items-center gap-2">
-                            <ExclamationTriangleIcon className="h-5 w-5" />
-                            Staff Needing Support
-                          </h3>
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                        {/* Mobile Header with Toggle */}
+                        <div
+                          className="lg:hidden cursor-pointer"
+                          onClick={() =>
+                            toggleMobileSection("staffNeedingSupport")
+                          }
+                        >
+                          <div className="bg-gradient-to-r from-orange-50 to-orange-100 px-6 py-4 border-b border-orange-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-orange-600 rounded-lg">
+                                  <ExclamationTriangleIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-orange-900">
+                                  Staff Needing Support
+                                </h3>
+                                <span className="px-2 py-1 bg-orange-200 text-orange-800 text-xs font-medium rounded-full">
+                                  {analytics.staffNeedingSupport.length}
+                                </span>
+                              </div>
+                              <ChevronRightIcon
+                                className={`h-5 w-5 text-orange-600 transform transition-transform duration-200 ${
+                                  expandedMobileSections.staffNeedingSupport
+                                    ? "rotate-90"
+                                    : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-6">
+
+                        {/* Desktop Header */}
+                        <div className="hidden lg:block bg-gradient-to-r from-orange-50 to-orange-100 px-6 py-4 border-b border-orange-200">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-orange-600 rounded-lg">
+                              <ExclamationTriangleIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-orange-900">
+                              Staff Needing Support
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Content - Expandable on mobile, always visible on desktop */}
+                        <div
+                          className={`${
+                            expandedMobileSections.staffNeedingSupport
+                              ? "block"
+                              : "hidden"
+                          } lg:block p-6`}
+                        >
                           {analytics.staffNeedingSupport.length > 0 ? (
                             <div className="space-y-4">
                               {analytics.staffNeedingSupport.map(
@@ -1126,43 +1255,286 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   )}
 
                   {/* Score Distribution Chart */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    {/* Mobile Header with Toggle */}
+                    <div
+                      className="lg:hidden cursor-pointer"
+                      onClick={() => toggleMobileSection("scoreDistribution")}
+                    >
+                      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="p-1.5 bg-purple-600 rounded-lg">
+                              <ChartBarIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <h2 className="text-xl font-semibold text-slate-900">
+                              Score Distribution
+                            </h2>
+                          </div>
+                          <ChevronRightIcon
+                            className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                              expandedMobileSections.scoreDistribution
+                                ? "rotate-90"
+                                : ""
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop Header */}
+                    <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          Score Distribution
-                        </h2>
+                        <div className="flex items-center space-x-2">
+                          <div className="p-1.5 bg-purple-600 rounded-lg">
+                            <ChartBarIcon className="h-4 w-4 text-white" />
+                          </div>
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            Score Distribution
+                          </h2>
+                        </div>
                         <button
                           onClick={() =>
                             setShowDistributionChart(!showDistributionChart)
                           }
-                          className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                          className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         >
                           {showDistributionChart ? "Hide Chart" : "Show Chart"}
                         </button>
                       </div>
                     </div>
 
-                    {showDistributionChart && (
-                      <div className="p-6">
-                        <ScoreDistributionChart
-                          staffData={staffData}
-                          selectedCategory={selectedPerformanceCategory}
-                          onSelectCategory={setSelectedPerformanceCategory}
-                        />
+                    {/* Mobile Content - Simplified */}
+                    <div
+                      className={`${
+                        expandedMobileSections.scoreDistribution
+                          ? "block"
+                          : "hidden"
+                      } lg:hidden p-6`}
+                    >
+                      <div className="space-y-4">
+                        <div className="text-center text-sm text-slate-600 mb-4">
+                          Staff distribution by performance level
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            {
+                              label: "Excellent (90%+)",
+                              category: "excellent",
+                              bgColor: "bg-green-50",
+                              textColor: "text-green-700",
+                              borderColor: "border-green-200",
+                            },
+                            {
+                              label: "Good (75-89%)",
+                              category: "good",
+                              bgColor: "bg-blue-50",
+                              textColor: "text-blue-700",
+                              borderColor: "border-blue-200",
+                            },
+                            {
+                              label: "Average (60-74%)",
+                              category: "average",
+                              bgColor: "bg-yellow-50",
+                              textColor: "text-yellow-700",
+                              borderColor: "border-yellow-200",
+                            },
+                            {
+                              label: "Needs Work (<60%)",
+                              category: "needsWork",
+                              bgColor: "bg-red-50",
+                              textColor: "text-red-700",
+                              borderColor: "border-red-200",
+                            },
+                          ].map((item) => {
+                            const count = staffData.filter((staff) => {
+                              const avgScore = staff.averageScore;
+                              if (avgScore === null) return false;
+                              switch (item.category) {
+                                case "excellent":
+                                  return avgScore >= 90;
+                                case "good":
+                                  return avgScore >= 75 && avgScore < 90;
+                                case "average":
+                                  return avgScore >= 60 && avgScore < 75;
+                                case "needsWork":
+                                  return avgScore < 60;
+                                default:
+                                  return false;
+                              }
+                            }).length;
+
+                            return (
+                              <div
+                                key={item.category}
+                                className={`${item.bgColor} ${item.borderColor} border-2 rounded-lg p-4 text-center cursor-pointer hover:shadow-md transition-shadow`}
+                                onClick={() =>
+                                  setSelectedPerformanceCategory(item.category)
+                                }
+                              >
+                                <div
+                                  className={`text-2xl font-bold ${item.textColor} mb-1`}
+                                >
+                                  {count}
+                                </div>
+                                <div
+                                  className={`text-xs ${item.textColor} font-medium`}
+                                >
+                                  {item.label.split(" ")[0]}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Desktop Content - Full Chart */}
+                    <div className="hidden lg:block">
+                      {showDistributionChart && (
+                        <div className="p-6">
+                          <ScoreDistributionChart
+                            staffData={staffData}
+                            selectedCategory={selectedPerformanceCategory}
+                            onSelectCategory={setSelectedPerformanceCategory}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Staff Results Table */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                      <h2 className="text-xl font-semibold text-slate-900">
-                        Detailed Staff Performance
-                      </h2>
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    {/* Mobile Header with Toggle */}
+                    <div
+                      className="lg:hidden cursor-pointer"
+                      onClick={() => toggleMobileSection("staffPerformance")}
+                    >
+                      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="p-1.5 bg-indigo-600 rounded-lg">
+                              <UsersIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <div>
+                              <h2 className="text-xl font-semibold text-slate-900">
+                                Staff Performance
+                              </h2>
+                              <p className="text-xs text-slate-600">
+                                {filteredAndSortedStaff.length} members
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRightIcon
+                            className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                              expandedMobileSections.staffPerformance
+                                ? "rotate-90"
+                                : ""
+                            }`}
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="p-6">
+                    {/* Desktop Header */}
+                    <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-indigo-600 rounded-lg">
+                          <UsersIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            Detailed Staff Performance
+                          </h2>
+                          <p className="text-sm text-slate-600 mt-1">
+                            Complete performance breakdown for all team members
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mobile Content - Simplified */}
+                    <div
+                      className={`${
+                        expandedMobileSections.staffPerformance
+                          ? "block"
+                          : "hidden"
+                      } lg:hidden p-6`}
+                    >
+                      {/* Minimal Filters */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            name="name"
+                            placeholder="Search staff..."
+                            value={filters.name}
+                            onChange={handleFilterChange}
+                            className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <UsersIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        </div>
+                        {(filters.name || selectedPerformanceCategory) && (
+                          <button
+                            onClick={resetFilters}
+                            className="px-3 py-2 text-xs bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Simplified Staff Table */}
+                      <div className="space-y-3">
+                        {filteredAndSortedStaff.length > 0 ? (
+                          filteredAndSortedStaff.map((staff) => (
+                            <div
+                              key={staff._id}
+                              className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-slate-900 text-sm truncate">
+                                    {staff.name}
+                                  </div>
+                                  <div className="text-xs text-slate-600 truncate">
+                                    {staff.assignedRoleName ||
+                                      staff.professionalRole ||
+                                      "No role assigned"}
+                                  </div>
+                                </div>
+                                <div className="text-right ml-3">
+                                  <div
+                                    className={`text-lg font-bold ${
+                                      staff.averageScore === null
+                                        ? "text-slate-400"
+                                        : staff.averageScore >= 85
+                                        ? "text-green-600"
+                                        : staff.averageScore >= 70
+                                        ? "text-blue-600"
+                                        : staff.averageScore >= 50
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {staff.averageScore !== null
+                                      ? `${staff.averageScore.toFixed(1)}%`
+                                      : "N/A"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-8 text-slate-500">
+                            No staff found matching filters
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop Content - Full Table */}
+                    <div className="hidden lg:block p-6">
                       <StaffResultsFilter
                         filters={filters}
                         staffData={staffData}
@@ -1182,19 +1554,124 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   </div>
 
                   {/* Category Champions */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
-                      <div className="flex items-center space-x-3">
-                        <AcademicCapIcon className="h-6 w-6 text-green-600" />
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          Category Champions
-                        </h2>
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    {/* Mobile Header with Toggle */}
+                    <div
+                      className="lg:hidden cursor-pointer"
+                      onClick={() => toggleMobileSection("categoryChampions")}
+                    >
+                      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="p-1.5 bg-green-600 rounded-lg">
+                              <AcademicCapIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <div>
+                              <h2 className="text-xl font-semibold text-slate-900">
+                                Category Champions
+                              </h2>
+                            </div>
+                          </div>
+                          <ChevronRightIcon
+                            className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                              expandedMobileSections.categoryChampions
+                                ? "rotate-90"
+                                : ""
+                            }`}
+                          />
+                        </div>
                       </div>
-                      <p className="text-sm text-slate-600 mt-1">
-                        Best performers in each knowledge category
-                      </p>
                     </div>
-                    <div className="p-6">
+
+                    {/* Desktop Header */}
+                    <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-green-600 rounded-lg">
+                          <AcademicCapIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            Category Champions
+                          </h2>
+                          <p className="text-sm text-slate-600 mt-1">
+                            Best performers in each knowledge category
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mobile Content - 2x2 Grid */}
+                    <div
+                      className={`${
+                        expandedMobileSections.categoryChampions
+                          ? "block"
+                          : "hidden"
+                      } lg:hidden p-6`}
+                    >
+                      {leaderboardData?.categoryChampions ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          {Object.entries(
+                            leaderboardData.categoryChampions
+                          ).map(([categoryKey, champion]) => {
+                            const config =
+                              CATEGORY_CONFIG[
+                                categoryKey as keyof typeof CATEGORY_CONFIG
+                              ];
+                            const IconComponent = config.icon;
+
+                            const bgColorClass =
+                              "bgColor" in config
+                                ? config.bgColor
+                                : config.lightColor;
+
+                            return (
+                              <div
+                                key={categoryKey}
+                                className={`${bgColorClass} ${config.borderColor} rounded-lg p-3 border text-center`}
+                              >
+                                <div className="flex items-center justify-center mb-2">
+                                  <IconComponent
+                                    className={`h-4 w-4 ${config.textColor}`}
+                                  />
+                                </div>
+                                <h3
+                                  className={`font-medium text-xs ${config.textColor} mb-2 truncate`}
+                                >
+                                  {config.label}
+                                </h3>
+
+                                {champion ? (
+                                  <div>
+                                    <p className="font-semibold text-slate-900 text-sm truncate mb-1">
+                                      {champion.name}
+                                    </p>
+                                    <p className="text-lg font-bold text-slate-800">
+                                      {Math.round(champion.averageScore)}%
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="text-center">
+                                    <p className="text-xs text-slate-500">
+                                      No champion
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <SparklesIcon className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                          <p className="text-slate-500 text-sm">
+                            No data available
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desktop Content - Full Grid */}
+                    <div className="hidden lg:block p-6">
                       {leaderboardData?.categoryChampions ? (
                         <CategoryChampions
                           categoryChampions={leaderboardData.categoryChampions}
@@ -1215,13 +1692,112 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
                   {/* Enhanced Question Distribution */}
                   {analytics && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Question Distribution by Category
-                        </h3>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                      {/* Mobile Header with Toggle */}
+                      <div
+                        className="lg:hidden cursor-pointer"
+                        onClick={() =>
+                          toggleMobileSection("questionDistribution")
+                        }
+                      >
+                        <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <div className="p-1.5 bg-amber-600 rounded-lg">
+                                <ChartPieIcon className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-semibold text-slate-900">
+                                  Question Distribution
+                                </h3>
+                              </div>
+                            </div>
+                            <ChevronRightIcon
+                              className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                                expandedMobileSections.questionDistribution
+                                  ? "rotate-90"
+                                  : ""
+                              }`}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="p-6">
+
+                      {/* Desktop Header */}
+                      <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-1.5 bg-amber-600 rounded-lg">
+                            <ChartPieIcon className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-semibold text-slate-900">
+                              Question Distribution by Category
+                            </h3>
+                            <p className="text-sm text-slate-600 mt-1">
+                              Breakdown of AI-generated vs manually created
+                              questions
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile Content - 2x2 Grid */}
+                      <div
+                        className={`${
+                          expandedMobileSections.questionDistribution
+                            ? "block"
+                            : "hidden"
+                        } lg:hidden p-6`}
+                      >
+                        <div className="grid grid-cols-2 gap-3">
+                          {Object.entries(analytics.questionDistribution).map(
+                            ([category, distribution]) => {
+                              const config =
+                                CATEGORY_CONFIG[category as KnowledgeCategory];
+                              const IconComponent = config.icon;
+
+                              const lightColorClass =
+                                "lightColor" in config
+                                  ? config.lightColor
+                                  : "bg-gray-50";
+
+                              return (
+                                <div
+                                  key={category}
+                                  className={`${lightColorClass} rounded-lg p-3 border border-gray-200 text-center`}
+                                >
+                                  <div className="flex items-center justify-center mb-2">
+                                    <IconComponent
+                                      className={`h-4 w-4 ${config.textColor}`}
+                                    />
+                                  </div>
+                                  <h4
+                                    className={`font-medium text-xs ${config.textColor} mb-2 truncate`}
+                                  >
+                                    {config.label}
+                                  </h4>
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-slate-900 mb-1">
+                                      {distribution.totalQuestions}
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                      {Math.round(
+                                        (distribution.aiGenerated /
+                                          distribution.totalQuestions) *
+                                          100
+                                      )}
+                                      % AI
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Desktop Content - Full Grid */}
+                      <div className="hidden lg:block p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                           {Object.entries(analytics.questionDistribution).map(
                             ([category, distribution]) => {
@@ -1301,21 +1877,54 @@ const RestaurantStaffResultsPage: React.FC = () => {
                   {analytics && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Overall Completion Time Stats */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-slate-800 px-6 py-4 border-b border-slate-700">
+                      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                        {/* Mobile Header with Toggle */}
+                        <div
+                          className="lg:hidden cursor-pointer"
+                          onClick={() => toggleMobileSection("completionTimes")}
+                        >
+                          <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-1.5 bg-slate-600 rounded-lg">
+                                  <ClockIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <div>
+                                  <h3 className="text-xl font-semibold text-slate-900">
+                                    Completion Time Analytics
+                                  </h3>
+                                </div>
+                              </div>
+                              <ChevronRightIcon
+                                className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                                  expandedMobileSections.completionTimes
+                                    ? "rotate-90"
+                                    : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Header */}
+                        <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                           <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-semibold flex items-center gap-2 text-white">
-                              <ClockIcon className="h-5 w-5 text-slate-300" />
-                              Completion Time Analytics
-                            </h3>
+                            <div className="flex items-center space-x-2">
+                              <div className="p-1.5 bg-slate-600 rounded-lg">
+                                <ClockIcon className="h-4 w-4 text-white" />
+                              </div>
+                              <h3 className="text-xl font-semibold text-slate-900">
+                                Completion Time Analytics
+                              </h3>
+                            </div>
                             {/* Info icon for unusually fast times */}
                             {analytics.completionTimeStats
                               ?.averageCompletionTime &&
                               analytics.completionTimeStats
                                 .averageCompletionTime < 60 && (
                                 <div className="relative group">
-                                  <InformationCircleIcon className="h-5 w-5 text-slate-300 hover:text-white cursor-help transition-colors" />
-                                  <div className="absolute right-0 top-8 w-64 p-3 bg-black/90 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                  <InformationCircleIcon className="h-5 w-5 text-slate-400 hover:text-slate-600 cursor-help transition-colors" />
+                                  <div className="absolute right-0 top-8 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                                     <strong>Note:</strong> Average completion
                                     times appear unusually fast (under 1
                                     minute). This may indicate test data or
@@ -1325,7 +1934,72 @@ const RestaurantStaffResultsPage: React.FC = () => {
                               )}
                           </div>
                         </div>
-                        <div className="p-6">
+
+                        {/* Mobile Content - 2x2 Grid */}
+                        <div
+                          className={`${
+                            expandedMobileSections.completionTimes
+                              ? "block"
+                              : "hidden"
+                          } lg:hidden p-6`}
+                        >
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="text-center p-3 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                              <p className="text-xs font-medium text-slate-600 mb-1">
+                                Average
+                              </p>
+                              <p className="text-lg font-bold text-slate-900">
+                                {analytics.completionTimeStats
+                                  ?.averageCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .averageCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                              <p className="text-xs font-medium text-green-700 mb-1">
+                                Fastest
+                              </p>
+                              <p className="text-lg font-bold text-green-900">
+                                {analytics.completionTimeStats
+                                  ?.fastestCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .fastestCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                              <p className="text-xs font-medium text-orange-700 mb-1">
+                                Slowest
+                              </p>
+                              <p className="text-lg font-bold text-orange-900">
+                                {analytics.completionTimeStats
+                                  ?.slowestCompletionTime
+                                  ? formatCompletionTimeDetailed(
+                                      analytics.completionTimeStats
+                                        .slowestCompletionTime
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                              <p className="text-xs font-medium text-blue-700 mb-1">
+                                Total Quizzes
+                              </p>
+                              <p className="text-lg font-bold text-blue-900">
+                                {analytics.completionTimeStats
+                                  ?.totalQuizzesCompleted || 0}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Content - Full Grid */}
+                        <div className="hidden lg:block p-6">
                           <div className="grid grid-cols-2 gap-4">
                             <div className="text-center p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200">
                               <p className="text-sm font-medium text-slate-600 mb-2">
@@ -1419,14 +2093,118 @@ const RestaurantStaffResultsPage: React.FC = () => {
                       </div>
 
                       {/* Category Completion Times */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4 text-white">
-                          <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <FireIcon className="h-5 w-5" />
-                            Average Completion Time by Category
-                          </h3>
+                      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                        {/* Mobile Header with Toggle */}
+                        <div
+                          className="lg:hidden cursor-pointer"
+                          onClick={() => toggleMobileSection("completionTimes")}
+                        >
+                          <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-1.5 bg-purple-600 rounded-lg">
+                                  <FireIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <div>
+                                  <h3 className="text-xl font-semibold text-slate-900">
+                                    Completion Times
+                                  </h3>
+                                </div>
+                              </div>
+                              <ChevronRightIcon
+                                className={`h-5 w-5 text-slate-600 transform transition-transform duration-200 ${
+                                  expandedMobileSections.completionTimes
+                                    ? "rotate-90"
+                                    : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-6">
+
+                        {/* Desktop Header */}
+                        <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
+                          <div className="flex items-center space-x-2">
+                            <div className="p-1.5 bg-purple-600 rounded-lg">
+                              <FireIcon className="h-4 w-4 text-white" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-slate-900">
+                              Category Completion Times
+                            </h3>
+                          </div>
+                          <p className="text-sm text-slate-600 mt-1">
+                            Average time to complete quizzes by knowledge area
+                          </p>
+                        </div>
+
+                        {/* Mobile Content - 2x2 Grid */}
+                        <div
+                          className={`${
+                            expandedMobileSections.completionTimes
+                              ? "block"
+                              : "hidden"
+                          } lg:hidden p-6`}
+                        >
+                          {analytics.categoryCompletionTimes ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              {Object.entries(
+                                analytics.categoryCompletionTimes
+                              ).map(([categoryKey, time]) => {
+                                const categoryConfig = Object.values(
+                                  CATEGORY_CONFIG
+                                ).find(
+                                  (config) =>
+                                    "timeKey" in config &&
+                                    config.timeKey === categoryKey
+                                );
+
+                                if (!categoryConfig) return null;
+
+                                const IconComponent = categoryConfig.icon;
+                                const lightColorClass =
+                                  "lightColor" in categoryConfig
+                                    ? categoryConfig.lightColor
+                                    : "bg-gray-50";
+
+                                return (
+                                  <div
+                                    key={categoryKey}
+                                    className={`${lightColorClass} rounded-lg p-3 border border-gray-200 text-center`}
+                                  >
+                                    <div className="flex items-center justify-center mb-2">
+                                      <IconComponent
+                                        className={`h-4 w-4 ${categoryConfig.textColor}`}
+                                      />
+                                    </div>
+                                    <h4
+                                      className={`font-medium text-xs ${categoryConfig.textColor} mb-2 truncate`}
+                                    >
+                                      {categoryConfig.label}
+                                    </h4>
+                                    <div className="text-center">
+                                      <div className="text-lg font-bold text-slate-900 mb-1">
+                                        {formatCompletionTimeDetailed(time)}
+                                      </div>
+                                      <div className="text-xs text-slate-600">
+                                        avg time
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <ClockIcon className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                              <p className="text-gray-500 text-sm">
+                                No data available
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Desktop Content - Full List */}
+                        <div className="hidden lg:block p-6">
                           {analytics.categoryCompletionTimes ? (
                             <div className="grid grid-cols-1 gap-4">
                               {Object.entries(
@@ -1507,8 +2285,8 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
                   {/* Last Updated */}
                   {analytics && (
-                    <div className="text-center text-sm text-gray-500">
-                      <div className="flex items-center justify-center gap-2">
+                    <div className="text-center bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+                      <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
                         <ClockIcon className="h-4 w-4" />
                         <span>
                           Analytics last updated:{" "}

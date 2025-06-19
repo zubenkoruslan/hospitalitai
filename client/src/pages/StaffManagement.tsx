@@ -41,6 +41,7 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   UserGroupIcon,
   AcademicCapIcon,
   ClockIcon,
@@ -100,6 +101,9 @@ const StaffManagement: React.FC = () => {
   // Filtering state
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null); // null means all roles
 
+  // Expandable cards state (for mobile role cards)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
   const { user } = useAuth();
 
   const clearMessages = () => {
@@ -107,6 +111,19 @@ const StaffManagement: React.FC = () => {
     setError(null);
     setRolesError(null); // Also clear role-specific errors if any general message clear is called
   };
+
+  // Handle card expand/collapse on mobile
+  const toggleCardExpansion = useCallback((cardId: string) => {
+    setExpandedCards((prev) => {
+      const newExpandedCards = new Set(prev);
+      if (newExpandedCards.has(cardId)) {
+        newExpandedCards.delete(cardId);
+      } else {
+        newExpandedCards.add(cardId);
+      }
+      return newExpandedCards;
+    });
+  }, []);
 
   const fetchRestaurantStaff = useCallback(async () => {
     setLoading(true);
@@ -416,8 +433,7 @@ const StaffManagement: React.FC = () => {
     { label: "Role", field: null },
     { label: "Avg. Score", field: "averageScore" },
     { label: "Completion", field: "completionRate" },
-    { label: "Joined", field: "createdAt" },
-    { label: "Actions", field: null },
+    { label: "", field: null },
   ];
 
   const tabs = [
@@ -449,106 +465,132 @@ const StaffManagement: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                    <UserGroupIcon className="h-8 w-8 text-emerald-600" />
-                    Team Management
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Manage your team members, roles, and invitations in one
-                    place.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setActiveTab("invitations")}
-                    className="flex items-center gap-2"
-                  >
-                    <EnvelopeIcon className="h-4 w-4" />
-                    Invitations
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <UserPlusIcon className="h-4 w-4" />
-                    Invite Staff
-                  </Button>
+            {/* Enhanced Header with gradient background */}
+            <div className="bg-gradient-to-br from-background via-slate-50 to-slate-100">
+              {/* Page Header */}
+              <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+                <div className="flex flex-col gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                        <UserGroupIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        Team Management
+                      </h1>
+                    </div>
+                    <p className="text-muted-gray text-sm mb-3">
+                      Manage your team members, roles, and invitations in one
+                      place.
+                    </p>
+                  </div>
+
+                  {/* Action Buttons - Stack on mobile */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={() => setActiveTab("invitations")}
+                      className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                    >
+                      <EnvelopeIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className="hidden sm:inline">Invitations</span>
+                      <span className="sm:hidden">Invites</span>
+                    </button>
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-medium rounded-lg hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                    >
+                      <UserPlusIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className="hidden sm:inline">Invite Staff</span>
+                      <span className="sm:hidden">Invite</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-600 rounded-lg">
-                      <UsersIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-emerald-700">
-                        Total Staff
-                      </p>
-                      <p className="text-2xl font-bold text-emerald-900">
-                        {staffStats.totalStaff}
-                      </p>
+              {/* Enhanced Stats Cards with animations */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  {/* Gradient overlay on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-emerald-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-3">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <UsersIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                          Total Staff
+                        </p>
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {staffStats.totalStaff}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-600 rounded-lg">
-                      <AcademicCapIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-blue-700">
-                        Active Learners
-                      </p>
-                      <p className="text-2xl font-bold text-blue-900">
-                        {staffStats.activeStaff}
-                      </p>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <AcademicCapIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                          Active Learners
+                        </p>
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {staffStats.activeStaff}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-600 rounded-lg">
-                      <StarIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-purple-700">
-                        Avg. Score
-                      </p>
-                      <p className="text-2xl font-bold text-purple-900">
-                        {formatPercentage(staffStats.avgScore)}
-                      </p>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <StarIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                          Avg. Score
+                        </p>
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {formatPercentage(staffStats.avgScore)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-600 rounded-lg">
-                      <ClockIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-orange-700">
-                        Avg. Completion
-                      </p>
-                      <p className="text-2xl font-bold text-orange-900">
-                        {formatPercentage(staffStats.avgCompletion)}
-                      </p>
+                <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ClockIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                          Avg. Completion
+                        </p>
+                        <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                          {formatPercentage(staffStats.avgCompletion)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -700,13 +742,21 @@ const StaffManagement: React.FC = () => {
                           <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                               <tr>
-                                {tableHeaders.map((col) => (
+                                {tableHeaders.map((col, index) => (
                                   <th
                                     key={col.label}
                                     scope="col"
                                     className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                                       col.field
                                         ? "cursor-pointer hover:bg-gray-100 transition-colors"
+                                        : ""
+                                    } ${
+                                      // Hide Email, Role, Avg. Score, Completion on mobile
+                                      index === 1 ||
+                                      index === 2 ||
+                                      index === 3 ||
+                                      index === 4
+                                        ? "hidden md:table-cell"
                                         : ""
                                     }`}
                                     onClick={() =>
@@ -765,10 +815,10 @@ const StaffManagement: React.FC = () => {
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
                                       {staff.email}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
                                       <select
                                         value={staff.assignedRoleId || ""}
                                         onChange={(e) =>
@@ -793,7 +843,7 @@ const StaffManagement: React.FC = () => {
                                         ))}
                                       </select>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
                                       <div className="flex items-center">
                                         <span
                                           className={`text-sm font-medium ${
@@ -808,7 +858,7 @@ const StaffManagement: React.FC = () => {
                                         </span>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
                                       <div className="flex items-center">
                                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                                           <div
@@ -826,9 +876,6 @@ const StaffManagement: React.FC = () => {
                                           )}
                                         </span>
                                       </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                      {formatDate(staff.createdAt)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                       <div className="flex items-center justify-end space-x-2">
@@ -904,59 +951,139 @@ const StaffManagement: React.FC = () => {
                         variant="primary"
                         onClick={handleOpenCreateRoleModal}
                         disabled={roleSubmitLoading}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 text-sm px-3 py-1.5"
                       >
-                        <PlusIcon className="h-4 w-4" />
+                        <PlusIcon className="h-3 w-3" />
                         Create Role
                       </Button>
                     </div>
 
                     {rolesList.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {rolesList.map((role) => (
-                          <div
-                            key={role._id}
-                            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                                  {role.name}
-                                </h4>
-                                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                                  {role.description ||
-                                    "No description provided"}
-                                </p>
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <UsersIcon className="h-4 w-4 mr-1" />
-                                  {roleCounts[role._id] || 0} staff members
+                        {rolesList.map((role) => {
+                          const isExpanded =
+                            expandedCards.has(role._id) || false;
+
+                          return (
+                            <div
+                              key={role._id}
+                              className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
+                            >
+                              {/* Mobile Header (collapsed by default) */}
+                              <div
+                                className="md:hidden"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCardExpansion(role._id);
+                                }}
+                              >
+                                <div className="p-4 flex items-center justify-between cursor-pointer">
+                                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                    <div className="flex-shrink-0 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                                      <CogIcon className="h-4 w-4 text-gray-600" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-base font-semibold text-gray-900 truncate">
+                                        {role.name}
+                                      </h4>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditRoleModal(role);
+                                      }}
+                                      disabled={roleSubmitLoading}
+                                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors duration-200"
+                                    >
+                                      <PencilIcon className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteRole(role._id, role.name);
+                                      }}
+                                      disabled={roleSubmitLoading}
+                                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors duration-200"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                    <div className="transform transition-transform duration-200">
+                                      {isExpanded ? (
+                                        <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                                      ) : (
+                                        <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Mobile Expanded Content */}
+                              {isExpanded && (
+                                <div className="md:hidden border-t border-gray-100">
+                                  <div className="p-4 space-y-4">
+                                    {/* Description */}
+                                    <p className="text-gray-600 text-sm">
+                                      {role.description ||
+                                        "No description provided"}
+                                    </p>
+
+                                    {/* Staff Count */}
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <UsersIcon className="h-4 w-4 mr-2" />
+                                      {roleCounts[role._id] || 0} staff members
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Desktop Full Content (always visible) */}
+                              <div className="hidden md:block p-6">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                      {role.name}
+                                    </h4>
+                                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                                      {role.description ||
+                                        "No description provided"}
+                                    </p>
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <UsersIcon className="h-4 w-4 mr-1" />
+                                      {roleCounts[role._id] || 0} staff members
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-end space-x-2 mt-4 pt-4 border-t border-gray-100">
+                                  <Button
+                                    variant="secondary"
+                                    onClick={() =>
+                                      handleOpenEditRoleModal(role)
+                                    }
+                                    disabled={roleSubmitLoading}
+                                    className="text-xs px-3 py-1.5"
+                                  >
+                                    <PencilIcon className="h-3 w-3 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    onClick={() =>
+                                      handleDeleteRole(role._id, role.name)
+                                    }
+                                    disabled={roleSubmitLoading}
+                                    className="text-xs px-3 py-1.5"
+                                  >
+                                    <TrashIcon className="h-3 w-3 mr-1" />
+                                    Delete
+                                  </Button>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center justify-end space-x-2 mt-4 pt-4 border-t border-gray-100">
-                              <Button
-                                variant="secondary"
-                                onClick={() => handleOpenEditRoleModal(role)}
-                                disabled={roleSubmitLoading}
-                                className="text-xs px-3 py-1.5"
-                              >
-                                <PencilIcon className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                onClick={() =>
-                                  handleDeleteRole(role._id, role.name)
-                                }
-                                disabled={roleSubmitLoading}
-                                className="text-xs px-3 py-1.5"
-                              >
-                                <TrashIcon className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-16 bg-white rounded-lg border border-gray-200">

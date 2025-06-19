@@ -1,38 +1,31 @@
 import { Variants } from "framer-motion";
 
-// Card animations for menu items
+// Card animations for menu items - Minimal version
 export const cardAnimations: Variants = {
   initial: {
     opacity: 0,
-    y: 20,
-    scale: 0.95,
-    transition: { duration: 0.2 },
+    transition: { duration: 0.15 },
   },
   animate: {
     opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.4,
-      ease: [0.4, 0, 0.2, 1],
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -20,
-    scale: 0.95,
-    transition: { duration: 0.2 },
-  },
-  hover: {
-    y: -2,
-    scale: 1.02,
     transition: {
       duration: 0.2,
       ease: [0.4, 0, 0.2, 1],
     },
   },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.15 },
+  },
+  hover: {
+    // Minimal hover - just slight background change via CSS
+    transition: {
+      duration: 0.15,
+      ease: [0.4, 0, 0.2, 1],
+    },
+  },
   tap: {
-    scale: 0.98,
+    scale: 0.995,
     transition: { duration: 0.1 },
   },
 };
@@ -188,28 +181,24 @@ export const spinnerAnimation: Variants = {
   },
 };
 
-// Badge/pill animations
+// Badge/pill animations - Minimal version
 export const badgeAnimation: Variants = {
   initial: {
-    scale: 0,
     opacity: 0,
   },
   animate: {
-    scale: 1,
     opacity: 1,
     transition: {
-      type: "spring",
-      stiffness: 500,
-      damping: 30,
+      duration: 0.2,
+      ease: [0.4, 0, 0.2, 1],
     },
   },
   exit: {
-    scale: 0,
     opacity: 0,
-    transition: { duration: 0.2 },
+    transition: { duration: 0.15 },
   },
   hover: {
-    scale: 1.05,
+    // Minimal hover - rely on CSS
     transition: { duration: 0.15 },
   },
 };
@@ -270,21 +259,21 @@ export const overlayAnimation: Variants = {
   },
 };
 
-// Button animations
+// Button animations - Minimal version
 export const buttonAnimation: Variants = {
   initial: { scale: 1 },
   hover: {
-    scale: 1.02,
+    // Minimal hover - rely on CSS for color changes
     transition: { duration: 0.15 },
   },
   tap: {
     scale: 0.98,
-    transition: { duration: 0.1 },
+    transition: { duration: 0.08 },
   },
   disabled: {
     opacity: 0.5,
     scale: 1,
-    transition: { duration: 0.2 },
+    transition: { duration: 0.15 },
   },
 };
 
@@ -301,15 +290,15 @@ export const iconAnimation: Variants = {
   },
 };
 
-// Chevron rotation for expandable cards
+// Chevron rotation for expandable cards - Minimal version
 export const chevronAnimation: Variants = {
   collapsed: {
     rotate: 0,
-    transition: { duration: 0.2 },
+    transition: { duration: 0.15 },
   },
   expanded: {
-    rotate: 180,
-    transition: { duration: 0.2 },
+    rotate: 90,
+    transition: { duration: 0.15 },
   },
 };
 

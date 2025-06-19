@@ -262,28 +262,16 @@ const PerformanceScore: React.FC<{ score: number; comparison: number }> = ({
 
   return (
     <div className="text-center">
-      <div
-        className={`text-4xl font-bold mb-2 ${
-          score >= 80 ? "text-white" : score >= 60 ? "text-white" : "text-white"
-        }`}
-        style={{
-          textShadow:
-            score < 60
-              ? "0 0 8px rgba(239, 68, 68, 0.8)"
-              : score < 80
-              ? "0 0 8px rgba(245, 158, 11, 0.8)"
-              : "0 0 8px rgba(34, 197, 94, 0.8)",
-        }}
-      >
+      <div className="text-4xl font-bold mb-2 text-slate-700">
         {score.toFixed(1)}%
       </div>
       <div className="flex items-center justify-center gap-2 text-sm">
         {isAboveAverage ? (
-          <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
+          <ArrowTrendingUpIcon className="h-4 w-4 text-slate-600" />
         ) : (
-          <ArrowTrendingDownIcon className="h-4 w-4 text-white" />
+          <ArrowTrendingDownIcon className="h-4 w-4 text-slate-600" />
         )}
-        <span className="text-white text-opacity-90">
+        <span className="text-slate-600">
           {difference.toFixed(1)}% {isAboveAverage ? "above" : "below"} average
         </span>
       </div>
@@ -1015,12 +1003,61 @@ const StaffDetails: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-center min-h-[60vh]">
+              {/* Header skeleton */}
+              <div className="mb-8 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-3xl p-8 border border-primary/10 shadow-lg">
+                <div className="animate-pulse">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-8 h-8 bg-slate-200/60 rounded-xl"></div>
+                    <div className="h-8 bg-slate-200/60 rounded w-80"></div>
+                  </div>
+                  <div className="h-5 bg-slate-200/60 rounded w-96 mb-4"></div>
+                  <div className="h-12 bg-slate-200/60 rounded-xl w-80"></div>
+                </div>
+              </div>
+
+              {/* Staff info skeleton */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 mb-8">
+                <div className="animate-pulse flex items-center gap-6">
+                  <div className="w-20 h-20 bg-slate-200 rounded-xl"></div>
+                  <div className="space-y-4 flex-1">
+                    <div className="h-8 bg-slate-200 rounded w-64"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-slate-200 rounded w-48"></div>
+                      <div className="h-4 bg-slate-200 rounded w-40"></div>
+                      <div className="h-4 bg-slate-200 rounded w-36"></div>
+                    </div>
+                  </div>
+                  <div className="w-48 h-32 bg-slate-200 rounded-2xl"></div>
+                </div>
+              </div>
+
+              {/* Metrics skeleton */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl border border-slate-200 p-6"
+                  >
+                    <div className="animate-pulse">
+                      <div className="flex items-center space-x-4 mb-4">
+                        <div className="w-12 h-12 bg-slate-200 rounded-xl"></div>
+                        <div className="space-y-2 flex-1">
+                          <div className="h-4 bg-slate-200 rounded w-24"></div>
+                          <div className="h-8 bg-slate-200 rounded w-16"></div>
+                        </div>
+                      </div>
+                      <div className="h-4 bg-slate-200 rounded w-32"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-center py-12">
                 <LoadingSpinner message="Loading staff details..." />
               </div>
             </div>
@@ -1033,17 +1070,29 @@ const StaffDetails: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center">
-                <UserIcon className="h-12 w-12 text-red-600 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-red-600 mb-4">
-                  Error Loading Staff Details
-                </h1>
-                <ErrorMessage message={error} />
+              <div className="text-center">
+                <Card
+                  variant="outlined"
+                  className="max-w-md mx-auto border-red-200"
+                >
+                  <UserIcon className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                  <h1 className="text-2xl font-bold text-red-600 mb-4">
+                    Error Loading Staff Details
+                  </h1>
+                  <ErrorMessage message={error} />
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate("/staff")}
+                    className="mt-4"
+                  >
+                    Back to Team Management
+                  </Button>
+                </Card>
               </div>
             </div>
           </div>
@@ -1096,19 +1145,31 @@ const StaffDetails: React.FC = () => {
 
   if (!displayData?.staffInfo) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
         <Navbar />
         <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-                <UserIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-gray-700 mb-4">
-                  Staff Member Not Found
-                </h1>
-                <p className="text-gray-600">
-                  The requested staff member could not be found.
-                </p>
+              <div className="text-center">
+                <Card
+                  variant="outlined"
+                  className="max-w-md mx-auto border-gray-200"
+                >
+                  <UserIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h1 className="text-2xl font-bold text-gray-700 mb-4">
+                    Staff Member Not Found
+                  </h1>
+                  <p className="text-gray-600 mb-4">
+                    The requested staff member could not be found.
+                  </p>
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate("/staff")}
+                    className="mt-4"
+                  >
+                    Back to Team Management
+                  </Button>
+                </Card>
               </div>
             </div>
           </div>
@@ -1118,45 +1179,61 @@ const StaffDetails: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
       <Navbar />
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Navigation */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="secondary"
-                onClick={() => navigate("/staff")}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeftIcon className="h-4 w-4" />
-                Back to Team Management
-              </Button>
-              <div className="text-sm text-gray-500">
-                Team Management → Staff Details
-              </div>
-            </div>
-
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl p-8 text-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div className="p-4 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <UserIcon className="h-12 w-12 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold mb-2">
+            {/* Enhanced Header with Staff Details */}
+            <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+              <div className="flex flex-col gap-6">
+                {/* Header Title and Navigation */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                        <UserIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        {displayData.staffInfo.name} - Staff Details
+                      </h1>
+                    </div>
+                    <p className="text-muted-gray text-sm">
+                      Performance analytics and detailed insights for{" "}
                       {displayData.staffInfo.name}
-                    </h1>
-                    <div className="space-y-1 text-emerald-100">
+                    </p>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="flex-shrink-0">
+                    <button
+                      onClick={() => navigate("/staff")}
+                      className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                    >
+                      <ArrowLeftIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className="hidden sm:inline">
+                        Back to Team Management
+                      </span>
+                      <span className="sm:hidden">Back</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Staff Information and Performance */}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div className="flex-1">
+                    <div className="space-y-2 text-slate-600">
                       <p className="flex items-center gap-2">
                         <span className="font-medium">Email:</span>
-                        {displayData.staffInfo.email}
+                        <span className="text-slate-700">
+                          {displayData.staffInfo.email}
+                        </span>
                       </p>
                       <p className="flex items-center gap-2">
                         <span className="font-medium">Role:</span>
-                        {displayData.staffInfo.assignedRoleName}
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                          {displayData.staffInfo.assignedRoleName}
+                        </span>
                       </p>
                       <p className="flex items-center gap-2">
                         <CalendarIcon className="h-4 w-4" />
@@ -1169,64 +1246,123 @@ const StaffDetails: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="text-right">
-                  <PerformanceScore
-                    score={displayData.personalMetrics.overallAverageScore}
-                    comparison={displayData.restaurantComparison.averageScore}
-                  />
+                  <div className="lg:text-right">
+                    <div className="text-slate-700">
+                      <PerformanceScore
+                        score={displayData.personalMetrics.overallAverageScore}
+                        comparison={
+                          displayData.restaurantComparison.averageScore
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Key Metrics */}
+            {/* Enhanced Key Metrics with animations */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <MetricsCard
-                title="Quizzes Completed"
-                value={displayData.personalMetrics.totalQuizzesCompleted}
-                subtitle={`${displayData.personalMetrics.totalQuestionsAnswered} questions answered`}
-                icon={AcademicCapIcon}
-                color="blue"
-              />
-              <MetricsCard
-                title="Average Time"
-                value={formatCompletionTime(
-                  displayData.personalMetrics.averageCompletionTime
-                )}
-                subtitle={`Restaurant avg: ${formatCompletionTime(
-                  displayData.restaurantComparison.averageCompletionTime
-                )}`}
-                icon={ClockIcon}
-                color="purple"
-                trend={
-                  displayData.personalMetrics.averageCompletionTime <=
-                  displayData.restaurantComparison.averageCompletionTime
-                    ? "up"
-                    : "down"
-                }
-              />
-              <MetricsCard
-                title="Performance"
-                value={
-                  displayData.personalMetrics.overallAverageScore >=
-                  displayData.restaurantComparison.averageScore
-                    ? "Above Average"
-                    : "Below Average"
-                }
-                subtitle={`${Math.abs(
-                  displayData.personalMetrics.overallAverageScore -
-                    displayData.restaurantComparison.averageScore
-                ).toFixed(1)}% difference`}
-                icon={TrophyIcon}
-                color="emerald"
-                trend={
-                  displayData.personalMetrics.overallAverageScore >=
-                  displayData.restaurantComparison.averageScore
-                    ? "up"
-                    : "down"
-                }
-              />
+              {/* Quizzes Completed */}
+              <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 lg:space-x-3">
+                    <div className="p-2 lg:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                      <AcademicCapIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                        Quizzes Completed
+                      </p>
+                      <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        {displayData.personalMetrics.totalQuizzesCompleted}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 lg:mt-4 text-xs lg:text-sm text-slate-500">
+                    {displayData.personalMetrics.totalQuestionsAnswered}{" "}
+                    questions answered
+                  </div>
+                </div>
+              </div>
+
+              {/* Average Time */}
+              <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 lg:space-x-3">
+                    <div className="p-2 lg:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                      <ClockIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                        Average Time
+                      </p>
+                      <p className="text-xl lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        {formatCompletionTime(
+                          displayData.personalMetrics.averageCompletionTime
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 lg:mt-4 flex items-center text-xs lg:text-sm text-slate-500">
+                    <span>
+                      Restaurant avg:{" "}
+                      {formatCompletionTime(
+                        displayData.restaurantComparison.averageCompletionTime
+                      )}
+                    </span>
+                    {displayData.personalMetrics.averageCompletionTime <=
+                    displayData.restaurantComparison.averageCompletionTime ? (
+                      <ArrowTrendingUpIcon className="ml-1 h-3 w-3 text-green-500" />
+                    ) : (
+                      <ArrowTrendingDownIcon className="ml-1 h-3 w-3 text-red-500" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance */}
+              <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-emerald-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 lg:space-x-3">
+                    <div className="p-2 lg:p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                      <TrophyIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
+                        Performance
+                      </p>
+                      <p className="text-lg lg:text-2xl font-bold text-slate-900 transition-colors duration-300">
+                        {displayData.personalMetrics.overallAverageScore >=
+                        displayData.restaurantComparison.averageScore
+                          ? "Above Average"
+                          : "Below Average"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 lg:mt-4 flex items-center text-xs lg:text-sm text-slate-500">
+                    <span>
+                      {Math.abs(
+                        displayData.personalMetrics.overallAverageScore -
+                          displayData.restaurantComparison.averageScore
+                      ).toFixed(1)}
+                      % difference
+                    </span>
+                    {displayData.personalMetrics.overallAverageScore >=
+                    displayData.restaurantComparison.averageScore ? (
+                      <ArrowTrendingUpIcon className="ml-1 h-3 w-3 text-green-500" />
+                    ) : (
+                      <ArrowTrendingDownIcon className="ml-1 h-3 w-3 text-red-500" />
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Main Content Grid */}

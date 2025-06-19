@@ -10,6 +10,7 @@ import { useMenus } from "../hooks/useMenus";
 import { useCategoriesAnalytics } from "../hooks/useCategoriesAnalytics";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
+import Typography from "../components/common/Typography";
 import ErrorMessage from "../components/common/ErrorMessage";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 
@@ -96,7 +97,6 @@ const RestaurantDashboard: React.FC = () => {
 
   // Mobile expandable state
   const [expandedSections, setExpandedSections] = useState({
-    quickActions: false,
     recentNotifications: false,
     knowledgeCategories: false,
   });
@@ -309,20 +309,18 @@ const RestaurantDashboard: React.FC = () => {
 
   // Enhanced skeleton loading component
   const SkeletonCard = ({ className = "" }: { className?: string }) => (
-    <div
-      className={`bg-white rounded-2xl border border-slate-200 p-6 ${className}`}
-    >
+    <Card variant="default" size="md" className={className}>
       <div className="animate-pulse">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-slate-200 rounded-xl"></div>
+          <div className="w-12 h-12 bg-background-secondary rounded-xl"></div>
           <div className="space-y-2">
-            <div className="h-4 bg-slate-200 rounded w-20"></div>
-            <div className="h-6 bg-slate-200 rounded w-12"></div>
+            <div className="h-4 bg-background-secondary rounded w-20"></div>
+            <div className="h-6 bg-background-secondary rounded w-12"></div>
           </div>
         </div>
-        <div className="mt-4 h-4 bg-slate-200 rounded w-24"></div>
+        <div className="mt-4 h-4 bg-background-secondary rounded w-24"></div>
       </div>
-    </div>
+    </Card>
   );
 
   if (isLoading) {
@@ -458,54 +456,73 @@ const RestaurantDashboard: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Enhanced Header with gradient background */}
-            <div className="mb-8 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-3xl p-8 border border-primary/10 shadow-lg backdrop-blur-sm">
-              <div className="flex items-start justify-between">
+            {/* Page Header */}
+            <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+              <div className="flex flex-col gap-4">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <div className="p-2 bg-gradient-to-r from-primary to-accent rounded-xl shadow-lg">
-                      <HomeIcon className="h-6 w-6 text-white" />
+                    <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                      <HomeIcon className="h-5 w-5 text-white" />
                     </div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                       {user?.restaurantName || "Restaurant"} Dashboard
                     </h1>
                   </div>
-                  <p className="text-muted-gray text-lg mb-4">
-                    Welcome back,{" "}
-                    <span className="font-semibold text-dark-slate">
-                      {user?.name}
-                    </span>
-                    ! Here's your comprehensive overview.
+                  <p className="text-muted-gray text-sm mb-3">
+                    Welcome back, {user?.name}! Track performance, manage staff,
+                    and optimize training across your restaurant.
                   </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => navigate("/upload")}
+                    className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                  >
+                    <DocumentArrowUpIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="hidden sm:inline">Upload Menu PDF</span>
+                    <span className="sm:hidden">Upload PDF</span>
+                  </button>
+                  <button
+                    onClick={() => navigate("/quiz-management")}
+                    className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-medium rounded-lg hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="hidden sm:inline">Create New Quiz</span>
+                    <span className="sm:hidden">New Quiz</span>
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Enhanced Stats Grid with animations */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            {/* Enhanced Stats Grid with animations - 2x2 on mobile */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4 mb-8">
               {/* Total Staff Card */}
               <Link to="/staff-results" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
                   {/* Gradient overlay on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-info-50 to-info-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
                   <div className="relative z-10">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                        <UsersIcon className="h-6 w-6 text-white" />
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-info-500 to-info-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <UsersIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                      <div className="min-w-0">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Total Staff
                         </p>
-                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {staffData.length}
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-blue-600 text-sm font-medium group-hover:text-blue-700">
-                      <span>View Details</span>
-                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                    <div className="mt-2 lg:mt-4 flex items-center text-info-600 group-hover:text-info-700">
+                      <span className="text-xs lg:text-sm font-medium">
+                        View Details
+                      </span>
+                      <ArrowRightIcon className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 </div>
@@ -513,26 +530,26 @@ const RestaurantDashboard: React.FC = () => {
 
               {/* Quizzes Active Card */}
               <Link to="/quiz-management" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
                   <div className="relative z-10">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                        <AcademicCapIcon className="h-6 w-6 text-white" />
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <AcademicCapIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                      <div className="min-w-0">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Quizzes Active
                         </p>
-                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {totalQuizzes}
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-green-600 text-sm font-medium group-hover:text-green-700">
+                    <div className="mt-2 lg:mt-4 flex items-center text-green-600 text-xs lg:text-sm font-medium group-hover:text-green-700">
                       <span>Manage Quizzes</span>
-                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                      <ArrowRightIcon className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 </div>
@@ -540,26 +557,26 @@ const RestaurantDashboard: React.FC = () => {
 
               {/* Menus Active Card */}
               <Link to="/menu" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-amber-50 to-amber-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
                   <div className="relative z-10">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                        <DocumentTextIcon className="h-6 w-6 text-white" />
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <DocumentTextIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                      <div className="min-w-0">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Menus Active
                         </p>
-                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {menus.length}
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-amber-600 text-sm font-medium group-hover:text-amber-700">
+                    <div className="mt-2 lg:mt-4 flex items-center text-amber-600 text-xs lg:text-sm font-medium group-hover:text-amber-700">
                       <span>Manage Menus</span>
-                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                      <ArrowRightIcon className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 </div>
@@ -567,26 +584,26 @@ const RestaurantDashboard: React.FC = () => {
 
               {/* Enhanced Average Performance Card */}
               <Link to="/staff-results" className="block group">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 lg:p-6 hover:shadow-xl transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1 relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
 
                   <div className="relative z-10">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                        <ChartBarIcon className="h-6 w-6 text-white" />
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <div className="p-2 lg:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg lg:rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                        <ChartBarIcon className="h-4 w-4 lg:h-6 lg:w-6 text-white" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-500 group-hover:text-slate-600">
+                      <div className="min-w-0">
+                        <p className="text-xs lg:text-sm font-medium text-slate-500 group-hover:text-slate-600 truncate">
                           Avg. Performance
                         </p>
-                        <p className="text-3xl font-bold text-slate-900 transition-colors duration-300">
+                        <p className="text-lg lg:text-3xl font-bold text-slate-900 transition-colors duration-300">
                           {overallAveragePerformance}%
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-purple-600 text-sm font-medium group-hover:text-purple-700">
+                    <div className="mt-2 lg:mt-4 flex items-center text-purple-600 text-xs lg:text-sm font-medium group-hover:text-purple-700">
                       <span>View Analytics</span>
-                      <ArrowRightIcon className="ml-2 h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                      <ArrowRightIcon className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4 transform transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 </div>
@@ -595,79 +612,6 @@ const RestaurantDashboard: React.FC = () => {
 
             {/* Enhanced Action Cards */}
             <div className="space-y-8 mb-8">
-              {/* Quick Actions - Mobile expandable */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                {/* Mobile Header */}
-                <div
-                  className="lg:hidden cursor-pointer"
-                  onClick={() => toggleExpandedSection("quickActions")}
-                >
-                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="p-1.5 bg-blue-600 rounded-lg">
-                          <ClockIcon className="h-4 w-4 text-white" />
-                        </div>
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          Quick Actions
-                        </h2>
-                      </div>
-                      <div className="transform transition-transform duration-200">
-                        {expandedSections.quickActions ? (
-                          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Desktop Header */}
-                <div className="hidden lg:block bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-blue-600 rounded-lg">
-                      <ClockIcon className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Quick Actions
-                    </h2>
-                  </div>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Streamline your workflow
-                  </p>
-                </div>
-
-                {/* Content - Expandable on mobile, always visible on desktop */}
-                <div
-                  className={`${
-                    expandedSections.quickActions ? "block" : "hidden"
-                  } lg:block p-6 space-y-4`}
-                >
-                  <button
-                    onClick={() => navigate("/upload")}
-                    className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                  >
-                    <DocumentArrowUpIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span>Upload Menu PDF</span>
-                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </div>
-                  </button>
-
-                  <Link
-                    to="/quiz-management"
-                    className="w-full group flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-medium rounded-xl hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                  >
-                    <PlusIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span>Create New Quiz</span>
-                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </div>
-                  </Link>
-                </div>
-              </div>
-
               {/* Knowledge Categories Performance - Always visible on all devices */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-300">
                 {/* Universal Header */}
@@ -725,8 +669,8 @@ const RestaurantDashboard: React.FC = () => {
                     categoriesData &&
                     categoriesData.length > 0 ? (
                     <>
-                      {/* Four Horizontal Circular Charts */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                      {/* Four Horizontal Circular Charts - 2x2 on mobile */}
+                      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8">
                         {categoriesData.map((cat, index) => {
                           const categoryConfig = {
                             "food-knowledge": {
@@ -859,26 +803,26 @@ const RestaurantDashboard: React.FC = () => {
                               className="group block"
                             >
                               <div
-                                className={`${config.bgColor} ${config.borderColor} border-2 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:-translate-y-1 cursor-pointer`}
+                                className={`${config.bgColor} ${config.borderColor} border-2 rounded-xl lg:rounded-2xl p-3 lg:p-6 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:-translate-y-1 cursor-pointer`}
                               >
                                 {/* Icon and Status */}
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between mb-2 lg:mb-4">
                                   <div
-                                    className={`p-2 bg-white rounded-lg border ${config.borderColor} shadow-sm`}
+                                    className={`p-1 lg:p-2 bg-white rounded-md lg:rounded-lg border ${config.borderColor} shadow-sm`}
                                   >
                                     <IconComponent
-                                      className={`h-5 w-5 ${config.iconColor}`}
+                                      className={`h-3 w-3 lg:h-5 lg:w-5 ${config.iconColor}`}
                                     />
                                   </div>
                                   <span
-                                    className={`px-2 py-1 text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}
+                                    className={`px-1.5 lg:px-2 py-0.5 lg:py-1 text-[10px] lg:text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}
                                   >
                                     {status.label}
                                   </span>
                                 </div>
 
                                 {/* Chart */}
-                                <div className="w-32 h-32 mx-auto relative mb-4">
+                                <div className="w-20 h-20 lg:w-32 lg:h-32 mx-auto relative mb-2 lg:mb-4">
                                   <Doughnut
                                     data={chartData}
                                     options={singleChartOptions}
@@ -886,7 +830,7 @@ const RestaurantDashboard: React.FC = () => {
                                   {/* Center text overlay */}
                                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className="text-center">
-                                      <div className="text-2xl font-bold text-slate-900 group-hover:scale-110 transition-transform duration-300">
+                                      <div className="text-sm lg:text-2xl font-bold text-slate-900 group-hover:scale-110 transition-transform duration-300">
                                         {score}%
                                       </div>
                                     </div>
@@ -895,24 +839,27 @@ const RestaurantDashboard: React.FC = () => {
 
                                 {/* Category Info */}
                                 <div className="text-center">
-                                  <h4 className="font-semibold text-slate-900 text-sm mb-2 group-hover:text-slate-700 transition-colors">
+                                  <h4 className="font-semibold text-slate-900 text-xs lg:text-sm mb-1 lg:mb-2 group-hover:text-slate-700 transition-colors line-clamp-2">
                                     {config.label}
                                   </h4>
-                                  <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
+                                  <div className="flex flex-col lg:flex-row items-center justify-center lg:space-x-4 space-y-1 lg:space-y-0 text-[10px] lg:text-xs text-slate-500">
                                     <span className="flex items-center">
-                                      <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                                      <ClipboardDocumentIcon className="h-2 w-2 lg:h-3 lg:w-3 mr-1" />
                                       {cat.totalQuestions} answered
                                     </span>
                                     <span className="flex items-center">
-                                      <UsersIcon className="h-3 w-3 mr-1" />
+                                      <UsersIcon className="h-2 w-2 lg:h-3 lg:w-3 mr-1" />
                                       {cat.totalStaffParticipating} staff
                                     </span>
                                   </div>
 
                                   {/* View Details Indicator */}
-                                  <div className="mt-3 flex items-center justify-center text-xs text-slate-400 group-hover:text-blue-600 transition-colors">
-                                    <span>View Details</span>
-                                    <ArrowRightIcon className="ml-1 h-3 w-3 transform group-hover:translate-x-1 transition-transform" />
+                                  <div className="mt-2 lg:mt-3 flex items-center justify-center text-[10px] lg:text-xs text-slate-400 group-hover:text-blue-600 transition-colors">
+                                    <span className="hidden lg:inline">
+                                      View Details
+                                    </span>
+                                    <span className="lg:hidden">Details</span>
+                                    <ArrowRightIcon className="ml-1 h-2 w-2 lg:h-3 lg:w-3 transform group-hover:translate-x-1 transition-transform" />
                                   </div>
                                 </div>
                               </div>
@@ -1123,39 +1070,6 @@ const RestaurantDashboard: React.FC = () => {
           </div>
         </div>
       </main>
-
-      {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <div className="relative group">
-          {/* Quick actions menu */}
-          <div className="absolute bottom-16 right-0 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
-            <div className="bg-white rounded-lg shadow-xl border border-slate-200 p-2 space-y-1 min-w-48">
-              <Link
-                to="/upload"
-                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors duration-150"
-              >
-                <DocumentArrowUpIcon className="h-4 w-4" />
-                <span>Upload Menu</span>
-              </Link>
-              <Link
-                to="/quiz-management"
-                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-700 hover:bg-green-50 hover:text-green-700 rounded-md transition-colors duration-150"
-              >
-                <PlusIcon className="h-4 w-4" />
-                <span>Create Quiz</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Main FAB */}
-          <button
-            className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 flex items-center justify-center group-hover:rotate-45"
-            aria-label="Quick Actions"
-          >
-            <PlusIcon className="h-6 w-6" />
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

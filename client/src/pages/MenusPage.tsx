@@ -255,50 +255,62 @@ const MenusPage: React.FC = () => {
       <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-6 text-white border border-slate-700 shadow-md mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-600 rounded-lg shadow-md">
-                    <BuildingStorefrontIcon className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-white">
+            {/* Page Header */}
+            <div className="mb-6 bg-gradient-to-r from-primary/5 via-white to-accent/5 rounded-2xl p-4 lg:p-6 border border-primary/10 shadow-md backdrop-blur-sm">
+              <div className="flex flex-col gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-1.5 bg-gradient-to-r from-primary to-accent rounded-lg shadow-md">
+                      <BuildingStorefrontIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                       Menu Management
                     </h1>
-                    <p className="text-slate-300 text-sm">
-                      {stats.totalMenus} menu{stats.totalMenus !== 1 ? "s" : ""}{" "}
-                      • {user?.restaurantName || "My Restaurant"}
-                    </p>
                   </div>
+                  <p className="text-muted-gray text-sm mb-3">
+                    {stats.totalMenus} menu{stats.totalMenus !== 1 ? "s" : ""} •{" "}
+                    {user?.restaurantName || "My Restaurant"}
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
+
+                {/* Search - Full width on mobile */}
+                <div className="relative mb-4 lg:mb-0">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search menus..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full lg:w-56 text-sm"
+                  />
+                </div>
+
+                {/* Action Buttons - Stack on mobile */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={openAddModal}
+                    className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="hidden sm:inline">Create Menu</span>
+                    <span className="sm:hidden">Create</span>
+                  </button>
                   <button
                     onClick={openMenuUploadModal}
-                    className="inline-flex items-center px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg border border-slate-600 shadow-sm transition-colors duration-200"
+                    className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-medium rounded-lg hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
                   >
-                    <ArrowUpTrayIcon className="h-4 w-4 mr-1.5" />
-                    Upload
+                    <ArrowUpTrayIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="hidden sm:inline">Upload Menu</span>
+                    <span className="sm:hidden">Upload</span>
                   </button>
                   <button
                     onClick={toggleTemplatesSection}
-                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border shadow-sm transition-colors duration-200 ${
-                      isTemplatesSectionExpanded
-                        ? "bg-slate-600 hover:bg-slate-500 text-white border-slate-500"
-                        : "bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
-                    }`}
+                    className="group inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-medium rounded-lg hover:from-purple-700 hover:to-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
                   >
-                    <DocumentIcon className="h-4 w-4 mr-1.5" />
-                    Templates
+                    <DocumentIcon className="h-4 w-4 mr-1.5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="hidden sm:inline">Templates</span>
+                    <span className="sm:hidden">Templates</span>
                   </button>
-                  <Button
-                    variant="primary"
-                    onClick={openAddModal}
-                    className="shadow-sm text-sm px-3 py-2"
-                  >
-                    <PlusIcon className="h-4 w-4 mr-1.5" />
-                    Create
-                  </Button>
                 </div>
               </div>
             </div>
