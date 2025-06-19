@@ -16,6 +16,7 @@ import QuizActions from "../components/staff/dashboard/QuizActions";
 import ProgressRing from "../components/staff/dashboard/ProgressRing";
 import AchievementsBanner from "../components/staff/dashboard/AchievementsBanner";
 import BottomNavigation from "../components/staff/dashboard/BottomNavigation";
+import PracticeModeModal from "../components/quiz/PracticeModeModal";
 
 // Mock achievement data (to be replaced with real API calls)
 const mockAchievements = [
@@ -60,6 +61,7 @@ const StaffDashboard: React.FC = () => {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPracticeModeModalOpen, setIsPracticeModeModalOpen] = useState(false);
 
   // Progress stats
   const [totalCompleted, setTotalCompleted] = useState(0);
@@ -128,7 +130,7 @@ const StaffDashboard: React.FC = () => {
   };
 
   const handlePracticeMode = () => {
-    navigate("/staff/practice");
+    setIsPracticeModeModalOpen(true);
   };
 
   const handleViewProgress = () => {
@@ -278,6 +280,12 @@ const StaffDashboard: React.FC = () => {
 
       {/* Bottom Navigation */}
       <BottomNavigation />
+
+      {/* Practice Mode Modal */}
+      <PracticeModeModal
+        isOpen={isPracticeModeModalOpen}
+        onClose={() => setIsPracticeModeModalOpen(false)}
+      />
     </div>
   );
 };

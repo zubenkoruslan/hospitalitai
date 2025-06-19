@@ -288,6 +288,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/staff/quiz/:quizId/practice"
+                element={
+                  <ProtectedRoute requiredRole="staff">
+                    <QuizTakingPage isPracticeMode={true} />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Admin Protected Routes */}
               <Route

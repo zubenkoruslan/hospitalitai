@@ -25,7 +25,13 @@ const getLocalStorageKey = (quizId: string | undefined) => {
   return `${LOCAL_STORAGE_QUIZ_ANSWERS_PREFIX}${quizId}`;
 };
 
-const QuizTakingPage: React.FC = () => {
+interface QuizTakingPageProps {
+  isPracticeMode?: boolean;
+}
+
+const QuizTakingPage: React.FC<QuizTakingPageProps> = ({
+  isPracticeMode = false,
+}) => {
   const { quizId } = useParams<{ quizId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -309,8 +315,15 @@ const QuizTakingPage: React.FC = () => {
         <div className="text-center">
           <LoadingSpinner />
           <p className="mt-4 text-slate-600 font-medium">
-            Loading your quiz... 📚
+            Loading your {isPracticeMode ? "practice " : ""}quiz... 📚
           </p>
+          {isPracticeMode && (
+            <div className="mt-4 bg-green-100 border border-green-300 rounded-lg p-3">
+              <p className="text-green-700 text-sm font-medium">
+                🎯 Practice Mode - Results won't count towards your analytics
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -366,7 +379,7 @@ const QuizTakingPage: React.FC = () => {
         <QuizResultsDisplay
           score={submissionResult.score}
           totalQuestions={submissionResult.totalQuestionsAttempted}
-          quizTitle={quizTitle}
+          quizTitle={isPracticeMode ? `${quizTitle} (Practice)` : quizTitle}
           completionTime={completionTime}
           incorrectAnswers={
             submissionResult.questions?.filter((q) => !q.isCorrect) || []
@@ -383,6 +396,7 @@ const QuizTakingPage: React.FC = () => {
             loadQuizQuestions();
           }}
           onBackToDashboard={() => navigate("/staff/dashboard")}
+          isPracticeMode={isPracticeMode}
         />
 
         {showIncorrectAnswersModal && submissionResult.questions && (

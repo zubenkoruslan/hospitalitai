@@ -22,6 +22,7 @@ interface QuizResultsDisplayProps {
   onViewIncorrectAnswers?: () => void;
   onRetakeQuiz?: () => void;
   onBackToDashboard: () => void;
+  isPracticeMode?: boolean;
 }
 
 const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
@@ -33,6 +34,7 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
   onViewIncorrectAnswers,
   onRetakeQuiz,
   onBackToDashboard,
+  isPracticeMode = false,
 }) => {
   const percentage = Math.round((score / totalQuestions) * 100);
 
@@ -85,8 +87,16 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
                 )}
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold mb-2">
-                Quiz Completed! {performance.emoji}
+                {isPracticeMode ? "Practice " : ""}Quiz Completed!{" "}
+                {performance.emoji}
               </h1>
+              {isPracticeMode && (
+                <div className="mt-2 mb-4">
+                  <div className="inline-block px-4 py-2 bg-green-500 text-white rounded-full text-sm font-medium">
+                    🎯 Practice Mode - Results don't count towards analytics
+                  </div>
+                </div>
+              )}
               <p className="text-xl lg:text-2xl font-semibold opacity-90">
                 {score} out of {totalQuestions} correct
               </p>
