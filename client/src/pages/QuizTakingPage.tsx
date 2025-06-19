@@ -233,11 +233,11 @@ const QuizTakingPage: React.FC = () => {
         .filter(([_, answer]) => answer !== undefined)
         .map(([questionId, answer]) => ({
           questionId,
-          selectedOptions: Array.isArray(answer) ? answer : [answer],
+          answerGiven: Array.isArray(answer) ? answer : [answer],
         }));
 
       const submitData: ClientQuizAttemptSubmitData = {
-        answers: answersArray,
+        questions: answersArray,
       };
 
       const result = await submitQuizAttempt(quizId, submitData);
@@ -354,10 +354,10 @@ const QuizTakingPage: React.FC = () => {
           quizTitle={quizTitle}
           completionTime={completionTime}
           incorrectAnswers={
-            submissionResult.gradedQuestions?.filter((q) => !q.isCorrect) || []
+            submissionResult.questions?.filter((q) => !q.isCorrect) || []
           }
           onViewIncorrectAnswers={
-            submissionResult.gradedQuestions?.some((q) => !q.isCorrect)
+            submissionResult.questions?.some((q) => !q.isCorrect)
               ? () => setShowIncorrectAnswersModal(true)
               : undefined
           }
@@ -370,11 +370,11 @@ const QuizTakingPage: React.FC = () => {
           onBackToDashboard={() => navigate("/staff/dashboard")}
         />
 
-        {showIncorrectAnswersModal && submissionResult.gradedQuestions && (
+        {showIncorrectAnswersModal && submissionResult.questions && (
           <ViewIncorrectAnswersModal
             isOpen={showIncorrectAnswersModal}
             onClose={() => setShowIncorrectAnswersModal(false)}
-            incorrectQuestions={submissionResult.gradedQuestions.filter(
+            incorrectQuestions={submissionResult.questions.filter(
               (q) => !q.isCorrect
             )}
             quizTitle={quizTitle}
