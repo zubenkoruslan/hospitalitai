@@ -231,10 +231,25 @@ const QuizTakingPage: React.FC = () => {
         userAnswers
       )
         .filter(([_, answer]) => answer !== undefined)
-        .map(([questionId, answer]) => ({
-          questionId,
-          answerGiven: Array.isArray(answer) ? answer : [answer],
-        }));
+        .map(([questionId, answer]) => {
+          // Find the question to determine its type
+          const question = questions.find((q) => q._id === questionId);
+          const questionType = question?.questionType;
+
+          // For multiple-choice-multiple, keep as array
+          // For all other types (true-false, multiple-choice-single), send as single value
+          let answerGiven: any;
+          if (questionType === "multiple-choice-multiple") {
+            answerGiven = Array.isArray(answer) ? answer : [answer];
+          } else {
+            answerGiven = Array.isArray(answer) ? answer[0] : answer;
+          }
+
+          return {
+            questionId,
+            answerGiven,
+          };
+        });
 
       const submitData: ClientQuizAttemptSubmitData = {
         questions: answersArray,
