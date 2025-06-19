@@ -47,19 +47,34 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
     return { level: "needs-work", color: "orange", emoji: "📚" };
   };
 
-  const getEncouragementMessage = (percent: number) => {
-    if (percent >= 90)
-      return "Outstanding work! You've mastered this topic! 🎉";
-    if (percent >= 80)
-      return "Excellent job! You're really getting the hang of this! 🚀";
-    if (percent >= 70) return "Good work! You're on the right track! 💪";
-    if (percent >= 60)
-      return "Nice effort! A bit more practice and you'll ace it! 🎯";
-    return "Great start! Learning takes time - keep practicing! 📚";
+  const getEncouragementMessage = (percent: number, isPractice: boolean) => {
+    if (isPractice) {
+      if (percent >= 90)
+        return "Excellent practice! You've got this material down! 🎯";
+      if (percent >= 80)
+        return "Great practice session! Keep honing those skills! 🚀";
+      if (percent >= 70)
+        return "Good practice! Try again to perfect your knowledge! 💪";
+      if (percent >= 60)
+        return "Nice practice run! Each attempt makes you stronger! 🎯";
+      return "Perfect for practice! Try different approaches and learn! 📚";
+    } else {
+      if (percent >= 90)
+        return "Outstanding work! You've mastered this topic! 🎉";
+      if (percent >= 80)
+        return "Excellent job! You're really getting the hang of this! 🚀";
+      if (percent >= 70) return "Good work! You're on the right track! 💪";
+      if (percent >= 60)
+        return "Nice effort! A bit more practice and you'll ace it! 🎯";
+      return "Great start! Learning takes time - keep practicing! 📚";
+    }
   };
 
   const performance = getPerformanceLevel(percentage);
-  const encouragementMessage = getEncouragementMessage(percentage);
+  const encouragementMessage = getEncouragementMessage(
+    percentage,
+    isPracticeMode
+  );
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -189,7 +204,16 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
               <ArrowRightIcon className="w-5 h-5 ml-2" />
             </Button>
 
-            {onRetakeQuiz && percentage < 100 && (
+            {isPracticeMode && onRetakeQuiz && (
+              <Button
+                onClick={onRetakeQuiz}
+                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+              >
+                🎯 Practice Again - No Cooldown!
+              </Button>
+            )}
+
+            {!isPracticeMode && onRetakeQuiz && percentage < 100 && (
               <Button
                 onClick={onRetakeQuiz}
                 variant="white"
@@ -201,12 +225,23 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
           </div>
 
           {/* Achievement Hint */}
-          {percentage >= 90 && (
+          {!isPracticeMode && percentage >= 90 && (
             <div className="mt-6 text-center">
               <div className="inline-flex items-center px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-full">
                 <TrophyIcon className="w-5 h-5 text-yellow-600 mr-2" />
                 <span className="text-yellow-800 font-medium">
                   Achievement unlocked! Check your progress page! 🏆
+                </span>
+              </div>
+            </div>
+          )}
+
+          {isPracticeMode && (
+            <div className="mt-6 text-center">
+              <div className="inline-flex items-center px-4 py-2 bg-green-100 border border-green-300 rounded-full">
+                <span className="text-green-800 font-medium">
+                  🎯 Practice Mode: Results help you learn but don't affect your
+                  official scores
                 </span>
               </div>
             </div>

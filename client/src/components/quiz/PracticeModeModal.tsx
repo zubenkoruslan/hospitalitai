@@ -49,8 +49,8 @@ const PracticeModeModal: React.FC<PracticeModeModalProps> = ({
   };
 
   const handleStartPractice = (quizId: string) => {
-    onClose();
     navigate(`/staff/quiz/${quizId}/practice`);
+    onClose();
   };
 
   if (!isOpen) return null;
