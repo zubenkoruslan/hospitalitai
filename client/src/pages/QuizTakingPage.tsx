@@ -384,17 +384,50 @@ const QuizTakingPage: React.FC = () => {
               attemptDate: new Date().toISOString(),
               incorrectQuestions: submissionResult.questions
                 .filter((q) => !q.isCorrect)
-                .map((q) => ({
-                  questionText: q.questionText || "Question",
-                  userAnswer: Array.isArray(q.answerGiven)
-                    ? q.answerGiven.join(", ")
-                    : q.answerGiven?.toString() || "No answer",
-                  correctAnswer:
-                    q.correctAnswer?.text ||
-                    q.correctAnswer?.texts?.join(", ") ||
-                    "Unknown",
-                  explanation: q.explanation,
-                })),
+                .map((q) => {
+                  // Helper function to get option text by ID
+                  const getOptionText = (optionId: string): string => {
+                    const option = q.options?.find(
+                      (opt) => opt._id === optionId
+                    );
+                    return option?.text || optionId;
+                  };
+
+                  // Convert user answer (option IDs) to readable text
+                  let userAnswerText: string;
+                  if (Array.isArray(q.answerGiven)) {
+                    userAnswerText = q.answerGiven
+                      .map(getOptionText)
+                      .join(", ");
+                  } else if (q.answerGiven) {
+                    userAnswerText = getOptionText(q.answerGiven.toString());
+                  } else {
+                    userAnswerText = "No answer";
+                  }
+
+                  // Convert correct answer to readable text
+                  let correctAnswerText: string;
+                  if (q.correctAnswer?.texts) {
+                    correctAnswerText = q.correctAnswer.texts.join(", ");
+                  } else if (q.correctAnswer?.text) {
+                    correctAnswerText = q.correctAnswer.text;
+                  } else if (q.correctAnswer?.optionIds) {
+                    correctAnswerText = q.correctAnswer.optionIds
+                      .map(getOptionText)
+                      .join(", ");
+                  } else if (q.correctAnswer?.optionId) {
+                    correctAnswerText = getOptionText(q.correctAnswer.optionId);
+                  } else {
+                    correctAnswerText = "Unknown";
+                  }
+
+                  return {
+                    questionText: q.questionText || "Question",
+                    userAnswer: userAnswerText,
+                    correctAnswer: correctAnswerText,
+                    explanation: q.explanation,
+                  };
+                }),
             }}
           />
         )}
