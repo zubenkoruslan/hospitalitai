@@ -30,7 +30,12 @@ const QuizActions: React.FC<QuizActionsProps> = ({
       </h2>
 
       {/* Primary Action - Start Quiz */}
-      <Card className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0 transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl">
+      <div
+        className="text-white border-0 rounded-2xl transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl"
+        style={{
+          background: "linear-gradient(to right, #3B82F6, #14B8A6)",
+        }}
+      >
         <div className="p-4 lg:p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -54,70 +59,83 @@ const QuizActions: React.FC<QuizActionsProps> = ({
               </div>
             </div>
             <Button
-              className="bg-white text-blue-600 hover:bg-blue-50 h-11 lg:h-12 px-4 lg:px-6 rounded-xl font-semibold text-sm lg:text-base shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
+              variant="white"
+              className="h-11 lg:h-12 px-4 lg:px-6 rounded-xl font-semibold text-sm lg:text-base shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
               onClick={onStartQuiz}
             >
               Let's Go!
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Secondary Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Practice Mode */}
-        <Card className="border-2 border-dashed border-green-300 hover:border-green-400 transition-colors duration-200 hover:shadow-md">
+        <div
+          className="text-white border-0 rounded-2xl transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl"
+          style={{
+            background: "linear-gradient(to right, #10B981, #059669)",
+          }}
+        >
           <div className="p-4 lg:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                  <BookOpenIcon className="w-5 h-5 lg:w-6 lg:h-6 text-green-600" />
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <BookOpenIcon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base lg:text-lg font-semibold text-slate-800 mb-1">
+                  <h3 className="text-base lg:text-lg font-semibold text-white mb-1">
                     Practice Mode 📚
                   </h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-green-100 text-sm">
                     Review previous topics
                   </p>
                 </div>
               </div>
               <Button
                 variant="white"
-                className="border-green-500 text-green-600 hover:bg-green-50 h-10 lg:h-11 px-3 lg:px-4 rounded-xl text-sm lg:text-base"
+                className="h-10 lg:h-11 px-3 lg:px-4 rounded-xl text-sm lg:text-base"
                 onClick={onPracticeMode}
               >
                 Practice
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* View Progress */}
-        <Card className="border-2 border-dashed border-purple-300 hover:border-purple-400 transition-colors duration-200 hover:shadow-md">
+        <div
+          className="text-white border-0 rounded-2xl transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl"
+          style={{
+            background: "linear-gradient(to right, #8B5CF6, #7C3AED)",
+          }}
+        >
           <div className="p-4 lg:p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <AcademicCapIcon className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <AcademicCapIcon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base lg:text-lg font-semibold text-slate-800 mb-1">
+                  <h3 className="text-base lg:text-lg font-semibold text-white mb-1">
                     My Progress 📊
                   </h3>
-                  <p className="text-slate-600 text-sm">See how you're doing</p>
+                  <p className="text-purple-100 text-sm">
+                    See how you're doing
+                  </p>
                 </div>
               </div>
               <Button
                 variant="white"
-                className="border-purple-500 text-purple-600 hover:bg-purple-50 h-10 lg:h-11 px-3 lg:px-4 rounded-xl text-sm lg:text-base"
+                className="h-10 lg:h-11 px-3 lg:px-4 rounded-xl text-sm lg:text-base"
                 onClick={onViewProgress}
               >
                 View
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

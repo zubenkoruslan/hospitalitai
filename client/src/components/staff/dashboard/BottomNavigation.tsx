@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   HomeIcon,
@@ -6,6 +6,7 @@ import {
   TrophyIcon,
   UserIcon,
   ChartBarIcon,
+  PlayIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeIconSolid,
@@ -14,6 +15,7 @@ import {
   UserIcon as UserIconSolid,
   ChartBarIcon as ChartBarIconSolid,
 } from "@heroicons/react/24/solid";
+import QuizTypeSelectionModal from "../../quiz/QuizTypeSelectionModal";
 
 interface NavItem {
   path: string;
@@ -28,12 +30,6 @@ const navItems: NavItem[] = [
     label: "Home",
     icon: HomeIcon,
     iconSolid: HomeIconSolid,
-  },
-  {
-    path: "/staff/quizzes",
-    label: "Quizzes",
-    icon: AcademicCapIcon,
-    iconSolid: AcademicCapIconSolid,
   },
   {
     path: "/staff/progress",
@@ -58,6 +54,7 @@ const navItems: NavItem[] = [
 const BottomNavigation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isQuizTypeModalOpen, setIsQuizTypeModalOpen] = useState(false);
 
   const isActive = (path: string) => {
     if (path === "/staff/dashboard") {
@@ -66,44 +63,82 @@ const BottomNavigation: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
+  // Split nav items into two groups for left and right of the CTA button
+  const leftNavItems = navItems.slice(0, 2);
+  const rightNavItems = navItems.slice(2);
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-40 safe-area-bottom">
-      <div className="grid grid-cols-5 h-16">
-        {navItems.map((item) => {
-          const active = isActive(item.path);
-          const Icon = active ? item.iconSolid : item.icon;
+    <>
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg lg:hidden z-40 safe-area-bottom">
+        <div className="relative flex h-20 px-4">
+          {/* Left nav items */}
+          <div className="flex flex-1 justify-around items-center">
+            {leftNavItems.map((item) => {
+              const active = isActive(item.path);
+              const Icon = active ? item.iconSolid : item.icon;
 
-          return (
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  className={`
+                    flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-200
+                    ${
+                      active
+                        ? "text-blue-600"
+                        : "text-gray-400 hover:text-gray-600 active:bg-gray-50"
+                    }
+                  `}
+                >
+                  <Icon className="w-7 h-7 mb-1" />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Central Take Quiz CTA Button */}
+          <div className="flex items-center justify-center px-8">
             <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={`
-                flex flex-col items-center justify-center h-16 space-y-1 transition-all duration-200
-                ${
-                  active
-                    ? "text-blue-600 bg-blue-50"
-                    : "text-slate-600 hover:text-slate-800 active:bg-slate-50"
-                }
-              `}
+              onClick={() => setIsQuizTypeModalOpen(true)}
+              className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 rounded-full shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center"
             >
-              <Icon className="w-6 h-6" />
-              <span
-                className={`text-xs font-medium ${
-                  active ? "font-semibold" : ""
-                }`}
-              >
-                {item.label}
-              </span>
-
-              {/* Active indicator */}
-              {active && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-blue-600 rounded-b-full" />
-              )}
+              <PlayIcon className="w-6 h-6 text-white ml-0.5" />
             </button>
-          );
-        })}
+          </div>
+
+          {/* Right nav items */}
+          <div className="flex flex-1 justify-around items-center">
+            {rightNavItems.map((item) => {
+              const active = isActive(item.path);
+              const Icon = active ? item.iconSolid : item.icon;
+
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  className={`
+                    flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-200
+                    ${
+                      active
+                        ? "text-blue-600"
+                        : "text-gray-400 hover:text-gray-600 active:bg-gray-50"
+                    }
+                  `}
+                >
+                  <Icon className="w-7 h-7 mb-1" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Quiz Type Selection Modal */}
+      <QuizTypeSelectionModal
+        isOpen={isQuizTypeModalOpen}
+        onClose={() => setIsQuizTypeModalOpen(false)}
+      />
+    </>
   );
 };
 

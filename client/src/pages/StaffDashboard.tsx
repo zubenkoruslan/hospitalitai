@@ -11,6 +11,7 @@ import { ClientStaffQuizProgressWithAttempts } from "../types/staffTypes";
 import { ClientIQuiz } from "../types/quizTypes";
 
 // New components
+import Navbar from "../components/Navbar";
 import WelcomeHeader from "../components/staff/dashboard/WelcomeHeader";
 import QuizActions from "../components/staff/dashboard/QuizActions";
 import ProgressRing from "../components/staff/dashboard/ProgressRing";
@@ -184,95 +185,103 @@ const StaffDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Mobile-first container */}
-      <div className="max-w-md mx-auto lg:max-w-6xl lg:mx-auto">
-        {/* Main content */}
-        <div className="px-4 lg:px-6 pt-6 pb-20 lg:pb-6">
-          {/* Welcome Header */}
-          <WelcomeHeader
-            staffMember={{
-              firstName: user.name?.split(" ")[0] || "Friend",
-              lastName: user.name?.split(" ").slice(1).join(" ") || "",
-            }}
-            currentStreak={currentStreak}
-            totalCompleted={totalCompleted}
-            averageScore={averageScore}
-          />
+      {/* Desktop Navbar */}
+      <Navbar />
 
-          {/* Progress Overview */}
-          <div className="mb-6">
-            <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-slate-100">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                <div className="text-center lg:text-left">
-                  <h3 className="text-lg lg:text-xl font-semibold text-slate-800 mb-2">
-                    Your Learning Journey
-                  </h3>
-                  <p className="text-slate-600 mb-4">
-                    Level {currentLevel} • {totalCompleted} quizzes completed
-                  </p>
-                  <div className="w-full bg-slate-200 rounded-full h-3 mb-2">
-                    <div
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${progressPercentage}%` }}
-                    />
+      {/* Main content with sidebar offset on desktop */}
+      <div className="lg:ml-16 min-h-screen">
+        {/* Mobile-first container */}
+        <div className="max-w-md mx-auto lg:max-w-6xl lg:mx-auto">
+          {/* Main content */}
+          <div className="px-4 lg:px-6 pt-6 pb-20 lg:pb-6">
+            {/* Welcome Header */}
+            <WelcomeHeader
+              staffMember={{
+                firstName: user.name?.split(" ")[0] || "Friend",
+                lastName: user.name?.split(" ").slice(1).join(" ") || "",
+              }}
+              currentStreak={currentStreak}
+              totalCompleted={totalCompleted}
+              averageScore={averageScore}
+            />
+
+            {/* Progress Overview */}
+            <div className="mb-6">
+              <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-slate-100">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                  <div className="text-center lg:text-left">
+                    <h3 className="text-lg lg:text-xl font-semibold text-slate-800 mb-2">
+                      Your Learning Journey
+                    </h3>
+                    <p className="text-slate-600 mb-4">
+                      Level {currentLevel} • {totalCompleted} quizzes completed
+                    </p>
+                    <div className="w-full bg-slate-200 rounded-full h-3 mb-2">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${progressPercentage}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-slate-500">
+                      {5 - (totalCompleted % 5)} more to reach Level{" "}
+                      {currentLevel + 1}
+                    </p>
                   </div>
-                  <p className="text-sm text-slate-500">
-                    {5 - (totalCompleted % 5)} more to reach Level{" "}
-                    {currentLevel + 1}
-                  </p>
-                </div>
-                <div className="flex justify-center">
-                  <ProgressRing
-                    progress={progressPercentage}
-                    level={currentLevel}
-                    size="lg"
-                  />
+                  <div className="flex justify-center lg:justify-end">
+                    <div className="w-44 h-44 flex items-center justify-center">
+                      <ProgressRing
+                        progress={progressPercentage}
+                        level={currentLevel}
+                        size="lg"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Quiz Actions */}
-          <QuizActions
-            availableQuizzes={availableQuizCount}
-            hasIncompleteQuizzes={hasIncompleteQuizzes}
-            onStartQuiz={handleStartQuiz}
-            onPracticeMode={handlePracticeMode}
-            onViewProgress={handleViewProgress}
-          />
+            {/* Quiz Actions */}
+            <QuizActions
+              availableQuizzes={availableQuizCount}
+              hasIncompleteQuizzes={hasIncompleteQuizzes}
+              onStartQuiz={handleStartQuiz}
+              onPracticeMode={handlePracticeMode}
+              onViewProgress={handleViewProgress}
+            />
 
-          {/* Achievements */}
-          <AchievementsBanner
-            recentAchievements={mockAchievements}
-            totalAchievements={mockAchievements.length}
-            onViewAll={handleViewAllAchievements}
-          />
+            {/* Achievements */}
+            <AchievementsBanner
+              recentAchievements={mockAchievements}
+              totalAchievements={mockAchievements.length}
+              onViewAll={handleViewAllAchievements}
+            />
 
-          {/* Quick Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
-              <div className="text-2xl font-bold text-blue-600 mb-1">
-                {availableQuizCount}
+            {/* Quick Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                <div className="text-2xl font-bold text-blue-600 mb-1">
+                  {availableQuizCount}
+                </div>
+                <div className="text-sm text-slate-600">Available</div>
               </div>
-              <div className="text-sm text-slate-600">Available</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
-              <div className="text-2xl font-bold text-green-600 mb-1">
-                {totalCompleted}
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">
+                  {totalCompleted}
+                </div>
+                <div className="text-sm text-slate-600">Completed</div>
               </div>
-              <div className="text-sm text-slate-600">Completed</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
-              <div className="text-2xl font-bold text-purple-600 mb-1">
-                {averageScore}%
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                <div className="text-2xl font-bold text-purple-600 mb-1">
+                  {averageScore}%
+                </div>
+                <div className="text-sm text-slate-600">Avg Score</div>
               </div>
-              <div className="text-sm text-slate-600">Avg Score</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
-              <div className="text-2xl font-bold text-orange-600 mb-1">
-                {currentStreak}
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                <div className="text-2xl font-bold text-orange-600 mb-1">
+                  {currentStreak}
+                </div>
+                <div className="text-sm text-slate-600">Day Streak</div>
               </div>
-              <div className="text-sm text-slate-600">Day Streak</div>
             </div>
           </div>
         </div>

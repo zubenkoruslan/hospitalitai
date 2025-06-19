@@ -16,8 +16,11 @@ import {
   UserIcon,
   MapPinIcon,
   PresentationChartLineIcon,
+  TrophyIcon,
+  PlayIcon,
 } from "@heroicons/react/24/outline";
 import { MapPinIcon as MapPinIconSolid } from "@heroicons/react/24/solid";
+import QuizTypeSelectionModal from "./quiz/QuizTypeSelectionModal";
 
 // Define props interface
 interface NavbarProps {
@@ -54,6 +57,7 @@ const Navbar: React.FC<NavbarProps> = ({
     return typeof window !== "undefined" && window.innerWidth < 1024;
   });
   const [showContent, setShowContent] = useState(false);
+  const [isQuizTypeModalOpen, setIsQuizTypeModalOpen] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -149,6 +153,20 @@ const Navbar: React.FC<NavbarProps> = ({
     },
   ];
 
+  // Navigation items specific to staff role
+  const staffNavItems = [
+    {
+      name: "My Progress",
+      path: "/staff/progress",
+      icon: ChartBarIcon,
+    },
+    {
+      name: "Achievements",
+      path: "/staff/achievements",
+      icon: TrophyIcon,
+    },
+  ];
+
   // Navigation items specific to admin role
   const adminNavItems = [
     {
@@ -169,6 +187,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const mainNavItems = [
     ...baseNavItems,
     ...(user?.role === UserRole.RestaurantOwner ? restaurantNavItems : []),
+    ...(user?.role === UserRole.Staff ? staffNavItems : []),
     ...(user?.role === UserRole.Admin ? adminNavItems : []),
     settingsNavItem,
   ];
@@ -235,7 +254,7 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav
       ref={navRef}
-      className={`bg-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
+      className={`hidden lg:block bg-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
         isExpanded ? "w-64" : "w-16"
       }`}
       role="navigation"
@@ -327,6 +346,35 @@ const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Take Quiz CTA Button for Staff Users */}
+        {user?.role === UserRole.Staff && (
+          <div className="px-2 py-4 border-b border-slate-200/50">
+            <button
+              onClick={() => setIsQuizTypeModalOpen(true)}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center min-h-[48px] group"
+            >
+              {/* Icon - always visible */}
+              <div className="flex items-center justify-center w-12 h-full flex-shrink-0">
+                <PlayIcon className="h-6 w-6 text-white group-hover:scale-110 transition-transform duration-200" />
+              </div>
+
+              {/* Text label - shows when expanded */}
+              <div
+                className={`overflow-hidden transition-all duration-200 ease-out ${
+                  showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
+                }`}
+              >
+                <span className="truncate whitespace-nowrap block pr-3 font-semibold text-white">
+                  Take Quiz
+                </span>
+              </div>
+
+              {/* Screen reader text for collapsed state */}
+              {!isExpanded && <span className="sr-only">Take Quiz</span>}
+            </button>
+          </div>
+        )}
 
         {/* Main Navigation Links */}
         <div className="flex-1 py-4 overflow-y-auto">
@@ -479,6 +527,12 @@ const Navbar: React.FC<NavbarProps> = ({
           }
         }
       `}</style>
+
+      {/* Quiz Type Selection Modal */}
+      <QuizTypeSelectionModal
+        isOpen={isQuizTypeModalOpen}
+        onClose={() => setIsQuizTypeModalOpen(false)}
+      />
     </nav>
   );
 };

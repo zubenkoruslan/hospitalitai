@@ -94,7 +94,12 @@ const AchievementsBanner: React.FC<AchievementsBannerProps> = ({
 
       {/* Recent Achievement Spotlight */}
       {recentAchievements.length > 0 && recentAchievements[0].isNew && (
-        <Card className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0 mb-4 shadow-lg">
+        <div
+          className="text-white border-0 rounded-2xl mb-4 shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+          style={{
+            background: "linear-gradient(to right, #F59E0B, #D97706)",
+          }}
+        >
           <div className="p-4 lg:p-6">
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -103,24 +108,24 @@ const AchievementsBanner: React.FC<AchievementsBannerProps> = ({
                     {recentAchievements[0].emoji}
                   </span>
                 </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
-                  <SparklesIcon className="w-4 h-4 text-yellow-800" />
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center">
+                  <SparklesIcon className="w-4 h-4 text-amber-600" />
                 </div>
               </div>
               <div className="flex-1">
-                <div className="text-yellow-200 text-xs lg:text-sm font-medium mb-1">
+                <div className="text-white text-xs lg:text-sm font-bold mb-1 bg-white/20 px-2 py-1 rounded-full inline-block">
                   🎉 NEW ACHIEVEMENT!
                 </div>
-                <h3 className="text-lg lg:text-xl font-bold mb-1">
+                <h3 className="text-lg lg:text-xl font-bold mb-1 text-white">
                   {recentAchievements[0].title}
                 </h3>
-                <p className="text-indigo-100 text-sm lg:text-base">
+                <p className="text-amber-100 text-sm lg:text-base">
                   {recentAchievements[0].description}
                 </p>
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Achievement Grid */}

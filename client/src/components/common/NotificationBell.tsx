@@ -257,7 +257,7 @@ const NotificationBell: React.FC = () => {
   return (
     <>
       {/* Floating Notification Bell Button - Bottom Right */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-24 right-6 z-50 lg:bottom-6">
         <div className="relative">
           <button
             ref={buttonRef}

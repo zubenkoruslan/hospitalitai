@@ -18,12 +18,13 @@ const ProgressRing: React.FC<ProgressRingProps> = ({
   xpToNextLevel = 100,
 }) => {
   const sizes = {
-    sm: { container: "w-20 h-20", stroke: 6, radius: 34 },
-    md: { container: "w-28 h-28", stroke: 8, radius: 46 },
-    lg: { container: "w-36 h-36", stroke: 10, radius: 58 },
+    sm: { container: "w-24 h-24", stroke: 4, radius: 40, viewBox: 100 },
+    md: { container: "w-32 h-32", stroke: 6, radius: 42, viewBox: 100 },
+    lg: { container: "w-40 h-40", stroke: 8, radius: 42, viewBox: 100 },
   };
 
-  const { container, stroke, radius } = sizes[size];
+  const { container, stroke, radius, viewBox } = sizes[size];
+  const center = viewBox / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDasharray = `${
     (progress / 100) * circumference
@@ -33,12 +34,12 @@ const ProgressRing: React.FC<ProgressRingProps> = ({
     <div className={`relative ${container} mx-auto`}>
       {/* Background Circle */}
       <svg
-        className={`${container} transform -rotate-90`}
-        viewBox="0 0 120 120"
+        className={`w-full h-full transform -rotate-90`}
+        viewBox={`0 0 ${viewBox} ${viewBox}`}
       >
         <circle
-          cx="60"
-          cy="60"
+          cx={center}
+          cy={center}
           r={radius}
           stroke="#e2e8f0"
           strokeWidth={stroke}
@@ -48,8 +49,8 @@ const ProgressRing: React.FC<ProgressRingProps> = ({
 
         {/* Progress Circle */}
         <circle
-          cx="60"
-          cy="60"
+          cx={center}
+          cy={center}
           r={radius}
           stroke="url(#progressGradient)"
           strokeWidth={stroke}

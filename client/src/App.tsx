@@ -19,6 +19,8 @@ import LoginForm from "./components/LoginForm";
 import SignupForm from "./components/SignupForm";
 import RestaurantDashboard from "./pages/RestaurantDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
+import MyProgressPage from "./pages/MyProgressPage";
+import StaffAchievementsPage from "./pages/StaffAchievementsPage";
 import MenusPage from "./pages/MenusPage";
 import MenuItemsPage from "./pages/MenuItemsPage";
 import QuizAndBankManagementPage from "./pages/QuizAndBankManagementPage";
@@ -277,6 +279,22 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="staff">
                     <StaffDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/staff/progress"
+                element={
+                  <ProtectedRoute requiredRole="staff">
+                    <MyProgressPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/staff/achievements"
+                element={
+                  <ProtectedRoute requiredRole="staff">
+                    <StaffAchievementsPage />
                   </ProtectedRoute>
                 }
               />

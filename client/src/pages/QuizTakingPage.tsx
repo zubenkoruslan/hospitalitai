@@ -176,13 +176,17 @@ const QuizTakingPage: React.FC<QuizTakingPageProps> = ({
         Object.keys(userAnswersRef.current).length > 0
       ) {
         event.preventDefault();
-        event.returnValue = ""; // Modern browsers require this
+        const warningMessage = isPracticeMode
+          ? "Your progress will be saved and you can continue later."
+          : "Unanswered questions will be counted as incorrect answers.";
+        event.returnValue = warningMessage;
+        return warningMessage;
       }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
+  }, [isPracticeMode]);
 
   // Handle answer selection
   const handleAnswerSelect = (
@@ -285,11 +289,25 @@ const QuizTakingPage: React.FC<QuizTakingPageProps> = ({
   // Cancel quiz
   const handleCancel = () => {
     const hasAnswers = Object.keys(userAnswers).length > 0;
+    const answeredQuestionsCount = questions.filter(
+      (q) =>
+        userAnswers[q._id] !== undefined &&
+        (Array.isArray(userAnswers[q._id])
+          ? userAnswers[q._id].length > 0
+          : true)
+    ).length;
+    const unansweredCount = questions.length - answeredQuestionsCount;
 
-    if (hasAnswers) {
-      const confirmed = window.confirm(
-        "Are you sure you want to leave? Your progress will be saved and you can continue later."
-      );
+    if (hasAnswers || unansweredCount > 0) {
+      const warningMessage = isPracticeMode
+        ? "Are you sure you want to leave? Your progress will be saved and you can continue later."
+        : `Are you sure you want to leave? ${
+            unansweredCount > 0
+              ? `${unansweredCount} unanswered questions will be counted as incorrect answers. `
+              : ""
+          }Your quiz attempt will be submitted automatically.`;
+
+      const confirmed = window.confirm(warningMessage);
       if (!confirmed) return;
     }
 
