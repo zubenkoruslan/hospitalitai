@@ -117,55 +117,63 @@ export class BeverageItemEnhancerService {
    */
   private buildBeverageAnalysisPrompt(): string {
     return `
-You are a professional beverage expert specializing in analyzing cocktails, beers, spirits, and non-alcoholic drinks.
+You are a master bartender, beverage specialist, and pricing extraction expert. Your job is to extract comprehensive beverage information including prices and serving options.
 
-CRITICAL: Always extract what you can identify from the name and description. Be specific and accurate.
+CRITICAL EXTRACTION RULES:
 
-BEVERAGE ANALYSIS RULES:
+1. PRICE AND SERVING SIZE EXTRACTION:
+   - Extract ALL prices and their associated serving sizes
+   - Common beer/beverage serving sizes: "pint", "half pint", "bottle", "can", "glass", "shot", "double", "pitcher", "jug"
+   - Look for price patterns: £X.XX, $X.XX, €X.XX, X.XX (without symbol)
+   - Multiple prices indicate different serving sizes
+   
+   Examples:
+   - "Stella Artois Draft: Pint £6.50, Half Pint £3.25" → servingOptions: [{"size": "Pint", "price": 6.50}, {"size": "Half Pint", "price": 3.25}]
+   - "Guinness: £5.80" → price: 5.80, servingStyle: "draft" (if context suggests)
+   - "Corona Bottle £4.75, Draft Pint £5.50" → servingOptions: [{"size": "Bottle", "price": 4.75}, {"size": "Pint", "price": 5.50}]
+   - "Whiskey: Single £8, Double £14" → servingOptions: [{"size": "Single", "price": 8}, {"size": "Double", "price": 14}]
 
-1. SPIRIT TYPE DETECTION:
+2. INGREDIENT EXTRACTION (for cocktails):
+   - Base spirits (vodka, gin, rum, whiskey, tequila, brandy, cognac)
+   - Mixers (juices, sodas, syrups, liqueurs, bitters)
+   - Garnishes (lemon peel, cherry, olive, mint, lime wheel)
+
+3. NORMALIZE INGREDIENT NAMES:
+   - "fresh lime juice" → "lime juice"
+   - "house-made simple syrup" → "simple syrup" 
+   - "muddled mint leaves" → "mint"
+
+4. SPIRIT TYPE DETECTION:
    - Look for: vodka, gin, rum, whiskey, whisky, bourbon, rye, tequila, brandy, cognac
-   - Examples: "Martini" → gin, "Manhattan" → whiskey, "Mojito" → rum
-   - Include variations: "Scotch whisky" → whiskey, "Bourbon whiskey" → whiskey
-   - Brand names: "Mirabeau French rosé gin" → gin, "Grey Goose vodka" → vodka
+   - Brand names: "Grey Goose vodka" → vodka, "Hendrick's gin" → gin
 
-2. BEER STYLE IDENTIFICATION:
-   - Look for: IPA, India Pale Ale, lager, stout, pilsner, wheat beer, porter, amber ale, bitter
+5. BEER STYLE IDENTIFICATION:
+   - Look for: IPA, India Pale Ale, lager, stout, pilsner, wheat beer, porter, amber ale, bitter, ale
    - Extract from descriptions: "hoppy India Pale Ale" → IPA, "dry stout" → stout
-   - Brand context: "Guinness" → stout, "London Pride" → bitter
 
-3. COCKTAIL INGREDIENTS EXTRACTION:
-   - Extract ALL mentioned ingredients from name and description
-   - Split on commas, ampersands (&), and "and" 
-   - Include brand names: "Mirabeau French rosé gin" → "Mirabeau French rosé gin"
-   - Include garnishes: "garnished with lemon peel" → "lemon peel"
-   - Common patterns: spirits, mixers, garnishes, fruits, syrups, bitters
-   - Examples: 
-     * "vodka, cranberry juice, lime" → ["vodka", "cranberry juice", "lime"]
-     * "Mirabeau French rosé gin, Lillet rosé vermouth & Pampelle grapefruit apéritif, garnished with lemon peel" → ["Mirabeau French rosé gin", "Lillet rosé vermouth", "Pampelle grapefruit apéritif", "lemon peel"]
-
-4. ALCOHOL CONTENT PARSING:
+6. ALCOHOL CONTENT PARSING:
    - Look for: "X% ABV", "X.X% ABV", "X% vol", "alcohol by volume"
-   - Extract numbers: "5.6% ABV" → "5.6% ABV", "4.2%" → "4.2% ABV"
+   - Extract numbers: "5.6% ABV" → "5.6% ABV"
 
-5. NON-ALCOHOLIC DETECTION:
-   - Keywords: "virgin", "mocktail", "non-alcoholic", "alcohol-free"
-   - Names: "Virgin Mojito" → isNonAlcoholic: true
-   - Context: If no alcohol mentioned in description → likely non-alcoholic
+7. SERVING STYLE DETECTION:
+   - Look for: draft, tap, bottled, canned, neat, "on the rocks", shaken, stirred
+   - Extract from context: "draft pint" → "draft", "bottled beer" → "bottled"
 
-6. SERVING STYLE DETECTION:
-   - Look for: neat, "on the rocks", shaken, stirred, draft, bottled, pint, "half pint"
-   - Extract from descriptions: "draft pint" → "draft", "bottle" → "bottled"
+8. NON-ALCOHOLIC DETECTION:
+   - Keywords: "virgin", "mocktail", "non-alcoholic", "alcohol-free", "0%"
 
-EXAMPLES:
-- "Classic Martini - Premium vodka or gin, dry vermouth, olive"
-  → spiritType: "gin", cocktailIngredients: ["vodka", "gin", "dry vermouth", "olive"]
-- "Rosé Negroni - Mirabeau French rosé gin, Lillet rosé vermouth & Pampelle grapefruit apéritif, garnished with lemon peel"
-  → spiritType: "gin", cocktailIngredients: ["Mirabeau French rosé gin", "Lillet rosé vermouth", "Pampelle grapefruit apéritif", "lemon peel"], servingStyle: "garnished"
-- "Punk IPA - BrewDog hoppy India Pale Ale, 5.6% ABV"  
-  → beerStyle: "IPA", alcoholContent: "5.6% ABV"
-- "Virgin Mojito - Lime, mint, sugar, soda water"
-  → isNonAlcoholic: true, cocktailIngredients: ["lime", "mint", "sugar", "soda water"]
+PRICE EXTRACTION EXAMPLES:
+- "Heineken: Pint £5.50, Bottle £4.25, Can £3.90" 
+  → servingOptions: [{"size": "Pint", "price": 5.50}, {"size": "Bottle", "price": 4.25}, {"size": "Can", "price": 3.90}]
+
+- "House Red Wine: Glass £7, Carafe £18, Bottle £28"
+  → servingOptions: [{"size": "Glass", "price": 7}, {"size": "Carafe", "price": 18}, {"size": "Bottle", "price": 28}]
+
+- "Vodka Tonic £8.50"
+  → price: 8.50, cocktailIngredients: ["vodka", "tonic water"]
+
+- "Premium Whiskey: Single £12, Double £22, Triple £32"
+  → servingOptions: [{"size": "Single", "price": 12}, {"size": "Double", "price": 22}, {"size": "Triple", "price": 32}]
 
 Return ONLY valid JSON in this exact format:
 {
@@ -174,17 +182,28 @@ Return ONLY valid JSON in this exact format:
       "index": 0,
       "spiritType": "vodka",
       "beerStyle": null,
-      "cocktailIngredients": ["vodka", "dry vermouth", "olive"],
+      "cocktailIngredients": ["vodka", "cranberry juice", "lime", "lime wheel"],
       "alcoholContent": null,
-      "servingStyle": null,
+      "servingStyle": "shaken",
       "isNonAlcoholic": false,
       "temperature": null,
+      "price": 8.50,
+      "servingOptions": [
+        {"size": "Regular", "price": 8.50},
+        {"size": "Large", "price": 12.00}
+      ],
       "confidence": 90
     }
   ]
 }
 
-IMPORTANT: Always include isNonAlcoholic as true/false (never null). Extract ALL identifiable ingredients.
+CRITICAL RULES:
+- If multiple prices found, create servingOptions array
+- If only one price found, use price field
+- Extract ALL serving sizes and their prices
+- Be precise with price numbers (no rounding unless necessary)
+- Include currency-free numeric prices only
+- Normalize serving size names (e.g., "1/2 pint" → "Half Pint")
 `.trim();
   }
 
@@ -290,10 +309,10 @@ Return analysis for all beverages as JSON in the specified format.
               analysis.cocktailIngredients &&
               Array.isArray(analysis.cocktailIngredients)
             ) {
-              // Filter out empty ingredients
-              const validIngredients = analysis.cocktailIngredients
-                .map((ing: string) => ing?.trim())
-                .filter((ing: string) => ing && ing.length > 0);
+              // Enhanced ingredient validation and normalization
+              const validIngredients = this.validateAndNormalizeIngredients(
+                analysis.cocktailIngredients
+              );
 
               if (validIngredients.length > 0) {
                 item.cocktailIngredients = validIngredients;
@@ -327,6 +346,54 @@ Return analysis for all beverages as JSON in the specified format.
               enhancementsApplied.push(`temperature: ${item.temperature}`);
             }
 
+            // Apply price information if extracted
+            if (analysis.price && typeof analysis.price === "number") {
+              item.price = analysis.price;
+              enhancementsApplied.push(`price: £${item.price}`);
+            }
+
+            // Apply serving options if extracted (for items with multiple sizes/prices)
+            if (
+              analysis.servingOptions &&
+              Array.isArray(analysis.servingOptions)
+            ) {
+              const validServingOptions = analysis.servingOptions
+                .filter(
+                  (option: any) =>
+                    option &&
+                    typeof option.size === "string" &&
+                    typeof option.price === "number" &&
+                    option.size.trim().length > 0 &&
+                    option.price > 0
+                )
+                .map((option: any) => ({
+                  size: option.size.trim(),
+                  price: Number(option.price),
+                }));
+
+              if (validServingOptions.length > 0) {
+                item.servingOptions = validServingOptions;
+                enhancementsApplied.push(
+                  `servingOptions: ${
+                    validServingOptions.length
+                  } options (${validServingOptions
+                    .map(
+                      (o: { size: string; price: number }) =>
+                        `${o.size}: £${o.price}`
+                    )
+                    .join(", ")})`
+                );
+
+                // If we have serving options, clear the single price field to avoid confusion
+                if (item.price && validServingOptions.length > 1) {
+                  item.price = undefined;
+                  enhancementsApplied.push(
+                    "cleared single price (using servingOptions instead)"
+                  );
+                }
+              }
+            }
+
             // Update confidence if provided
             if (analysis.confidence && analysis.confidence > item.confidence) {
               item.confidence = Math.min(analysis.confidence, 100);
@@ -350,6 +417,115 @@ Return analysis for all beverages as JSON in the specified format.
     }
 
     return enhancedItems;
+  }
+
+  /**
+   * Validate and normalize extracted ingredients for maximum accuracy
+   */
+  private validateAndNormalizeIngredients(ingredients: string[]): string[] {
+    // Preparation methods that should NOT be considered ingredients
+    const preparationMethods = [
+      "shaken",
+      "stirred",
+      "muddled",
+      "built",
+      "strained",
+      "blended",
+      "chilled",
+      "frozen",
+      "neat",
+      "on the rocks",
+      "straight up",
+      "garnished",
+      "served",
+      "topped",
+      "finished",
+      "mixed",
+      "combined",
+    ];
+
+    // Ingredient normalization mappings
+    const normalizations: Record<string, string> = {
+      // Fresh/house-made variations
+      "fresh lime juice": "lime juice",
+      "fresh lemon juice": "lemon juice",
+      "fresh-squeezed lime juice": "lime juice",
+      "fresh-squeezed lemon juice": "lemon juice",
+      "freshly squeezed lime juice": "lime juice",
+      "freshly squeezed lemon juice": "lemon juice",
+      "house-made simple syrup": "simple syrup",
+      "homemade simple syrup": "simple syrup",
+      "house simple syrup": "simple syrup",
+      "homemade grenadine": "grenadine",
+      "house-made grenadine": "grenadine",
+
+      // Muddled/prepared variations
+      "muddled mint": "mint",
+      "muddled mint leaves": "mint",
+      "fresh mint": "mint",
+      "fresh mint leaves": "mint",
+      "muddled cucumber": "cucumber",
+      "fresh cucumber": "cucumber",
+
+      // Garnish variations
+      "lemon twist": "lemon peel",
+      "orange twist": "orange peel",
+      "lime twist": "lime peel",
+      "maraschino cherry": "cherry",
+      "cocktail cherry": "cherry",
+
+      // Soda/mixer variations
+      "soda water": "soda water",
+      "club soda": "soda water",
+      "sparkling water": "soda water",
+      "tonic water": "tonic",
+      "ginger beer": "ginger beer",
+      "ginger ale": "ginger ale",
+
+      // Common misspellings/variations
+      "simple syrup": "simple syrup",
+      "triple sec": "triple sec",
+      "dry vermouth": "vermouth",
+      "sweet vermouth": "vermouth",
+    };
+
+    return ingredients
+      .map((ingredient: string) => ingredient?.trim())
+      .filter((ingredient: string) => {
+        if (!ingredient || ingredient.length === 0) return false;
+
+        const lowerIngredient = ingredient.toLowerCase();
+
+        // Filter out preparation methods
+        const isPreparationMethod = preparationMethods.some(
+          (method) =>
+            lowerIngredient.includes(method.toLowerCase()) &&
+            lowerIngredient.split(" ").length <= 3 // Avoid filtering complex ingredient descriptions
+        );
+
+        if (isPreparationMethod) {
+          console.log(`🚫 Filtered out preparation method: ${ingredient}`);
+          return false;
+        }
+
+        return true;
+      })
+      .map((ingredient: string) => {
+        const normalized = normalizations[ingredient.toLowerCase()];
+        if (normalized) {
+          console.log(`🔄 Normalized "${ingredient}" → "${normalized}"`);
+          return normalized;
+        }
+        return ingredient;
+      })
+      .filter((ingredient: string, index: number, array: string[]) => {
+        // Remove duplicates (case-insensitive)
+        return (
+          array.findIndex(
+            (item) => item.toLowerCase() === ingredient.toLowerCase()
+          ) === index
+        );
+      });
   }
 
   /**

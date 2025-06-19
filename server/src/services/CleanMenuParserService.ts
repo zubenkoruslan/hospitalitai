@@ -2107,6 +2107,11 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
               servingStyle: enhancedBeverage.servingStyle,
               isNonAlcoholic: enhancedBeverage.isNonAlcoholic,
               temperature: enhancedBeverage.temperature,
+              // Apply price information from beverage enhancement
+              price: enhancedBeverage.price || enhancedItems[itemIndex].price,
+              servingOptions:
+                enhancedBeverage.servingOptions ||
+                enhancedItems[itemIndex].servingOptions,
             };
             enhancedCount++;
 
@@ -2121,6 +2126,17 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
             ) {
               enhancementDetails.push(
                 `${enhancedBeverage.cocktailIngredients.length} ingredients`
+              );
+            }
+            if (enhancedBeverage.price) {
+              enhancementDetails.push(`price: £${enhancedBeverage.price}`);
+            }
+            if (
+              enhancedBeverage.servingOptions &&
+              enhancedBeverage.servingOptions.length > 0
+            ) {
+              enhancementDetails.push(
+                `${enhancedBeverage.servingOptions.length} serving options`
               );
             }
 

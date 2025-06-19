@@ -45,14 +45,14 @@ export type WineColorType = (typeof WINE_COLORS)[number];
 // export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
 // export type ItemCategory = FoodCategory | BeverageCategory; // Will just be string now
 
-// Interface for Wine Serving Option sub-document
-export interface IWineServingOption extends Types.Subdocument {
+// Interface for Serving Option sub-document (used by wines, beers, and beverages)
+export interface IServingOption extends Types.Subdocument {
   size: string;
   price: number;
 }
 
 // For plain objects (e.g. after .lean())
-export interface ILeanWineServingOption {
+export interface ILeanServingOption {
   _id?: Types.ObjectId;
   size: string;
   price: number;
@@ -97,7 +97,7 @@ export interface IMenuItem extends Document {
   grapeVariety?: string[];
   vintage?: number;
   region?: string;
-  servingOptions?: Types.DocumentArray<IWineServingOption>; // Array of serving options for wines
+  servingOptions?: Types.DocumentArray<IServingOption>; // Array of serving options for wines, beers, and beverages
   suggestedPairingsText?: string[]; // Names of food items suggested for pairing by AI
 }
 
@@ -138,7 +138,7 @@ export interface ILeanMenuItem {
   grapeVariety?: string[];
   vintage?: number;
   region?: string;
-  servingOptions?: ILeanWineServingOption[];
+  servingOptions?: ILeanServingOption[];
   suggestedPairingsText?: string[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -146,7 +146,7 @@ export interface ILeanMenuItem {
 }
 
 // Mongoose schema definition
-const WineServingOptionSchema: Schema<IWineServingOption> = new Schema({
+const ServingOptionSchema: Schema<IServingOption> = new Schema({
   size: { type: String, required: true, trim: true },
   price: { type: Number, required: true, min: [0, "Price cannot be negative"] },
 });
@@ -315,7 +315,7 @@ const MenuItemSchema: Schema<IMenuItem> = new Schema(
       trim: true,
     },
     servingOptions: {
-      type: [WineServingOptionSchema],
+      type: [ServingOptionSchema],
       default: undefined, // Explicitly undefined for arrays if not provided
     },
     suggestedPairingsText: {
