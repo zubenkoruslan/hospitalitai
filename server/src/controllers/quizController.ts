@@ -180,108 +180,116 @@ export const submitQuizAttemptController = async (
       attemptData
     );
 
-    // Update knowledge analytics when quiz is completed
-    try {
-      const { KnowledgeAnalyticsService } = await import(
-        "../services/knowledgeAnalyticsService"
-      );
-      await KnowledgeAnalyticsService.updateAnalyticsOnQuizCompletion(
-        staffUserId,
-        new mongoose.Types.ObjectId(req.user!.restaurantId!),
-        new mongoose.Types.ObjectId(result.attemptId)
-      );
-      console.log(
-        `Updated knowledge analytics for user ${staffUserId} after quiz completion`
-      );
-    } catch (analyticsError) {
-      console.error(
-        "Error updating knowledge analytics on quiz completion:",
-        analyticsError
-      );
-      // Don't fail the submission if analytics update fails
+    // Update knowledge analytics when quiz is completed (skip for practice mode)
+    if (!attemptData.isPracticeMode) {
+      try {
+        const { KnowledgeAnalyticsService } = await import(
+          "../services/knowledgeAnalyticsService"
+        );
+        await KnowledgeAnalyticsService.updateAnalyticsOnQuizCompletion(
+          staffUserId,
+          new mongoose.Types.ObjectId(req.user!.restaurantId!),
+          new mongoose.Types.ObjectId(result.attemptId)
+        );
+        console.log(
+          `Updated knowledge analytics for user ${staffUserId} after quiz completion`
+        );
+      } catch (analyticsError) {
+        console.error(
+          "Error updating knowledge analytics on quiz completion:",
+          analyticsError
+        );
+        // Don't fail the submission if analytics update fails
+      }
     }
 
-    // Create completion notification for the staff member
-    try {
-      const quiz = await QuizModel.findById(quizObjectId)
-        .select("title")
-        .lean<Pick<IQuiz, "title">>();
-      if (quiz) {
-        const percentage = Math.round(
-          (result.score / result.totalQuestionsAttempted) * 100
-        );
+    // Create completion notification for the staff member (skip for practice mode)
+    if (!attemptData.isPracticeMode) {
+      try {
+        const quiz = await QuizModel.findById(quizObjectId)
+          .select("title")
+          .lean<Pick<IQuiz, "title">>();
+        if (quiz) {
+          const percentage = Math.round(
+            (result.score / result.totalQuestionsAttempted) * 100
+          );
 
-        // Create notification for the staff member
-        await NotificationService.createNotification({
-          type: "completed_training",
-          content: `Congratulations! You completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
-          userId: staffUserId,
-          restaurantId: new mongoose.Types.ObjectId(req.user!.restaurantId!),
-          relatedId: quizObjectId,
-          metadata: {
-            quizId: quizObjectId,
-            score: result.score,
-            totalQuestions: result.totalQuestionsAttempted,
-            percentage: percentage,
-          },
-        });
-
-        console.log(
-          `Created completion notification for user ${staffUserId} completing quiz ${quiz.title}`
-        );
-
-        // Also notify restaurant managers about staff completion
-        try {
-          const staffUser = await User.findById(staffUserId)
-            .select("name")
-            .lean();
-          const restaurantManagers = await User.find({
+          // Create notification for the staff member
+          await NotificationService.createNotification({
+            type: "completed_training",
+            content: `Congratulations! You completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
+            userId: staffUserId,
             restaurantId: new mongoose.Types.ObjectId(req.user!.restaurantId!),
-            role: { $in: ["restaurant", "restaurantAdmin", "manager"] },
-          })
-            .select("_id")
-            .lean();
+            relatedId: quizObjectId,
+            metadata: {
+              quizId: quizObjectId,
+              score: result.score,
+              totalQuestions: result.totalQuestionsAttempted,
+              percentage: percentage,
+            },
+          });
 
-          if (restaurantManagers.length > 0 && staffUser) {
-            const managerNotifications = restaurantManagers.map((manager) => ({
-              type: "completed_training" as const,
-              content: `${staffUser.name} completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
-              userId: manager._id,
+          console.log(
+            `Created completion notification for user ${staffUserId} completing quiz ${quiz.title}`
+          );
+
+          // Also notify restaurant managers about staff completion
+          try {
+            const staffUser = await User.findById(staffUserId)
+              .select("name")
+              .lean();
+            const restaurantManagers = await User.find({
               restaurantId: new mongoose.Types.ObjectId(
                 req.user!.restaurantId!
               ),
-              relatedId: quizObjectId,
-              metadata: {
-                staffId: staffUserId,
-                staffName: staffUser.name,
-                quizId: quizObjectId,
-                score: result.score,
-                totalQuestions: result.totalQuestionsAttempted,
-                percentage: percentage,
-              },
-            }));
+              role: { $in: ["restaurant", "restaurantAdmin", "manager"] },
+            })
+              .select("_id")
+              .lean();
 
-            await NotificationService.createBulkNotifications(
-              managerNotifications
+            if (restaurantManagers.length > 0 && staffUser) {
+              const managerNotifications = restaurantManagers.map(
+                (manager) => ({
+                  type: "completed_training" as const,
+                  content: `${staffUser.name} completed "${quiz.title}" with a score of ${percentage}% (${result.score}/${result.totalQuestionsAttempted})`,
+                  userId: manager._id,
+                  restaurantId: new mongoose.Types.ObjectId(
+                    req.user!.restaurantId!
+                  ),
+                  relatedId: quizObjectId,
+                  metadata: {
+                    staffId: staffUserId,
+                    staffName: staffUser.name,
+                    quizId: quizObjectId,
+                    score: result.score,
+                    totalQuestions: result.totalQuestionsAttempted,
+                    percentage: percentage,
+                  },
+                })
+              );
+
+              await NotificationService.createBulkNotifications(
+                managerNotifications
+              );
+              console.log(
+                `Created ${managerNotifications.length} manager notifications for ${staffUser.name} completing quiz ${quiz.title}`
+              );
+            }
+          } catch (managerNotificationError) {
+            console.error(
+              "Error creating manager notifications for quiz completion:",
+              managerNotificationError
             );
-            console.log(
-              `Created ${managerNotifications.length} manager notifications for ${staffUser.name} completing quiz ${quiz.title}`
-            );
+            // Don't fail the submission if manager notifications fail
           }
-        } catch (managerNotificationError) {
-          console.error(
-            "Error creating manager notifications for quiz completion:",
-            managerNotificationError
-          );
-          // Don't fail the submission if manager notifications fail
         }
+      } catch (notificationError) {
+        console.error(
+          "Error creating completion notification:",
+          notificationError
+        );
+        // Don't fail the submission if notifications fail
       }
-    } catch (notificationError) {
-      console.error(
-        "Error creating completion notification:",
-        notificationError
-      );
-      // Don't fail the submission if notifications fail
     }
 
     res.status(200).json({

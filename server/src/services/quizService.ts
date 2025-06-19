@@ -265,6 +265,7 @@ export interface QuizAttemptSubmitData {
     answerGiven: any; // User's answer, type depends on questionType
   }>;
   durationInSeconds?: number; // Optional: time taken for the quiz
+  isPracticeMode?: boolean; // Optional: whether this is a practice attempt
 }
 
 // Define a type for the questions being sent to the client for an attempt
@@ -1247,35 +1248,45 @@ export class QuizService {
       });
     }
 
-    // 3. Create QuizAttempt document
-    const newAttempt = await QuizAttempt.create({
-      staffUserId,
-      quizId,
-      restaurantId: quiz.restaurantId,
-      questionsPresented: attemptQuestionsProcessedForDB,
-      score,
-      attemptDate: new Date(),
-      durationInSeconds: attemptData.durationInSeconds,
-    });
+    // 3. Create QuizAttempt document (skip for practice mode)
+    let newAttempt;
+    if (!attemptData.isPracticeMode) {
+      newAttempt = await QuizAttempt.create({
+        staffUserId,
+        quizId,
+        restaurantId: quiz.restaurantId,
+        questionsPresented: attemptQuestionsProcessedForDB,
+        score,
+        attemptDate: new Date(),
+        durationInSeconds: attemptData.durationInSeconds,
+      });
 
-    // 4. Update StaffQuizProgress
-    staffProgress.seenQuestionIds = [
-      ...new Set([
-        ...staffProgress.seenQuestionIds.map((id) => id.toString()),
-        ...presentedQuestionIds.map((id) => id.toString()),
-      ]),
-    ].map((idStr) => new Types.ObjectId(idStr));
+      // 4. Update StaffQuizProgress (skip for practice mode)
+      staffProgress.seenQuestionIds = [
+        ...new Set([
+          ...staffProgress.seenQuestionIds.map((id) => id.toString()),
+          ...presentedQuestionIds.map((id) => id.toString()),
+        ]),
+      ].map((idStr) => new Types.ObjectId(idStr));
 
-    staffProgress.lastAttemptCompletedAt = newAttempt.attemptDate;
+      staffProgress.lastAttemptCompletedAt = newAttempt.attemptDate;
 
-    if (
-      staffProgress.seenQuestionIds.length >=
-      staffProgress.totalUniqueQuestionsInSource
-    ) {
-      staffProgress.isCompletedOverall = true;
+      if (
+        staffProgress.seenQuestionIds.length >=
+        staffProgress.totalUniqueQuestionsInSource
+      ) {
+        staffProgress.isCompletedOverall = true;
+      }
+
+      await staffProgress.save();
+    } else {
+      // For practice mode, create a temporary attempt object for response
+      newAttempt = {
+        _id: new Types.ObjectId(),
+        attemptDate: new Date(),
+        durationInSeconds: attemptData.durationInSeconds,
+      };
     }
-
-    await staffProgress.save();
 
     // 5. Return the detailed response for the client
     return {

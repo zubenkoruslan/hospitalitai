@@ -92,6 +92,7 @@ export interface ClientAnswerForSubmission {
 export interface ClientQuizAttemptSubmitData {
   questions: ClientAnswerForSubmission[];
   durationInSeconds?: number;
+  isPracticeMode?: boolean;
 }
 
 // From api.ts: ClientGradedQuestion (lines 551-556)

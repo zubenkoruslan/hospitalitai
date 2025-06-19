@@ -259,6 +259,7 @@ const QuizTakingPage: React.FC<QuizTakingPageProps> = ({
 
       const submitData: ClientQuizAttemptSubmitData = {
         questions: answersArray,
+        isPracticeMode,
       };
 
       const result = await submitQuizAttempt(quizId, submitData);

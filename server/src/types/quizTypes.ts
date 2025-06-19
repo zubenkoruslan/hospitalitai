@@ -39,6 +39,7 @@ export interface SubmitQuizAttemptRequestBody {
     answerGiven: any; // Consider making this more specific if possible, e.g., number | string | string[]
   }>;
   durationInSeconds?: number;
+  isPracticeMode?: boolean;
 }
 
 // ADDED: Details of a correct answer for the quiz review
