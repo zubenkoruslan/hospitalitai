@@ -121,7 +121,7 @@ const StaffDashboard: React.FC = () => {
     );
 
     if (availableQuiz) {
-      navigate(`/quiz/${availableQuiz._id}`);
+      navigate(`/staff/quiz/${availableQuiz._id}/take`);
     } else {
       navigate("/staff/quizzes");
     }
