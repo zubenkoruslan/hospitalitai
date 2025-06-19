@@ -212,16 +212,6 @@ const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
                 🎯 Practice Again - No Cooldown!
               </Button>
             )}
-
-            {!isPracticeMode && onRetakeQuiz && percentage < 100 && (
-              <Button
-                onClick={onRetakeQuiz}
-                variant="white"
-                className="w-full h-12 text-lg font-semibold border-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                Take Quiz Again
-              </Button>
-            )}
           </div>
 
           {/* Achievement Hint */}
