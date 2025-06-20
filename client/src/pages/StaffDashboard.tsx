@@ -19,38 +19,228 @@ import AchievementsBanner from "../components/staff/dashboard/AchievementsBanner
 import BottomNavigation from "../components/staff/dashboard/BottomNavigation";
 import PracticeModeModal from "../components/quiz/PracticeModeModal";
 
-// Mock achievement data (to be replaced with real API calls)
-const mockAchievements = [
-  {
-    id: "1",
-    title: "Getting Started",
-    description: "Complete your first quiz",
-    emoji: "🎯",
-    tier: "bronze" as const,
-    earnedAt: "2024-01-15",
-    isNew: true,
-  },
-  {
-    id: "2",
-    title: "Quick Learner",
-    description: "Score 90% or higher",
-    emoji: "⚡",
-    tier: "silver" as const,
-    earnedAt: "2024-01-14",
-  },
-  {
-    id: "3",
-    title: "Perfectionist",
-    description: "Get 100% on a quiz",
-    emoji: "⭐",
-    tier: "gold" as const,
-    earnedAt: "2024-01-13",
-  },
-];
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  emoji: string;
+  tier: "bronze" | "silver" | "gold" | "platinum";
+  earnedAt: string;
+  isNew?: boolean;
+}
 
 interface StaffQuizDisplayItem extends ClientIQuiz {
   progress?: ClientStaffQuizProgressWithAttempts | null;
 }
+
+// Real Achievement Calculator
+const calculateRealAchievements = (
+  completedQuizzes: number,
+  averageScore: number,
+  totalQuestions: number,
+  currentLevel: number
+): Achievement[] => {
+  const achievements: Achievement[] = [];
+  const now = new Date();
+  const recentDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+
+  // Achievement 1: Getting Started (Complete first quiz)
+  if (completedQuizzes >= 1) {
+    achievements.push({
+      id: "getting_started",
+      title: "Getting Started",
+      description: "Complete your first quiz",
+      emoji: "🎯",
+      tier: "bronze",
+      earnedAt: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: completedQuizzes === 1, // New if just completed first quiz
+    });
+  }
+
+  // Achievement 2: Quiz Enthusiast (Complete 3 quizzes)
+  if (completedQuizzes >= 3) {
+    achievements.push({
+      id: "quiz_enthusiast",
+      title: "Quiz Enthusiast",
+      description: "Complete 3 quizzes",
+      emoji: "📚",
+      tier: "bronze",
+      earnedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: completedQuizzes === 3,
+    });
+  }
+
+  // Achievement 3: Dedicated Learner (Complete 5 quizzes)
+  if (completedQuizzes >= 5) {
+    achievements.push({
+      id: "dedicated_learner",
+      title: "Dedicated Learner",
+      description: "Complete 5 quizzes",
+      emoji: "🏆",
+      tier: "silver",
+      earnedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: completedQuizzes === 5,
+    });
+  }
+
+  // Achievement 4: Quiz Master (Complete 10 quizzes)
+  if (completedQuizzes >= 10) {
+    achievements.push({
+      id: "quiz_master",
+      title: "Quiz Master",
+      description: "Complete 10 quizzes",
+      emoji: "👑",
+      tier: "gold",
+      earnedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: completedQuizzes === 10,
+    });
+  }
+
+  // Achievement 5: Knowledge Champion (Complete 20 quizzes)
+  if (completedQuizzes >= 20) {
+    achievements.push({
+      id: "knowledge_champion",
+      title: "Knowledge Champion",
+      description: "Complete 20 quizzes",
+      emoji: "🌟",
+      tier: "platinum",
+      earnedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: completedQuizzes === 20,
+    });
+  }
+
+  // Achievement 6: Good Score (70%+ average)
+  if (averageScore >= 70 && completedQuizzes >= 2) {
+    achievements.push({
+      id: "good_score",
+      title: "Good Performer",
+      description: "Achieve 70%+ average score",
+      emoji: "👍",
+      tier: "bronze",
+      earnedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: averageScore >= 70 && averageScore < 80,
+    });
+  }
+
+  // Achievement 7: High Scorer (80%+ average)
+  if (averageScore >= 80 && completedQuizzes >= 3) {
+    achievements.push({
+      id: "high_scorer",
+      title: "High Scorer",
+      description: "Achieve 80%+ average score",
+      emoji: "⭐",
+      tier: "silver",
+      earnedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: averageScore >= 80 && averageScore < 90,
+    });
+  }
+
+  // Achievement 8: Excellent Student (90%+ average)
+  if (averageScore >= 90 && completedQuizzes >= 3) {
+    achievements.push({
+      id: "excellent_student",
+      title: "Excellent Student",
+      description: "Achieve 90%+ average score",
+      emoji: "🌟",
+      tier: "gold",
+      earnedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: averageScore >= 90 && averageScore < 95,
+    });
+  }
+
+  // Achievement 9: Perfectionist (95%+ average)
+  if (averageScore >= 95 && completedQuizzes >= 3) {
+    achievements.push({
+      id: "perfectionist",
+      title: "Perfectionist",
+      description: "Achieve 95%+ average score",
+      emoji: "💎",
+      tier: "platinum",
+      earnedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: averageScore >= 95,
+    });
+  }
+
+  // Achievement 10: Question Explorer (50+ questions answered)
+  if (totalQuestions >= 50) {
+    achievements.push({
+      id: "question_explorer",
+      title: "Question Explorer",
+      description: "Answer 50+ questions",
+      emoji: "🔍",
+      tier: "bronze",
+      earnedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: totalQuestions >= 50 && totalQuestions < 100,
+    });
+  }
+
+  // Achievement 11: Knowledge Seeker (100+ questions answered)
+  if (totalQuestions >= 100) {
+    achievements.push({
+      id: "knowledge_seeker",
+      title: "Knowledge Seeker",
+      description: "Answer 100+ questions",
+      emoji: "🎓",
+      tier: "silver",
+      earnedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: totalQuestions >= 100 && totalQuestions < 200,
+    });
+  }
+
+  // Achievement 12: Scholar (200+ questions answered)
+  if (totalQuestions >= 200) {
+    achievements.push({
+      id: "scholar",
+      title: "Scholar",
+      description: "Answer 200+ questions",
+      emoji: "📖",
+      tier: "gold",
+      earnedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: totalQuestions >= 200,
+    });
+  }
+
+  // Achievement 13: Level Achiever (Reach Level 3+)
+  if (currentLevel >= 3) {
+    achievements.push({
+      id: "level_achiever",
+      title: "Level Achiever",
+      description: `Reach Level ${currentLevel}`,
+      emoji: "🚀",
+      tier: currentLevel >= 5 ? "gold" : "silver",
+      earnedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: currentLevel >= 3 && currentLevel <= 4,
+    });
+  }
+
+  // Achievement 14: Consistency King (Special - reach level 5+)
+  if (currentLevel >= 5) {
+    achievements.push({
+      id: "consistency_king",
+      title: "Consistency King",
+      description: "Reach Level 5+ through consistent learning",
+      emoji: "👑",
+      tier: "platinum",
+      earnedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      isNew: currentLevel === 5,
+    });
+  }
+
+  // Sort achievements by tier importance and earned date
+  const tierOrder = { platinum: 4, gold: 3, silver: 2, bronze: 1 };
+  return achievements.sort((a, b) => {
+    // First, prioritize "new" achievements
+    if (a.isNew && !b.isNew) return -1;
+    if (!a.isNew && b.isNew) return 1;
+
+    // Then by tier (higher tier first)
+    const tierDiff = tierOrder[b.tier] - tierOrder[a.tier];
+    if (tierDiff !== 0) return tierDiff;
+
+    // Finally by earned date (most recent first)
+    return new Date(b.earnedAt).getTime() - new Date(a.earnedAt).getTime();
+  });
+};
 
 const StaffDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -70,6 +260,10 @@ const StaffDashboard: React.FC = () => {
   const [averageScore, setAverageScore] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(1);
   const [progressPercentage, setProgressPercentage] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+
+  // Real achievements state
+  const [realAchievements, setRealAchievements] = useState<Achievement[]>([]);
 
   // Calculate level based on completed quizzes - MATCH MyProgressPage calculation
   const calculateLevel = (completed: number): number => {
@@ -106,7 +300,8 @@ const StaffDashboard: React.FC = () => {
       const realAverageScore = Math.round(
         personalMetrics.overallAverageScore || 0
       );
-      const totalQuestions = personalMetrics.totalQuestionsAnswered || 0;
+      const totalQuestionsAnswered =
+        personalMetrics.totalQuestionsAnswered || 0;
 
       // Calculate level and streak - SAME AS MyProgressPage
       const currentStreak = Math.min(completedQuizzes, 7); // Mock streak based on completed quizzes
@@ -118,6 +313,16 @@ const StaffDashboard: React.FC = () => {
       setCurrentLevel(level);
       setProgressPercentage(progressPercentage);
       setCurrentStreak(currentStreak);
+      setTotalQuestions(totalQuestionsAnswered);
+
+      // Calculate real achievements based on actual progress
+      const achievements = calculateRealAchievements(
+        completedQuizzes,
+        realAverageScore,
+        totalQuestionsAnswered,
+        level
+      );
+      setRealAchievements(achievements);
 
       console.log("StaffDashboard Analytics Data:", {
         totalQuizzes,
@@ -125,6 +330,8 @@ const StaffDashboard: React.FC = () => {
         realAverageScore,
         level,
         progressPercentage,
+        totalQuestionsAnswered,
+        achievements: achievements.length,
         personalMetrics,
       });
     } catch (err) {
@@ -273,10 +480,10 @@ const StaffDashboard: React.FC = () => {
               onViewProgress={handleViewProgress}
             />
 
-            {/* Achievements */}
+            {/* Real Achievements */}
             <AchievementsBanner
-              recentAchievements={mockAchievements}
-              totalAchievements={mockAchievements.length}
+              recentAchievements={realAchievements}
+              totalAchievements={realAchievements.length}
               onViewAll={handleViewAllAchievements}
             />
 
