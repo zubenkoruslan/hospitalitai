@@ -71,15 +71,15 @@ const StaffDashboard: React.FC = () => {
   const [currentLevel, setCurrentLevel] = useState(1);
   const [progressPercentage, setProgressPercentage] = useState(0);
 
-  // Calculate level based on completed quizzes (simplified)
+  // Calculate level based on completed quizzes - MATCH MyProgressPage calculation
   const calculateLevel = (completed: number): number => {
-    return Math.floor(completed / 5) + 1;
+    return Math.floor(completed / 3) + 1;
   };
 
-  // Calculate progress within current level
+  // Calculate progress within current level - MATCH MyProgressPage calculation
   const calculateLevelProgress = (completed: number): number => {
-    const progressInLevel = completed % 5;
-    return (progressInLevel / 5) * 100;
+    const progressInLevel = completed % 3;
+    return (progressInLevel / 3) * 100;
   };
 
   // Fetch dashboard data
@@ -90,19 +90,43 @@ const StaffDashboard: React.FC = () => {
     setError(null);
 
     try {
+      // Fetch real analytics data - SAME AS MyProgressPage
+      const analyticsResponse = await api.get(`/analytics/staff/${user._id}`);
+      const analytics = analyticsResponse.data.data; // Access nested data field
+
+      // Fetch available quizzes
       const quizzesData = await getAvailableQuizzesForStaff();
       setAvailableQuizzes(quizzesData);
 
-      // For now, using mock data for progress stats
-      // In real implementation, these would come from a dedicated progress endpoint
-      const mockCompleted = 3;
-      const mockAverageScore = 85;
+      // Use real analytics data for overall stats with fallbacks - SAME AS MyProgressPage
+      const personalMetrics = analytics?.personalMetrics || {};
 
-      setTotalCompleted(mockCompleted);
-      setAverageScore(mockAverageScore);
-      setCurrentLevel(calculateLevel(mockCompleted));
-      setProgressPercentage(calculateLevelProgress(mockCompleted));
-      setCurrentStreak(Math.min(mockCompleted, 7));
+      const totalQuizzes = quizzesData.length;
+      const completedQuizzes = personalMetrics.totalQuizzesCompleted || 0;
+      const realAverageScore = Math.round(
+        personalMetrics.overallAverageScore || 0
+      );
+      const totalQuestions = personalMetrics.totalQuestionsAnswered || 0;
+
+      // Calculate level and streak - SAME AS MyProgressPage
+      const currentStreak = Math.min(completedQuizzes, 7); // Mock streak based on completed quizzes
+      const level = Math.floor(completedQuizzes / 3) + 1; // FIXED: Match MyProgressPage calculation
+      const progressPercentage = ((completedQuizzes % 3) / 3) * 100; // FIXED: Match MyProgressPage calculation
+
+      setTotalCompleted(completedQuizzes);
+      setAverageScore(realAverageScore);
+      setCurrentLevel(level);
+      setProgressPercentage(progressPercentage);
+      setCurrentStreak(currentStreak);
+
+      console.log("StaffDashboard Analytics Data:", {
+        totalQuizzes,
+        completedQuizzes,
+        realAverageScore,
+        level,
+        progressPercentage,
+        personalMetrics,
+      });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data. Please try again.");
@@ -223,7 +247,7 @@ const StaffDashboard: React.FC = () => {
                       />
                     </div>
                     <p className="text-sm text-slate-500">
-                      {5 - (totalCompleted % 5)} more to reach Level{" "}
+                      {3 - (totalCompleted % 3)} more to reach Level{" "}
                       {currentLevel + 1}
                     </p>
                   </div>
