@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GrapeVarietyIdentifierService } from "./GrapeVarietyIdentifierService";
 import { FoodItemEnhancerService } from "./FoodItemEnhancerService";
 import { BeverageItemEnhancerService } from "./BeverageItemEnhancerService";
+import { AdvancedPriceCategoryService } from "./AdvancedPriceCategoryService";
 import * as XLSX from "xlsx";
 import * as mammoth from "mammoth";
 import * as csv from "csv-parser";
@@ -69,6 +70,7 @@ export class CleanMenuParserService {
   private grapeIdentifier: GrapeVarietyIdentifierService;
   private foodEnhancer: FoodItemEnhancerService;
   private beverageEnhancer: BeverageItemEnhancerService;
+  private advancedPriceCategoryService: AdvancedPriceCategoryService;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -79,6 +81,7 @@ export class CleanMenuParserService {
     this.grapeIdentifier = new GrapeVarietyIdentifierService();
     this.foodEnhancer = new FoodItemEnhancerService();
     this.beverageEnhancer = new BeverageItemEnhancerService();
+    this.advancedPriceCategoryService = new AdvancedPriceCategoryService();
   }
 
   /**
@@ -614,9 +617,18 @@ export class CleanMenuParserService {
         processingNotes.push(...validatedData.processingNotes);
       }
 
+      // Apply advanced price and category enhancements FIRST
+      const advancedEnhancedData = await this.enhanceWithAdvancedPriceCategory(
+        validatedData
+      );
+
+      if (advancedEnhancedData.processingNotes) {
+        processingNotes.push(...advancedEnhancedData.processingNotes);
+      }
+
       // Enhance wine items with grape variety identification
       const wineEnhancedData = await this.enhanceWineItemsWithGrapeVarieties(
-        validatedData
+        advancedEnhancedData
       );
 
       if (wineEnhancedData.processingNotes) {
@@ -1176,20 +1188,41 @@ export class CleanMenuParserService {
       // Validate and clean results
       const validatedData = this.validateAndCleanResults(combinedData);
 
-      // Enhance wine items with grape variety identification
-      const wineEnhancedData = await this.enhanceWineItemsWithGrapeVarieties(
+      // Apply advanced price and category enhancements FIRST
+      const advancedEnhancedData = await this.enhanceWithAdvancedPriceCategory(
         validatedData
       );
+
+      if (advancedEnhancedData.processingNotes) {
+        processingNotes.push(...advancedEnhancedData.processingNotes);
+      }
+
+      // Enhance wine items with grape variety identification
+      const wineEnhancedData = await this.enhanceWineItemsWithGrapeVarieties(
+        advancedEnhancedData
+      );
+
+      if (wineEnhancedData.processingNotes) {
+        processingNotes.push(...wineEnhancedData.processingNotes);
+      }
 
       // Enhance food items with detailed analysis
       const foodEnhancedData = await this.enhanceFoodItemsWithDetails(
         wineEnhancedData
       );
 
+      if (foodEnhancedData.processingNotes) {
+        processingNotes.push(...foodEnhancedData.processingNotes);
+      }
+
       // Enhance beverage items with detailed analysis
       const fullyEnhancedData = await this.enhanceBeverageItemsWithDetails(
         foodEnhancedData
       );
+
+      if (fullyEnhancedData.processingNotes) {
+        processingNotes.push(...fullyEnhancedData.processingNotes);
+      }
 
       return {
         success: true,
@@ -1411,11 +1444,20 @@ CRITICAL INSTRUCTION: Extract EVERY SINGLE menu item found in the document. Do n
 GUIDELINES:
 1. Extract ONLY actual menu items (food, drinks, wines) - skip headers, descriptions, decorative text
 2. Determine item type: "food", "beverage", or "wine"
-3. Extract prices accurately - look for £, $, € symbols and numbers
+3. Extract prices accurately using ADVANCED PATTERN RECOGNITION:
+   - Multi-column formats: "8.5   24.25   34" → Glass £8.50, Carafe £24.25, Bottle £34.00
+   - Explicit serving sizes: "Pint £6.50, Half Pint £3.25, Bottle £4.75"
+   - Currency symbols: £, $, €, ¥ with decimal amounts
+   - Price ranges: "£15-22" → average price with range notation
+   - Context-aware decimals: "70" in wine context = £70.00 bottle price
+   - Standalone pricing: Look for reasonable price values (£3-500 range)
 4. For wines: extract vintage, producer, region, serving options (glass/bottle/half-bottle prices)
 5. Look for multiple serving sizes and prices: "by the glass", "125ml", "175ml", "bottle", "half bottle", "magnum"
 6. Extract serving options as array: [{"size": "Glass", "price": 8.50}, {"size": "Bottle", "price": 32.00}]
-7. Categorize items logically (appetizers, mains, desserts, wines, etc.)
+7. Categorize items using INTELLIGENT CONTEXT ANALYSIS:
+   - Wine indicators: vintage years (1990-2025), regions (Bordeaux, Tuscany), grape varieties (Cabernet, Chardonnay)
+   - Food indicators: cooking methods (grilled, fried, baked), ingredients, dietary markers ((V), (GF), (VG))
+   - Beverage indicators: spirit types (gin, vodka, whiskey), beer styles (IPA, lager, stout), serving styles (draft, bottled)
 8. Set confidence score (0-100) based on how clear the extraction is
 9. Be conservative - if unsure about details, leave fields empty rather than guess
 10. NEVER skip wine items - extract every wine mentioned in the document
@@ -2343,5 +2385,142 @@ Remember: Extract ALL items found. Do not limit the count. Return ONLY the JSON 
 
     // Default to still wine for everything else
     return "still";
+  }
+
+  /**
+   * Apply advanced price and category enhancements
+   */
+  private async enhanceWithAdvancedPriceCategory(
+    data: ParsedMenuData
+  ): Promise<ParsedMenuData> {
+    console.log("🎯 Applying advanced price and category enhancements...");
+
+    const enhancedItems = [...data.items];
+    const processingNotes: string[] = [];
+
+    let priceEnhancementCount = 0;
+    let categoryEnhancementCount = 0;
+
+    // Process each item with advanced detection
+    for (let i = 0; i < enhancedItems.length; i++) {
+      const item = enhancedItems[i];
+
+      try {
+        // Get context from surrounding items and original text
+        const contextItems = enhancedItems
+          .slice(Math.max(0, i - 2), i)
+          .map((contextItem) => contextItem.originalText);
+
+        // Enhanced price extraction
+        const extractedPrices =
+          this.advancedPriceCategoryService.extractPricesAdvanced(
+            item.originalText,
+            contextItems
+          );
+
+        // Apply better prices if found
+        if (extractedPrices.length > 0) {
+          const bestPrices = extractedPrices.filter((p) => p.confidence >= 70);
+
+          if (bestPrices.length > 1) {
+            // Multiple prices - create serving options
+            item.servingOptions = bestPrices.map((p) => ({
+              size: p.size || "Standard",
+              price: p.price,
+            }));
+
+            // Clear single price if we have multiple options
+            if (item.price) {
+              item.price = undefined;
+            }
+
+            priceEnhancementCount++;
+            console.log(
+              `💰 Enhanced "${item.name}" with ${bestPrices.length} price options`
+            );
+          } else if (bestPrices.length === 1 && bestPrices[0].confidence > 85) {
+            // Single high-confidence price
+            const newPrice = bestPrices[0];
+
+            if (!item.price || newPrice.confidence > 90) {
+              item.price = newPrice.price;
+              priceEnhancementCount++;
+              console.log(
+                `💰 Enhanced "${item.name}" price: £${newPrice.price} (${newPrice.confidence}% confidence)`
+              );
+            }
+          }
+        }
+
+        // Enhanced category detection
+        const categoryAnalysis =
+          this.advancedPriceCategoryService.detectCategoryAdvanced(
+            item.originalText,
+            contextItems,
+            enhancedItems
+              .slice(Math.max(0, i - 3), i)
+              .map((c) => c.originalText)
+          );
+
+        // Apply better category if confidence is high enough
+        if (
+          categoryAnalysis.confidence > 70 &&
+          (item.confidence < 80 ||
+            categoryAnalysis.confidence > item.confidence + 20)
+        ) {
+          const oldCategory = item.category;
+          item.category = this.capitalizeCategory(categoryAnalysis.category);
+          item.confidence = Math.max(
+            item.confidence,
+            categoryAnalysis.confidence
+          );
+
+          categoryEnhancementCount++;
+          console.log(
+            `📂 Enhanced "${item.name}" category: ${oldCategory} → ${item.category} (${categoryAnalysis.confidence}% confidence)`
+          );
+          console.log(`   Reasoning: ${categoryAnalysis.reasoning.join(", ")}`);
+        }
+      } catch (error: any) {
+        console.warn(
+          `⚠️ Advanced enhancement failed for "${item.name}":`,
+          error.message
+        );
+      }
+    }
+
+    processingNotes.push(
+      `Advanced price enhancement: Improved ${priceEnhancementCount}/${enhancedItems.length} items`,
+      `Advanced category enhancement: Improved ${categoryEnhancementCount}/${enhancedItems.length} items`
+    );
+
+    console.log(
+      `✅ Advanced enhancements complete: ${priceEnhancementCount} price improvements, ${categoryEnhancementCount} category improvements`
+    );
+
+    return {
+      ...data,
+      items: enhancedItems,
+      processingNotes: [...data.processingNotes, ...processingNotes],
+    };
+  }
+
+  /**
+   * Capitalize category names properly
+   */
+  private capitalizeCategory(category: string): string {
+    if (!category) return "Other";
+
+    const categoryMap: Record<string, string> = {
+      wine: "Wine",
+      food: "Main Course",
+      beverage: "Beverages",
+      other: "Other",
+    };
+
+    return (
+      categoryMap[category.toLowerCase()] ||
+      category.charAt(0).toUpperCase() + category.slice(1).toLowerCase()
+    );
   }
 }
