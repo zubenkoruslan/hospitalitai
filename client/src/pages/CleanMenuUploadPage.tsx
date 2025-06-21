@@ -5,7 +5,6 @@ import {
   uploadCleanMenu,
   importCleanMenu,
   getMenusByRestaurant,
-  CleanMenuItem as APICleanMenuItem,
   CleanMenuParseResult,
 } from "../services/api";
 import { IMenuClient } from "../types/menuTypes";

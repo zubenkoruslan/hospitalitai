@@ -9,14 +9,11 @@ import ErrorMessage from "../components/common/ErrorMessage";
 import ScoreDistributionChart from "../components/charts/ScoreDistributionChart";
 import StaffResultsFilter from "../components/staff/StaffResultsFilter";
 import StaffResultsTable from "../components/staff/StaffResultsTable";
-import Card from "../components/common/Card";
 
 // Import shared types
 import { Filters, StaffMemberWithData } from "../types/staffTypes";
 import { KnowledgeCategory } from "../types/questionBankTypes";
 
-import KPICard from "../components/settings/KPICard";
-import BarChart from "../components/charts/BarChart";
 import { ChartData } from "chart.js";
 import {
   ChartBarIcon,
@@ -34,7 +31,6 @@ import {
   UserGroupIcon,
   ChartPieIcon,
   ExclamationTriangleIcon,
-  HomeIcon,
   InformationCircleIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
@@ -342,8 +338,6 @@ const formatCompletionTimeDetailed = (seconds?: number): string => {
 };
 
 // Helper function to format percentages (moved from StaffManagement.tsx)
-const formatPercentage = (value: number | null) =>
-  value === null ? "N/A" : `${value.toFixed(1)}%`;
 
 // Helper function to calculate staff completion rate (moved from StaffManagement.tsx)
 const calculateStaffCompletionRate = (staff: StaffMemberWithData): number => {

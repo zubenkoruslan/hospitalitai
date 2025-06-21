@@ -18,13 +18,8 @@ import {
   ArrowUpTrayIcon,
   DocumentTextIcon,
   EyeIcon,
-  PencilIcon,
-  ClipboardDocumentListIcon,
   DocumentIcon,
-  InformationCircleIcon,
   MagnifyingGlassIcon,
-  ListBulletIcon,
-  ChartBarIcon,
   BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 

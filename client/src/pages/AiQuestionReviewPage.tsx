@@ -5,7 +5,7 @@ import { IQuestion } from "../types/questionBankTypes";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
-import Card from "../components/common/Card";
+
 import {
   getPendingReviewQuestions,
   processReviewedAiQuestions,
@@ -19,103 +19,6 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
-// Simple component to display a single question - can be expanded
-const ReviewQuestionItem: React.FC<{
-  question: IQuestion;
-  onEdit: (question: IQuestion) => void;
-  onApprove: (questionId: string) => void;
-  onDelete: (questionId: string) => void;
-  isSelected: boolean;
-  onToggleSelect: (questionId: string) => void;
-  isProcessing: boolean;
-}> = ({
-  question,
-  onEdit,
-  onApprove,
-  onDelete,
-  isSelected,
-  onToggleSelect,
-  isProcessing,
-}) => {
-  const formatQuestionType = (type: string) => {
-    if (!type) return "N/A";
-    return type
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
-  return (
-    <Card className="bg-white shadow-lg rounded-xl p-4 mb-4 hover:shadow-xl transition-shadow duration-300 flex items-start space-x-3">
-      <input
-        type="checkbox"
-        className="mt-1 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-        checked={isSelected}
-        onChange={() => onToggleSelect(question._id)}
-        disabled={isProcessing}
-        aria-label={`Select question: ${question.questionText}`}
-      />
-      <div className="flex-grow">
-        <p className="font-semibold text-gray-800 mb-2">
-          {question.questionText}
-        </p>
-        <div className="text-sm text-gray-700 mb-2">
-          <strong>Type:</strong> {formatQuestionType(question.questionType)} |{" "}
-          <strong>Category:</strong> {question.categories?.join(", ") || "N/A"}
-        </div>
-        {question.options && question.options.length > 0 && (
-          <div className="mb-2">
-            <p className="text-sm font-medium text-gray-700">Options:</p>
-            <ul className="list-disc list-inside pl-4 text-sm text-gray-600">
-              {question.options.map((opt, index) => (
-                <li
-                  key={index}
-                  className={
-                    opt.isCorrect ? "font-semibold text-green-600" : ""
-                  }
-                >
-                  {opt.text} {opt.isCorrect ? "(Correct)" : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {question.explanation && (
-          <p className="text-sm text-gray-600 italic mb-3">
-            <strong>Explanation:</strong> {question.explanation}
-          </p>
-        )}
-      </div>
-      <div className="mt-3 flex justify-end space-x-2">
-        <Button
-          variant="secondary"
-          onClick={() => onEdit(question)}
-          disabled={isProcessing}
-          className="text-xs px-3 py-1"
-        >
-          Edit
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => onApprove(question._id)}
-          disabled={isProcessing}
-          className="text-xs px-3 py-1"
-        >
-          Approve
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => onDelete(question._id)}
-          disabled={isProcessing}
-          className="text-xs px-3 py-1 text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 focus:ring-red-500"
-        >
-          Delete
-        </Button>
-      </div>
-    </Card>
-  );
-};
-
 const AiQuestionReviewPage: React.FC = () => {
   const { bankId } = useParams<{ bankId: string }>();
   const navigate = useNavigate();
@@ -123,9 +26,7 @@ const AiQuestionReviewPage: React.FC = () => {
   const [pendingQuestions, setPendingQuestions] = useState<IQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingStates, setProcessingStates] = useState<
-    Record<string, boolean>
-  >({}); // For individual question processing
+  const [, setProcessingStates] = useState<Record<string, boolean>>({}); // For individual question processing
   const [isBulkProcessing, setIsBulkProcessing] = useState(false); // For bulk actions
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
@@ -164,11 +65,6 @@ const AiQuestionReviewPage: React.FC = () => {
     fetchPending();
   }, [fetchPending]);
 
-  const handleEditQuestion = (question: IQuestion) => {
-    setQuestionToEdit(question);
-    setIsEditModalOpen(true);
-  };
-
   const handleCloseEditModal = () => {
     setQuestionToEdit(null);
     setIsEditModalOpen(false);
@@ -186,22 +82,6 @@ const AiQuestionReviewPage: React.FC = () => {
     );
     handleCloseEditModal();
     // Optionally, you could call fetchPending() again if the update is critical to re-fetch.
-  };
-
-  const handleToggleSelectQuestion = (questionId: string) => {
-    setSelectedQuestionIds((prevSelected) =>
-      prevSelected.includes(questionId)
-        ? prevSelected.filter((id) => id !== questionId)
-        : [...prevSelected, questionId]
-    );
-  };
-
-  const handleToggleSelectAll = () => {
-    if (selectedQuestionIds.length === pendingQuestions.length) {
-      setSelectedQuestionIds([]);
-    } else {
-      setSelectedQuestionIds(pendingQuestions.map((q) => q._id));
-    }
   };
 
   const handleApproveQuestion = async (questionId: string) => {
@@ -308,14 +188,6 @@ const AiQuestionReviewPage: React.FC = () => {
       }));
       setQuestionToDelete(null);
     }
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedQuestionIds.length === 0) {
-      alert("No questions selected to delete.");
-      return;
-    }
-    setIsConfirmDeleteSelectedModalOpen(true);
   };
 
   const confirmDeleteSelectedQuestions = async () => {
