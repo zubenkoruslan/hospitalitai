@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import Modal from "../common/Modal";
 import Button from "../common/Button";
-import LoadingSpinner from "../common/LoadingSpinner";
 import {
   DocumentArrowDownIcon,
   DocumentTextIcon,
