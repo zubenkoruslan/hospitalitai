@@ -3,7 +3,17 @@ import { BrowserRouter } from "react-router-dom";
 import HomePage from "./HomePage";
 
 // Mock the Button component to avoid testing its implementation
-const MockButton = ({ children, variant, className, ...props }: any) => {
+const MockButton = ({
+  children,
+  variant,
+  className,
+  ...props
+}: {
+  children: React.ReactNode;
+  variant?: string;
+  className?: string;
+  [key: string]: unknown;
+}) => {
   return (
     <button data-testid={`button-${variant}`} className={className} {...props}>
       {children}

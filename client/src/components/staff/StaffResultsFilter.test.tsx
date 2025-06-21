@@ -4,7 +4,15 @@ import StaffResultsFilter from "./StaffResultsFilter";
 import { Filters, StaffMemberWithData } from "../../types/staffTypes";
 
 // Mock Button component
-const MockButton = ({ onClick, children, variant }: any) => (
+const MockButton = ({
+  onClick,
+  children,
+  variant,
+}: {
+  onClick?: () => void;
+  children: React.ReactNode;
+  variant?: string;
+}) => (
   <button data-testid={`button-${variant}`} onClick={onClick}>
     {children}
   </button>
