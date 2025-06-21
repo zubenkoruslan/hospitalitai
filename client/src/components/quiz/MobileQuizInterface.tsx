@@ -7,10 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Button from "../common/Button";
 import Card from "../common/Card";
-import {
-  ClientQuestionForAttempt,
-  ClientQuestionOption,
-} from "../../types/questionTypes";
+import { ClientQuestionForAttempt } from "../../types/questionTypes";
 
 interface MobileQuizInterfaceProps {
   question: ClientQuestionForAttempt;
@@ -65,7 +62,11 @@ const MobileQuizInterface: React.FC<MobileQuizInterfaceProps> = ({
               <button
                 key={option._id}
                 onClick={() =>
-                  onAnswerSelect(question._id, option._id, question.questionType)
+                  onAnswerSelect(
+                    question._id,
+                    option._id,
+                    question.questionType
+                  )
                 }
                 className={`
                   w-full p-4 rounded-xl border-2 text-left transition-all duration-200 touch-target
@@ -105,7 +106,11 @@ const MobileQuizInterface: React.FC<MobileQuizInterfaceProps> = ({
               <button
                 key={option._id}
                 onClick={() =>
-                  onAnswerSelect(question._id, option._id, question.questionType)
+                  onAnswerSelect(
+                    question._id,
+                    option._id,
+                    question.questionType
+                  )
                 }
                 className={`
                   w-full p-4 rounded-xl border-2 text-left transition-all duration-200 touch-target
@@ -148,7 +153,11 @@ const MobileQuizInterface: React.FC<MobileQuizInterfaceProps> = ({
               <button
                 key={option._id}
                 onClick={() =>
-                  onAnswerSelect(question._id, option._id, question.questionType)
+                  onAnswerSelect(
+                    question._id,
+                    option._id,
+                    question.questionType
+                  )
                 }
                 className={`
                   w-full p-4 rounded-xl border-2 text-left transition-all duration-200 touch-target

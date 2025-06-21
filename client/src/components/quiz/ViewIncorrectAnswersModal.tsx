@@ -1,7 +1,4 @@
 import React, { useEffect } from "react";
-// Import the type for the quiz result details
-// TODO: Move QuizResultDetails to a shared types file (e.g., types/quizTypes.ts)
-import { QuizResultDetails } from "../../types/staffTypes";
 import {
   IncorrectQuestionDetail,
   ClientQuizAttemptDetails,

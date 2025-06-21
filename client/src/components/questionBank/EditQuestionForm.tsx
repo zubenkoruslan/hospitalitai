@@ -45,7 +45,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   const [categories, setCategories] = useState<string[]>([
     ...questionToEdit.categories,
   ]);
-  const [categoryInput, setCategoryInput] = useState("");
+
   const [explanation, setExplanation] = useState(
     questionToEdit.explanation || ""
   );
@@ -200,7 +200,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
       // The options state would have been reset by the useEffect hook,
       // so finalOptions will reflect the new structure.
       // We must ensure updateData.options gets populated.
-      updateData.options = finalOptions.map(({ _id, ...rest }) => ({
+      updateData.options = finalOptions.map(({ ...rest }) => ({
         text: rest.text || "",
         isCorrect: !!rest.isCorrect,
       }));
@@ -218,7 +218,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         JSON.stringify(newOptionsComparable) !==
         JSON.stringify(originalOptionsComparable)
       ) {
-        updateData.options = finalOptions.map(({ _id, ...rest }) => ({
+        updateData.options = finalOptions.map(({ ...rest }) => ({
           text: rest.text || "",
           isCorrect: !!rest.isCorrect,
         }));

@@ -1,4 +1,4 @@
-import React, { useState, FormEvent, useEffect, useCallback } from "react";
+import React, { useState, FormEvent, useEffect } from "react";
 import { IQuestion } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import {
@@ -107,10 +107,6 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
     useState<number>(3);
 
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
-  const [aiQuestionTypes] = useState<string[]>([
-    "multiple-choice-single",
-    "true-false",
-  ]);
 
   const [formError, setFormError] = useState<string | null>(null);
   const [internalIsLoading, setInternalIsLoading] = useState(false);
