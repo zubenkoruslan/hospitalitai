@@ -92,9 +92,13 @@ const BarChart: React.FC<BarChartProps> = ({
       datalabels: {
         anchor: "end",
         align: "top",
-        formatter: (value: any, context: Context) => {
+        formatter: (value: unknown, context: Context) => {
           const datasetLabel = context.dataset.label || "";
-          return datasetLabel.includes("%") ? `${value}%` : value;
+          // Conservative type guard - only handle what we actually use
+          if (typeof value === "number" || typeof value === "string") {
+            return datasetLabel.includes("%") ? `${value}%` : value;
+          }
+          return value;
         },
         font: {
           family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -211,7 +215,11 @@ const BarChart: React.FC<BarChartProps> = ({
       ) {
         mergedOptions.scales = { ...defaultOptions.scales, ...options.scales };
       } else {
-        (mergedOptions as any)[optionKey] = (options as any)[optionKey];
+        // Conservative fallback for other option types - preserve type safety
+        const optionValue = options[optionKey];
+        if (optionValue !== undefined) {
+          (mergedOptions as Record<string, unknown>)[optionKey] = optionValue;
+        }
       }
     });
   }
