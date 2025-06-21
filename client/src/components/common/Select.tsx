@@ -1,11 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect } from "react";
 import { ChevronDownIcon, CheckIcon } from "@heroicons/react/24/outline";
-import {
-  spacing,
-  borderRadius,
-  colorTokens,
-  typography,
-} from "../../design-system";
+import { borderRadius, typography } from "../../design-system";
 
 export interface SelectOption {
   value: string;

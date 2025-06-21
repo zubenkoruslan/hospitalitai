@@ -1,5 +1,5 @@
 import React, { forwardRef } from "react";
-import { borderRadius, colorTokens, typography } from "../../design-system";
+import { typography } from "../../design-system";
 
 export interface RadioOption {
   value: string;

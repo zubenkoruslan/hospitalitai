@@ -53,8 +53,6 @@ const PasswordInput: React.FC<PasswordInputProps> = ({
     });
   }, [value]);
 
-  const isPasswordValid = Object.values(passwordStrength).every(Boolean);
-
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-slate-700 mb-2">

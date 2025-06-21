@@ -70,9 +70,7 @@ interface AddEditMenuItemModalProps {
   onSubmit: (formData: MenuItemFormData, currentItemId: string | null) => void;
   currentItem: MenuItem | null; // If null, it's an Add operation
   menuId: string; // Needed for context or potentially validation
-  restaurantId: string; // Needed for context or potentially validation
   isSubmitting: boolean;
-  allItemsInMenu?: MenuItem[]; // Existing prop for all items
   availableCategories?: string[]; // New prop for unique categories from the menu
   itemType: "food" | "beverage" | "wine"; // Add itemType as required prop
 }
@@ -83,9 +81,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
   onSubmit,
   currentItem,
   menuId,
-  restaurantId: _restaurantId,
   isSubmitting,
-  allItemsInMenu: _allItemsInMenu,
   availableCategories, // Destructure the new prop
   itemType, // Destructure the new prop
 }) => {
@@ -301,7 +297,7 @@ const AddEditMenuItemModal: React.FC<AddEditMenuItemModalProps> = ({
               return prevTemp;
             });
           }
-        } catch (_error) {
+        } catch {
           setFormError("Failed to load item data for editing.");
         }
       } else if (!isEditMode) {
