@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   HomeIcon,
-  AcademicCapIcon,
   TrophyIcon,
   UserIcon,
   ChartBarIcon,
@@ -10,7 +9,6 @@ import {
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeIconSolid,
-  AcademicCapIcon as AcademicCapIconSolid,
   TrophyIcon as TrophyIconSolid,
   UserIcon as UserIconSolid,
   ChartBarIcon as ChartBarIconSolid,

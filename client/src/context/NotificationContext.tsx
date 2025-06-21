@@ -5,10 +5,8 @@ import React, {
   useEffect,
   ReactNode,
   useCallback,
-  useRef,
 } from "react";
 import { useAuth } from "./AuthContext";
-import api from "../services/api";
 import {
   getNotifications,
   getUnreadNotificationCount,
