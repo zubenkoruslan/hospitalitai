@@ -74,15 +74,34 @@ const SignupForm: React.FC = () => {
       // Navigate to login page or dashboard after successful signup
       alert("Signup successful! Please log in."); // Simple feedback
       navigate("/login");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Signup failed:", err);
+
+      // Type guard for axios error structure - CONSERVATIVE: only type what's actually used
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: Record<string, { message: string }>;
+          };
+        };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
       const errorMessage =
-        err.response?.data?.message ||
-        "Signup failed. Please check your details and try again.";
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Signup failed. Please check your details and try again.";
+
       // Display specific validation errors if available
-      if (err.response?.data?.errors) {
+      if (isAxiosError(err) && err.response?.data?.errors) {
         const specificErrors = Object.values(err.response.data.errors)
-          .map((e: any) => e.message)
+          .map((e: { message: string }) => e.message)
           .join(" \n");
         setError(`${errorMessage}\n${specificErrors}`);
       } else {
