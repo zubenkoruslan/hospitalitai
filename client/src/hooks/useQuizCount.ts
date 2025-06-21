@@ -32,9 +32,25 @@ export function useQuizCount(): UseQuizCountReturn {
       // setQuizCount(response.data.count || 0);
       const count = await getQuizCount(); // Use service function
       setQuizCount(count || 0); // Set data from service
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching quiz count:", err);
-      setError(err.response?.data?.message || "Failed to fetch quiz count.");
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to fetch quiz count.");
+      } else {
+        setError("Failed to fetch quiz count.");
+      }
       setQuizCount(0); // Default to 0 on error
     } finally {
       setLoading(false);

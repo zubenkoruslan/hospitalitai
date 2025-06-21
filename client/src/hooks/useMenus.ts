@@ -86,9 +86,25 @@ export function useMenus(
           setMenus([]);
           // Optionally set an error, though the initial check should handle it.
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching menus:", err);
-        setError(err.response?.data?.message || "Failed to fetch menus.");
+
+        // Type guard for axios error
+        const isAxiosError = (
+          error: unknown
+        ): error is {
+          response: { data?: { message?: string } };
+        } => {
+          return (
+            typeof error === "object" && error !== null && "response" in error
+          );
+        };
+
+        if (isAxiosError(err)) {
+          setError(err.response.data?.message || "Failed to fetch menus.");
+        } else {
+          setError("Failed to fetch menus.");
+        }
         setMenus([]);
       } finally {
         setLoading(false);

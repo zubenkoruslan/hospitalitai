@@ -810,10 +810,26 @@ export const deleteStaffMember = async (
 
 // Menu Item Endpoints
 
+interface TransformedMenuItemData extends Record<string, unknown> {
+  price?: number;
+  ingredients?: string[];
+  wineStyle?: string;
+  wineColor?: string;
+  grapeVariety?: string[];
+  vintage?: number;
+  producer?: string;
+  region?: string;
+  servingOptions?: Array<{ size: string; price: number }>;
+  suggestedPairingsText?: string[];
+  itemType?: string;
+}
+
 const transformMenuItemFormData = (
   formData: Partial<MenuItemFormData>
-): any => {
-  const backendData: any = { ...formData };
+): TransformedMenuItemData => {
+  const backendData: TransformedMenuItemData = {
+    ...formData,
+  } as TransformedMenuItemData;
 
   if (formData.price !== undefined) {
     const priceAsNumber = parseFloat(formData.price);
@@ -870,7 +886,15 @@ const transformMenuItemFormData = (
       try {
         const servingOptionsArray = JSON.parse(formData.servingOptions);
         backendData.servingOptions = Array.isArray(servingOptionsArray)
-          ? servingOptionsArray.filter((opt: any) => opt.size && opt.price)
+          ? servingOptionsArray.filter(
+              (opt: unknown): opt is { size: string; price: number } =>
+                typeof opt === "object" &&
+                opt !== null &&
+                "size" in opt &&
+                "price" in opt &&
+                typeof (opt as { size: unknown }).size === "string" &&
+                typeof (opt as { price: unknown }).price === "number"
+            )
           : [];
       } catch {
         // If JSON parsing fails, try to handle as empty array
@@ -993,8 +1017,8 @@ export const deleteMenu = async (
 export const deleteMenuCategory = async (
   menuId: string,
   categoryName: string
-): Promise<any> => {
-  const response = await api.delete(
+): Promise<{ message: string }> => {
+  const response = await api.delete<{ message: string }>(
     `/menus/${menuId}/categories/${categoryName}`
   );
   return response.data; // Assuming backend sends back some confirmation or updated menu
@@ -1271,8 +1295,11 @@ export const listRestaurantSopDocuments =
     const response = await api.get<{ data: ISopDocument[] }>(`/sop-documents`);
     // Adjust response data access based on your actual API structure.
     // Common patterns: response.data.data, response.data.documents, or just response.data if it's the array itself.
-    if (response.data && Array.isArray((response.data as any).data)) {
-      return (response.data as any).data;
+    if (
+      response.data &&
+      Array.isArray((response.data as { data?: ISopDocument[] }).data)
+    ) {
+      return (response.data as { data: ISopDocument[] }).data;
     }
     if (Array.isArray(response.data)) {
       // Fallback if response.data is the array directly
@@ -1310,7 +1337,8 @@ export const deleteSopDocument = async (documentId: string): Promise<void> => {
  * @returns A promise resolving to a list of processed SOP documents.
  */
 export const listSopDocumentsFiltered = async (
-  restaurantId: string // Kept for now, might be useful for client-side logic even if not sent to API
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _restaurantId: string // Kept for now, might be useful for client-side logic even if not sent to API
 ): Promise<ISopDocument[]> => {
   const response = await api.get<{
     data?: ISopDocument[];
@@ -1321,11 +1349,17 @@ export const listSopDocumentsFiltered = async (
 
   // Adjust access to response.data based on your actual API structure.
   // Assuming the backend returns an object with a 'data' or 'documents' key containing the array.
-  if (response.data && Array.isArray((response.data as any).data)) {
-    return (response.data as any).data;
+  if (
+    response.data &&
+    Array.isArray((response.data as { data?: ISopDocument[] }).data)
+  ) {
+    return (response.data as { data: ISopDocument[] }).data;
   }
-  if (response.data && Array.isArray((response.data as any).documents)) {
-    return (response.data as any).documents;
+  if (
+    response.data &&
+    Array.isArray((response.data as { documents?: ISopDocument[] }).documents)
+  ) {
+    return (response.data as { documents: ISopDocument[] }).documents;
   }
   // Fallback if response.data is the array itself (less common for consistent APIs)
   if (Array.isArray(response.data)) {
@@ -1574,7 +1608,11 @@ export interface InvitationResponse {
 
 export interface AcceptInvitationResponse {
   message: string;
-  user: any; // You can create a more specific type based on your User model
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export interface PendingInvitation {
@@ -1618,7 +1656,7 @@ export interface Notification {
   restaurantId: string;
   relatedId?: string;
   isRead: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -1993,9 +2031,15 @@ export const downloadJSONTemplate = async (): Promise<void> => {
 /**
  * Get template information and available formats
  */
-export const getTemplateInfo = async (): Promise<any> => {
+export const getTemplateInfo = async (): Promise<{
+  availableFormats: string[];
+  description: string;
+}> => {
   try {
-    const response = await api.get("/templates/info");
+    const response = await api.get<{
+      availableFormats: string[];
+      description: string;
+    }>("/templates/info");
     return response.data;
   } catch (error) {
     console.error("Error fetching template info:", error);

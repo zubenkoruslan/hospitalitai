@@ -30,9 +30,24 @@ interface MenuFormData {
 }
 
 // --- Error Formatting Helper ---
-const formatApiError = (err: any, context: string): string => {
+const formatApiError = (err: unknown, context: string): string => {
   console.error(`Error ${context}:`, err);
-  if (err.response) {
+
+  // Type guard for axios error
+  const isAxiosError = (
+    error: unknown
+  ): error is {
+    response: { data?: { message?: string }; status: number };
+    request?: unknown;
+  } => {
+    return typeof error === "object" && error !== null && "response" in error;
+  };
+
+  const hasRequest = (error: unknown): error is { request: unknown } => {
+    return typeof error === "object" && error !== null && "request" in error;
+  };
+
+  if (isAxiosError(err)) {
     let message =
       err.response.data?.message ||
       `Request failed with status ${err.response.status}.`;
@@ -40,7 +55,7 @@ const formatApiError = (err: any, context: string): string => {
       message += " Please try again later.";
     }
     return message;
-  } else if (err.request) {
+  } else if (hasRequest(err)) {
     return `Network error while ${context}. Please check your connection and try again.`;
   } else {
     return `An unexpected error occurred while ${context}. Please try again.`;
@@ -112,7 +127,7 @@ const MenusPage: React.FC = () => {
       refetchMenus();
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, refetchMenus, navigate]);
+  }, [location.state, refetchMenus, navigate, location.pathname]);
 
   // --- Modal Handlers ---
   const openAddModal = () => {
@@ -188,7 +203,7 @@ const MenusPage: React.FC = () => {
       refetchMenus();
       setSuccessMessage("Menu added successfully.");
       closeModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const apiError = formatApiError(err, "adding menu");
       setFormError(apiError);
     } finally {
@@ -210,7 +225,7 @@ const MenusPage: React.FC = () => {
       refetchMenus();
       setSuccessMessage("Menu deleted successfully.");
       closeModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const apiError = formatApiError(err, "deleting menu");
       setPageError(apiError);
     } finally {

@@ -5,7 +5,12 @@ import MenuDetailsEditModal from "./MenuDetailsEditModal";
 // Mock common components that are direct children or rely on context if necessary
 // Button and ErrorMessage are used, so we'll mock them.
 
-const MockButton = (props: any) => (
+const MockButton = (props: {
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: string;
+  children: React.ReactNode;
+}) => (
   <button
     onClick={props.onClick}
     type={props.type || "button"} // Ensure type is set for form submission testing

@@ -90,13 +90,40 @@ const GenerateAiQuestionsFormSop: React.FC<GenerateAiQuestionsFormSopProps> = ({
 
       // Signal successful generation with empty array since questions are saved directly
       onQuestionsGenerated([]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error generating AI questions for SOP bank:", err);
-      setFormError(
-        err.response?.data?.message ||
-          err.message ||
-          "An unexpected error occurred."
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setFormError(
+          err.response.data?.message ||
+            err.message ||
+            "An unexpected error occurred."
+        );
+      } else if (isErrorWithMessage(err)) {
+        setFormError(err.message || "An unexpected error occurred.");
+      } else {
+        setFormError("An unexpected error occurred.");
+      }
     } finally {
       setIsLoading(false);
     }

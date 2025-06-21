@@ -85,7 +85,7 @@ export interface ClientQuizAttemptDetails {
 // From api.ts: ClientAnswerForSubmission (lines 541-544)
 export interface ClientAnswerForSubmission {
   questionId: string;
-  answerGiven: any; // Consider making this more specific based on question types if possible
+  answerGiven: string | string[]; // Single answer or multiple for multi-select questions
 }
 
 // From api.ts: ClientQuizAttemptSubmitData (lines 546-549)
@@ -100,7 +100,7 @@ export interface ClientGradedQuestion {
   questionId: string;
   questionText?: string; // Added
   options?: ClientQuestionOption[]; // Added, using new type
-  answerGiven: any;
+  answerGiven: string | string[];
   isCorrect: boolean;
   correctAnswer?: ClientCorrectAnswerDetails; // Changed type to ClientCorrectAnswerDetails
   explanation?: string; // Added

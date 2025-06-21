@@ -35,9 +35,25 @@ export function useStaffSummary(): UseStaffSummaryReturn {
       // setStaffData(response.data.staff || []);
       const fetchedStaff = await getStaffList(); // Use the service function
       setStaffData(fetchedStaff || []); // Set data from service function response
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching staff summary data:", err);
-      setError(err.response?.data?.message || "Failed to fetch staff data.");
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to fetch staff data.");
+      } else {
+        setError("Failed to fetch staff data.");
+      }
       setStaffData([]); // Clear data on error
     } finally {
       setLoading(false);

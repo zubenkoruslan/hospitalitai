@@ -83,11 +83,26 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       const cleanedContent = cleanContent(content.trim());
       await onSubmit({ name: name.trim(), content: cleanedContent });
       // onClose(); // Caller should handle closing on successful submission
-    } catch (submissionError: any) {
+    } catch (submissionError: unknown) {
       console.error("Error submitting category form:", submissionError);
-      setError(
-        submissionError.message || "Failed to save category. Please try again."
-      );
+
+      // Type guard for error with message
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isErrorWithMessage(submissionError)) {
+        setError(
+          submissionError.message ||
+            "Failed to save category. Please try again."
+        );
+      } else {
+        setError("Failed to save category. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }

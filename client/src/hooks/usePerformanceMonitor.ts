@@ -106,7 +106,7 @@ export class PerformanceMonitor {
 // Hook for component performance measurement
 export const usePerformanceMonitor = (componentName: string) => {
   const monitor = PerformanceMonitor.getInstance();
-  const mountTimeRef = useRef<number>();
+  const mountTimeRef = useRef<number | undefined>(undefined);
   const renderCountRef = useRef(0);
 
   // Track component mount time
@@ -129,6 +129,7 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   // Track render performance
   const measureRender = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     <T>(operation: () => T, _operationName?: string): T => {
       renderCountRef.current += 1;
       return monitor.measureRender(componentName, operation);
@@ -215,12 +216,13 @@ export const useInteractionPerformance = () => {
 
 // Hook for observing memory usage
 export const useMemoryMonitor = (componentName: string) => {
-  const memoryRef = useRef<number>();
+  const memoryRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     // Check if performance.memory is available (Chrome/Edge)
     if ("memory" in performance) {
-      const memoryInfo = (performance as any).memory;
+      const memoryInfo = (performance as { memory: { usedJSHeapSize: number } })
+        .memory;
       memoryRef.current = memoryInfo.usedJSHeapSize;
 
       if (process.env.NODE_ENV === "development") {
@@ -236,7 +238,9 @@ export const useMemoryMonitor = (componentName: string) => {
 
     return () => {
       if ("memory" in performance && memoryRef.current) {
-        const memoryInfo = (performance as any).memory;
+        const memoryInfo = (
+          performance as { memory: { usedJSHeapSize: number } }
+        ).memory;
         const memoryDiff = memoryInfo.usedJSHeapSize - memoryRef.current;
 
         if (
@@ -260,7 +264,7 @@ export const useMemoryMonitor = (componentName: string) => {
 // Hook for FPS monitoring
 export const useFPSMonitor = () => {
   const fpsRef = useRef<number[]>([]);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let lastTime = performance.now();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   PhotoIcon,
@@ -61,16 +61,16 @@ const LazyImage: React.FC<LazyImageProps> = ({
   }, [imageRef, src, threshold, rootMargin, priority]);
 
   // Handle successful image load
-  const handleLoad = () => {
+  const handleLoad = useCallback(() => {
     setHasLoaded(true);
     onLoad?.();
-  };
+  }, [onLoad]);
 
   // Handle image load error
-  const handleError = () => {
+  const handleError = useCallback(() => {
     setHasError(true);
     onError?.();
-  };
+  }, [onError]);
 
   // Preload image when it becomes visible
   useEffect(() => {
@@ -80,7 +80,15 @@ const LazyImage: React.FC<LazyImageProps> = ({
       img.onerror = handleError;
       img.src = src;
     }
-  }, [isIntersecting, src, placeholder, hasLoaded, hasError]);
+  }, [
+    isIntersecting,
+    src,
+    placeholder,
+    hasLoaded,
+    hasError,
+    handleLoad,
+    handleError,
+  ]);
 
   return (
     <div className={`relative overflow-hidden ${className}`}>

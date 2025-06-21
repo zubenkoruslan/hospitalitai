@@ -193,7 +193,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
       try {
         const fetchedMenus = await getMenusByRestaurant(restaurantId);
         setMenus(fetchedMenus);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching menus:", err);
         setMenusError(formatErrorMessage(err));
       }
@@ -275,7 +275,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setIncludeBeverageCategoriesInBank(false);
         setAreAllCategoriesSelected(false);
         setAreAllBeverageCategoriesSelected(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching menu categories:", err);
         setCategoriesError(formatErrorMessage(err));
         setWineItemCategories([]);
@@ -448,7 +448,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
           | "menu"
           | "sop",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating question bank:", err);
       setFormError(formatErrorMessage(err));
     } finally {
@@ -491,7 +491,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         // Assuming listSopDocumentsFiltered correctly fetches SOPs suitable for bank creation (e.g., processed)
         const fetchedSops = await listSopDocumentsFiltered(restaurantId);
         setSopDocuments(fetchedSops);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching SOP documents:", err);
         setSopsError(formatErrorMessage(err));
       }
@@ -517,7 +517,7 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
         setSopCategories(sopDoc.categories || []);
         setSelectedSopCategories([]);
         setAreAllSopCategoriesSelected(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching SOP categories:", err);
         setSopCategoriesError(formatErrorMessage(err));
         setSopCategories([]);

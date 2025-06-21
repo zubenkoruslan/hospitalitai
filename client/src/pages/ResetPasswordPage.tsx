@@ -103,11 +103,26 @@ const ResetPasswordPage: React.FC = () => {
     try {
       await resetPassword(token, password);
       setSuccess(true);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-          "Failed to reset password. Please try again."
-      );
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            "Failed to reset password. Please try again."
+        );
+      } else {
+        setError("Failed to reset password. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

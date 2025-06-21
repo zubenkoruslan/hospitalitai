@@ -89,7 +89,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
       }
     }
     // Only run when questionType changes, or when the initial questionToEdit.questionType influences reset
-  }, [questionType, questionToEdit.questionType]); // questionToEdit.options removed from deps
+  }, [questionType, questionToEdit.questionType, questionToEdit.options]);
 
   const handleOptionChange = (
     index: number,
@@ -272,7 +272,7 @@ const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 
       onQuestionUpdated(updatedQuestion);
       // The parent component (modal) will handle closing the modal
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = formatErrorMessage(error);
       setFormError(message);
       console.error("Error updating question:", error);

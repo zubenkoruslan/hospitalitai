@@ -37,11 +37,11 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
   const handleQuestionChange = (
     index: number,
     field: keyof Omit<IQuestion, "difficulty">, // difficulty already removed from IQuestion, this Omit is redundant but harmless
-    value: any
+    value: unknown
   ) => {
     setEditableQuestions((prev) => {
       const updated = [...prev];
-      // @ts-ignore
+      // @ts-expect-error - Dynamic field assignment requires type assertion
       updated[index][field] = value;
       return updated;
     });
@@ -51,11 +51,11 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
     qIndex: number,
     oIndex: number,
     field: keyof IOption,
-    value: any
+    value: unknown
   ) => {
     setEditableQuestions((prev) => {
       const updated = [...prev];
-      // @ts-ignore
+      // @ts-expect-error - Dynamic field assignment requires type assertion
       updated[qIndex].options[oIndex][field] = value;
       if (
         field === "isCorrect" &&
@@ -100,13 +100,40 @@ const AiQuestionReviewModal: React.FC<AiQuestionReviewModalProps> = ({
 
       onReviewComplete(targetBankId);
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error processing reviewed questions:", err);
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to process questions."
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            err.message ||
+            "Failed to process questions."
+        );
+      } else if (isErrorWithMessage(err)) {
+        setError(err.message || "Failed to process questions.");
+      } else {
+        setError("Failed to process questions.");
+      }
     } finally {
       setIsLoading(false);
     }

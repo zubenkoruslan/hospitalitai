@@ -128,9 +128,12 @@ const StaffManagement: React.FC = () => {
     try {
       const fetchedStaff = await getStaffList();
       setStaffList(fetchedStaff || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching staff list:", err);
-      setError(err.response?.data?.message || "Failed to load staff data.");
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load staff data.";
+      setError(errorMessage);
       setStaffList([]);
     } finally {
       setLoading(false);
@@ -144,11 +147,12 @@ const StaffManagement: React.FC = () => {
       try {
         const fetchedRoles = await getRoles(user.restaurantId);
         setRolesList(fetchedRoles || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching roles list:", err);
-        setRolesError(
-          err.response?.data?.message || "Failed to load roles data."
-        );
+        const errorMessage =
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "Failed to load roles data.";
+        setRolesError(errorMessage);
         setRolesList([]);
       } finally {
         setRolesLoading(false);
@@ -199,9 +203,12 @@ const StaffManagement: React.FC = () => {
       console.log(`Successfully deleted ${staffName}`);
       await fetchRestaurantStaff();
       setMessage(`${staffName} has been successfully deleted.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Error deleting staff member ${staffName}:`, err);
-      setError(err.response?.data?.message || `Failed to delete ${staffName}.`);
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || `Failed to delete ${staffName}.`;
+      setError(errorMessage);
       setTimeout(() => setError(null), 5000);
     }
   };
@@ -256,9 +263,12 @@ const StaffManagement: React.FC = () => {
           ? "Role updated successfully."
           : "Role created successfully."
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error submitting role form:", err);
-      setRolesError(err.response?.data?.message || "Failed to save role.");
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to save role.";
+      setRolesError(errorMessage);
     } finally {
       setRoleSubmitLoading(false);
     }
@@ -280,11 +290,12 @@ const StaffManagement: React.FC = () => {
       await fetchRestaurantStaff();
       setMessage(`Role "${roleName}" has been successfully deleted.`);
       if (selectedRoleId === roleId) setSelectedRoleId(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Error deleting role ${roleName}:`, err);
-      setRolesError(
-        err.response?.data?.message || `Failed to delete role ${roleName}.`
-      );
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || `Failed to delete role ${roleName}.`;
+      setRolesError(errorMessage);
     } finally {
       setRoleSubmitLoading(false);
     }
@@ -300,11 +311,12 @@ const StaffManagement: React.FC = () => {
       await updateStaffAssignedRole(staffId, newRoleId);
       await fetchRestaurantStaff();
       setMessage(`Successfully assigned role to staff.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error assigning role to staff:", err);
-      setError(
-        err.response?.data?.message || "Failed to update staff role assignment."
-      );
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to update staff role assignment.";
+      setError(errorMessage);
       setTimeout(() => setError(null), 5000);
     } finally {
       setAssignRoleLoading(null);
@@ -358,8 +370,8 @@ const StaffManagement: React.FC = () => {
     if (!list || list.length === 0) return [];
 
     return list.sort((a, b) => {
-      let valA: any;
-      let valB: any;
+      let valA: string | number;
+      let valB: string | number;
 
       switch (sortField) {
         case "name":

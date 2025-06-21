@@ -50,6 +50,14 @@ interface LeaderboardEntry {
   isCurrentUser?: boolean;
 }
 
+// Interface for performer data from API
+interface ApiPerformer {
+  rank: number;
+  userId: string;
+  name: string;
+  overallAverageScore: number;
+}
+
 const StaffAchievementsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -210,27 +218,34 @@ const StaffAchievementsPage: React.FC = () => {
         // Process leaderboard data
         if (leaderboardData.data?.topPerformers) {
           const processedLeaderboard: LeaderboardEntry[] =
-            leaderboardData.data.topPerformers.map((performer: any) => {
-              const isCurrentUser = performer.userId === user._id;
-              const achievementsCount = realAchievements.filter(
-                (a) => a.isUnlocked
-              ).length;
-              const points = realAchievements
-                .filter((a) => a.isUnlocked)
-                .reduce((sum, a) => sum + a.points, 0);
+            leaderboardData.data.topPerformers.map(
+              (performer: {
+                rank: number;
+                userId: string;
+                name: string;
+                overallAverageScore: number;
+              }) => {
+                const isCurrentUser = performer.userId === user._id;
+                const achievementsCount = realAchievements.filter(
+                  (a) => a.isUnlocked
+                ).length;
+                const points = realAchievements
+                  .filter((a) => a.isUnlocked)
+                  .reduce((sum, a) => sum + a.points, 0);
 
-              return {
-                rank: performer.rank,
-                name: isCurrentUser ? "You" : performer.name,
-                points: isCurrentUser
-                  ? points
-                  : Math.floor(performer.overallAverageScore * 10), // Convert score to points
-                achievementsCount: isCurrentUser
-                  ? achievementsCount
-                  : Math.floor(Math.random() * 12) + 3, // Mock for others
-                isCurrentUser,
-              };
-            });
+                return {
+                  rank: performer.rank,
+                  name: isCurrentUser ? "You" : performer.name,
+                  points: isCurrentUser
+                    ? points
+                    : Math.floor(performer.overallAverageScore * 10), // Convert score to points
+                  achievementsCount: isCurrentUser
+                    ? achievementsCount
+                    : Math.floor(Math.random() * 12) + 3, // Mock for others
+                  isCurrentUser,
+                };
+              }
+            );
 
           setLeaderboard(processedLeaderboard);
         }

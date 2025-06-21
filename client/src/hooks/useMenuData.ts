@@ -68,14 +68,37 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
         setMenuDetails(null);
         setItems([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Error fetching data for menu ${menuId}:`, err);
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
       let errorMessage = "Failed to fetch menu data.";
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
+      if (isAxiosError(err)) {
+        errorMessage =
+          err.response.data?.message || err.message || errorMessage;
+      } else if (isErrorWithMessage(err)) {
+        errorMessage = err.message || errorMessage;
       }
+
       setError(errorMessage);
       setMenuDetails(null);
       setItems([]);
@@ -90,7 +113,7 @@ export function useMenuData(menuId: string | undefined): UseMenuDataReturn {
       menuId
     ); // Log for useEffect
     fetchData();
-  }, [fetchData]); // Re-fetch if menuId changes (fetchData dependency includes menuId)
+  }, [fetchData, menuId]);
 
   const clearError = useCallback(() => {
     setError(null);

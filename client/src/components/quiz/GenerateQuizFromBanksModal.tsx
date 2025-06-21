@@ -180,12 +180,28 @@ const GenerateQuizFromBanksModal: React.FC<GenerateQuizFromBanksModalProps> = ({
       );
       onQuizGenerated(newQuiz); // Callback to parent
       onClose(); // Close modal
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to generate quiz:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to generate quiz. Please try again."
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            "Failed to generate quiz. Please try again."
+        );
+      } else {
+        setError("Failed to generate quiz. Please try again.");
+      }
     }
     setIsLoading(false);
   };

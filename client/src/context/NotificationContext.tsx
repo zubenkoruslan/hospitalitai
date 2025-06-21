@@ -64,9 +64,25 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     try {
       const data = await getNotifications();
       setNotifications(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching notifications:", err);
-      setError(err.response?.data?.message || "Failed to fetch notifications");
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to fetch notifications");
+      } else {
+        setError("Failed to fetch notifications");
+      }
     } finally {
       setLoading(false);
     }
@@ -78,7 +94,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     try {
       const count = await getUnreadNotificationCount();
       setUnreadCount(count);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching unread count:", err);
       // Don't set error for unread count failures, it's non-critical
     }
@@ -99,11 +115,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
       // Update unread count
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error marking notification as read:", err);
-      setError(
-        err.response?.data?.message || "Failed to mark notification as read"
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message || "Failed to mark notification as read"
+        );
+      } else {
+        setError("Failed to mark notification as read");
+      }
     }
   }, []);
 
@@ -118,12 +150,28 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
       // Reset unread count
       setUnreadCount(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error marking all notifications as read:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to mark all notifications as read"
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            "Failed to mark all notifications as read"
+        );
+      } else {
+        setError("Failed to mark all notifications as read");
+      }
     }
   }, []);
 
@@ -147,11 +195,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
             (notification) => notification._id !== notificationId
           );
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error deleting notification:", err);
-        setError(
-          err.response?.data?.message || "Failed to delete notification"
-        );
+
+        // Type guard for axios error
+        const isAxiosError = (
+          error: unknown
+        ): error is {
+          response: { data?: { message?: string } };
+        } => {
+          return (
+            typeof error === "object" && error !== null && "response" in error
+          );
+        };
+
+        if (isAxiosError(err)) {
+          setError(
+            err.response.data?.message || "Failed to delete notification"
+          );
+        } else {
+          setError("Failed to delete notification");
+        }
       }
     },
     [] // Remove notifications dependency since we use functional updates

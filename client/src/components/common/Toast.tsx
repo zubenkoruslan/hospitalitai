@@ -60,6 +60,13 @@ const Toast: React.FC<ToastProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose?.(id);
+    }, 300); // Match exit animation duration
+  }, [onClose, id]);
+
   // Auto-remove toast after duration
   useEffect(() => {
     if (!persistent && duration > 0) {
@@ -69,19 +76,12 @@ const Toast: React.FC<ToastProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [duration, persistent]);
+  }, [duration, persistent, handleClose]);
 
   // Animate in on mount
   useEffect(() => {
     setIsVisible(true);
   }, []);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose?.(id);
-    }, 300); // Match exit animation duration
-  };
 
   // Variant configurations
   const variantConfig = {

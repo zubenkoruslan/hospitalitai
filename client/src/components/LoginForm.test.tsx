@@ -9,7 +9,7 @@ import { UserRole } from "../types/user";
 // Mock react-router-dom
 const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
-  ...(jest.requireActual("react-router-dom") as any),
+  ...(jest.requireActual("react-router-dom") as Record<string, unknown>),
   useNavigate: () => mockNavigate,
 }));
 
@@ -120,7 +120,7 @@ describe("LoginForm Component", () => {
     mockUseAuth.mockReturnValue({
       ...defaultAuthContextValue,
       isLoading: true,
-    } as any);
+    });
 
     render(
       <BrowserRouter>
@@ -139,7 +139,7 @@ describe("LoginForm Component", () => {
     mockUseAuth.mockReturnValue({
       ...defaultAuthContextValue,
       error: errorMessage,
-    } as any);
+    });
 
     render(
       <BrowserRouter>
@@ -187,7 +187,7 @@ describe("LoginForm Component", () => {
     };
 
     // Start with logged-out state
-    mockUseAuth.mockReturnValue(defaultAuthContextValue as any);
+    mockUseAuth.mockReturnValue(defaultAuthContextValue);
 
     const { rerender } = render(
       <BrowserRouter>

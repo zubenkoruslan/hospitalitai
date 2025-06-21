@@ -499,7 +499,7 @@ const QuizAndBankManagementPage: React.FC = () => {
       await handleUpdateQuizSnapshots();
     };
     updateSnapshots();
-  }, [fetchQuizzes, refetchBanks]);
+  }, [fetchQuizzes, refetchBanks, handleUpdateQuizSnapshots]);
 
   // Update snapshots when switching to quizzes view
   useEffect(() => {
@@ -859,7 +859,7 @@ const QuizAndBankManagementPage: React.FC = () => {
 
   // Handle recent activity item clicks
   const handleRecentItemClick = useCallback(
-    (item: any) => {
+    (item: { type: string; id: string }) => {
       if (item.type === "question-bank") {
         handleViewChange("question-banks");
         // Optional: You could also navigate directly to the specific question bank

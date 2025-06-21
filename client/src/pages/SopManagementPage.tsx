@@ -102,13 +102,18 @@ const SopManagementPage: React.FC = () => {
       // listRestaurantSopDocuments in api.ts should return Promise<ISopDocument[]>
       const responseData = await listRestaurantSopDocuments();
       setSopDocuments(responseData || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch SOP documents:", err);
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to load SOP documents."
-      );
+      const errorMessage =
+        (
+          err as {
+            response?: { data?: { message?: string } };
+            message?: string;
+          }
+        )?.response?.data?.message ||
+        (err as { message?: string })?.message ||
+        "Failed to load SOP documents.";
+      setError(errorMessage);
       setSopDocuments([]); // Clear documents on error
     }
     setIsLoading(false);
@@ -143,13 +148,18 @@ const SopManagementPage: React.FC = () => {
         );
         fetchDocuments(); // Refresh the list
         setIsUploadModalOpen(false); // Close modal on success
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to upload SOP document:", err);
-        setUploadError(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to upload document."
-        );
+        const errorMessage =
+          (
+            err as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          )?.response?.data?.message ||
+          (err as { message?: string })?.message ||
+          "Failed to upload document.";
+        setUploadError(errorMessage);
         // Do not close modal on error, let user see the error in modal
       } finally {
         setIsUploading(false);
@@ -175,13 +185,18 @@ const SopManagementPage: React.FC = () => {
         setSopDocuments((prevDocs) =>
           prevDocs.filter((doc) => doc._id !== documentId)
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`Failed to delete SOP document ${documentId}:`, err);
-        setDeleteError(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to delete document."
-        );
+        const errorMessage =
+          (
+            err as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          )?.response?.data?.message ||
+          (err as { message?: string })?.message ||
+          "Failed to delete document.";
+        setDeleteError(errorMessage);
       }
       setDeletingId(null);
     },

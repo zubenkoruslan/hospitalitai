@@ -3,7 +3,13 @@ import DeleteCategoryModal from "./DeleteCategoryModal";
 
 // Mock the Modal and Button components as they are tested separately
 // and we want to focus on DeleteCategoryModal's logic.
-const MockModal = (props: any) => (
+const MockModal = (props: {
+  isOpen: boolean;
+  title?: string;
+  children: React.ReactNode;
+  footerContent?: React.ReactNode;
+  onClose: () => void;
+}) => (
   <div data-testid="mock-modal" data-isopen={props.isOpen.toString()}>
     {props.title && <h1>{props.title}</h1>}
     <div>{props.children}</div>
@@ -15,7 +21,13 @@ const MockModal = (props: any) => (
 MockModal.displayName = "MockModal";
 jest.mock("../common/Modal", () => MockModal);
 
-const MockButton = (props: any) => (
+const MockButton = (props: {
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: string;
+  className?: string;
+  children: React.ReactNode;
+}) => (
   <button
     onClick={props.onClick}
     disabled={props.disabled}

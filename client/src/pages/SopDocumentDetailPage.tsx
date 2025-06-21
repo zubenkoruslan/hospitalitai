@@ -92,13 +92,18 @@ const SopDocumentDetailPage: React.FC = () => {
             setNewTitle(responseDoc.title);
             setNewDescription(responseDoc.description || "");
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error(`Failed to fetch SOP document ${documentId}:`, err);
-          setError(
-            err.response?.data?.message ||
-              err.message ||
-              "Failed to load document details."
-          );
+          const errorMessage =
+            (
+              err as {
+                response?: { data?: { message?: string } };
+                message?: string;
+              }
+            )?.response?.data?.message ||
+            (err as { message?: string })?.message ||
+            "Failed to load document details.";
+          setError(errorMessage);
         }
         setIsLoading(false);
       };
@@ -136,7 +141,7 @@ const SopDocumentDetailPage: React.FC = () => {
       );
       // Optionally, update local state with the full response if it contains more (e.g., updatedAt)
       setDocument(updatedDoc);
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error("Failed to update title:", apiError);
       // Revert optimistic update on error
       setDocument((prevDoc) =>
@@ -144,7 +149,9 @@ const SopDocumentDetailPage: React.FC = () => {
       );
       setNewTitle(originalTitle); // Also reset the input field buffer
       // TODO: Show user-friendly error message (e.g., using a toast notification)
-      alert(`Error updating title: ${apiError.message || "Please try again."}`);
+      const errorMessage =
+        (apiError as { message?: string })?.message || "Please try again.";
+      alert(`Error updating title: ${errorMessage}`);
     }
   };
 
@@ -178,15 +185,15 @@ const SopDocumentDetailPage: React.FC = () => {
         newDescription.trim()
       );
       setDocument(updatedDoc);
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error("Failed to update description:", apiError);
       setDocument((prevDoc) =>
         prevDoc ? { ...prevDoc, description: originalDescription } : null
       );
       setNewDescription(originalDescription);
-      alert(
-        `Error updating description: ${apiError.message || "Please try again."}`
-      );
+      const errorMessage =
+        (apiError as { message?: string })?.message || "Please try again.";
+      alert(`Error updating description: ${errorMessage}`);
     }
   };
 
@@ -257,7 +264,7 @@ const SopDocumentDetailPage: React.FC = () => {
       setDocument(updatedDoc);
       closeCategoryModal();
       // TODO: Show success notification
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error(`Failed to ${categoryModalMode} category:`, apiError);
       // Error will be displayed within the modal by CategoryFormModal
       // but re-throw if you want to handle it here as well (e.g., for global notifications)
@@ -331,13 +338,11 @@ const SopDocumentDetailPage: React.FC = () => {
           setSelectedCategoryId(null);
           setSelectedSubCategoryId(null);
         }
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         console.error(`Failed to delete ${itemType}:`, apiError);
-        alert(
-          `Error deleting ${itemType}: ${
-            apiError.message || "Please try again."
-          }`
-        );
+        const errorMessage =
+          (apiError as { message?: string })?.message || "Please try again.";
+        alert(`Error deleting ${itemType}: ${errorMessage}`);
       }
     }
   };
@@ -444,23 +449,26 @@ const SopDocumentDetailPage: React.FC = () => {
   };
 
   // Content Display Component
+  // Interface for ContentDisplay component
+  interface ContentDisplayProps {
+    content: {
+      type: "category" | "subcategory";
+      category: ISopCategory;
+      subCategory?: ISopCategory;
+    };
+    searchTerm: string;
+    onEdit: (category: ISopCategory, subCategory?: ISopCategory) => void;
+    onDelete: (category: ISopCategory, subCategory?: ISopCategory) => void;
+    onAddSubCategory: (category: ISopCategory) => void;
+  }
+
   const ContentDisplay = ({
     content,
     searchTerm,
     onEdit,
     onDelete,
     onAddSubCategory,
-  }: {
-    content: {
-      type: "category" | "subcategory";
-      category: any;
-      subCategory?: any;
-    };
-    searchTerm: string;
-    onEdit: (category: any, subCategory?: any) => void;
-    onDelete: (category: any, subCategory?: any) => void;
-    onAddSubCategory: (category: any) => void;
-  }) => {
+  }: ContentDisplayProps) => {
     const { type, category, subCategory } = content;
     const isSubCategory = type === "subcategory" && subCategory;
     const displayItem = isSubCategory ? subCategory : category;
@@ -488,9 +496,7 @@ const SopDocumentDetailPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              {displayItem.description && (
-                <p className="text-gray-600">{displayItem.description}</p>
-              )}
+              {/* Note: ISopCategory doesn't have description field */}
             </div>
 
             <div className="flex items-center space-x-2 ml-4">
@@ -573,35 +579,33 @@ const SopDocumentDetailPage: React.FC = () => {
             <div className="border-t border-gray-200 p-4">
               <h3 className="font-medium text-gray-900 mb-3">Subcategories</h3>
               <div className="grid md:grid-cols-2 gap-3">
-                {category.subCategories.map((subcat: any, subIndex: number) => {
-                  const subcatKey =
-                    subcat._id || `subcat-${category._id}-${subIndex}`;
-                  return (
-                    <button
-                      key={subcatKey}
-                      onClick={() =>
-                        handleCategorySelect(selectedCategoryId!, subcatKey)
-                      }
-                      className="text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                    >
-                      <div className="flex items-start space-x-2">
-                        <div className="p-1.5 bg-blue-100 rounded">
-                          <DocumentTextIcon className="h-3 w-3 text-blue-600" />
+                {category.subCategories.map(
+                  (subcat: ISopCategory, subIndex: number) => {
+                    const subcatKey =
+                      subcat._id || `subcat-${category._id}-${subIndex}`;
+                    return (
+                      <button
+                        key={subcatKey}
+                        onClick={() =>
+                          handleCategorySelect(selectedCategoryId!, subcatKey)
+                        }
+                        className="text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        <div className="flex items-start space-x-2">
+                          <div className="p-1.5 bg-blue-100 rounded">
+                            <DocumentTextIcon className="h-3 w-3 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {subcat.name}
+                            </h4>
+                            {/* Note: ISopCategory doesn't have description field */}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 text-sm">
-                            {subcat.name}
-                          </h4>
-                          {subcat.description && (
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                              {subcat.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  }
+                )}
               </div>
             </div>
           )}

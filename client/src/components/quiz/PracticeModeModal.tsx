@@ -39,7 +39,7 @@ const PracticeModeModal: React.FC<PracticeModeModalProps> = ({
     try {
       const result = await getAvailableQuizzesForStaff();
       setQuizzes(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching quizzes:", err);
       setError("Failed to load available quizzes. Please try again.");
     } finally {

@@ -86,9 +86,27 @@ export function useStaffDetails(
       // setStaffDetails(response.data.staff || null);
       const details = await getStaffDetails(staffId);
       setStaffDetails(details || null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Error fetching details for staff ${staffId}:`, err);
-      setError(err.response?.data?.message || "Failed to fetch staff details.");
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message || "Failed to fetch staff details."
+        );
+      } else {
+        setError("Failed to fetch staff details.");
+      }
       setStaffDetails(null);
     } finally {
       setLoading(false);

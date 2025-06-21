@@ -83,7 +83,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isCollapsed, isHovered]);
+  }, [isCollapsed, isHovered, isPinned]);
 
   // Handle content visibility timing
   useEffect(() => {

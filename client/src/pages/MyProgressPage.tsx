@@ -98,7 +98,16 @@ const MyProgressPage: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   // Category data for breakdown
-  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<
+    Array<{
+      category: string;
+      score: number;
+      questionsAnswered: number;
+      totalQuestions: number;
+      color: string;
+      icon: React.ComponentType<{ className?: string }>;
+    }>
+  >([]);
 
   // Fetch progress data
   useEffect(() => {
@@ -1037,7 +1046,15 @@ const MyProgressPage: React.FC = () => {
                   return (
                     <button
                       key={tab.key}
-                      onClick={() => setActiveTab(tab.key as any)}
+                      onClick={() =>
+                        setActiveTab(
+                          tab.key as
+                            | "overview"
+                            | "quizzes"
+                            | "achievements"
+                            | "insights"
+                        )
+                      }
                       className={`
                         flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm lg:text-base
                         ${

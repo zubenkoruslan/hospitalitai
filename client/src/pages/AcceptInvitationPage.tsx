@@ -41,10 +41,25 @@ const AcceptInvitationPage: React.FC = () => {
         const details = await getInvitationDetails(token);
         setInvitation(details);
         setFormData((prev) => ({ ...prev, name: details.name || "" }));
-      } catch (err: any) {
-        setError(
-          err.response?.data?.message || "Invalid or expired invitation"
-        );
+      } catch (err: unknown) {
+        // Type guard for axios error
+        const isAxiosError = (
+          error: unknown
+        ): error is {
+          response: { data?: { message?: string } };
+        } => {
+          return (
+            typeof error === "object" && error !== null && "response" in error
+          );
+        };
+
+        if (isAxiosError(err)) {
+          setError(
+            err.response.data?.message || "Invalid or expired invitation"
+          );
+        } else {
+          setError("Invalid or expired invitation");
+        }
       } finally {
         setLoading(false);
       }
@@ -86,8 +101,23 @@ const AcceptInvitationPage: React.FC = () => {
           email: invitation?.email,
         },
       });
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to accept invitation");
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to accept invitation");
+      } else {
+        setError("Failed to accept invitation");
+      }
     } finally {
       setSubmitting(false);
     }

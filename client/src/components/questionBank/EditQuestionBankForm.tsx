@@ -249,9 +249,19 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
                 "Could not load categories from the linked Menu (or menu has no items)."
               );
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             // Check if it's a 404 error (menu not found)
-            if (error?.response?.status === 404) {
+            const isAxiosError = (
+              err: unknown
+            ): err is {
+              response: { status: number };
+            } => {
+              return (
+                typeof err === "object" && err !== null && "response" in err
+              );
+            };
+
+            if (isAxiosError(error) && error.response.status === 404) {
               setSourceCategoryError(
                 "The linked menu no longer exists. The question bank may need to be updated with a new menu reference."
               );
@@ -267,15 +277,51 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
           );
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching source categories:", err);
-      setSourceCategoryError(
-        err.response?.data?.message ||
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setSourceCategoryError(
+          err.response.data?.message ||
+            err.message ||
+            (bankToEdit.sourceType === "SOP"
+              ? "Failed to load source categories for SOP."
+              : "Failed to load source categories for Menu.")
+        );
+      } else if (isErrorWithMessage(err)) {
+        setSourceCategoryError(
           err.message ||
-          (bankToEdit.sourceType === "SOP"
+            (bankToEdit.sourceType === "SOP"
+              ? "Failed to load source categories for SOP."
+              : "Failed to load source categories for Menu.")
+        );
+      } else {
+        setSourceCategoryError(
+          bankToEdit.sourceType === "SOP"
             ? "Failed to load source categories for SOP."
-            : "Failed to load source categories for Menu.")
-      );
+            : "Failed to load source categories for Menu."
+        );
+      }
     } finally {
       setIsLoadingSourceCategories(false);
     }
@@ -425,11 +471,38 @@ const EditQuestionBankForm: React.FC<EditQuestionBankFormProps> = ({
           "Failed to update bank. Bank not found or an unexpected error occurred."
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error updating bank:", err);
-      setError(
-        err.response?.data?.message || err.message || "Failed to update bank."
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message || err.message || "Failed to update bank."
+        );
+      } else if (isErrorWithMessage(err)) {
+        setError(err.message || "Failed to update bank.");
+      } else {
+        setError("Failed to update bank.");
+      }
     } finally {
       setIsLoading(false);
     }

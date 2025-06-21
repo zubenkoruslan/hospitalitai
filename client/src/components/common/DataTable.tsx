@@ -15,7 +15,7 @@ export interface DataTableColumn<T> {
   header: string;
   sortable?: boolean;
   filterable?: boolean;
-  render?: (value: any, row: T, index: number) => React.ReactNode;
+  render?: (value: unknown, row: T, index: number) => React.ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
   sticky?: boolean;
@@ -46,8 +46,8 @@ export interface DataTableProps<T> {
   // Search and filter
   searchValue?: string;
   onSearchChange?: (value: string) => void;
-  filters?: Record<string, any>;
-  onFiltersChange?: (filters: Record<string, any>) => void;
+  filters?: Record<string, unknown>;
+  onFiltersChange?: (filters: Record<string, unknown>) => void;
 
   // Styling
   variant?: "default" | "bordered" | "striped";
@@ -75,7 +75,7 @@ export interface DataTableProps<T> {
   testId?: string;
 }
 
-function DataTable<T extends Record<string, any>>({
+function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   sortable = true,
@@ -110,8 +110,9 @@ function DataTable<T extends Record<string, any>>({
     direction: "asc" | "desc";
   } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [localFilters, setLocalFilters] =
-    useState<Record<string, string>>(filters);
+  const [localFilters, setLocalFilters] = useState<Record<string, string>>(
+    filters as Record<string, string>
+  );
 
   // Get row key function
   const getRowKey = (row: T): string | number => {

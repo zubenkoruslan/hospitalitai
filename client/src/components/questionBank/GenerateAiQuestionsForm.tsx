@@ -159,10 +159,22 @@ const GenerateAiQuestionsForm: React.FC<GenerateAiQuestionsFormProps> = ({
         } else {
           // setErrorMenuCategories("No categories found in the selected menu or menu has no items.");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching menu categories:", err);
+
+        // Type guard for axios error
+        const isAxiosError = (
+          error: unknown
+        ): error is {
+          response: { status: number };
+        } => {
+          return (
+            typeof error === "object" && error !== null && "response" in error
+          );
+        };
+
         // Check if it's a 404 error (menu not found)
-        if (err?.response?.status === 404) {
+        if (isAxiosError(err) && err.response.status === 404) {
           setErrorMenuCategories(
             "The linked menu no longer exists. Please select a different menu."
           );

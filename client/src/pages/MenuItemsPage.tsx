@@ -62,17 +62,28 @@ import MenuDetailsEditModal from "../components/menu/MenuDetailsEditModal"; // I
 import DeleteCategoryModal from "../components/category/DeleteCategoryModal"; // Import DeleteCategoryModal
 
 // --- Error Formatting Helper ---
-const formatApiError = (err: any, context: string): string => {
+const formatApiError = (err: unknown, context: string): string => {
   console.error(`Error ${context}:`, err);
-  if (err.response) {
+
+  // Type guard for axios error
+  const isAxiosError = (
+    error: unknown
+  ): error is {
+    response?: { data?: { message?: string }; status?: number };
+    request?: unknown;
+  } => {
+    return typeof error === "object" && error !== null;
+  };
+
+  if (isAxiosError(err) && err.response) {
     let message =
       err.response.data?.message ||
       `Request failed with status ${err.response.status}.`;
-    if (err.response.status >= 500) {
+    if (err.response.status && err.response.status >= 500) {
       message += " Please try again later.";
     }
     return message;
-  } else if (err.request) {
+  } else if (isAxiosError(err) && err.request) {
     return `Network error while ${context}. Please check your connection and try again.`;
   } else {
     return `An unexpected error occurred while ${context}. Please try again.`;
@@ -129,7 +140,6 @@ const MenuItemsPage: React.FC = () => {
     handleClearSearch,
     handleFiltersChange,
     handleSortChange,
-    setSortBy,
   } = useMenuViews("dashboard");
 
   // Remove state managed by the hook
@@ -462,30 +472,32 @@ const MenuItemsPage: React.FC = () => {
         }
         fetchData();
         closeModal();
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error submitting item:", err);
+        const errorDetails = err as {
+          message?: string;
+          response?: { data?: unknown; status?: number; statusText?: string };
+        };
         console.error("Error details:", {
-          message: err.message,
-          response: err.response?.data,
-          status: err.response?.status,
-          statusText: err.response?.statusText,
+          message: errorDetails.message,
+          response: errorDetails.response?.data,
+          status: errorDetails.response?.status,
+          statusText: errorDetails.response?.statusText,
         });
 
         // Display the actual error to the user
-        if (err.response?.status === 403) {
+        if (errorDetails.response?.status === 403) {
           setSuccessMessage(
             "Permission denied. Please ensure you are logged in as a restaurant user."
           );
-        } else if (err.response?.status === 401) {
+        } else if (errorDetails.response?.status === 401) {
           setSuccessMessage("Authentication required. Please log in again.");
         } else {
-          setSuccessMessage(
-            `Error: ${
-              err.response?.data?.message ||
-              err.message ||
-              "Unknown error occurred"
-            }`
-          );
+          const errorMessage =
+            (errorDetails.response?.data as { message?: string })?.message ||
+            errorDetails.message ||
+            "Unknown error occurred";
+          setSuccessMessage(`Error: ${errorMessage}`);
         }
       } finally {
         setIsSubmittingItem(false);
@@ -513,7 +525,7 @@ const MenuItemsPage: React.FC = () => {
       setSuccessMessage("Menu item deleted successfully.");
       fetchData();
       closeModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(formatApiError(err, "deleting menu item"));
       setSuccessMessage(null);
     } finally {
@@ -552,7 +564,7 @@ const MenuItemsPage: React.FC = () => {
         setSuccessMessage("Menu details updated successfully.");
         fetchData();
         closeMenuDetailsModal();
-      } catch (err: any) {
+      } catch (err: unknown) {
         setMenuDetailsError(formatApiError(err, "saving menu details"));
       } finally {
         setIsSavingMenuDetails(false);
@@ -628,7 +640,7 @@ const MenuItemsPage: React.FC = () => {
       );
       fetchData();
       closeDeleteCategoryModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(
         formatApiError(err, `deleting category ${categoryToDelete}`)
       );
@@ -661,11 +673,12 @@ const MenuItemsPage: React.FC = () => {
         const result = await bulkDeleteMenuItems(itemIds);
         setSuccessMessage(result.message);
         fetchData(); // Refresh the data
-      } catch (err: any) {
-        console.error(formatApiError(err, "bulk deleting menu items"));
-        setSuccessMessage(
-          `Error: ${formatApiError(err, "bulk deleting menu items")}`
+      } catch (err: unknown) {
+        console.error(
+          "Error during bulk delete:",
+          formatApiError(err, "bulk delete")
         );
+        alert(`Failed to delete items. ${formatApiError(err, "bulk delete")}`);
       }
     },
     [fetchData]

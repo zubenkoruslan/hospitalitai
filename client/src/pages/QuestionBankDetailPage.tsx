@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useQuestionBanks } from "../hooks/useQuestionBanks";
 import {
   IQuestion,
-  IQuestionBank,
   KnowledgeCategory,
   UpdateQuestionClientData,
 } from "../types/questionBankTypes";
@@ -110,30 +109,30 @@ const QuestionBankDetailPage: React.FC = () => {
   }, [bankId, currentQuestionBank, isLoading, fetchQuestionBankById]);
 
   // Helper functions to get questions
-  const getAllQuestionsAsObjects = (): IQuestion[] => {
+  const getAllQuestionsAsObjects = useCallback((): IQuestion[] => {
     if (!currentQuestionBank?.questions) {
       return [];
     }
     return currentQuestionBank.questions.filter(
       (q) => typeof q === "object"
     ) as IQuestion[];
-  };
+  }, [currentQuestionBank]);
 
-  const getActiveQuestionsAsObjects = (): IQuestion[] => {
+  const getActiveQuestionsAsObjects = useCallback((): IQuestion[] => {
     const allQuestions = getAllQuestionsAsObjects();
     return allQuestions.filter((q) => !q.status || q.status === "active");
-  };
+  }, [getAllQuestionsAsObjects]);
 
-  const getPreviewQuestionsAsObjects = (): IQuestion[] => {
+  const getPreviewQuestionsAsObjects = useCallback((): IQuestion[] => {
     const allQuestions = getAllQuestionsAsObjects();
     return allQuestions.filter((q) => q.status === "pending_review");
-  };
+  }, [getAllQuestionsAsObjects]);
 
-  const getCurrentTabQuestions = (): IQuestion[] => {
+  const getCurrentTabQuestions = useCallback((): IQuestion[] => {
     return activeTab === "active"
       ? getActiveQuestionsAsObjects()
       : getPreviewQuestionsAsObjects();
-  };
+  }, [activeTab, getActiveQuestionsAsObjects, getPreviewQuestionsAsObjects]);
 
   // Memoized filtered and sorted questions
   const filteredAndSortedQuestions = useMemo(() => {
@@ -171,8 +170,8 @@ const QuestionBankDetailPage: React.FC = () => {
 
     // Apply sorting
     questions.sort((a, b) => {
-      let valA: any;
-      let valB: any;
+      let valA: string | number;
+      let valB: string | number;
 
       switch (sortField) {
         case "questionText":
@@ -198,7 +197,7 @@ const QuestionBankDetailPage: React.FC = () => {
 
     return questions;
   }, [
-    getCurrentTabQuestions(),
+    getCurrentTabQuestions,
     searchTerm,
     selectedCategory,
     selectedMenuCategory,
@@ -244,7 +243,7 @@ const QuestionBankDetailPage: React.FC = () => {
       menuCategoryCounts,
       availableMenuCategories: availableMenuCategories.sort(),
     };
-  }, [getCurrentTabQuestions()]);
+  }, [getCurrentTabQuestions]);
 
   // Event handlers
   const handleSort = (field: string) => {
@@ -424,14 +423,14 @@ const QuestionBankDetailPage: React.FC = () => {
     setIsEditBankModalOpen(false);
   };
 
-  const handleBankDetailsUpdated = (_updatedBank: IQuestionBank) => {
+  const handleBankDetailsUpdated = () => {
     handleCloseEditBankModal();
     if (bankId) {
       fetchQuestionBankById(bankId);
     }
   };
 
-  const handleManualQuestionSubmit = async (newQuestion: IQuestion) => {
+  const handleManualQuestionSubmit = async () => {
     setShowAddManualQuestionModal(false);
     if (bankId) {
       await fetchQuestionBankById(bankId);

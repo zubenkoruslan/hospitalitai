@@ -17,7 +17,12 @@ interface QuizResultsDisplayProps {
   totalQuestions: number;
   quizTitle: string;
   completionTime?: number;
-  incorrectAnswers?: any[];
+  incorrectAnswers?: Array<{
+    questionText: string;
+    selectedAnswer?: string;
+    correctAnswer: string;
+    explanation?: string;
+  }>;
   onViewIncorrectAnswers?: () => void;
   onRetakeQuiz?: () => void;
   onBackToDashboard: () => void;

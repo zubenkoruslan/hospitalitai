@@ -6,7 +6,7 @@ jest.mock("./Modal", () => {
   const OriginalModal = jest.requireActual("./Modal").default;
   return {
     __esModule: true,
-    default: (props: any) => <OriginalModal {...props} />,
+    default: (props: Record<string, unknown>) => <OriginalModal {...props} />,
     // If Modal exports other things, mock them here if needed
   };
 });

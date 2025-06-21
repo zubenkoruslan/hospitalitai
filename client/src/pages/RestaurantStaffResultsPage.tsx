@@ -942,8 +942,18 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
                                   const userIdString =
                                     typeof performer.userId === "object"
-                                      ? (performer.userId as any)._id ||
-                                        (performer.userId as any).toString()
+                                      ? (
+                                          performer.userId as {
+                                            _id: string;
+                                            toString(): string;
+                                          }
+                                        )._id ||
+                                        (
+                                          performer.userId as {
+                                            _id: string;
+                                            toString(): string;
+                                          }
+                                        ).toString()
                                       : performer.userId;
 
                                   return (
@@ -1060,8 +1070,18 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
                                 const userIdString =
                                   typeof staff.userId === "object"
-                                    ? (staff.userId as any)._id ||
-                                      (staff.userId as any).toString()
+                                    ? (
+                                        staff.userId as {
+                                          _id: string;
+                                          toString(): string;
+                                        }
+                                      )._id ||
+                                      (
+                                        staff.userId as {
+                                          _id: string;
+                                          toString(): string;
+                                        }
+                                      ).toString()
                                     : staff.userId;
 
                                 return (

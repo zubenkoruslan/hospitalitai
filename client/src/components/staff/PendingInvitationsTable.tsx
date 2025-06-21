@@ -34,8 +34,23 @@ const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = ({
       const fetchedInvitations = await getRestaurantInvitations();
       setInvitations(fetchedInvitations);
       setError(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load invitations");
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to load invitations");
+      } else {
+        setError("Failed to load invitations");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,8 +73,23 @@ const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = ({
       if (onInvitationCancelled) {
         onInvitationCancelled();
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to cancel invitation");
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(err.response.data?.message || "Failed to cancel invitation");
+      } else {
+        setError("Failed to cancel invitation");
+      }
     } finally {
       setCancellingIds((prev) => {
         const newSet = new Set(prev);

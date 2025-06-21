@@ -59,7 +59,8 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
     value: string | boolean
   ) => {
     const newOptions = [...options];
-    (newOptions[index] as any)[field] = value;
+    // @ts-expect-error - Dynamic field assignment requires type assertion
+    newOptions[index][field] = value;
     setOptions(newOptions);
   };
 
@@ -93,7 +94,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
         ]);
       }
     }
-  }, [questionType]);
+  }, [questionType, options]);
 
   useEffect(() => {
     if (initialBankCategories && initialBankCategories.length > 0) {
@@ -189,18 +190,36 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
       } else {
         setFormError("Failed to create question. Please try again.");
       }
-    } catch (err: any) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setFormError(err.response.data.message);
-      } else if (
-        err.response &&
-        err.response.data &&
-        err.response.data.errors
-      ) {
-        const messages = err.response.data.errors
-          .map((e: any) => e.msg)
-          .join(", ");
-        setFormError(messages);
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: {
+          data?: {
+            message?: string;
+            errors?: Array<{ msg: string }>;
+          };
+        };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        if (err.response.data?.message) {
+          setFormError(err.response.data.message);
+        } else if (err.response.data?.errors) {
+          const messages = err.response.data.errors
+            .map((e) => e.msg)
+            .join(", ");
+          setFormError(messages);
+        } else {
+          setFormError(
+            "An unexpected error occurred while adding the question."
+          );
+        }
       } else {
         setFormError("An unexpected error occurred while adding the question.");
       }

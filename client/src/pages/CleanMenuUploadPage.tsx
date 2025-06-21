@@ -312,8 +312,20 @@ const CleanMenuUploadPage: React.FC = () => {
         ),
       ];
       setExpandedCategories(new Set(categories as string[]));
-    } catch (err: any) {
-      setError(err.message || "Upload failed");
+    } catch (err: unknown) {
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isErrorWithMessage(err)) {
+        setError(err.message || "Upload failed");
+      } else {
+        setError("Upload failed");
+      }
     } finally {
       setUploading(false);
     }
@@ -586,8 +598,20 @@ const CleanMenuUploadPage: React.FC = () => {
       } else {
         setError("Import failed: " + response.message);
       }
-    } catch (err: any) {
-      setError("Import failed: " + (err.message || "Unknown error"));
+    } catch (err: unknown) {
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isErrorWithMessage(err)) {
+        setError("Import failed: " + (err.message || "Unknown error"));
+      } else {
+        setError("Import failed: Unknown error");
+      }
     } finally {
       setImporting(false);
     }
@@ -618,7 +642,7 @@ const CleanMenuUploadPage: React.FC = () => {
       setCustomCategory("");
     };
 
-    const handleFieldChange = (field: keyof CleanMenuItem, value: any) => {
+    const handleFieldChange = (field: keyof CleanMenuItem, value: unknown) => {
       setEditItem((prev) => ({ ...prev, [field]: value }));
     };
 

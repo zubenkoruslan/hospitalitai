@@ -39,7 +39,7 @@ const QuizTypeSelectionModal: React.FC<QuizTypeSelectionModalProps> = ({
     ) {
       fetchAvailableQuizzes();
     }
-  }, [showGradedQuizSelection]);
+  }, [showGradedQuizSelection, availableQuizzes.length, isLoadingQuizzes]);
 
   const fetchAvailableQuizzes = async () => {
     setIsLoadingQuizzes(true);

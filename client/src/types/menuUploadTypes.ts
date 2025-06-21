@@ -28,7 +28,7 @@ export interface GeminiMenuItem {
   itemName: { value: string; confidence?: number; originalText?: string };
   description?: { value: string; confidence?: number; originalText?: string };
   price: { value: string; confidence?: number; originalText?: string };
-  sourceCoordinates?: any;
+  sourceCoordinates?: unknown;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface GeminiMenuItem {
 export interface GeminiMenuSection {
   sectionName: { value: string; confidence?: number; originalText?: string };
   items: GeminiMenuItem[];
-  sourceCoordinates?: any;
+  sourceCoordinates?: unknown;
 }
 
 /**
@@ -142,7 +142,7 @@ export interface MenuUploadPreview {
     itemsWithPotentialErrors: number;
   };
   rawAIText?: string; // PDF only
-  rawAIOutput?: any; // PDF only
+  rawAIOutput?: unknown; // PDF only - raw AI response
 }
 
 // --- Structures for Final Menu Import ---
@@ -193,5 +193,5 @@ export interface ImportResult {
   itemsSkipped: number;
   itemsErrored: number;
   errorDetails: ImportResultItemDetail[];
-  errorReport?: any;
+  errorReport?: unknown;
 }

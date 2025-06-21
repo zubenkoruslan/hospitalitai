@@ -274,10 +274,28 @@ const PerformanceScore: React.FC<{ score: number; comparison: number }> = ({
   );
 };
 
+// Interface for staffDetails prop
+interface StaffDetailsData {
+  _id?: string;
+  id?: string;
+  name?: string;
+  aggregatedQuizPerformance?: Array<{
+    quizId: string;
+    quizTitle: string;
+    attempts: Array<{
+      _id: string;
+      score?: number;
+      totalQuestions?: number;
+      attemptDate?: string;
+      completedAt?: string;
+    }>;
+  }>;
+}
+
 // Consolidated Quiz Performance Component
 const QuizPerformanceSection: React.FC<{
   enhancedData: EnhancedStaffData | null;
-  staffDetails: any;
+  staffDetails: StaffDetailsData | null;
   onViewDetails: (attemptId: string) => void;
 }> = ({ enhancedData, staffDetails, onViewDetails }) => {
   const [expandedQuizzes, setExpandedQuizzes] = useState<Set<string>>(
@@ -297,10 +315,10 @@ const QuizPerformanceSection: React.FC<{
 
     // Add from staff details aggregated performance if available
     if (staffDetails?.aggregatedQuizPerformance) {
-      staffDetails.aggregatedQuizPerformance.forEach((aggQuiz: any) => {
+      staffDetails.aggregatedQuizPerformance.forEach((aggQuiz) => {
         if (aggQuiz.attempts && aggQuiz.attempts.length > 0) {
           // Transform aggregated attempts to match the expected format
-          aggQuiz.attempts.forEach((attempt: any) => {
+          aggQuiz.attempts.forEach((attempt) => {
             allQuizSources.push({
               quizId: aggQuiz.quizId,
               quizTitle: aggQuiz.quizTitle,
@@ -433,7 +451,19 @@ const QuizPerformanceSection: React.FC<{
           "Times Incorrect",
         ];
 
-        const csvRows = data.incorrectQuestions.map((q: any) => [
+        // Interface for incorrect question data
+        interface IncorrectQuestion {
+          questionText: string;
+          userAnswer: string;
+          correctAnswer: string;
+          explanation?: string;
+          quizTitle: string;
+          attemptDate: Date;
+          attemptId: string;
+          timesIncorrect: number;
+        }
+
+        const csvRows = data.incorrectQuestions.map((q: IncorrectQuestion) => [
           `"${q.questionText.replace(/"/g, '""')}"`,
           `"${q.userAnswer.replace(/"/g, '""')}"`,
           `"${q.correctAnswer.replace(/"/g, '""')}"`,
@@ -519,7 +549,7 @@ const QuizPerformanceSection: React.FC<{
           "Times Incorrect",
         ];
 
-        const csvRows = data.incorrectQuestions.map((q: any) => [
+        const csvRows = data.incorrectQuestions.map((q: IncorrectQuestion) => [
           `"${q.quizTitle.replace(/"/g, '""')}"`,
           `"${q.questionText.replace(/"/g, '""')}"`,
           `"${q.userAnswer.replace(/"/g, '""')}"`,

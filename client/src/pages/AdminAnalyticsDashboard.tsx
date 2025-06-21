@@ -150,13 +150,40 @@ const AdminAnalyticsDashboard: React.FC = () => {
           "/admin/analytics/engagement-stats"
         );
         setEngagementMetrics(engagementResponse.data.data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching analytics:", err);
-        setError(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to load analytics data"
-        );
+
+        // Type guard for axios error
+        const isAxiosError = (
+          error: unknown
+        ): error is {
+          response: { data?: { message?: string } };
+          message: string;
+        } => {
+          return (
+            typeof error === "object" && error !== null && "response" in error
+          );
+        };
+
+        const isErrorWithMessage = (
+          error: unknown
+        ): error is { message: string } => {
+          return (
+            typeof error === "object" && error !== null && "message" in error
+          );
+        };
+
+        if (isAxiosError(err)) {
+          setError(
+            err.response.data?.message ||
+              err.message ||
+              "Failed to load analytics data"
+          );
+        } else if (isErrorWithMessage(err)) {
+          setError(err.message || "Failed to load analytics data");
+        } else {
+          setError("Failed to load analytics data");
+        }
       } finally {
         setLoading(false);
       }
@@ -191,12 +218,38 @@ const AdminAnalyticsDashboard: React.FC = () => {
 
       // TODO: Implement actual PDF download once backend is ready
       alert("Report generation feature will be implemented in Phase 3");
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to generate report"
-      );
+    } catch (err: unknown) {
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+        message: string;
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const isErrorWithMessage = (
+        error: unknown
+      ): error is { message: string } => {
+        return (
+          typeof error === "object" && error !== null && "message" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            err.message ||
+            "Failed to generate report"
+        );
+      } else if (isErrorWithMessage(err)) {
+        setError(err.message || "Failed to generate report");
+      } else {
+        setError("Failed to generate report");
+      }
     } finally {
       setGeneratingReport(false);
     }
@@ -286,7 +339,9 @@ const AdminAnalyticsDashboard: React.FC = () => {
                   <select
                     value={selectedTimeframe}
                     onChange={(e) =>
-                      setSelectedTimeframe(e.target.value as any)
+                      setSelectedTimeframe(
+                        e.target.value as "week" | "month" | "quarter" | "year"
+                      )
                     }
                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
@@ -365,7 +420,15 @@ const AdminAnalyticsDashboard: React.FC = () => {
                     return (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() =>
+                          setActiveTab(
+                            tab.id as
+                              | "overview"
+                              | "growth"
+                              | "engagement"
+                              | "cohort"
+                          )
+                        }
                         className={`${
                           activeTab === tab.id
                             ? "border-purple-500 text-purple-600"

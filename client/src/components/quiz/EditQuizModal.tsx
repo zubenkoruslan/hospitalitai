@@ -130,7 +130,7 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
       setFetchRolesError(null);
       setError(null);
     }
-  }, [isOpen, user?.restaurantId]);
+  }, [isOpen, user?.restaurantId, propQuestionBanks?.length]);
 
   const handleBankSelectionChange = (bankId: string) => {
     setSelectedBankIds((prevSelected) =>
@@ -190,12 +190,28 @@ const EditQuizModal: React.FC<EditQuizModalProps> = ({
       );
       onQuizUpdated(updatedQuiz); // Callback to parent with the full updated quiz object
       onClose(); // Close modal
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to update quiz:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to update quiz. Please try again."
-      );
+
+      // Type guard for axios error
+      const isAxiosError = (
+        error: unknown
+      ): error is {
+        response: { data?: { message?: string } };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      if (isAxiosError(err)) {
+        setError(
+          err.response.data?.message ||
+            "Failed to update quiz. Please try again."
+        );
+      } else {
+        setError("Failed to update quiz. Please try again.");
+      }
     }
     setIsLoading(false);
 

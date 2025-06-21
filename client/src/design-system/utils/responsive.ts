@@ -82,7 +82,7 @@ export const useIsTouchDevice = () => {
       setIsTouchDevice(
         "ontouchstart" in window ||
           navigator.maxTouchPoints > 0 ||
-          // @ts-ignore
+          // @ts-expect-error - msMaxTouchPoints is IE-specific and not in types
           navigator.msMaxTouchPoints > 0
       );
     };
@@ -218,25 +218,9 @@ export const buildResponsiveClasses = (
 };
 
 // Hook for responsive font sizes based on screen size
-export const useResponsiveFontSize = (
-  baseFontSize: string,
-  multiplier: { sm?: number; md?: number; lg?: number; xl?: number } = {}
-) => {
-  const { breakpoint } = useResponsive();
-
-  // Default multipliers for each breakpoint
-  const defaultMultipliers = {
-    sm: 1,
-    md: 1.1,
-    lg: 1.2,
-    xl: 1.3,
-  };
-
-  const activeMultiplier =
-    {
-      ...defaultMultipliers,
-      ...multiplier,
-    }[breakpoint as keyof typeof defaultMultipliers] || 1;
+export const useResponsiveFontSize = (baseFontSize: string) => {
+  // Note: This hook is a placeholder for future CSS-in-JS implementation
+  // Multiplier parameter removed as it's not currently implemented
 
   // This would need to be implemented based on your CSS-in-JS solution
   // For now, return the class name that should be applied
