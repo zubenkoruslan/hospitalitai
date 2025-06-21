@@ -13,7 +13,6 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  UserIcon,
   MapPinIcon,
   PresentationChartLineIcon,
   TrophyIcon,
@@ -197,7 +196,7 @@ const Navbar: React.FC<NavbarProps> = ({
   ];
 
   // Navigation Handler
-  const handleNavigationClick = (event: React.MouseEvent, to: string) => {
+  const handleNavigationClick = (event: React.MouseEvent) => {
     if (isBlockingNavigation && onAttemptBlockedNavigation) {
       const proceed = onAttemptBlockedNavigation();
       if (!proceed) {
@@ -284,14 +283,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     : baseNavItems[0]?.path || "/dashboard"
                 }
                 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hover:from-primary-600 hover:to-accent-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 rounded-lg px-2 py-1 whitespace-nowrap"
-                onClick={(e) =>
-                  handleNavigationClick(
-                    e,
-                    user?.role === UserRole.Admin
-                      ? "/admin/analytics"
-                      : baseNavItems[0]?.path || "/dashboard"
-                  )
-                }
+                onClick={(e) => handleNavigationClick(e)}
                 aria-label="QuizCrunch - Go to main page"
               >
                 QuizCrunch
@@ -396,7 +388,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     } focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1`
                   }
                   aria-label={`Navigate to ${item.name}`}
-                  onClick={(e) => handleNavigationClick(e, item.path)}
+                  onClick={(e) => handleNavigationClick(e)}
                   title={!isExpanded ? `${item.name}` : ""}
                   style={{
                     transitionDelay: showContent ? `${index * 20}ms` : "0ms",
