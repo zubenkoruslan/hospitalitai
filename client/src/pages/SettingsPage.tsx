@@ -31,28 +31,12 @@ const SettingsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-600 mb-4">
-                Not Authenticated
-              </h1>
-              <p className="text-gray-500">Please log in to access settings.</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Define available tabs based on user role
+  // Define available tabs based on user role - MOVED ABOVE conditional return to fix React hooks violations
   const getAvailableTabs = (): SettingsTab[] => {
+    // Use safe fallback for user role when user might be null
+    const userRole = user?.role || "staff";
     const ProfileComponent =
-      user.role === "restaurant" ? RestaurantSettings : StaffSettings;
+      userRole === "restaurant" ? RestaurantSettings : StaffSettings;
 
     const baseTabs: SettingsTab[] = [
       {
@@ -90,7 +74,7 @@ const SettingsPage: React.FC = () => {
 
   const availableTabs = getAvailableTabs();
 
-  // Filter tabs based on search query
+  // Filter tabs based on search query - MOVED ABOVE conditional return to fix React hooks violations
   const filteredTabs = useMemo(() => {
     if (!searchQuery.trim()) return availableTabs;
 
@@ -100,6 +84,25 @@ const SettingsPage: React.FC = () => {
         tab.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [availableTabs, searchQuery]);
+
+  // Check if user exists - MOVED AFTER hooks to fix React hooks violations
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-600 mb-4">
+                Not Authenticated
+              </h1>
+              <p className="text-gray-500">Please log in to access settings.</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const activeTabData = availableTabs.find((tab) => tab.id === activeTab);
   const ActiveComponent =
