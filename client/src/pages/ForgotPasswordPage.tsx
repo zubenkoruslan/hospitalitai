@@ -31,10 +31,26 @@ const ForgotPasswordPage: React.FC = () => {
       const response = await requestPasswordReset(email.trim());
       setMessage(response.message);
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // Type guard for API error structure - CONSERVATIVE: only type what's actually used
+      const isAPIError = (
+        error: unknown
+      ): error is {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
       setError(
-        err.response?.data?.message ||
-          "Failed to send password reset email. Please try again."
+        isAPIError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to send password reset email. Please try again."
       );
     } finally {
       setLoading(false);
