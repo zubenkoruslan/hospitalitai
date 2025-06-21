@@ -1,5 +1,16 @@
 import React, { createContext, ReactNode, useContext } from "react";
 
+// Error type for formatErrorMessage - CONSERVATIVE: only type what's actually used
+export interface APIError {
+  response?: {
+    data?: {
+      message?: string;
+      errors?: Record<string, unknown>;
+    };
+  };
+  message?: string;
+}
+
 // Validation helper types
 export interface ValidationFunctions {
   isValidName: (name: string) => { valid: boolean; message?: string };
@@ -10,7 +21,7 @@ export interface ValidationFunctions {
     message?: string;
   };
   isValidEmail: (email: string) => { valid: boolean; message?: string };
-  formatErrorMessage: (err: any) => string;
+  formatErrorMessage: (err: unknown) => string;
 }
 
 // Create the context
@@ -114,17 +125,22 @@ export const ValidationProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Format API error message
-  const formatErrorMessage = (err: any): string => {
-    if (err.response?.data?.message) {
+  const formatErrorMessage = (err: unknown): string => {
+    // Type guard for API error structure - CONSERVATIVE: only type what's actually used
+    const isAPIError = (error: unknown): error is APIError => {
+      return typeof error === "object" && error !== null;
+    };
+
+    if (isAPIError(err) && err.response?.data?.message) {
       return err.response.data.message;
     }
 
-    if (err.response?.data?.errors) {
+    if (isAPIError(err) && err.response?.data?.errors) {
       const errorMessages = Object.values(err.response.data.errors).join(", ");
       return errorMessages || "Validation failed.";
     }
 
-    if (err.message) {
+    if (isAPIError(err) && err.message) {
       return err.message;
     }
 
