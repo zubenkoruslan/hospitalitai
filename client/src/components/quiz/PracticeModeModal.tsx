@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   XMarkIcon,
   BookOpenIcon,
-  ClockIcon,
   AcademicCapIcon,
   PlayIcon,
 } from "@heroicons/react/24/outline";

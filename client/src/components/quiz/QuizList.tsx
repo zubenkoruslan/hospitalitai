@@ -7,11 +7,9 @@ import {
   PauseIcon,
   ChartBarIcon,
   TrashIcon,
-  EyeIcon,
   CalendarIcon,
   QuestionMarkCircleIcon,
   UserGroupIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 // --- Component Props ---
