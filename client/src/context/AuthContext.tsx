@@ -120,11 +120,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(loggedInUser);
       api.defaults.headers.common["Authorization"] = `Bearer ${receivedToken}`;
       console.log("Login successful for:", loggedInUser?.name);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // Type guard for error structure - CONSERVATIVE: only type what's actually used
+      const isErrorWithResponse = (
+        error: unknown
+      ): error is {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+        message?: string;
+      } => {
+        return typeof error === "object" && error !== null;
+      };
+
       const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "Login failed. Please check credentials or server connection.";
+        isErrorWithResponse(err) && err.response?.data?.message
+          ? err.response.data.message
+          : isErrorWithResponse(err) && err.message
+          ? err.message
+          : "Login failed. Please check credentials or server connection.";
       console.error("Login API error:", err);
       setError(errorMessage);
       delete api.defaults.headers.common["Authorization"];
