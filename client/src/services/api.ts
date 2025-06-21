@@ -134,7 +134,6 @@ import {
   ClientQuizAttemptDetails,
   ClientQuizAttemptSubmitData,
   ClientSubmitAttemptResponse,
-  IncorrectQuestionDetail,
   UpdateQuizClientData,
 } from "../types/quizTypes";
 
@@ -173,7 +172,6 @@ import // ISopDocumentListItem, // Assuming this might be from the old sopManage
 // Import from sopTypes - consolidated import
 import {
   ISopDocument,
-  SopDocumentStatus,
   SopDocumentUploadData, // Added SopDocumentUploadData here
 } from "../types/sopTypes";
 // Remove: import { ISopDocument as ISopDocumentType } from "../types/sopTypes"; // Removed duplicate/aliased import
@@ -182,7 +180,6 @@ import {
 import {
   ProcessConflictResolutionRequest,
   ProcessConflictResolutionResponse,
-  ParsedMenuItem as ClientParsedMenuItem,
   FinalImportRequestBody,
   ImportResult,
 } from "../types/menuUploadTypes";

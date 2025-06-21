@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import api, {
-  getAvailableQuizzesForStaff,
-  getMyQuizProgress,
-} from "../services/api";
+import { getAvailableQuizzesForStaff } from "../services/api";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { ClientStaffQuizProgressWithAttempts } from "../types/staffTypes";

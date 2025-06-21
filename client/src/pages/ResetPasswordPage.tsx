@@ -58,7 +58,7 @@ const ResetPasswordPage: React.FC = () => {
         } else {
           setTokenVerified(false);
         }
-      } catch (err) {
+      } catch {
         setTokenVerified(false);
       }
     };

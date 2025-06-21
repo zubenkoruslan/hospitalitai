@@ -5,7 +5,6 @@ import {
   WrenchScrewdriverIcon,
   BookOpenIcon,
   AcademicCapIcon,
-  ArrowPathIcon,
   MagnifyingGlassIcon,
   QuestionMarkCircleIcon,
   ClockIcon,
@@ -15,10 +14,7 @@ import {
   PencilIcon,
   TrashIcon,
   ChartBarIcon,
-  DocumentTextIcon,
-  FolderIcon,
   ArrowRightIcon,
-  HomeIcon,
   TrophyIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -39,7 +35,7 @@ import { ClientIQuiz, UpdateQuizClientData } from "../types/quizTypes";
 import { IQuestionBank } from "../types/questionBankTypes";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import Modal from "../components/common/Modal";
-import Typography from "../components/common/Typography";
+
 import ConfirmationModalContent from "../components/common/ConfirmationModalContent";
 import EditQuizModal from "../components/quiz/EditQuizModal";
 import GenerateQuizFromBanksModal from "../components/quiz/GenerateQuizFromBanksModal";
@@ -601,17 +597,6 @@ const QuizAndBankManagementPage: React.FC = () => {
   }, [refetchBanks, handleUpdateQuizSnapshots, state.currentView]); // Removed refetchQuizzes to reduce calls
 
   // Helper functions - MOVED ABOVE conditional return to fix React hooks violations
-  const getQuestionBankNames = useCallback(
-    (bankIds: string[]): string[] => {
-      return bankIds
-        .map((id) => {
-          const bank = questionBanks?.find((bank) => bank._id === id);
-          return bank?.name || `Unknown Bank (${id.slice(-6)})`;
-        })
-        .filter(Boolean);
-    },
-    [questionBanks]
-  );
 
   // Handle view changes
   const handleViewChange = useCallback((view: MainView) => {
@@ -720,13 +705,10 @@ const QuizAndBankManagementPage: React.FC = () => {
     setEditQuizModal({ isOpen: false, quiz: null });
   }, []);
 
-  const handleQuizUpdated = useCallback(
-    async (updatedQuiz: ClientIQuiz) => {
-      await refetchQuizzes();
-      handleCloseEditQuizModal();
-    },
-    [refetchQuizzes, handleCloseEditQuizModal]
-  );
+  const handleQuizUpdated = useCallback(async () => {
+    await refetchQuizzes();
+    handleCloseEditQuizModal();
+  }, [refetchQuizzes, handleCloseEditQuizModal]);
 
   const handleCloseDeleteModal = useCallback(() => {
     setDeleteModal({ isOpen: false, item: null, type: null });
@@ -760,16 +742,10 @@ const QuizAndBankManagementPage: React.FC = () => {
     setCreateQuestionBankModal(false);
   }, []);
 
-  const handleQuestionBankCreated = useCallback(
-    async (details: {
-      bankId: string;
-      sourceType: "manual" | "menu" | "sop";
-    }) => {
-      await refetchBanks();
-      handleCloseCreateQuestionBankModal();
-    },
-    [refetchBanks, handleCloseCreateQuestionBankModal]
-  );
+  const handleQuestionBankCreated = useCallback(async () => {
+    await refetchBanks();
+    handleCloseCreateQuestionBankModal();
+  }, [refetchBanks, handleCloseCreateQuestionBankModal]);
 
   const handleOpenGenerateQuizModal = useCallback(() => {
     // Force refresh question banks before opening modal to ensure current counts
@@ -781,13 +757,10 @@ const QuizAndBankManagementPage: React.FC = () => {
     setGenerateQuizModal(false);
   }, []);
 
-  const handleQuizGenerated = useCallback(
-    async (newQuiz: ClientIQuiz) => {
-      await refetchQuizzes();
-      handleCloseGenerateQuizModal();
-    },
-    [refetchQuizzes, handleCloseGenerateQuizModal]
-  );
+  const handleQuizGenerated = useCallback(async () => {
+    await refetchQuizzes();
+    handleCloseGenerateQuizModal();
+  }, [refetchQuizzes, handleCloseGenerateQuizModal]);
 
   const handleCloseQuizProgressModal = useCallback(() => {
     setQuizProgressModal({ isOpen: false, quiz: null });

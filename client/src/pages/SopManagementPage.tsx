@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  ChangeEvent,
-  FormEvent,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ISopDocument, SopDocumentUploadData } from "../types/sopTypes"; // Use ISopDocument from sopTypes
 import {
   listRestaurantSopDocuments, // Changed from listSopDocuments
@@ -12,28 +6,25 @@ import {
   deleteSopDocument, // Added deleteSopDocument
   // getSopDocumentStatus // Might need this later for status polling
 } from "../services/api"; // Corrected path
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { useNavigate } from "react-router-dom"; // Added useNavigate
 import Navbar from "../components/Navbar";
 import SopUploadModal from "../components/sop/SopUploadModal"; // Added
 import Button from "../components/common/Button"; // For consistent button styling
-import Card from "../components/common/Card"; // For layout consistency
+
 import LoadingSpinner from "../components/common/LoadingSpinner"; // For loading states
 import ErrorMessage from "../components/common/ErrorMessage"; // For error display
 import SuccessNotification from "../components/common/SuccessNotification"; // For success messages
 import { format } from "date-fns"; // Import date-fns for formatting
 import {
-  PlusIcon,
   TrashIcon,
   EyeIcon,
   ArrowUpTrayIcon,
   DocumentTextIcon,
   MagnifyingGlassIcon,
   ListBulletIcon,
-  ChartBarIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline"; // Example icons
 import { useAuth } from "../context/AuthContext"; // Added for restaurantId
 

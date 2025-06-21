@@ -10,9 +10,7 @@ import {
   deleteSopCategory,
 } from "../services/api"; // Adjusted path and added updateSopDocumentTitle
 import Navbar from "../components/Navbar";
-import RecursiveCategoryList, {
-  CategoryModalTriggers,
-} from "../components/sop/RecursiveCategoryList"; // Updated import
+
 import CategoryFormModal, {
   CategoryFormData,
 } from "../components/sop/CategoryFormModal"; // Added
@@ -22,27 +20,19 @@ import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
-  SparklesIcon,
-  InformationCircleIcon,
-  EyeIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArchiveBoxIcon,
-  ChartBarIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   BookOpenIcon,
-  DocumentMagnifyingGlassIcon,
   XMarkIcon,
   FolderIcon,
 } from "@heroicons/react/24/outline"; // Example icons for future edit/delete functionality
-import ErrorMessage from "../components/common/ErrorMessage";
-import LoadingSpinner from "../components/common/LoadingSpinner";
-import SuccessNotification from "../components/common/SuccessNotification";
-import AiQuestionReviewModal from "../components/questionBank/AiQuestionReviewModal";
+
 import { DocumentTextIcon } from "@heroicons/react/24/outline";
 
 const SopDocumentDetailPage: React.FC = () => {
@@ -65,14 +55,11 @@ const SopDocumentDetailPage: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<
     Record<string, boolean>
   >({});
-  const [expandedSubCategories, setExpandedSubCategories] = useState<
-    Record<string, boolean>
-  >({});
+
   const [searchResults, setSearchResults] = useState<{
     categories: string[];
     subcategories: string[];
   }>({ categories: [], subcategories: [] });
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Navigation state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
@@ -293,11 +280,7 @@ const SopDocumentDetailPage: React.FC = () => {
     openCategoryModal("addSub", parentCategory, parentCategory._id);
   };
 
-  const handleTriggerEditCategory = (categoryToEdit: ISopCategory) => {
-    openCategoryModal("edit", categoryToEdit);
-  };
-
-  // New handler that can handle both categories and subcategories
+  // Handler that can handle both categories and subcategories
   const handleTriggerEdit = (
     category: ISopCategory,
     subCategory?: ISopCategory
@@ -311,32 +294,7 @@ const SopDocumentDetailPage: React.FC = () => {
     }
   };
 
-  const handleDeleteCategory = async (categoryToDelete: ISopCategory) => {
-    if (!document || !categoryToDelete._id) return;
-    const categoryId = categoryToDelete._id;
-
-    if (
-      window.confirm(
-        `Are you sure you want to delete category "${categoryToDelete.name}" and all its subcategories?`
-      )
-    ) {
-      if (isCategoryModalOpen && currentCategoryForModal?._id === categoryId) {
-        closeCategoryModal();
-      }
-      console.log("Attempting to delete category:", categoryId);
-      try {
-        const updatedDoc = await deleteSopCategory(document._id, categoryId);
-        setDocument(updatedDoc);
-      } catch (apiError: any) {
-        console.error("Failed to delete category:", apiError);
-        alert(
-          `Error deleting category: ${apiError.message || "Please try again."}`
-        );
-      }
-    }
-  };
-
-  // New handler that can handle both categories and subcategories
+  // Handler that can handle both categories and subcategories
   const handleTriggerDelete = async (
     category: ISopCategory,
     subCategory?: ISopCategory
@@ -382,12 +340,6 @@ const SopDocumentDetailPage: React.FC = () => {
         );
       }
     }
-  };
-
-  const categoryModalTriggers: CategoryModalTriggers = {
-    onTriggerAddSubCategory: handleTriggerAddSubCategory,
-    onTriggerEditCategory: handleTriggerEditCategory,
-    onTriggerDeleteCategory: handleDeleteCategory,
   };
 
   // Navigation helper functions

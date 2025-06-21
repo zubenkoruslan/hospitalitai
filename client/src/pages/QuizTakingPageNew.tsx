@@ -230,7 +230,7 @@ const QuizTakingPageNew: React.FC = () => {
       const answersArray: ClientAnswerForSubmission[] = Object.entries(
         userAnswers
       )
-        .filter(([_, answer]) => answer !== undefined)
+        .filter(([, answer]) => answer !== undefined)
         .map(([questionId, answer]) => ({
           questionId,
           selectedOptions: Array.isArray(answer) ? answer : [answer],

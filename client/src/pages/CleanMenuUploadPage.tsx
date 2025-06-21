@@ -5,7 +5,6 @@ import {
   uploadCleanMenu,
   importCleanMenu,
   getMenusByRestaurant,
-  CleanMenuParseResult,
 } from "../services/api";
 import { IMenuClient } from "../types/menuTypes";
 
@@ -195,7 +194,7 @@ const CleanMenuUploadPage: React.FC = () => {
     }
 
     // Check by file extension as fallback
-    for (const [mimeType, extensions] of Object.entries(supportedTypes)) {
+    for (const [, extensions] of Object.entries(supportedTypes)) {
       if (extensions.includes(fileExtension || "")) {
         return true;
       }
@@ -353,7 +352,7 @@ const CleanMenuUploadPage: React.FC = () => {
 
   const handleBulkDelete = () => {
     const indicesToDelete = Array.from(selectedItems).sort((a, b) => b - a);
-    let newItems = [...editedItems];
+    const newItems = [...editedItems];
 
     indicesToDelete.forEach((index) => {
       newItems.splice(index, 1);
@@ -2035,7 +2034,7 @@ const CleanMenuUploadPage: React.FC = () => {
         : itemsToShow.filter((item) => item.itemType === activeFilter);
 
     // Group filtered items by category
-    const groupedItems = filteredItems.reduce((groups, item, originalIndex) => {
+    const groupedItems = filteredItems.reduce((groups, item) => {
       const category = item.category || "Uncategorized";
       if (!groups[category]) {
         groups[category] = [];
@@ -2859,14 +2858,12 @@ const CleanMenuUploadPage: React.FC = () => {
                     </summary>
                     <div className="px-4 pb-4 space-y-2">
                       {result.processingNotes.map((note, index) => {
-                        // Add icons for different types of notes
-                        let icon = "•";
+                        // Add styling for different types of notes
                         let bgColor = "bg-blue-50";
                         let textColor = "text-blue-700";
                         let borderColor = "border-blue-200";
 
                         if (note.includes("Grape variety identification")) {
-                          icon = "G";
                           bgColor = "bg-purple-50";
                           textColor = "text-purple-700";
                           borderColor = "border-purple-200";
@@ -2875,31 +2872,26 @@ const CleanMenuUploadPage: React.FC = () => {
                           note.includes("AI parsing") ||
                           note.includes("Parsed successfully")
                         ) {
-                          icon = "A";
                           bgColor = "bg-indigo-50";
                           textColor = "text-indigo-700";
                           borderColor = "border-indigo-200";
                         }
                         if (note.includes("Rate limit")) {
-                          icon = "R";
                           bgColor = "bg-amber-50";
                           textColor = "text-amber-700";
                           borderColor = "border-amber-200";
                         }
                         if (note.includes("Pattern matching")) {
-                          icon = "P";
                           bgColor = "bg-cyan-50";
                           textColor = "text-cyan-700";
                           borderColor = "border-cyan-200";
                         }
                         if (note.includes("Validation")) {
-                          icon = "V";
                           bgColor = "bg-green-50";
                           textColor = "text-green-700";
                           borderColor = "border-green-200";
                         }
                         if (note.includes("Food enhancement")) {
-                          icon = "F";
                           bgColor = "bg-emerald-50";
                           textColor = "text-emerald-700";
                           borderColor = "border-emerald-200";
@@ -2909,7 +2901,6 @@ const CleanMenuUploadPage: React.FC = () => {
                           (note.includes("Enhanced") &&
                             note.includes("beverage"))
                         ) {
-                          icon = "B";
                           bgColor = "bg-teal-50";
                           textColor = "text-teal-700";
                           borderColor = "border-teal-200";

@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import api, {
-  getAvailableQuizzesForStaff,
-  getMyQuizProgress,
-} from "../services/api";
+import api, { getAvailableQuizzesForStaff } from "../services/api";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { ClientStaffQuizProgressWithAttempts } from "../types/staffTypes";
@@ -42,7 +39,6 @@ const calculateRealAchievements = (
 ): Achievement[] => {
   const achievements: Achievement[] = [];
   const now = new Date();
-  const recentDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
   // Achievement 1: Getting Started (Complete first quiz)
   if (completedQuizzes >= 1) {
@@ -260,21 +256,9 @@ const StaffDashboard: React.FC = () => {
   const [averageScore, setAverageScore] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(1);
   const [progressPercentage, setProgressPercentage] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
 
   // Real achievements state
   const [realAchievements, setRealAchievements] = useState<Achievement[]>([]);
-
-  // Calculate level based on completed quizzes - MATCH MyProgressPage calculation
-  const calculateLevel = (completed: number): number => {
-    return Math.floor(completed / 3) + 1;
-  };
-
-  // Calculate progress within current level - MATCH MyProgressPage calculation
-  const calculateLevelProgress = (completed: number): number => {
-    const progressInLevel = completed % 3;
-    return (progressInLevel / 3) * 100;
-  };
 
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -295,7 +279,6 @@ const StaffDashboard: React.FC = () => {
       // Use real analytics data for overall stats with fallbacks - SAME AS MyProgressPage
       const personalMetrics = analytics?.personalMetrics || {};
 
-      const totalQuizzes = quizzesData.length;
       const completedQuizzes = personalMetrics.totalQuizzesCompleted || 0;
       const realAverageScore = Math.round(
         personalMetrics.overallAverageScore || 0
@@ -313,7 +296,6 @@ const StaffDashboard: React.FC = () => {
       setCurrentLevel(level);
       setProgressPercentage(progressPercentage);
       setCurrentStreak(currentStreak);
-      setTotalQuestions(totalQuestionsAnswered);
 
       // Calculate real achievements based on actual progress
       const achievements = calculateRealAchievements(
@@ -325,7 +307,6 @@ const StaffDashboard: React.FC = () => {
       setRealAchievements(achievements);
 
       console.log("StaffDashboard Analytics Data:", {
-        totalQuizzes,
         completedQuizzes,
         realAverageScore,
         level,

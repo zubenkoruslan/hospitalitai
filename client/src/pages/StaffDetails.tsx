@@ -9,7 +9,7 @@ import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import ViewIncorrectAnswersModal from "../components/quiz/ViewIncorrectAnswersModal";
-import SuccessNotification from "../components/common/SuccessNotification";
+
 import { formatDate } from "../utils/helpers";
 import { useStaffDetails } from "../hooks/useStaffDetails";
 import { ClientQuizAttemptDetails } from "../types/quizTypes";
@@ -28,12 +28,8 @@ import {
   ClipboardDocumentListIcon,
   ArrowLeftIcon,
   CalendarIcon,
-  FireIcon,
   ChevronRightIcon,
   EyeIcon,
-  StarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   ArrowPathIcon,
@@ -43,7 +39,6 @@ import {
 
 // Import Chart.js components for radial chart
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
-import { Doughnut } from "react-chartjs-2";
 
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
@@ -278,42 +273,6 @@ const PerformanceScore: React.FC<{ score: number; comparison: number }> = ({
     </div>
   );
 };
-
-// Metrics Card Component
-const MetricsCard: React.FC<{
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ComponentType<any>;
-  color: string;
-  trend?: "up" | "down" | null;
-}> = ({ title, value, subtitle, icon: Icon, color, trend }) => (
-  <div className={`bg-${color}-50 border border-${color}-200 rounded-xl p-6`}>
-    <div className="flex items-center justify-between">
-      <div className="flex-1">
-        <h3 className={`text-sm font-medium text-${color}-700 mb-1`}>
-          {title}
-        </h3>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-gray-900">{value}</span>
-          {trend && (
-            <span
-              className={`text-xs ${
-                trend === "up" ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {trend === "up" ? "↗" : "↘"}
-            </span>
-          )}
-        </div>
-        {subtitle && <p className="text-xs text-gray-600 mt-1">{subtitle}</p>}
-      </div>
-      <div className={`p-3 bg-${color}-100 rounded-lg`}>
-        <Icon className={`h-6 w-6 text-${color}-600`} />
-      </div>
-    </div>
-  </div>
-);
 
 // Consolidated Quiz Performance Component
 const QuizPerformanceSection: React.FC<{

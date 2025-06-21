@@ -17,7 +17,7 @@ import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import SuccessNotification from "../components/common/SuccessNotification";
 import Button from "../components/common/Button"; // Import Button
-import Typography from "../components/common/Typography";
+
 import {
   TrashIcon,
   PlusIcon,
@@ -54,7 +54,6 @@ import {
 // import QuizEditorModal from "../components/quiz/QuizEditorModal"; // Removed QuizEditorModal
 // Import item components
 import AddEditMenuItemModal from "../components/items/AddEditMenuItemModal"; // Import the new modal
-import MenuItemList from "../components/items/MenuItemList"; // Import the item list
 import DeleteMenuItemModal from "../components/items/DeleteMenuItemModal";
 
 // Import the custom hook

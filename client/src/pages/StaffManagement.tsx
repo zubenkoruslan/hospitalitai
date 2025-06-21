@@ -8,15 +8,13 @@ import {
   updateRole,
   deleteRole,
   updateStaffAssignedRole,
-  inviteStaff,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
-import Card from "../components/common/Card";
-import KPICard from "../components/settings/KPICard";
+
 import StaffInvitationForm from "../components/staff/StaffInvitationForm";
 import PendingInvitationsTable from "../components/staff/PendingInvitationsTable";
 import {
@@ -37,7 +35,6 @@ import {
   EnvelopeIcon,
   CheckCircleIcon,
   XCircleIcon,
-  UserIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronDownIcon,
@@ -181,7 +178,7 @@ const StaffManagement: React.FC = () => {
         month: "short",
         day: "numeric",
       });
-    } catch (_e) {
+    } catch {
       return "Invalid Date";
     }
   };

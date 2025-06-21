@@ -10,20 +10,14 @@ import {
   StarIcon,
   AcademicCapIcon,
   ArrowTrendingUpIcon,
-  EyeIcon,
   CheckCircleIcon,
-  XCircleIcon,
   SparklesIcon,
   HeartIcon,
   CogIcon,
   ChevronDownIcon,
   ChevronUpIcon,
 } from "@heroicons/react/24/outline";
-import {
-  TrophyIcon as TrophyIconSolid,
-  StarIcon as StarIconSolid,
-  FireIcon as FireIconSolid,
-} from "@heroicons/react/24/solid";
+import { FireIcon as FireIconSolid } from "@heroicons/react/24/solid";
 
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -32,7 +26,7 @@ import Button from "../components/common/Button";
 import Navbar from "../components/Navbar";
 import ProgressRing from "../components/staff/dashboard/ProgressRing";
 import BottomNavigation from "../components/staff/dashboard/BottomNavigation";
-import ProgressChart from "../components/progress/ProgressChart";
+
 import CategoryBreakdown from "../components/progress/CategoryBreakdown";
 
 // Import APIs
@@ -455,55 +449,7 @@ const MyProgressPage: React.FC = () => {
   }
 
   const renderOverviewTab = () => {
-    // Prepare data for progress chart
-    const chartData = quizProgress
-      .filter((p) => p.lastAttemptDate && p.averageScore !== null)
-      .sort(
-        (a, b) =>
-          (a.lastAttemptDate?.getTime() || 0) -
-          (b.lastAttemptDate?.getTime() || 0)
-      )
-      .map((p) => ({
-        date: p.lastAttemptDate!.toISOString().split("T")[0],
-        score: p.averageScore!,
-        quizTitle: p.quiz.title,
-      }));
-
-    // Prepare data for category breakdown (mock data for now)
-    const categoryData = [
-      {
-        category: "Food Knowledge",
-        score: 85,
-        questionsAnswered: 12,
-        totalQuestions: 15,
-        color: "blue",
-        icon: BookOpenIcon,
-      },
-      {
-        category: "Beverage Knowledge",
-        score: 92,
-        questionsAnswered: 8,
-        totalQuestions: 10,
-        color: "purple",
-        icon: SparklesIcon,
-      },
-      {
-        category: "Wine Knowledge",
-        score: 78,
-        questionsAnswered: 6,
-        totalQuestions: 12,
-        color: "red",
-        icon: HeartIcon,
-      },
-      {
-        category: "Procedure Knowledge",
-        score: 88,
-        questionsAnswered: 10,
-        totalQuestions: 14,
-        color: "green",
-        icon: CogIcon,
-      },
-    ];
+    // Data preparation for future chart implementation (currently unused)
 
     return (
       <div className="space-y-6">
@@ -646,7 +592,7 @@ const MyProgressPage: React.FC = () => {
                   (a.lastAttemptDate?.getTime() || 0)
               )
               .slice(0, 5)
-              .map((progress, index) => (
+              .map((progress) => (
                 <div
                   key={progress.quiz._id}
                   className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"

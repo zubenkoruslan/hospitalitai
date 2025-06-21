@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
-import { getStaffList } from "../services/api"; // Added getStaffList
+
 import Navbar from "../components/Navbar";
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
@@ -10,12 +10,9 @@ import { useMenus } from "../hooks/useMenus";
 import { useCategoriesAnalytics } from "../hooks/useCategoriesAnalytics";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
-import Typography from "../components/common/Typography";
-import ErrorMessage from "../components/common/ErrorMessage";
+
 import LoadingSpinner from "../components/common/LoadingSpinner";
 
-import { ResultSummary, StaffMemberWithData } from "../types/staffTypes"; // Added StaffMemberWithData, ensure ResultSummary is still used or remove
-import BarChart from "../components/charts/BarChart"; // Added BarChart import
 import { ChartData } from "chart.js"; // Added ChartData import
 import { Doughnut } from "react-chartjs-2"; // Added Doughnut chart import
 import {
@@ -37,12 +34,10 @@ import {
   ClipboardDocumentIcon,
   ChartBarIcon,
   PlusIcon,
-  ArrowUpOnSquareIcon,
   DocumentArrowUpIcon,
   HomeIcon,
   TrophyIcon,
   ClockIcon,
-  CheckCircleIcon,
   ExclamationTriangleIcon,
   BellIcon,
   ArrowRightIcon,
@@ -53,13 +48,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-
-// Helper function to check if a quiz is completed regardless of capitalization
-// This function uses ResultSummary, ensure it's compatible with the imported one
-const _isCompletedQuiz = (result: ResultSummary): boolean => {
-  const status = result.status.toLowerCase();
-  return status === "completed";
-};
 
 const RestaurantDashboard: React.FC = () => {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -102,9 +90,6 @@ const RestaurantDashboard: React.FC = () => {
   });
 
   // Keep other state
-
-  // State for menu upload modal
-  const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
 
   // Toggle expanded section on mobile
   const toggleExpandedSection = (section: keyof typeof expandedSections) => {
@@ -151,58 +136,6 @@ const RestaurantDashboard: React.FC = () => {
 
   // Get recent notifications (limit to 4)
   const recentNotifications = notifications?.slice(0, 4) || [];
-
-  // Enhanced chart options with better styling and responsive design
-  const chartOptions: ChartOptions<"doughnut"> = {
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: {
-      legend: {
-        display: false, // We'll show a custom legend
-      },
-      tooltip: {
-        enabled: true,
-        backgroundColor: "rgba(15, 23, 42, 0.9)",
-        titleColor: "white",
-        bodyColor: "white",
-        borderColor: "rgba(59, 130, 246, 0.5)",
-        borderWidth: 1,
-        padding: 12,
-        cornerRadius: 8,
-        titleFont: {
-          size: 14,
-          weight: "bold",
-        },
-        bodyFont: {
-          size: 13,
-        },
-        callbacks: {
-          label: function (context) {
-            const label = context.label || "";
-            const value = context.parsed || 0;
-            return ` ${label}: ${value}%`;
-          },
-        },
-      },
-      title: {
-        display: false,
-      },
-    },
-    cutout: "50%",
-    rotation: -90,
-    circumference: 360,
-    animation: {
-      animateRotate: true,
-      animateScale: false,
-      duration: 1000,
-    },
-    elements: {
-      arc: {
-        borderWidth: 2,
-        hoverBorderWidth: 3,
-      },
-    },
-  };
 
   // Effect to listen for analytics refresh events
   useEffect(() => {
@@ -671,7 +604,7 @@ const RestaurantDashboard: React.FC = () => {
                     <>
                       {/* Four Horizontal Circular Charts - 2x2 on mobile */}
                       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8">
-                        {categoriesData.map((cat, index) => {
+                        {categoriesData.map((cat) => {
                           const categoryConfig = {
                             "food-knowledge": {
                               label: "Food Knowledge",

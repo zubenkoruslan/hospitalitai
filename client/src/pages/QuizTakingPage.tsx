@@ -240,7 +240,7 @@ const QuizTakingPage: React.FC<QuizTakingPageProps> = ({
       const answersArray: ClientAnswerForSubmission[] = Object.entries(
         userAnswers
       )
-        .filter(([_, answer]) => answer !== undefined)
+        .filter(([, answer]) => answer !== undefined)
         .map(([questionId, answer]) => {
           // Find the question to determine its type
           const question = questions.find((q) => q._id === questionId);

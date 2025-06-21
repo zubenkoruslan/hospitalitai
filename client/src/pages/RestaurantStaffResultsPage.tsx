@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+
 import { useStaffSummary } from "../hooks/useStaffSummary";
 import { useQuizCount } from "../hooks/useQuizCount";
 import Navbar from "../components/Navbar";
@@ -14,7 +13,6 @@ import StaffResultsTable from "../components/staff/StaffResultsTable";
 import { Filters, StaffMemberWithData } from "../types/staffTypes";
 import { KnowledgeCategory } from "../types/questionBankTypes";
 
-import { ChartData } from "chart.js";
 import {
   ChartBarIcon,
   UsersIcon,
@@ -339,96 +337,10 @@ const formatCompletionTimeDetailed = (seconds?: number): string => {
 
 // Helper function to format percentages (moved from StaffManagement.tsx)
 
-// Helper function to calculate staff completion rate (moved from StaffManagement.tsx)
-const calculateStaffCompletionRate = (staff: StaffMemberWithData): number => {
-  if (staff.quizProgressSummaries && staff.quizProgressSummaries.length > 0) {
-    const completedCount = staff.quizProgressSummaries.filter(
-      (qps) => qps.isCompletedOverall
-    ).length;
-    return (completedCount / staff.quizProgressSummaries.length) * 100;
-  }
-  return 0;
-};
-
-// Top Performers Leaderboard Component
-const TopPerformersLeaderboard: React.FC<{
-  topPerformers: LeaderboardEntry[];
-}> = ({ topPerformers }) => {
-  const navigate = useNavigate();
-
-  const getRankBadge = (rank: number) => {
-    if (rank === 1) return "🥇";
-    if (rank === 2) return "🥈";
-    if (rank === 3) return "🥉";
-    return `#${rank}`;
-  };
-
-  const getRankStyle = (rank: number) => {
-    if (rank === 1) return "bg-yellow-50 border-yellow-200 text-yellow-800";
-    if (rank === 2) return "bg-gray-50 border-gray-200 text-gray-800";
-    if (rank === 3) return "bg-orange-50 border-orange-200 text-orange-800";
-    return "bg-slate-50 border-slate-200 text-slate-800";
-  };
-
-  const handleStaffClick = (
-    userId: string | { _id: string; toString(): string }
-  ) => {
-    // Ensure userId is always a string
-    const staffId =
-      typeof userId === "string" ? userId : userId._id || userId.toString();
-    console.log("Navigating to staff ID:", staffId, "Type:", typeof staffId);
-    window.open(`/staff/${staffId}`, "_blank");
-  };
-
-  return (
-    <div className="space-y-3">
-      {topPerformers.map((performer) => (
-        <div
-          key={
-            typeof performer.userId === "string"
-              ? performer.userId
-              : performer.userId._id || performer.userId.toString()
-          }
-          className={`p-4 rounded-lg border ${getRankStyle(
-            performer.rank
-          )} hover:bg-gray-100 transition-colors cursor-pointer`}
-          onClick={() => handleStaffClick(performer.userId)}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="text-2xl font-bold">
-                {getRankBadge(performer.rank)}
-              </div>
-              <div>
-                <p className="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
-                  {performer.name}
-                </p>
-                {performer.roleName && (
-                  <p className="text-sm text-slate-600">{performer.roleName}</p>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-bold text-slate-900">
-                {Math.round(performer.overallAverageScore)}%
-              </div>
-              <div className="text-sm text-slate-600">
-                {performer.totalQuestions} questions
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 // Category Champions Component
 const CategoryChampions: React.FC<{
   categoryChampions: LeaderboardData["categoryChampions"];
 }> = ({ categoryChampions }) => {
-  const navigate = useNavigate();
-
   // Debug logging for category champions
   React.useEffect(() => {
     console.log("[Category Champions] Received data:", categoryChampions);
@@ -557,11 +469,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
     loading: staffLoading,
     error: staffError,
   } = useStaffSummary();
-  const {
-    quizCount: _totalQuizzes,
-    loading: quizCountLoading,
-    error: quizCountError,
-  } = useQuizCount();
+  const { loading: quizCountLoading, error: quizCountError } = useQuizCount();
 
   // Enhanced analytics hooks - use consolidated time filter
   const {
@@ -615,8 +523,6 @@ const RestaurantStaffResultsPage: React.FC = () => {
 
   // Keep other state specific to this page
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
-  const { user: _user } = useAuth();
-  const navigate = useNavigate();
 
   // Filtering state
   const [filters, setFilters] = useState<Filters>({
@@ -647,11 +553,7 @@ const RestaurantStaffResultsPage: React.FC = () => {
   const [totalStaff, setTotalStaff] = useState<number | null>(null);
   const [avgQuizScore, setAvgQuizScore] = useState<number | null>(null);
 
-  // Chart Data State (moved from StaffManagement.tsx)
-  const [averageScoreChartData, setAverageScoreChartData] =
-    useState<ChartData<"bar"> | null>(null);
-  const [completionRateChartData, setCompletionRateChartData] =
-    useState<ChartData<"bar"> | null>(null);
+  // Chart Data State (moved from StaffManagement.tsx) - currently unused but kept for future features
 
   const toggleExpand = useCallback((staffId: string) => {
     setExpandedStaffId((prev) => (prev === staffId ? null : staffId));
@@ -754,48 +656,12 @@ const RestaurantStaffResultsPage: React.FC = () => {
     []
   );
 
-  // Effect to prepare KPI and chart data when staffData changes
+  // Effect to prepare KPI data when staffData changes
   useEffect(() => {
     if (staffData && staffData.length > 0) {
       calculateAndSetKPIs(staffData);
-
-      // Prepare chart data for BarCharts (based on all staff, not filteredAndSortedStaff)
-      // This uses staffData directly to show overall visualizations before filtering for the table.
-      const labels = staffData.map((staff) => staff.name);
-
-      const averageScores = staffData.map((staff) => staff.averageScore ?? 0);
-      setAverageScoreChartData({
-        labels,
-        datasets: [
-          {
-            label: "Average Score (%)",
-            data: averageScores,
-            backgroundColor: "rgba(75, 192, 192, 0.6)",
-            borderColor: "rgba(75, 192, 192, 1)",
-            borderWidth: 1,
-          },
-        ],
-      });
-
-      const completionRates = staffData.map((staff) =>
-        calculateStaffCompletionRate(staff)
-      );
-      setCompletionRateChartData({
-        labels,
-        datasets: [
-          {
-            label: "Completion Rate (%)",
-            data: completionRates,
-            backgroundColor: "rgba(153, 102, 255, 0.6)",
-            borderColor: "rgba(153, 102, 255, 1)",
-            borderWidth: 1,
-          },
-        ],
-      });
     } else {
       calculateAndSetKPIs([]); // Reset KPIs if no staff data
-      setAverageScoreChartData(null);
-      setCompletionRateChartData(null);
     }
   }, [staffData, calculateAndSetKPIs]);
 
@@ -1187,58 +1053,56 @@ const RestaurantStaffResultsPage: React.FC = () => {
                         >
                           {analytics.staffNeedingSupport.length > 0 ? (
                             <div className="space-y-4">
-                              {analytics.staffNeedingSupport.map(
-                                (staff, index) => {
-                                  const categoryConfig =
-                                    CATEGORY_CONFIG[staff.weakestCategory];
-                                  const IconComponent = categoryConfig.icon;
+                              {analytics.staffNeedingSupport.map((staff) => {
+                                const categoryConfig =
+                                  CATEGORY_CONFIG[staff.weakestCategory];
+                                const IconComponent = categoryConfig.icon;
 
-                                  const userIdString =
-                                    typeof staff.userId === "object"
-                                      ? (staff.userId as any)._id ||
-                                        (staff.userId as any).toString()
-                                      : staff.userId;
+                                const userIdString =
+                                  typeof staff.userId === "object"
+                                    ? (staff.userId as any)._id ||
+                                      (staff.userId as any).toString()
+                                    : staff.userId;
 
-                                  return (
-                                    <div
-                                      key={userIdString}
-                                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                                      onClick={() => {
-                                        console.log(
-                                          "Navigating to staff ID:",
-                                          userIdString,
-                                          "Type:",
-                                          typeof userIdString
-                                        );
-                                        window.open(
-                                          `/staff/${userIdString}`,
-                                          "_blank"
-                                        );
-                                      }}
-                                    >
-                                      <div className="flex-1">
-                                        <p className="font-medium text-gray-900">
-                                          {staff.userName}
-                                        </p>
-                                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                                          <IconComponent className="h-4 w-4" />
-                                          <span>
-                                            Needs help: {categoryConfig.label}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="text-lg font-bold text-orange-600">
-                                          {(
-                                            staff.overallAverageScore || 0
-                                          ).toFixed(1)}
-                                          %
-                                        </p>
+                                return (
+                                  <div
+                                    key={userIdString}
+                                    className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                      console.log(
+                                        "Navigating to staff ID:",
+                                        userIdString,
+                                        "Type:",
+                                        typeof userIdString
+                                      );
+                                      window.open(
+                                        `/staff/${userIdString}`,
+                                        "_blank"
+                                      );
+                                    }}
+                                  >
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900">
+                                        {staff.userName}
+                                      </p>
+                                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <IconComponent className="h-4 w-4" />
+                                        <span>
+                                          Needs help: {categoryConfig.label}
+                                        </span>
                                       </div>
                                     </div>
-                                  );
-                                }
-                              )}
+                                    <div className="text-right">
+                                      <p className="text-lg font-bold text-orange-600">
+                                        {(
+                                          staff.overallAverageScore || 0
+                                        ).toFixed(1)}
+                                        %
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <p className="text-gray-500 text-center py-8 flex flex-col items-center gap-2">
