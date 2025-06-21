@@ -51,8 +51,21 @@ const StaffSettings: React.FC = () => {
       }
       setMessage("Profile updated successfully!");
       if (fetchUser) fetchUser();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to update profile.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to update profile.";
+      setError(errorMessage);
     } finally {
       setIsProfileLoading(false);
     }
@@ -69,8 +82,21 @@ const StaffSettings: React.FC = () => {
         newPassword: passwordData.newPassword,
       });
       setMessage("Password changed successfully!");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to change password.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to change password.";
+      setError(errorMessage);
     } finally {
       setIsPasswordLoading(false);
     }
@@ -88,8 +114,21 @@ const StaffSettings: React.FC = () => {
       setTimeout(() => {
         if (logout) logout();
       }, 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete account.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to delete account.";
+      setError(errorMessage);
       setIsAccountDeleting(false);
     }
   };

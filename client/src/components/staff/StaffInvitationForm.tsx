@@ -50,7 +50,7 @@ const StaffInvitationForm: React.FC<StaffInvitationFormProps> = ({
       try {
         const fetchedRoles = await getRoles(user.restaurantId);
         setRoles(fetchedRoles || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to fetch roles:", err);
         setError("Failed to load roles");
       } finally {
@@ -74,7 +74,7 @@ const StaffInvitationForm: React.FC<StaffInvitationFormProps> = ({
         assignedRoleId: formData.assignedRoleId || undefined,
       };
 
-      const response = await sendStaffInvitation(invitationData);
+      await sendStaffInvitation(invitationData);
 
       const successMessage = `Invitation sent successfully to ${formData.email}! ✨`;
       setSuccess(successMessage);
@@ -90,9 +90,20 @@ const StaffInvitationForm: React.FC<StaffInvitationFormProps> = ({
       if (onSuccess) {
         onSuccess(successMessage);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
       const errorMessage =
-        err.response?.data?.message || "Failed to send invitation";
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to send invitation";
       setError(errorMessage);
 
       // Call error callback

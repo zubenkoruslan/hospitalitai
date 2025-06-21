@@ -75,8 +75,21 @@ const SecuritySettings: React.FC = () => {
         newPassword: passwordData.newPassword,
       });
       setMessage("Password changed successfully!");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to change password.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to change password.";
+      setError(errorMessage);
     } finally {
       setIsPasswordLoading(false);
     }

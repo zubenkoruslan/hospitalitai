@@ -9,6 +9,16 @@ import {
 import { formatDate } from "../../utils/helpers";
 
 // Mock Button component
+interface MockButtonProps {
+  onClick?: () => void;
+  children: React.ReactNode;
+  variant?: string;
+  className?: string;
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  "aria-label"?: string;
+}
+
 const MockButton = ({
   onClick,
   children,
@@ -17,7 +27,7 @@ const MockButton = ({
   "aria-expanded": ariaExpanded,
   "aria-controls": ariaControls,
   "aria-label": ariaLabel,
-}: any) => (
+}: MockButtonProps) => (
   <button
     data-testid={`button-${variant}`}
     onClick={onClick}
@@ -232,7 +242,7 @@ describe("StaffResultsTable", () => {
   });
 
   test("applies correct styling for expanded row and button", () => {
-    const { container: _container } = renderTable(mockStaffData[0]._id);
+    renderTable(mockStaffData[0]._id);
     const staff1Row = screen.getByText(mockStaffData[0].name).closest("tr");
     expect(staff1Row).toHaveClass("bg-blue-50");
 
