@@ -181,7 +181,7 @@ describe("EditQuestionForm", () => {
       // Find the radio button for the first option (index 0)
       // The options are rendered with an input for text and a checkbox/radio for isCorrect
       // Let's assume checkboxes are used for 'isCorrect' and have accessible names or roles
-      const _optionInputs = screen.getAllByRole("textbox"); // Prefixed, assuming this is line 214
+      // Option inputs query removed as it's unused in current test implementation
       const firstOptionCorrectCheckbox = screen.getAllByRole("checkbox")[0]; // Assuming order matches options
 
       fireEvent.click(firstOptionCorrectCheckbox); // Click to make first option correct

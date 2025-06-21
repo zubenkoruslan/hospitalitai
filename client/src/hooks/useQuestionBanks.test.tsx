@@ -166,15 +166,7 @@ describe("useQuestionBanks Hook", () => {
       name: "New Bank",
       description: "New Desc",
     };
-    const _newBankMatcher = expect.objectContaining({
-      ...createData,
-      _id: "qb3",
-      questions: [],
-      createdBy: "user123",
-      restaurantId: "rest123",
-      categories: [],
-      questionCount: 0,
-    });
+    // Matcher object removed as it's unused in current test implementation
     const newBankReturned: IQuestionBank = {
       ...createData,
       _id: "qb3",

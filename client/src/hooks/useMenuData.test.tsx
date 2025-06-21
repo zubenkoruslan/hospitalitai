@@ -56,30 +56,7 @@ const mockMenuItems: MenuItem[] = [
   },
 ];
 
-const _mockAddedItem: MenuItem = {
-  _id: "newItem3",
-  restaurantId: "rest123",
-  menuId: mockMenuId,
-  name: "Placeholder Name",
-  description: "Placeholder Desc",
-  price: 9.99,
-  ingredients: ["placeholder"],
-  itemType: "food",
-  category: FOOD_CATEGORIES[0],
-  isGlutenFree: false,
-  isDairyFree: false,
-  isVegetarian: false,
-  isVegan: false,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
-const _mockUpdatedItem: MenuItem = {
-  ...mockMenuItems[0],
-  name: "Updated Burger Deluxe",
-  price: 11.5,
-  updatedAt: new Date().toISOString(), // Simulate update timestamp
-};
+// Mock items removed as they were unused in current test scenarios
 
 describe("useMenuData Hook", () => {
   beforeEach(() => {

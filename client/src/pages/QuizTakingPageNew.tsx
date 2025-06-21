@@ -9,7 +9,7 @@ import {
 } from "../types/quizTypes";
 import {
   ClientQuestionForAttempt,
-  ClientQuestionOption,
+  ClientQuestionOption, // Used indirectly by ClientQuestionForAttempt.options
 } from "../types/questionTypes";
 
 import LoadingSpinner from "../components/common/LoadingSpinner";
