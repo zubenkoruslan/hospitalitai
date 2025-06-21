@@ -251,17 +251,24 @@ const TemplateDownloadSection: React.FC = () => {
                   <button
                     onClick={() => handleDownload(format)}
                     disabled={isDownloadingFormat}
-                    className={`w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    className={`w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 border-0 outline-none ${
                       isDownloadingFormat
                         ? "bg-slate-400 text-white cursor-not-allowed"
                         : format.key === "excel"
-                        ? "bg-green-600 hover:bg-green-700 text-white focus:ring-2 focus:ring-green-500"
+                        ? "bg-green-600 hover:bg-green-700 text-white focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                         : format.key === "csv"
-                        ? "bg-blue-600 hover:bg-blue-700 text-white focus:ring-2 focus:ring-blue-500"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         : format.key === "word"
-                        ? "bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-2 focus:ring-indigo-500"
-                        : "bg-purple-600 hover:bg-purple-700 text-white focus:ring-2 focus:ring-purple-500"
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-md hover:shadow-lg"
+                        : "bg-purple-600 hover:bg-purple-700 text-white focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                     }`}
+                    style={{
+                      backgroundColor:
+                        !isDownloadingFormat && format.key === "word"
+                          ? "#4f46e5"
+                          : undefined,
+                      color: !isDownloadingFormat ? "#ffffff" : undefined,
+                    }}
                   >
                     {isDownloadingFormat ? (
                       <>

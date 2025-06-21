@@ -7,6 +7,18 @@ import RecentActivityFeed from "./RecentActivityFeed";
 import MenuHealthDashboard from "./MenuHealthDashboard";
 import ExportMenuModal from "./ExportMenuModal";
 
+// Import the ActivityItem interface
+interface ActivityItem {
+  id: string;
+  type: "created" | "updated" | "deleted" | "bulk_import";
+  itemName: string;
+  itemType: "food" | "beverage" | "wine" | "multiple";
+  timestamp: Date;
+  user?: string;
+  changes?: string[];
+  itemCount?: number;
+}
+
 interface DashboardViewProps {
   items: MenuItem[];
   onViewChange: (view: MenuView) => void;
@@ -115,45 +127,73 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [items]);
 
-  // Generate mock activity data based on real items
+  // Generate real activity data based on menu item timestamps
   const recentActivities = useMemo(() => {
-    const activities = [];
+    const activities: ActivityItem[] = [];
 
-    // Add recent items as "created" activities
+    // Add recent items as "created" activities (items created in last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const recentItems = items
-      .filter((item) => item.createdAt)
+      .filter((item) => {
+        if (!item.createdAt) return false;
+        const createdDate = new Date(item.createdAt);
+        return createdDate > thirtyDaysAgo;
+      })
       .sort(
         (a, b) =>
           new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
       )
-      .slice(0, 5);
+      .slice(0, 8); // Show up to 8 recent items
 
     recentItems.forEach((item, index) => {
       activities.push({
-        id: `activity-${item._id}-${index}`,
+        id: `activity-created-${item._id}-${index}`,
         type: "created" as const,
         itemName: item.name,
         itemType: item.itemType,
         timestamp: new Date(item.createdAt!),
-        user: "Current User",
+        user: "Restaurant User", // Could be enhanced with actual user data
       });
     });
 
-    // Add some mock update activities
-    if (items.length > 0) {
-      const randomItem = items[Math.floor(Math.random() * items.length)];
-      activities.push({
-        id: `activity-update-${Date.now()}`,
-        type: "updated" as const,
-        itemName: randomItem.name,
-        itemType: randomItem.itemType,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        user: "Current User",
-        changes: ["price", "description"],
-      });
-    }
+    // Add recently updated items (items updated in last 30 days, but not just created)
+    const recentlyUpdated = items
+      .filter((item) => {
+        if (!item.updatedAt || !item.createdAt) return false;
+        const updatedDate = new Date(item.updatedAt);
+        const createdDate = new Date(item.createdAt);
 
-    return activities;
+        // Only include if updated after creation and within last 30 days
+        return (
+          updatedDate > createdDate &&
+          updatedDate > thirtyDaysAgo &&
+          updatedDate.getTime() - createdDate.getTime() > 60000 // At least 1 minute after creation
+        );
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime()
+      )
+      .slice(0, 5); // Show up to 5 recently updated items
+
+    recentlyUpdated.forEach((item, index) => {
+      activities.push({
+        id: `activity-updated-${item._id}-${index}`,
+        type: "updated" as const,
+        itemName: item.name,
+        itemType: item.itemType,
+        timestamp: new Date(item.updatedAt!),
+        user: "Restaurant User",
+        changes: ["Item details"], // Could be enhanced with actual change tracking
+      });
+    });
+
+    // Sort all activities by timestamp (newest first) and limit to show most recent
+    return activities
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 8);
   }, [items]);
 
   // Calculate menu health metrics
