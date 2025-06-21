@@ -191,12 +191,12 @@ export interface ThemeContextValue {
 }
 
 // Utility type for component ref forwarding
-export type ComponentWithRef<T, P = {}> = React.ForwardRefExoticComponent<
+export type ComponentWithRef<T, P = object> = React.ForwardRefExoticComponent<
   P & React.RefAttributes<T>
 >;
 
 // Utility type for polymorphic components
-export type PolymorphicProps<T extends React.ElementType, P = {}> = P & {
+export type PolymorphicProps<T extends React.ElementType, P = object> = P & {
   as?: T;
 } & Omit<React.ComponentPropsWithoutRef<T>, keyof P>;
 
@@ -208,7 +208,7 @@ export const createComponentProps = <T extends BaseComponentProps>(
   return { ...defaultProps, ...props };
 };
 
-export const filterHTMLProps = <T extends Record<string, any>>(
+export const filterHTMLProps = <T extends Record<string, unknown>>(
   props: T,
   allowedProps: (keyof T)[]
 ): Partial<T> => {

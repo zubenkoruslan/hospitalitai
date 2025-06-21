@@ -694,11 +694,12 @@ const MenuItemsPage: React.FC = () => {
   }, []);
 
   // --- Table of Contents Component ---
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderTableOfContents = () => {
     const itemTypes: Array<{
       key: "food" | "beverage" | "wine";
       label: string;
-      icon: any;
+      icon: React.ComponentType<{ className?: string }>;
       count: number;
     }> = [
       { key: "food", label: "Food", icon: CakeIcon, count: stats.foodCount },
@@ -1271,6 +1272,7 @@ const MenuItemsPage: React.FC = () => {
   };
 
   // --- Enhanced Content Display Component ---
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const ContentDisplay: React.FC = () => {
     // Breadcrumb component for better navigation
     const Breadcrumb: React.FC = () => {
@@ -1604,8 +1606,8 @@ const MenuItemsPage: React.FC = () => {
                       ...selectedItem,
                       name: `${selectedItem.name} (Copy)`,
                     };
-                    delete (duplicateItem as any)._id;
-                    openEditModal(duplicateItem as any);
+                    delete (duplicateItem as { _id?: string })._id;
+                    openEditModal(duplicateItem);
                   }}
                   className="flex items-center gap-2"
                 >

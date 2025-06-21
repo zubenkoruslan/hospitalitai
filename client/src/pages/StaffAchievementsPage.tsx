@@ -51,12 +51,12 @@ interface LeaderboardEntry {
 }
 
 // Interface for performer data from API
-interface ApiPerformer {
-  rank: number;
-  userId: string;
-  name: string;
-  overallAverageScore: number;
-}
+// interface ApiPerformer {
+//   rank: number;
+//   userId: string;
+//   name: string;
+//   overallAverageScore: number;
+// }
 
 const StaffAchievementsPage: React.FC = () => {
   const { user } = useAuth();

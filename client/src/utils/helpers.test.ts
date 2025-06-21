@@ -108,7 +108,7 @@ describe("isCompletedQuiz", () => {
   });
 
   it("should return false if result itself is null or undefined", () => {
-    expect(isCompletedQuiz(null as any)).toBe(false);
-    expect(isCompletedQuiz(undefined as any)).toBe(false);
+    expect(isCompletedQuiz(null as unknown as ResultSummary)).toBe(false);
+    expect(isCompletedQuiz(undefined as unknown as ResultSummary)).toBe(false);
   });
 });
