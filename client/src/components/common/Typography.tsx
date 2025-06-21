@@ -1,5 +1,5 @@
 import React from "react";
-import { typography, colorTokens } from "../../design-system";
+import { typography } from "../../design-system";
 
 type TypographyVariant =
   | "h1"

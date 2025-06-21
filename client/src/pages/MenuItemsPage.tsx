@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { /* Link, */ useParams, useNavigate } from "react-router-dom"; // Removed Link
 import { useAuth } from "../context/AuthContext";
 import { useMenuViews, MenuView } from "../hooks/useMenuViews";
@@ -2150,8 +2150,6 @@ const MenuItemsPage: React.FC = () => {
                 currentItem={currentItem}
                 isSubmitting={isSubmittingItem}
                 menuId={menuId ?? ""}
-                allItemsInMenu={items}
-                restaurantId={restaurantId ?? ""}
                 itemType={
                   currentItem?.itemType ?? // Use existing item's type when editing
                   (localStorage.getItem("pendingItemType") as

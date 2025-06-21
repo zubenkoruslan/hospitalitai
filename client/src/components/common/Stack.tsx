@@ -1,5 +1,4 @@
 import React from "react";
-import { spacing } from "../../design-system";
 
 export interface StackProps {
   children: React.ReactNode;

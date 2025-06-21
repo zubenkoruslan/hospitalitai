@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import TopNavigation from "../components/common/TopNavigation";
 import {
@@ -9,7 +8,6 @@ import {
   ChartBarIcon,
   SparklesIcon,
   CheckCircleIcon,
-  ArrowRightIcon,
   BookOpenIcon,
   UsersIcon,
   CogIcon,
