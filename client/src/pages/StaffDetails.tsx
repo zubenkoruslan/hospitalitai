@@ -755,7 +755,7 @@ const CategoryInsightsChart: React.FC<{ categoryData: CategoryBreakdown }> = ({
   categoryData,
 }) => {
   const categories = Object.entries(categoryData);
-  const hasData = categories.some(([_, data]) => data.totalQuestions > 0);
+  const hasData = categories.some(([, data]) => data.totalQuestions > 0);
 
   if (!hasData) {
     return (
@@ -774,7 +774,7 @@ const CategoryInsightsChart: React.FC<{ categoryData: CategoryBreakdown }> = ({
   }
 
   const validCategories = categories.filter(
-    ([_, data]) => data.totalQuestions > 0
+    ([, data]) => data.totalQuestions > 0
   );
   const bestCategory = validCategories.reduce(
     (best, [key, data]) =>
@@ -920,9 +920,9 @@ const StaffDetails: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDataForIncorrectAnswers, setModalDataForIncorrectAnswers] =
     useState<ClientQuizAttemptDetails | null>(null);
-  const [loadingModalDetails, setLoadingModalDetails] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [, setLoadingModalDetails] = useState(false);
+  const [, setModalError] = useState<string | null>(null);
+  const [, setSuccessMessage] = useState<string | null>(null);
 
   // Handlers
   const handleOpenAttemptModal = useCallback(async (attemptId: string) => {

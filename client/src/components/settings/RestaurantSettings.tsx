@@ -68,8 +68,21 @@ const RestaurantSettings: React.FC = () => {
       if (fetchUser)
         fetchUser(); // Refresh user data in AuthContext if fetchUser exists
       else console.warn("fetchUser function not available on AuthContext");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to update profile.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to update profile.";
+      setError(errorMessage);
     } finally {
       setIsProfileLoading(false);
     }
@@ -86,8 +99,21 @@ const RestaurantSettings: React.FC = () => {
         newPassword: passwordData.newPassword,
       });
       setMessage("Password changed successfully!");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to change password.");
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to change password.";
+      setError(errorMessage);
     } finally {
       setIsPasswordLoading(false);
     }
@@ -110,10 +136,21 @@ const RestaurantSettings: React.FC = () => {
         // Navigation will be handled by AuthContext/App routing if logout clears user
         // Or explicitly navigate if needed: navigate("/login");
       }, 3000); // Delay for message visibility
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Failed to delete restaurant account."
-      );
+    } catch (err: unknown) {
+      // Type guard for axios error response
+      const isAxiosError = (
+        error: unknown
+      ): error is { response?: { data?: { message?: string } } } => {
+        return (
+          typeof error === "object" && error !== null && "response" in error
+        );
+      };
+
+      const errorMessage =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : "Failed to delete restaurant account.";
+      setError(errorMessage);
       setIsAccountDeleting(false); // Ensure loading state is reset on error
     }
     // Don't set isLoadingAccountDeleting to false here if logout is happening
