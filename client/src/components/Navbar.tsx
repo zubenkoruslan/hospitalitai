@@ -34,11 +34,7 @@ const Navbar: React.FC<NavbarProps> = ({
   onAttemptBlockedNavigation,
   hidden = false,
 }) => {
-  // Return null if navbar should be hidden (e.g., during quiz taking)
-  if (hidden) {
-    return null;
-  }
-
+  // Move all hooks ABOVE the conditional return to fix Rules of Hooks violation
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     // Always start collapsed on desktop
@@ -61,6 +57,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navRef = useRef<HTMLElement>(null);
+
+  // ALL useEffect hooks MOVED ABOVE conditional return to comply with Rules of Hooks
 
   // Save pinned state to localStorage to persist across page navigation
   useEffect(() => {
@@ -110,6 +108,12 @@ const Navbar: React.FC<NavbarProps> = ({
       }
     };
   }, [isMobile, isCollapsed, isHovered, isPinned]);
+
+  // Return null if navbar should be hidden (e.g., during quiz taking)
+  // MOVED AFTER ALL hooks to comply with Rules of Hooks
+  if (hidden) {
+    return null;
+  }
 
   // Base navigation items with icons (exclude dashboard for admin users)
   const baseNavItems =
