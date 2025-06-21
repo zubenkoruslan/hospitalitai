@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import ProfileForm, { ProfileData } from "./ProfileForm";
 import PasswordForm from "./PasswordForm";
 import DeleteAccountCard from "./DeleteAccountCard";
-import { useNavigate } from "react-router-dom";
 
 // API service functions
 import {
@@ -22,14 +21,13 @@ import { PasswordChangeDataClient } from "../../services/api";
 const StaffSettings: React.FC = () => {
   // Removed props, will use AuthContext
   const { user, fetchUser, logout } = useAuth();
-  const navigate = useNavigate();
 
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
-  const [isAccountDeleting, setIsAccountDeleting] = useState(false);
+  const [, setIsAccountDeleting] = useState(false);
 
   const clearMessages = () => {
     setMessage(null);
