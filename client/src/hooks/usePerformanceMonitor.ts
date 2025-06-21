@@ -129,7 +129,7 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   // Track render performance
   const measureRender = useCallback(
-    <T>(operation: () => T, operationName?: string): T => {
+    <T>(operation: () => T, _operationName?: string): T => {
       renderCountRef.current += 1;
       return monitor.measureRender(componentName, operation);
     },
