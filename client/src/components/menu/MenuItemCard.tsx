@@ -9,14 +9,7 @@ import {
   BeakerIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
-import {
-  cardAnimations,
-  chevronAnimation,
-  buttonAnimation,
-  badgeAnimation,
-  priceAnimation,
-} from "../../utils/animations";
-import LazyImage from "../common/LazyImage";
+import { cardAnimations } from "../../utils/animations";
 import { usePerformanceMonitor } from "../../hooks/usePerformanceMonitor";
 import { MenuItem } from "../../types/menuItemTypes";
 
@@ -26,7 +19,7 @@ interface MenuItemCardProps {
   onToggleExpansion?: (itemId: string) => void;
   onEdit: (item: MenuItem) => void;
   onDelete: (item: MenuItem) => void;
-  variant?: "mobile" | "desktop";
+
   // Bulk selection props
   bulkMode?: boolean;
   isSelected?: boolean;
@@ -39,15 +32,13 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   onToggleExpansion,
   onEdit,
   onDelete,
-  variant = "desktop",
+
   bulkMode = false,
   isSelected = false,
   onToggleSelect,
 }) => {
-  const isMobile = variant === "mobile";
-
   // Performance monitoring for this component
-  const { measureRender } = usePerformanceMonitor("MenuItemCard");
+  usePerformanceMonitor("MenuItemCard");
 
   // Get item type icon and color
   const getItemTypeConfig = () => {
@@ -83,327 +74,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     }
   };
 
-  const { icon: ItemIcon, color, bgColor, borderColor } = getItemTypeConfig();
-
-  // Get category-specific colors for better visual distinction
-  const getCategoryConfig = (category: string) => {
-    const normalizedCategory = category.toLowerCase().trim();
-
-    // Color mapping for common menu categories
-    const categoryColors: Record<
-      string,
-      { color: string; bgColor: string; borderColor: string }
-    > = {
-      // Starters/Appetizers - Green shades
-      starters: {
-        color: "text-emerald-700",
-        bgColor: "bg-emerald-100",
-        borderColor: "border-emerald-200",
-      },
-      appetizers: {
-        color: "text-emerald-700",
-        bgColor: "bg-emerald-100",
-        borderColor: "border-emerald-200",
-      },
-      "small plates": {
-        color: "text-emerald-700",
-        bgColor: "bg-emerald-100",
-        borderColor: "border-emerald-200",
-      },
-
-      // Mains - Orange shades
-      mains: {
-        color: "text-orange-700",
-        bgColor: "bg-orange-100",
-        borderColor: "border-orange-200",
-      },
-      "main courses": {
-        color: "text-orange-700",
-        bgColor: "bg-orange-100",
-        borderColor: "border-orange-200",
-      },
-      entrees: {
-        color: "text-orange-700",
-        bgColor: "bg-orange-100",
-        borderColor: "border-orange-200",
-      },
-
-      // Sides - Yellow shades
-      sides: {
-        color: "text-yellow-700",
-        bgColor: "bg-yellow-100",
-        borderColor: "border-yellow-200",
-      },
-      "side dishes": {
-        color: "text-yellow-700",
-        bgColor: "bg-yellow-100",
-        borderColor: "border-yellow-200",
-      },
-
-      // Desserts - Pink shades
-      desserts: {
-        color: "text-pink-700",
-        bgColor: "bg-pink-100",
-        borderColor: "border-pink-200",
-      },
-      sweets: {
-        color: "text-pink-700",
-        bgColor: "bg-pink-100",
-        borderColor: "border-pink-200",
-      },
-
-      // Salads - Lime shades
-      salads: {
-        color: "text-lime-700",
-        bgColor: "bg-lime-100",
-        borderColor: "border-lime-200",
-      },
-
-      // Soups - Cyan shades
-      soups: {
-        color: "text-cyan-700",
-        bgColor: "bg-cyan-100",
-        borderColor: "border-cyan-200",
-      },
-
-      // Seafood - Teal shades
-      seafood: {
-        color: "text-teal-700",
-        bgColor: "bg-teal-100",
-        borderColor: "border-teal-200",
-      },
-      fish: {
-        color: "text-teal-700",
-        bgColor: "bg-teal-100",
-        borderColor: "border-teal-200",
-      },
-
-      // Meat - Red shades
-      meat: {
-        color: "text-red-700",
-        bgColor: "bg-red-100",
-        borderColor: "border-red-200",
-      },
-      steaks: {
-        color: "text-red-700",
-        bgColor: "bg-red-100",
-        borderColor: "border-red-200",
-      },
-      beef: {
-        color: "text-red-700",
-        bgColor: "bg-red-100",
-        borderColor: "border-red-200",
-      },
-
-      // Pasta - Indigo shades
-      pasta: {
-        color: "text-indigo-700",
-        bgColor: "bg-indigo-100",
-        borderColor: "border-indigo-200",
-      },
-      noodles: {
-        color: "text-indigo-700",
-        bgColor: "bg-indigo-100",
-        borderColor: "border-indigo-200",
-      },
-
-      // Wine categories - Purple shades (different from item type)
-      "red wines": {
-        color: "text-purple-700",
-        bgColor: "bg-purple-100",
-        borderColor: "border-purple-200",
-      },
-      "white wines": {
-        color: "text-violet-700",
-        bgColor: "bg-violet-100",
-        borderColor: "border-violet-200",
-      },
-      "rosé wines": {
-        color: "text-rose-700",
-        bgColor: "bg-rose-100",
-        borderColor: "border-rose-200",
-      },
-      "sparkling wines": {
-        color: "text-fuchsia-700",
-        bgColor: "bg-fuchsia-100",
-        borderColor: "border-fuchsia-200",
-      },
-      "dessert wines": {
-        color: "text-pink-700",
-        bgColor: "bg-pink-100",
-        borderColor: "border-pink-200",
-      },
-
-      // Beverages - Blue/Cyan variations
-      cocktails: {
-        color: "text-blue-700",
-        bgColor: "bg-blue-100",
-        borderColor: "border-blue-200",
-      },
-      spirits: {
-        color: "text-indigo-700",
-        bgColor: "bg-indigo-100",
-        borderColor: "border-indigo-200",
-      },
-      beer: {
-        color: "text-amber-700",
-        bgColor: "bg-amber-100",
-        borderColor: "border-amber-200",
-      },
-      "non-alcoholic": {
-        color: "text-green-700",
-        bgColor: "bg-green-100",
-        borderColor: "border-green-200",
-      },
-      coffee: {
-        color: "text-yellow-800",
-        bgColor: "bg-yellow-100",
-        borderColor: "border-yellow-200",
-      },
-      tea: {
-        color: "text-green-800",
-        bgColor: "bg-green-100",
-        borderColor: "border-green-200",
-      },
-      juice: {
-        color: "text-orange-700",
-        bgColor: "bg-orange-100",
-        borderColor: "border-orange-200",
-      },
-    };
-
-    // If we have a predefined category color, use it
-    if (categoryColors[normalizedCategory]) {
-      return categoryColors[normalizedCategory];
-    }
-
-    // Generate a consistent color from the category string
-    const generateColorFromString = (str: string) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-
-      // Ensure the hash is positive and normalize it
-      const normalizedHash = Math.abs(hash) / 2147483647; // 2^31 - 1
-
-      const colorPalettes = [
-        {
-          color: "text-slate-700",
-          bgColor: "bg-slate-100",
-          borderColor: "border-slate-200",
-        },
-        {
-          color: "text-zinc-700",
-          bgColor: "bg-zinc-100",
-          borderColor: "border-zinc-200",
-        },
-        {
-          color: "text-neutral-700",
-          bgColor: "bg-neutral-100",
-          borderColor: "border-neutral-200",
-        },
-        {
-          color: "text-stone-700",
-          bgColor: "bg-stone-100",
-          borderColor: "border-stone-200",
-        },
-        {
-          color: "text-orange-700",
-          bgColor: "bg-orange-100",
-          borderColor: "border-orange-200",
-        },
-        {
-          color: "text-blue-700",
-          bgColor: "bg-blue-100",
-          borderColor: "border-blue-200",
-        },
-        {
-          color: "text-green-700",
-          bgColor: "bg-green-100",
-          borderColor: "border-green-200",
-        },
-        {
-          color: "text-yellow-700",
-          bgColor: "bg-yellow-100",
-          borderColor: "border-yellow-200",
-        },
-        {
-          color: "text-purple-700",
-          bgColor: "bg-purple-100",
-          borderColor: "border-purple-200",
-        },
-        {
-          color: "text-pink-700",
-          bgColor: "bg-pink-100",
-          borderColor: "border-pink-200",
-        },
-        {
-          color: "text-indigo-700",
-          bgColor: "bg-indigo-100",
-          borderColor: "border-indigo-200",
-        },
-        {
-          color: "text-red-700",
-          bgColor: "bg-red-100",
-          borderColor: "border-red-200",
-        },
-        {
-          color: "text-teal-700",
-          bgColor: "bg-teal-100",
-          borderColor: "border-teal-200",
-        },
-        {
-          color: "text-cyan-700",
-          bgColor: "bg-cyan-100",
-          borderColor: "border-cyan-200",
-        },
-        {
-          color: "text-emerald-700",
-          bgColor: "bg-emerald-100",
-          borderColor: "border-emerald-200",
-        },
-        {
-          color: "text-lime-700",
-          bgColor: "bg-lime-100",
-          borderColor: "border-lime-200",
-        },
-        {
-          color: "text-sky-700",
-          bgColor: "bg-sky-100",
-          borderColor: "border-sky-200",
-        },
-        {
-          color: "text-rose-700",
-          bgColor: "bg-rose-100",
-          borderColor: "border-rose-200",
-        },
-        {
-          color: "text-amber-700",
-          bgColor: "bg-amber-100",
-          borderColor: "border-amber-200",
-        },
-        {
-          color: "text-fuchsia-700",
-          bgColor: "bg-fuchsia-100",
-          borderColor: "border-fuchsia-200",
-        },
-        {
-          color: "text-slate-700",
-          bgColor: "bg-slate-100",
-          borderColor: "border-slate-200",
-        },
-      ];
-
-      // Select color palette based on hash
-      const paletteIndex = Math.floor(normalizedHash * colorPalettes.length);
-      return colorPalettes[paletteIndex];
-    };
-
-    return generateColorFromString(normalizedCategory);
-  };
+  const { icon: ItemIcon, color, bgColor } = getItemTypeConfig();
 
   const handleCardClick = () => {
     if (onToggleExpansion) {
@@ -458,19 +129,6 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   };
 
   // Unified category badge rendering
-  const renderCategoryBadge = () => {
-    if (!item.category) return null;
-
-    const categoryConfig = getCategoryConfig(item.category);
-
-    return (
-      <span
-        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color} ${categoryConfig.borderColor} border`}
-      >
-        {item.category}
-      </span>
-    );
-  };
 
   // Enhanced wine color badge with support for new wine types
   const getWineColorBadge = (wineColor: string) => {

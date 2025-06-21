@@ -45,7 +45,7 @@ const AddManualQuestionForm: React.FC<AddManualQuestionFormProps> = ({
       ? initialBankCategories.join(", ")
       : ""
   );
-  const [explanation, setExplanation] = useState("");
+
   const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

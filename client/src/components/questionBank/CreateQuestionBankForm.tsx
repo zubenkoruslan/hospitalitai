@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
-  CreateQuestionBankData,
   // CreateQuestionBankFromMenuClientData, // Remove this import
   // MenuAiGenerationClientParams, // No longer needed
   // NewAiQuestionGenerationParams, // No longer needed
   // IQuestion, // No longer needed for review modal here
   CreateQuestionBankClientData,
-  IQuestionBank, // Added for onBankCreated details
 } from "../../types/questionBankTypes";
 import { IMenuClient } from "../../types/menuTypes";
 import { MenuItem } from "../../types/menuItemTypes"; // ADDED: Import MenuItem
@@ -14,7 +12,6 @@ import { ISopDocument, ISopCategory } from "../../types/sopTypes"; // Import ISo
 import {
   getMenusByRestaurant,
   getMenuWithItems,
-  createQuestionBankFromMenu,
   createQuestionBank as apiCreateQuestionBank,
   listSopDocumentsFiltered,
   getSopDocumentDetails,
@@ -546,15 +543,6 @@ const CreateQuestionBankForm: React.FC<CreateQuestionBankFormProps> = ({
       setAreAllSopCategoriesSelected(false);
     }
   }, [selectedSopCategories, sopCategories]);
-
-  const handleCategoryChange = (categoryName: string) => {
-    // For menu categories
-    setSelectedCategories((prev) =>
-      prev.includes(categoryName)
-        ? prev.filter((c) => c !== categoryName)
-        : [...prev, categoryName]
-    );
-  };
 
   // Updated to work with category IDs for toggling, but stores names
   const handleSopCategoryToggle = (

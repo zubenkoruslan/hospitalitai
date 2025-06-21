@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  IQuestion,
-  IOption,
-  IQuestionBank,
-} from "../../types/questionBankTypes";
+import { IQuestion, IOption } from "../../types/questionBankTypes";
 import Button from "../common/Button";
 import Modal from "../common/Modal"; // Assuming a generic Modal component exists
 import LoadingSpinner from "../common/LoadingSpinner"; // Added import for LoadingSpinner
