@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  colorTokens,
-  spacing,
-  typography,
-  borderRadius,
-} from "../../design-system";
+import { typography, borderRadius } from "../../design-system";
 
 interface CardProps {
   children: React.ReactNode;

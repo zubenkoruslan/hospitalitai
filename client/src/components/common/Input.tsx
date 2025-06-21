@@ -1,10 +1,5 @@
 import React, { forwardRef } from "react";
-import {
-  colorTokens,
-  spacing,
-  typography,
-  borderRadius,
-} from "../../design-system";
+import { spacing, typography, borderRadius } from "../../design-system";
 
 interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {

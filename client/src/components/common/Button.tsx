@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  colorTokens,
-  spacing,
-  touchTargets,
-  typography,
-} from "../../design-system";
+import { touchTargets, typography } from "../../design-system";
 
 type ButtonVariant =
   | "primary"

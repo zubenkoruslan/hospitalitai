@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import { CheckIcon, MinusIcon } from "@heroicons/react/24/outline";
-import { borderRadius, colorTokens, typography } from "../../design-system";
+import { borderRadius, typography } from "../../design-system";
 
 export interface CheckboxProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {

@@ -1,10 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import {
-  colorTokens,
-  spacing,
-  typography,
-  borderRadius,
-} from "../../design-system";
+import { typography, borderRadius } from "../../design-system";
 
 interface ModalProps {
   isOpen: boolean;
