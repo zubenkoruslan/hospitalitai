@@ -549,15 +549,25 @@ const QuizPerformanceSection: React.FC<{
           "Times Incorrect",
         ];
 
-        const csvRows = data.incorrectQuestions.map((q: IncorrectQuestion) => [
-          `"${q.quizTitle.replace(/"/g, '""')}"`,
-          `"${q.questionText.replace(/"/g, '""')}"`,
-          `"${q.userAnswer.replace(/"/g, '""')}"`,
-          `"${q.correctAnswer.replace(/"/g, '""')}"`,
-          `"${(q.explanation || "N/A").replace(/"/g, '""')}"`,
-          new Date(q.attemptDate).toLocaleDateString(),
-          q.timesIncorrect.toString(),
-        ]);
+        const csvRows = data.incorrectQuestions.map(
+          (q: {
+            questionText: string;
+            userAnswer: string;
+            correctAnswer: string;
+            explanation?: string;
+            quizTitle: string;
+            attemptDate: Date;
+            timesIncorrect: number;
+          }) => [
+            `"${q.quizTitle.replace(/"/g, '""')}"`,
+            `"${q.questionText.replace(/"/g, '""')}"`,
+            `"${q.userAnswer.replace(/"/g, '""')}"`,
+            `"${q.correctAnswer.replace(/"/g, '""')}"`,
+            `"${(q.explanation || "N/A").replace(/"/g, '""')}"`,
+            new Date(q.attemptDate).toLocaleDateString(),
+            q.timesIncorrect.toString(),
+          ]
+        );
 
         const csvContent = [
           csvHeaders.join(","),
@@ -952,7 +962,8 @@ const StaffDetails: React.FC = () => {
     useState<ClientQuizAttemptDetails | null>(null);
   const [, setLoadingModalDetails] = useState(false);
   const [, setModalError] = useState<string | null>(null);
-  const [, setSuccessMessage] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [, _setSuccessMessage] = useState<string | null>(null);
 
   // Handlers
   const handleOpenAttemptModal = useCallback(async (attemptId: string) => {
