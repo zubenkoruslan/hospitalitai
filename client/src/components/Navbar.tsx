@@ -201,18 +201,12 @@ const Navbar: React.FC<NavbarProps> = ({
         return;
       }
     }
-
-    if (isMobile) {
-      setIsCollapsed(true);
-    }
   };
 
   const handleLogout = () => {
     if (isBlockingNavigation && onAttemptBlockedNavigation) {
       const proceed = onAttemptBlockedNavigation();
-      if (!proceed) {
-        return;
-      }
+      if (!proceed) return;
     }
     logout();
   };
@@ -221,7 +215,6 @@ const Navbar: React.FC<NavbarProps> = ({
     if (isMobile) {
       setIsCollapsed(!isCollapsed);
     } else {
-      // On desktop, toggle the pinned state
       setIsPinned(!isPinned);
     }
   };
@@ -231,30 +224,36 @@ const Navbar: React.FC<NavbarProps> = ({
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
-
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsHovered(true);
-      }, 150);
+      setIsHovered(true);
     }
   };
 
   const handleMouseLeave = () => {
     if (!isMobile) {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-
-      setIsHovered(false);
+      hoverTimeoutRef.current = setTimeout(() => {
+        setIsHovered(false);
+      }, 100);
     }
   };
 
   // Determine if navbar should be expanded
   const isExpanded = isMobile ? !isCollapsed : isHovered || isPinned;
 
+  // Determine navbar visibility classes based on user role
+  const getNavbarVisibilityClass = () => {
+    if (user?.role === UserRole.Staff) {
+      // Staff users: Hidden on mobile (they have BottomNavigation), visible on desktop
+      return "hidden lg:block";
+    } else {
+      // Restaurant/Admin users: Visible on both mobile and desktop
+      return "block";
+    }
+  };
+
   return (
     <nav
       ref={navRef}
-      className={`hidden lg:block bg-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
+      className={`${getNavbarVisibilityClass()} bg-white shadow-xl border-r border-slate-200/50 fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-out ${
         isExpanded ? "w-64" : "w-16"
       }`}
       role="navigation"
@@ -447,36 +446,51 @@ const Navbar: React.FC<NavbarProps> = ({
               >
                 <div className="pr-3">
                   <p className="text-sm font-semibold text-dark-slate truncate">
-                    {user?.name || "User Name"}
+                    {user?.name || "User"}
                   </p>
-                  <p className="text-xs text-muted-gray truncate capitalize">
-                    {user?.role === "staff"
-                      ? user?.professionalRole || "Staff"
-                      : user?.role || "Role"}
+                  <p className="text-xs text-muted-gray truncate">
+                    {user?.role === UserRole.RestaurantOwner
+                      ? "Restaurant Owner"
+                      : user?.role === UserRole.Staff
+                      ? "Staff Member"
+                      : user?.role === UserRole.Admin
+                      ? "Platform Admin"
+                      : "User"}
                   </p>
                 </div>
               </div>
 
               {/* Screen reader text for collapsed state */}
-              {!isExpanded && <span className="sr-only">User Profile</span>}
+              {!isExpanded && (
+                <span className="sr-only">
+                  {user?.name || "User"} -{" "}
+                  {user?.role === UserRole.RestaurantOwner
+                    ? "Restaurant Owner"
+                    : user?.role === UserRole.Staff
+                    ? "Staff Member"
+                    : user?.role === UserRole.Admin
+                    ? "Platform Admin"
+                    : "User"}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Sign Out Button */}
           <button
             onClick={handleLogout}
-            className="group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-200 ease-out min-h-[44px] text-secondary hover:bg-secondary/10 hover:text-secondary-700 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 border border-transparent hover:border-secondary/20"
+            className="w-full group relative flex items-center rounded-lg text-sm font-medium transition-all duration-200 ease-out min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-1"
             aria-label="Sign out"
             title={!isExpanded ? "Sign out" : ""}
           >
-            {/* Icon - perfectly centered in collapsed state */}
+            {/* Sign Out Icon - aligned with navigation icons */}
             <div className="flex items-center justify-center w-12 h-full flex-shrink-0">
               <div className="w-6 h-6 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
                 <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
               </div>
             </div>
 
-            {/* Text label */}
+            {/* Sign Out Text - shows when expanded */}
             <div
               className={`overflow-hidden transition-all duration-200 ease-out ${
                 showContent ? "opacity-100 max-w-full" : "opacity-0 max-w-0"
@@ -493,46 +507,13 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Enhanced animation styles */}
-      <style>{`
-        /* Smooth hover effect for navbar */
-        nav:hover {
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
-        }
-
-        /* Enhanced focus indicators */
-        nav a:focus-visible,
-        nav button:focus-visible {
-          outline: 2px solid rgb(31 111 120 / 0.5);
-          outline-offset: 2px;
-        }
-
-        /* Better touch targets on mobile */
-        @media (max-width: 768px) {
-          nav a,
-          nav button {
-            min-height: 48px;
-          }
-        }
-
-        /* Reduced motion support */
-        @media (prefers-reduced-motion: reduce) {
-          nav,
-          nav *,
-          nav *::before,
-          nav *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-          }
-        }
-      `}</style>
-
-      {/* Quiz Type Selection Modal */}
-      <QuizTypeSelectionModal
-        isOpen={isQuizTypeModalOpen}
-        onClose={() => setIsQuizTypeModalOpen(false)}
-      />
+      {/* Quiz Type Selection Modal for Staff */}
+      {user?.role === UserRole.Staff && (
+        <QuizTypeSelectionModal
+          isOpen={isQuizTypeModalOpen}
+          onClose={() => setIsQuizTypeModalOpen(false)}
+        />
+      )}
     </nav>
   );
 };
