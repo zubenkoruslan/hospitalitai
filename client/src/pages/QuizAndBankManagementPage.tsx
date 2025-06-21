@@ -600,30 +600,7 @@ const QuizAndBankManagementPage: React.FC = () => {
     };
   }, [refetchBanks, handleUpdateQuizSnapshots, state.currentView]); // Removed refetchQuizzes to reduce calls
 
-  // Check if user exists and has restaurant access
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-                <h1 className="text-2xl font-bold text-slate-900 mb-4">
-                  Access Denied
-                </h1>
-                <p className="text-slate-600">
-                  You need to be logged in to access this page.
-                </p>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Helper functions
+  // Helper functions - MOVED ABOVE conditional return to fix React hooks violations
   const getQuestionBankNames = useCallback(
     (bankIds: string[]): string[] => {
       return bankIds
@@ -935,6 +912,29 @@ const QuizAndBankManagementPage: React.FC = () => {
       return { ...prev, expandedCards: newExpandedCards };
     });
   }, []);
+
+  // Check if user exists and has restaurant access - MOVED AFTER hooks to fix React hooks violations
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+                <h1 className="text-2xl font-bold text-slate-900 mb-4">
+                  Access Denied
+                </h1>
+                <p className="text-slate-600">
+                  You need to be logged in to access this page.
+                </p>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-slate-50 to-slate-100">
