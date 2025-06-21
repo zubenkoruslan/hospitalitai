@@ -1,7 +1,6 @@
 import React from "react";
 import {
   TrophyIcon,
-  StarIcon,
   CheckCircleIcon,
   InformationCircleIcon,
   ArrowRightIcon,
@@ -28,7 +27,6 @@ interface QuizResultsDisplayProps {
 const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
   score,
   totalQuestions,
-  quizTitle,
   completionTime,
   incorrectAnswers = [],
   onViewIncorrectAnswers,

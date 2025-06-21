@@ -3,7 +3,6 @@ import {
   CheckCircleIcon,
   LockClosedIcon,
   CalendarIcon,
-  StarIcon,
 } from "@heroicons/react/24/outline";
 import Card from "../common/Card";
 
