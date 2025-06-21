@@ -6,7 +6,6 @@ import {
   CakeIcon,
   BeakerIcon,
   SparklesIcon,
-  ChevronDownIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 

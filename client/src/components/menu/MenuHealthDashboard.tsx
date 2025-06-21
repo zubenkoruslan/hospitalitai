@@ -25,7 +25,6 @@ interface MenuHealthMetrics {
 
 interface MenuHealthDashboardProps {
   health: MenuHealthMetrics;
-  onViewDetails?: () => void;
 }
 
 interface ScoreBarProps {
@@ -82,7 +81,6 @@ const ScoreBar: React.FC<ScoreBarProps> = ({
 
 const MenuHealthDashboard: React.FC<MenuHealthDashboardProps> = ({
   health,
-  onViewDetails,
 }) => {
   const { overallScore, completeness, recommendations, warnings } = health;
   const [isExpanded, setIsExpanded] = useState(false);
