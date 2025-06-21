@@ -92,7 +92,7 @@ const NotificationSettings: React.FC = () => {
       // TODO: Implement API call to save notification preferences
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
       setMessage("Notification preferences saved successfully!");
-    } catch (err: any) {
+    } catch {
       setError("Failed to save notification preferences. Please try again.");
     } finally {
       setIsLoading(false);

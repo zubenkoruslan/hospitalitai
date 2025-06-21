@@ -6,7 +6,6 @@ import {
   MoonIcon,
   ComputerDesktopIcon,
   GlobeAltIcon,
-  EyeIcon,
   BellIcon,
   PaintBrushIcon,
 } from "@heroicons/react/24/outline";
@@ -25,7 +24,6 @@ interface UserPreferences {
 }
 
 const PreferencesSettings: React.FC = () => {
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +89,7 @@ const PreferencesSettings: React.FC = () => {
           document.documentElement.classList.remove("dark");
         }
       }
-    } catch (err: any) {
+    } catch {
       setError("Failed to save preferences. Please try again.");
     } finally {
       setIsLoading(false);

@@ -6,7 +6,6 @@ import {
   ShieldCheckIcon,
   KeyIcon,
   DevicePhoneMobileIcon,
-  ClockIcon,
   ComputerDesktopIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
@@ -29,7 +28,6 @@ interface LoginSession {
 }
 
 const SecuritySettings: React.FC = () => {
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -109,7 +107,7 @@ const SecuritySettings: React.FC = () => {
       // TODO: Implement API call to save security settings
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
       setMessage("Security settings saved successfully!");
-    } catch (err: any) {
+    } catch {
       setError("Failed to save security settings. Please try again.");
     } finally {
       setIsLoading(false);
@@ -121,7 +119,7 @@ const SecuritySettings: React.FC = () => {
       // TODO: Implement API call to terminate session
       console.log("Terminating session:", sessionId);
       setMessage("Session terminated successfully!");
-    } catch (err: any) {
+    } catch {
       setError("Failed to terminate session. Please try again.");
     }
   };

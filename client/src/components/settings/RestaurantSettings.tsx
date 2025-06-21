@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import ProfileForm, { ProfileData } from "./ProfileForm";
 import PasswordForm from "./PasswordForm";
 import DeleteAccountCard from "./DeleteAccountCard";
-import { useNavigate } from "react-router-dom";
 
 // API service functions
 import {
@@ -21,7 +20,6 @@ import { useAuth } from "../../context/AuthContext";
 
 const RestaurantSettings: React.FC = () => {
   const { user, fetchUser, logout } = useAuth();
-  const navigate = useNavigate();
 
   // General message state
   const [message, setMessage] = useState<string | null>(null);
@@ -30,7 +28,7 @@ const RestaurantSettings: React.FC = () => {
   // Loading states for different sections
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
-  const [isAccountDeleting, setIsAccountDeleting] = useState(false);
+  const [, setIsAccountDeleting] = useState(false);
 
   const clearMessages = () => {
     setMessage(null);
