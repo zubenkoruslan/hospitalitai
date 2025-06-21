@@ -551,8 +551,7 @@ describe("AddEditMenuItemModal", () => {
     );
 
     await userEvent.selectOptions(screen.getByLabelText(/Item Type/), "food");
-    const _categorySelect =
-      screen.getByLabelText<HTMLSelectElement>(/Category/);
+    // Category select is available for testing dropdown options
 
     for (const cat of initialAvailable) {
       expect(screen.getByRole("option", { name: cat })).toBeInTheDocument();
