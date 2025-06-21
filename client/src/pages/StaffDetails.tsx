@@ -974,9 +974,13 @@ const StaffDetails: React.FC = () => {
       } else {
         setModalError("Could not load attempt details.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching attempt details:", err);
-      setModalError(err.message || "Failed to load details for this attempt.");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to load details for this attempt.";
+      setModalError(errorMessage);
     } finally {
       setLoadingModalDetails(false);
       setIsModalOpen(true);

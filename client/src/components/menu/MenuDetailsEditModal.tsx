@@ -67,7 +67,6 @@ const MenuDetailsEditModal: React.FC<MenuDetailsEditModalProps> = ({
       tabIndex={0}
       aria-label="Close modal"
     >
-      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto my-8 max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-in-out animate-slide-up-fast"
         onClick={handleContentClick}
@@ -166,7 +165,6 @@ const MenuDetailsEditModal: React.FC<MenuDetailsEditModalProps> = ({
           </div>
         </form>
       </div>
-      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
     </div>
   );
 };
