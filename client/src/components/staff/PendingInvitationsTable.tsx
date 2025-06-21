@@ -9,7 +9,6 @@ import LoadingSpinner from "../common/LoadingSpinner";
 import ErrorMessage from "../common/ErrorMessage";
 import {
   ClockIcon,
-  XMarkIcon,
   EnvelopeIcon,
   CalendarDaysIcon,
   TrashIcon,

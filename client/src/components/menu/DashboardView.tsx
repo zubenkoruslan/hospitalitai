@@ -12,7 +12,6 @@ interface DashboardViewProps {
   onViewChange: (view: MenuView) => void;
   onAddItem: () => void;
   onImportMenu: () => void;
-  onExportMenu: () => void;
   // Add these new props
   menuId?: string;
   menuName?: string;
@@ -23,7 +22,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   onViewChange,
   onAddItem,
   onImportMenu,
-  onExportMenu,
   menuId,
   menuName,
 }) => {
@@ -42,23 +40,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     }, {} as Record<string, number>);
 
     // Price analytics - Handle both regular prices and wine serving options
-    const itemsWithPrices = items.filter((item) => {
-      // Regular price
-      if (item.price && item.price > 0) {
-        return true;
-      }
-      // Wine serving options
-      if (
-        item.itemType === "wine" &&
-        item.servingOptions &&
-        item.servingOptions.length > 0
-      ) {
-        return item.servingOptions.some(
-          (option) => option.price && option.price > 0
-        );
-      }
-      return false;
-    });
 
     // For average price calculation, collect all prices (including serving options)
     const allPrices: number[] = [];

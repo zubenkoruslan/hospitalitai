@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { MenuItem } from "../../types/menuItemTypes";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import MenuItemCard from "./MenuItemCard";
 import SmartSearchBar from "./SmartSearchBar";
 import SortDropdown, { SortOption } from "./SortDropdown";
@@ -31,7 +30,6 @@ interface ItemTypeViewProps {
   onSearchChange: (term: string) => void;
   onClearSearch: () => void;
   filters: FilterOptions;
-  onFiltersChange: (filters: FilterOptions) => void;
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
 
@@ -54,13 +52,10 @@ const ItemTypeView: React.FC<ItemTypeViewProps> = ({
   onSearchChange,
   onClearSearch,
   filters,
-  onFiltersChange,
   sortBy,
   onSortChange,
   onBulkDelete,
 }) => {
-  const isMobile = useIsMobile();
-
   // Bulk selection state
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());

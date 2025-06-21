@@ -4,10 +4,8 @@ import {
   ChevronUpIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  XMarkIcon,
-  CheckIcon,
 } from "@heroicons/react/24/outline";
-import { borderRadius, typography, spacing } from "../../design-system";
+import { borderRadius, typography } from "../../design-system";
 import Button from "./Button";
 import Input from "./Input";
 import Checkbox from "./Checkbox";
